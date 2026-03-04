@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MVP Portfolio Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f5f6f8;
+        color: #1f2937;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-size: 20px;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .add-card {
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+      form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        align-items: end;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 10px;
+      }
+      input {
+        height: 22px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0 6px;
+        font-size: 10px;
+      }
+      button {
+        height: 24px;
+        border: 0;
+        border-radius: 6px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 10px;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 12px;
+      }
+      .status.error {
+        color: #b91c1c;
+      }
+      .status.ok {
+        color: #065f46;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      .rating-cell {
+        min-width: 112px;
+      }
+      .sortable {
+        cursor: pointer;
+        white-space: normal;
+      }
+      .sort-arrow {
+        font-size: 12px;
+        margin-left: 6px;
+        white-space: nowrap;
+      }
+      .editable-input {
+        width: 56px;
+        height: 22px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 11px;
+        padding: 0 4px;
+        appearance: textfield;
+        -moz-appearance: textfield;
+      }
+      .editable-input::-webkit-outer-spin-button,
+      .editable-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      th.col-coupon,
+      td.col-coupon,
+      th.col-your-annual,
+      td.col-your-annual,
+      th.col-frequency,
+      td.col-frequency,
+      th.col-market,
+      td.col-market {
+        width: 90px;
+        min-width: 70px;
+        text-align: center;
+      }
+      th.col-qty,
+      td.col-qty,
+      th.col-purchase,
+      td.col-purchase {
+        width: 70px;
+        min-width: 70px;
+        max-width: 70px;
+      }
+      .rating-track {
+        position: relative;
+        width: 100%;
+        height: 12px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        overflow: hidden;
+      }
+      .rating-fill {
+        height: 100%;
+        border-radius: 999px;
+      }
+      .rating-label {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 8px;
+        font-weight: 700;
+        color: #111827;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+        pointer-events: none;
+      }
+      .danger-btn {
+        background: #b91c1c;
+      }
+      .danger-btn.small {
+        height: 16px;
+        padding: 0 5px;
+        font-size: 8px;
+        background: #fecaca;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+        border-radius: 4px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #e5e7eb;
+        padding: 4px 6px;
+        text-align: center;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+      th {
+        background: #f9fafb;
+      }
+      .profit-positive {
+        background: #dcfce7;
+      }
+      .profit-negative {
+        background: #fee2e2;
+      }
+      .summary-row td {
+        background: #f3f4f6;
+        font-weight: 700;
+      }
+      @media (max-width: 900px) {
+        form {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Портфель — MVP дашборд</h1>
+
+      <section class="card add-card">
+        <form id="add-form">
+          <label>
+            Тикер / название
+            <input id="ticker" name="ticker" required />
+          </label>
+          <label>
+            Количество
+            <input id="quantity" name="quantity" type="number" step="0.01" min="0.01" required style="appearance: textfield; -moz-appearance: textfield;" />
+          </label>
+          <label>
+            Цена покупки
+            <input id="purchase_price" name="purchase_price" type="number" step="0.01" min="0.01" required style="appearance: textfield; -moz-appearance: textfield;" />
+          </label>
+          <button id="submit-btn" type="submit">Добавить бумагу</button>
+        </form>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-sort-key="id">№</th>
+              <th class="sortable" data-sort-key="name">Название</th>
+              <th class="sortable" data-sort-key="company_rating">Рейтинг</th>
+              <th class="sortable" data-sort-key="current_price">Текущ. цена</th>
+              <th class="sortable col-qty" data-sort-key="quantity">Кол-во</th>
+              <th class="sortable col-purchase" data-sort-key="purchase_price">Цена покупки</th>
+              <th class="sortable" data-sort-key="current_value">Тек. стоимость</th>
+              <th class="sortable" data-sort-key="profit">Прибыль</th>
+              <th class="sortable" data-sort-key="weight">Доля</th>
+              <th class="sortable col-coupon" data-sort-key="coupon">Купон</th>
+              <th class="sortable col-your-annual" data-sort-key="your_annual_coupon">Ваш годовой купон</th>
+              <th class="sortable col-frequency" data-sort-key="coupon_frequency">Частота (в год)</th>
+              <th class="sortable col-market" data-sort-key="market_yield">Рын. доходность</th>
+              <th class="sortable" data-sort-key="maturity_date">Дата погашения</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <script>
+      const form = document.getElementById("add-form");
+      const statusEl = document.getElementById("status");
+      const tableBody = document.getElementById("table-body");
+      const submitBtn = document.getElementById("submit-btn");
+      const sortableHeaders = Array.from(
+        document.querySelectorAll("th.sortable")
+      );
+
+      // Preserve original header labels and render with optional line-break
+      for (const header of sortableHeaders) {
+        header.dataset.origLabel = header.textContent.trim();
+      }
+
+      function renderHeaderLabel(header) {
+        const label = (header.dataset.origLabel || '').trim();
+        const arrow = header.dataset.arrow || '';
+        const arrowHtml = arrow ? `<span class="sort-arrow">${arrow}</span>` : '';
+        const parts = label.split(/\s+/);
+        if (parts.length === 2) {
+          header.innerHTML = `${parts[0]}<br>${parts[1]} ${arrowHtml}`;
+        } else {
+          header.innerHTML = `${label} ${arrowHtml}`;
+        }
+      }
+
+      const TABLE_CACHE_KEY = "mvp_portfolio_table_cache_v1";
+      const TABLE_CACHE_TS_KEY = "mvp_portfolio_table_cache_ts_v1";
+      const SYNC_INTERVAL_MS = 120 * 1000;
+
+      let tableRows = [];
+      let sortState = {
+        key: null,
+        direction: "asc",
+      };
+
+      function roundTo2(value) {
+        return Math.round(value * 100) / 100;
+      }
+
+      function persistTableCache() {
+        localStorage.setItem(TABLE_CACHE_KEY, JSON.stringify(tableRows));
+        localStorage.setItem(TABLE_CACHE_TS_KEY, String(Date.now()));
+      }
+
+      function loadTableCache() {
+        try {
+          const raw = localStorage.getItem(TABLE_CACHE_KEY);
+          if (!raw) {
+            return false;
+          }
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) {
+            return false;
+          }
+          tableRows = parsed;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      function getLastSyncTimestamp() {
+        const raw = localStorage.getItem(TABLE_CACHE_TS_KEY);
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+
+      function recalculateWeights(rows) {
+        const totalValue = rows.reduce(
+          (sum, row) => sum + Number(row.current_value || 0),
+          0
+        );
+        for (const row of rows) {
+          const weight =
+            totalValue > 0
+              ? roundTo2((Number(row.current_value || 0) / totalValue) * 100)
+              : 0;
+          row.weight = weight;
+        }
+      }
+
+      function recalculateRow(row, quantity, purchasePrice) {
+        const currentPrice = Number(row.current_price || 0);
+        row.quantity = quantity;
+        row.purchase_price = purchasePrice;
+        row.current_value = roundTo2(currentPrice * quantity);
+        row.profit = roundTo2((currentPrice - purchasePrice) * quantity);
+      }
+
+      function fmt(value) {
+        if (value === null || value === undefined) return "—";
+        if (typeof value === "number") {
+          return value.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+        }
+        return String(value);
+      }
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.className = isError ? "status error" : "status ok";
+      }
+
+      function buildBondLink(ticker) {
+        return `https://smart-lab.ru/q/bonds/${encodeURIComponent(ticker)}/`;
+      }
+
+      function parseRating(rawRating) {
+        if (!rawRating) return null;
+        const text = String(rawRating).toUpperCase();
+        const match = text.match(
+          /\b(?:RU)?(AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|CCC|CC|C|D)\b/
+        );
+        if (!match) return null;
+        return match[1];
+      }
+
+      function ratingToScore(normalizedRating) {
+        if (!normalizedRating) return null;
+
+        const baseScores = {
+          AAA: 100,
+          AA: 85,
+          A: 70,
+          BBB: 55,
+          BB: 35,
+          B: 25,
+          CCC: 12,
+          CC: 8,
+          C: 4,
+          D: 0,
+        };
+
+        const baseKey = normalizedRating.replace(/[+-]/g, "");
+        const base = baseScores[baseKey];
+        if (base === undefined) return null;
+
+        let modifier = 0;
+        if (normalizedRating.endsWith("+")) modifier = 4;
+        if (normalizedRating.endsWith("-")) modifier = -4;
+        return Math.max(0, Math.min(100, base + modifier));
+      }
+
+      function createRatingCell(rawRating) {
+        const td = document.createElement("td");
+        td.className = "rating-cell";
+
+        const normalizedRating = parseRating(rawRating);
+        const score = ratingToScore(normalizedRating);
+        if (score === null) {
+          td.textContent = fmt(rawRating);
+          return td;
+        }
+
+        const track = document.createElement("div");
+        track.className = "rating-track";
+
+        const fill = document.createElement("div");
+        fill.className = "rating-fill";
+        fill.style.width = `${score}%`;
+        fill.style.backgroundColor = `hsl(${Math.round(score * 1.2)} 75% 45%)`;
+        track.appendChild(fill);
+
+        const label = document.createElement("span");
+        label.className = "rating-label";
+        label.textContent = String(rawRating);
+
+        track.appendChild(label);
+        td.appendChild(track);
+        return td;
+      }
+
+      function compareValues(left, right) {
+        const leftNumber = Number(left);
+        const rightNumber = Number(right);
+        const bothNumbers =
+          Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
+        if (bothNumbers) {
+          return leftNumber - rightNumber;
+        }
+
+        const leftText = String(left ?? "").toLowerCase();
+        const rightText = String(right ?? "").toLowerCase();
+        if (leftText < rightText) return -1;
+        if (leftText > rightText) return 1;
+        return 0;
+      }
+
+      function getSortValue(row, key) {
+        if (key === "company_rating") {
+          const normalizedRating = parseRating(row.company_rating);
+          const score = ratingToScore(normalizedRating);
+          return score === null ? -1 : score;
+        }
+        return row[key] ?? "";
+      }
+
+      function getSortedRows(rows) {
+        if (!sortState.key) {
+          return rows;
+        }
+
+        const sorted = [...rows].sort((left, right) => {
+          const result = compareValues(
+            getSortValue(left, sortState.key),
+            getSortValue(right, sortState.key)
+          );
+          return sortState.direction === "asc" ? result : -result;
+        });
+        return sorted;
+      }
+
+      function calculateSummary(rows) {
+        const totalAssets = rows.reduce(
+          (sum, row) => sum + Number(row.current_value || 0),
+          0
+        );
+        const totalProfit = rows.reduce(
+          (sum, row) => sum + Number(row.profit || 0),
+          0
+        );
+
+        const annualIncomeRub = rows.reduce((sum, row) => {
+          if (row.type !== "bond") return sum;
+          const coupon = Number(row.coupon || 0);
+          const quantity = Number(row.quantity || 0);
+          if (coupon > 0 && quantity > 0) {
+            const period = Number(row.coupon_period || 0);
+            // Расчет количества выплат в год на основе периода в днях
+            // Округляем до ближайшего целого для стандартных частот (1, 2, 4, 12)
+            const paymentsPerYearRaw = period > 0 ? 365 / period : 2;
+            // Округляем до ближайшего стандартного значения
+            const paymentsPerYear = Math.round(paymentsPerYearRaw);
+            return sum + coupon * paymentsPerYear * quantity;
+          }
+          return sum;
+        }, 0);
+
+        const annualYieldFromAssets =
+          totalAssets > 0
+            ? (annualIncomeRub / totalAssets) * 100
+            : 0;
+
+        return {
+          totalAssets,
+          totalProfit,
+          annualIncomeRub,
+          annualYieldFromAssets,
+        };
+      }
+
+      function renderTable() {
+        const rows = getSortedRows(tableRows);
+        tableBody.innerHTML = "";
+
+        for (let idx = 0; idx < rows.length; idx += 1) {
+          const row = rows[idx];
+          const tr = document.createElement("tr");
+
+          const addCell = (value) => {
+            const td = document.createElement("td");
+            td.textContent = value;
+            tr.appendChild(td);
+          };
+
+          addCell(String(idx + 1));
+
+          const nameTd = document.createElement("td");
+          const link = document.createElement("a");
+          link.href = buildBondLink(row.ticker);
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = fmt(row.name);
+          nameTd.appendChild(link);
+          tr.appendChild(nameTd);
+
+          tr.appendChild(createRatingCell(row.company_rating));
+          addCell(fmt(row.current_price));
+          tr.appendChild(
+            createEditableCell(row, "quantity", {
+              min: 0.01,
+              step: 0.01,
+              cellClass: "col-qty",
+            })
+          );
+          tr.appendChild(
+            createEditableCell(row, "purchase_price", {
+              min: 0.01,
+              step: 0.01,
+              cellClass: "col-purchase",
+            })
+          );
+          addCell(fmt(row.current_value));
+
+          const profitTd = document.createElement("td");
+          profitTd.textContent = fmt(row.profit);
+          if (Number(row.profit) > 0) {
+            profitTd.classList.add("profit-positive");
+          } else if (Number(row.profit) < 0) {
+            profitTd.classList.add("profit-negative");
+          }
+          tr.appendChild(profitTd);
+
+          addCell(`${fmt(row.weight)}%`);
+          const couponTd = createCouponCell(row);
+          couponTd.classList.add("col-coupon");
+          tr.appendChild(couponTd);
+
+          if (row.type === "bond") {
+            const couponNum = Number(row.coupon || 0);
+            const qty = Number(row.quantity || 0);
+            const yourCoupon = couponNum * qty;
+            const period = Number(row.coupon_period || 0);
+            // Расчет количества выплат в год на основе периода в днях
+            const paymentsPerYearRaw = period > 0 ? 365 / period : 2;
+            const paymentsPerYear = Math.round(paymentsPerYearRaw);
+            const yourAnnualCoupon = yourCoupon * paymentsPerYear;
+
+            const yourTd = document.createElement("td");
+            yourTd.className = "col-your-annual";
+            yourTd.textContent = fmt(roundTo2(yourAnnualCoupon));
+            tr.appendChild(yourTd);
+
+            const freqTd = document.createElement("td");
+            freqTd.className = "col-frequency";
+            freqTd.textContent = String(paymentsPerYear);
+            tr.appendChild(freqTd);
+
+            const marketTd = document.createElement("td");
+            marketTd.className = "col-market";
+            marketTd.textContent = fmt(row.market_yield);
+            tr.appendChild(marketTd);
+          } else {
+            const yourTd = document.createElement("td");
+            yourTd.className = "col-your-annual";
+            yourTd.textContent = "—";
+            tr.appendChild(yourTd);
+
+            const freqTd = document.createElement("td");
+            freqTd.className = "col-frequency";
+            freqTd.textContent = "—";
+            tr.appendChild(freqTd);
+
+            const marketTd = document.createElement("td");
+            marketTd.className = "col-market";
+            marketTd.textContent = "—";
+            tr.appendChild(marketTd);
+          }
+
+          addCell(row.type === "bond" ? fmt(row.maturity_date) : "—");
+
+          const actionTd = document.createElement("td");
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "danger-btn small";
+          deleteBtn.textContent = "Х";
+          deleteBtn.addEventListener("click", async () => {
+            const confirmed = window.confirm(
+              "Удалить эту строку из портфеля?"
+            );
+            if (!confirmed) {
+              return;
+            }
+
+            try {
+              const response = await fetch(
+                `/portfolio/instruments/${row.id}`,
+                { method: "DELETE" }
+              );
+              const body = await response.json();
+              if (!response.ok) {
+                throw new Error(body.detail || "Не удалось удалить строку.");
+              }
+
+              tableRows = tableRows.filter((item) => item.id !== row.id);
+              recalculateWeights(tableRows);
+              persistTableCache();
+              renderTable();
+              setStatus("Строка удалена.");
+            } catch (error) {
+              setStatus(error.message || "Ошибка удаления строки.", true);
+            }
+          });
+          actionTd.appendChild(deleteBtn);
+          tr.appendChild(actionTd);
+
+          tableBody.appendChild(tr);
+        }
+
+        const summary = calculateSummary(rows);
+
+        const spacerRow = document.createElement("tr");
+        const spacerCell = document.createElement("td");
+        spacerCell.colSpan = 16;
+        spacerCell.innerHTML = "&nbsp;";
+        spacerRow.appendChild(spacerCell);
+        tableBody.appendChild(spacerRow);
+
+        const summaryRow = document.createElement("tr");
+        summaryRow.className = "summary-row";
+
+        const summaryLabel = document.createElement("td");
+        summaryLabel.colSpan = 6;
+        summaryLabel.textContent = "Итого";
+        summaryRow.appendChild(summaryLabel);
+
+        const totalAssetsTd = document.createElement("td");
+        totalAssetsTd.textContent = fmt(roundTo2(summary.totalAssets));
+        summaryRow.appendChild(totalAssetsTd);
+
+        const totalProfitTd = document.createElement("td");
+        totalProfitTd.textContent = fmt(roundTo2(summary.totalProfit));
+        if (summary.totalProfit > 0) {
+          totalProfitTd.classList.add("profit-positive");
+        } else if (summary.totalProfit < 0) {
+          totalProfitTd.classList.add("profit-negative");
+        }
+        summaryRow.appendChild(totalProfitTd);
+
+        const annualIncomeTd = document.createElement("td");
+        annualIncomeTd.colSpan = 2;
+        annualIncomeTd.textContent = `Доход за год: ${fmt(roundTo2(summary.annualIncomeRub))}`;
+        summaryRow.appendChild(annualIncomeTd);
+
+        const annualYieldTd = document.createElement("td");
+        annualYieldTd.colSpan = 2;
+        annualYieldTd.textContent = `Годовая доходность: ${fmt(roundTo2(summary.annualYieldFromAssets))}%`;
+        summaryRow.appendChild(annualYieldTd);
+
+        const spacerTd = document.createElement("td");
+        spacerTd.colSpan = 4;
+        spacerTd.textContent = "";
+        summaryRow.appendChild(spacerTd);
+
+        tableBody.appendChild(summaryRow);
+      }
+
+      async function syncTableFromServer() {
+        const response = await fetch(`/portfolio/table?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить таблицу портфеля.");
+        }
+        const payload = await response.json();
+        tableRows = payload.items || [];
+        persistTableCache();
+        renderTable();
+      }
+
+      async function saveEditableRow(rowId, quantity, purchasePrice) {
+        const response = await fetch(`/portfolio/instruments/${rowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quantity,
+            purchase_price: purchasePrice,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Не удалось обновить строку.");
+        }
+      }
+
+      async function saveCouponRow(rowId, coupon) {
+        const response = await fetch(`/portfolio/instruments/${rowId}/coupon`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coupon }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Не удалось обновить купон.");
+        }
+        return payload;
+      }
+
+      function createCouponCell(row) {
+        if (row.type !== "bond") {
+          const td = document.createElement("td");
+          td.textContent = "—";
+          td.classList.add("col-coupon");
+          return td;
+        }
+
+        const couponValue = Number(row.coupon);
+        const isEditableCoupon =
+          row.manual_coupon_set === true
+          || (Number.isFinite(couponValue) && couponValue <= 0);
+
+        if (!isEditableCoupon) {
+          const td = document.createElement("td");
+          td.textContent = fmt(row.coupon);
+          td.classList.add("col-coupon");
+          return td;
+        }
+
+        const td = document.createElement("td");
+        td.classList.add("col-coupon");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.className = "editable-input";
+        input.min = "0";
+        input.step = "0.01";
+        input.value = Number.isFinite(couponValue)
+          ? String(couponValue)
+          : "0";
+
+        const commit = async () => {
+          const originalCoupon = Number.isFinite(Number(row.coupon))
+            ? Number(row.coupon)
+            : 0;
+          const parsedCoupon = Number(input.value);
+
+          if (!Number.isFinite(parsedCoupon) || parsedCoupon < 0) {
+            setStatus("Введите корректный купон (0 или больше).", true);
+            input.value = String(originalCoupon);
+            return;
+          }
+
+          try {
+            row.coupon = parsedCoupon;
+            row.manual_coupon_set = true;
+            persistTableCache();
+            renderTable();
+
+            const updated = await saveCouponRow(row.id, parsedCoupon);
+            row.coupon = Number(updated.coupon);
+            row.manual_coupon_set =
+              updated.manual_coupon_set === true;
+            persistTableCache();
+            renderTable();
+            setStatus("Купон установлен.");
+          } catch (error) {
+            row.coupon = originalCoupon;
+            persistTableCache();
+            renderTable();
+            setStatus(error.message || "Ошибка обновления купона.", true);
+            input.value = String(originalCoupon);
+          }
+        };
+
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            input.blur();
+          }
+        });
+        input.addEventListener(
+          "wheel",
+          (event) => {
+            event.preventDefault();
+          },
+          { passive: false }
+        );
+
+        td.appendChild(input);
+        return td;
+      }
+
+      function createEditableCell(
+        row,
+        field,
+        options = { min: 0.01, step: 0.01, cellClass: "" }
+      ) {
+        const td = document.createElement("td");
+        if (options.cellClass) {
+          td.className = options.cellClass;
+        }
+        const input = document.createElement("input");
+        input.type = "number";
+        input.className = "editable-input";
+        input.min = String(options.min);
+        input.step = String(options.step);
+        input.value = String(row[field]);
+
+        const commit = async () => {
+          const originalQuantity = Number(row.quantity);
+          const originalPurchasePrice = Number(row.purchase_price);
+
+          const parsedQuantity = Number(
+            field === "quantity" ? input.value : row.quantity
+          );
+          const parsedPurchasePrice = Number(
+            field === "purchase_price"
+              ? input.value
+              : row.purchase_price
+          );
+
+          if (
+            !Number.isFinite(parsedQuantity)
+            || !Number.isFinite(parsedPurchasePrice)
+            || parsedQuantity <= 0
+            || parsedPurchasePrice <= 0
+          ) {
+            setStatus("Введите корректные положительные значения.", true);
+            input.value = String(row[field]);
+            return;
+          }
+
+          try {
+            recalculateRow(row, parsedQuantity, parsedPurchasePrice);
+            recalculateWeights(tableRows);
+            persistTableCache();
+            renderTable();
+
+            await saveEditableRow(row.id, parsedQuantity, parsedPurchasePrice);
+            setStatus("Строка обновлена.");
+          } catch (error) {
+            // rollback on backend error
+            recalculateRow(row, originalQuantity, originalPurchasePrice);
+            recalculateWeights(tableRows);
+            persistTableCache();
+            renderTable();
+            setStatus(error.message || "Ошибка обновления строки.", true);
+            input.value = String(row[field]);
+          }
+        };
+
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            input.blur();
+          }
+        });
+        input.addEventListener(
+          "wheel",
+          (event) => {
+            event.preventDefault();
+          },
+          { passive: false }
+        );
+
+        td.appendChild(input);
+        return td;
+      }
+
+      function updateHeaderSortIndicators() {
+        for (const header of sortableHeaders) {
+          const key = header.dataset.sortKey;
+          header.dataset.arrow = key === sortState.key ? (sortState.direction === 'asc' ? '↑' : '↓') : '';
+          renderHeaderLabel(header);
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus("Проверка данных...");
+        submitBtn.disabled = true;
+
+        const payload = {
+          ticker: form.ticker.value.trim(),
+          quantity: Number(form.quantity.value),
+          purchase_price: Number(form.purchase_price.value),
+        };
+
+        try {
+          const validateResponse = await fetch("/portfolio/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_input: payload }),
+          });
+
+          const validation = await validateResponse.json();
+          if (!validateResponse.ok) {
+            throw new Error("Ошибка валидации запроса.");
+          }
+
+          if (!validation.validated) {
+            const warnings = (validation.warnings || []).join(" ");
+            setStatus(`Проверка не пройдена: ${warnings}`, true);
+            submitBtn.disabled = false;
+            return;
+          }
+
+          const instrumentTypeLabel =
+            validation.instrument_type === "bond"
+              ? "облигация"
+              : validation.instrument_type === "stock"
+                ? "акция"
+                : validation.instrument_type;
+
+          setStatus(`Тип инструмента: ${instrumentTypeLabel}. Добавление...`);
+
+          const addResponse = await fetch("/portfolio/instruments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const addResult = await addResponse.json();
+          if (!addResponse.ok) {
+            throw new Error(addResult.detail || "Не удалось добавить бумагу.");
+          }
+
+          await syncTableFromServer();
+          setStatus("Бумага добавлена.");
+          form.reset();
+        } catch (error) {
+          setStatus(error.message || "Ошибка запроса.", true);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      for (const header of sortableHeaders) {
+        header.addEventListener("click", () => {
+          const key = header.dataset.sortKey;
+          if (!key) {
+            return;
+          }
+
+          if (sortState.key === key) {
+            sortState.direction =
+              sortState.direction === "asc" ? "desc" : "asc";
+          } else {
+            sortState.key = key;
+            sortState.direction = "asc";
+          }
+
+          updateHeaderSortIndicators();
+          renderTable();
+        });
+      }
+
+      if (loadTableCache()) {
+        renderTable();
+      }
+
+      syncTableFromServer().catch((error) => {
+        const isCacheFresh =
+          Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
+        if (!isCacheFresh || tableRows.length === 0) {
+          setStatus(error.message || "Ошибка загрузки таблицы.", true);
+        }
+      });
+
+      setInterval(() => {
+        syncTableFromServer().catch(() => {
+          // silent background refresh failure
+        });
+      }, SYNC_INTERVAL_MS);
+    </script>
+  </body>
+</html>
