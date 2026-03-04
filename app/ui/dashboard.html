@@ -573,11 +573,12 @@
             yourTd.textContent = fmt(roundTo2(yourAnnualCoupon));
             tr.appendChild(yourTd);
 
-            // Купонная доходность = (Годовой купон / Стоимость покупки) × 100%
+            // Купонная доходность = (Купон × Частота выплат / 1000) × 100%
+            // Номинал облигации обычно 1000 рублей
             const couponYieldTd = document.createElement("td");
             couponYieldTd.className = "col-coupon-yield";
-            const purchaseValue = couponNum * qty; // Стоимость покупки купонов
-            const couponYield = purchaseValue > 0 ? (yourAnnualCoupon / purchaseValue) * 100 : 0;
+            const nominal = 1000;
+            const couponYield = (couponNum * paymentsPerYear / nominal) * 100;
             couponYieldTd.textContent = fmt(roundTo2(couponYield)) + "%";
             tr.appendChild(couponYieldTd);
 
