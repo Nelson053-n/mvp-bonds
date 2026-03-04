@@ -112,6 +112,8 @@
       td.col-coupon,
       th.col-your-annual,
       td.col-your-annual,
+      th.col-coupon-yield,
+      td.col-coupon-yield,
       th.col-frequency,
       td.col-frequency,
       th.col-market,
@@ -236,6 +238,7 @@
               <th class="sortable" data-sort-key="weight">Доля</th>
               <th class="sortable col-coupon" data-sort-key="coupon">Купон</th>
               <th class="sortable col-your-annual" data-sort-key="your_annual_coupon">Ваш годовой купон</th>
+              <th class="sortable col-coupon-yield" data-sort-key="coupon_yield">Купонная доходн.</th>
               <th class="sortable col-frequency" data-sort-key="coupon_frequency">Частота (в год)</th>
               <th class="sortable col-market" data-sort-key="market_yield">Рын. доходность</th>
               <th class="sortable" data-sort-key="maturity_date">Дата погашения</th>
@@ -570,6 +573,14 @@
             yourTd.textContent = fmt(roundTo2(yourAnnualCoupon));
             tr.appendChild(yourTd);
 
+            // Купонная доходность = (Годовой купон / Стоимость покупки) × 100%
+            const couponYieldTd = document.createElement("td");
+            couponYieldTd.className = "col-coupon-yield";
+            const purchaseValue = couponNum * qty; // Стоимость покупки купонов
+            const couponYield = purchaseValue > 0 ? (yourAnnualCoupon / purchaseValue) * 100 : 0;
+            couponYieldTd.textContent = fmt(roundTo2(couponYield)) + "%";
+            tr.appendChild(couponYieldTd);
+
             const freqTd = document.createElement("td");
             freqTd.className = "col-frequency";
             freqTd.textContent = String(paymentsPerYear);
@@ -584,6 +595,11 @@
             yourTd.className = "col-your-annual";
             yourTd.textContent = "—";
             tr.appendChild(yourTd);
+
+            const couponYieldTd = document.createElement("td");
+            couponYieldTd.className = "col-coupon-yield";
+            couponYieldTd.textContent = "—";
+            tr.appendChild(couponYieldTd);
 
             const freqTd = document.createElement("td");
             freqTd.className = "col-frequency";
@@ -677,7 +693,7 @@
         summaryRow.appendChild(annualYieldTd);
 
         const spacerTd = document.createElement("td");
-        spacerTd.colSpan = 4;
+        spacerTd.colSpan = 5;  // Было 4, стало 5 (добавлена колонка купонной доходности)
         spacerTd.textContent = "";
         summaryRow.appendChild(spacerTd);
 
