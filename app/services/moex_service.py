@@ -72,6 +72,7 @@ class MOEXService:
         nominal = sec_row.get("FACEVALUE")
         coupon = sec_row.get("COUPONVALUE")
         coupon_period = sec_row.get("COUPONPERIOD")
+        coupon_rate = sec_row.get("COUPONPERCENT")  # Ставка купона в %
         maturity_date = self._parse_date(sec_row.get("MATDATE"))
         aci = md_row.get("ACCINT")
         market_yield = md_row.get("YIELD")
@@ -88,6 +89,11 @@ class MOEXService:
             coupon_period=(
                 int(coupon_period)
                 if coupon_period is not None
+                else None
+            ),
+            coupon_rate=(
+                float(coupon_rate)
+                if coupon_rate is not None
                 else None
             ),
             maturity_date=maturity_date,
