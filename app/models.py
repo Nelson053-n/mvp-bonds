@@ -42,6 +42,7 @@ class InstrumentMetrics(BaseModel):
     company_rating: str | None = None
     coupon: float | None = None
     coupon_period: int | None = None
+    coupon_rate: float | None = None  # Ставка купона в % от номинала
     manual_coupon_set: bool = False
     maturity_date: date | None = None
     aci: float | None = None
@@ -65,6 +66,7 @@ class BondSnapshot(BaseModel):
     nominal: float | None = None
     coupon: float | None = None
     coupon_period: int | None = None
+    coupon_rate: float | None = None  # Ставка купона в % от номинала
     maturity_date: date | None = None
     aci: float | None = None
     market_yield: float | None = None

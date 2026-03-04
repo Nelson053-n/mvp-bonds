@@ -574,11 +574,18 @@
             tr.appendChild(yourTd);
 
             // Купонная доходность = (Купон × Частота выплат / 1000) × 100%
-            // Номинал облигации обычно 1000 рублей
+            // Если есть coupon_rate из MOEX, используем его
             const couponYieldTd = document.createElement("td");
             couponYieldTd.className = "col-coupon-yield";
-            const nominal = 1000;
-            const couponYield = (couponNum * paymentsPerYear / nominal) * 100;
+            let couponYield;
+            if (row.coupon_rate != null && row.coupon_rate > 0) {
+              // Используем ставку купона из MOEX
+              couponYield = Number(row.coupon_rate);
+            } else {
+              // Расчет по старой формуле
+              const nominal = 1000;
+              couponYield = (couponNum * paymentsPerYear / nominal) * 100;
+            }
             couponYieldTd.textContent = fmt(roundTo2(couponYield)) + "%";
             tr.appendChild(couponYieldTd);
 

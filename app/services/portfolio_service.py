@@ -231,6 +231,7 @@ class PortfolioService:
                                 else snapshot.coupon
                             ),
                             coupon_period=snapshot.coupon_period,
+                            coupon_rate=snapshot.coupon_rate,
                             manual_coupon_set=item.manual_coupon is not None,
                             maturity_date=snapshot.maturity_date,
                             aci=snapshot.aci,
