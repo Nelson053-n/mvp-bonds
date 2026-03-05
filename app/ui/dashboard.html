@@ -1516,57 +1516,70 @@
           document.body.insertBefore(div, document.body.firstChild);
           loginHtml = div;
 
-          document.getElementById('btn-login').onclick = async () => {
-            const username = document.getElementById('auth-username').value;
-            const password = document.getElementById('auth-password').value;
-            if (!username || !password) return;
+          setTimeout(() => {
+            const loginBtn = document.getElementById('btn-login');
+            const registerBtn = document.getElementById('btn-register');
 
-            try {
-              const res = await fetch('/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+            if (loginBtn) {
+              loginBtn.addEventListener('click', async () => {
+                const username = document.getElementById('auth-username').value.trim();
+                const password = document.getElementById('auth-password').value.trim();
+                if (!username || !password) {
+                  document.getElementById('auth-message').textContent = 'Введите логин и пароль';
+                  return;
+                }
+
+                try {
+                  const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    localStorage.setItem('mvp_auth_token', data.access_token);
+                    localStorage.setItem('mvp_username', data.username);
+                    loginHtml.style.display = 'none';
+                    location.reload();
+                  } else {
+                    document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
+                  }
+                } catch (err) {
+                  document.getElementById('auth-message').textContent = 'Ошибка сети: ' + err.message;
+                }
               });
-              const data = await res.json();
-              if (res.ok) {
-                localStorage.setItem('mvp_auth_token', data.access_token);
-                localStorage.setItem('mvp_username', data.username);
-                loginHtml.style.display = 'none';
-                showDashboard();
-                await loadPortfolios();
-              } else {
-                document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
-              }
-            } catch (err) {
-              document.getElementById('auth-message').textContent = 'Ошибка сети';
             }
-          };
 
-          document.getElementById('btn-register').onclick = async () => {
-            const username = document.getElementById('auth-username').value;
-            const password = document.getElementById('auth-password').value;
-            if (!username || !password) return;
+            if (registerBtn) {
+              registerBtn.addEventListener('click', async () => {
+                const username = document.getElementById('auth-username').value.trim();
+                const password = document.getElementById('auth-password').value.trim();
+                if (!username || !password) {
+                  document.getElementById('auth-message').textContent = 'Введите логин и пароль';
+                  return;
+                }
 
-            try {
-              const res = await fetch('/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                try {
+                  const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    localStorage.setItem('mvp_auth_token', data.access_token);
+                    localStorage.setItem('mvp_username', data.username);
+                    loginHtml.style.display = 'none';
+                    location.reload();
+                  } else {
+                    document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
+                  }
+                } catch (err) {
+                  document.getElementById('auth-message').textContent = 'Ошибка сети: ' + err.message;
+                }
               });
-              const data = await res.json();
-              if (res.ok) {
-                localStorage.setItem('mvp_auth_token', data.access_token);
-                localStorage.setItem('mvp_username', data.username);
-                loginHtml.style.display = 'none';
-                showDashboard();
-                await loadPortfolios();
-              } else {
-                document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
-              }
-            } catch (err) {
-              document.getElementById('auth-message').textContent = 'Ошибка сети';
             }
-          };
+          }, 0);
         }
         loginHtml.style.display = 'block';
       }
