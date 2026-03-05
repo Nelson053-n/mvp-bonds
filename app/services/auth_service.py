@@ -35,6 +35,13 @@ class AuthService:
         except ValueError as e:
             raise AuthError(str(e)) from e
 
+        # Create default portfolio for new user
+        try:
+            storage_service.create_portfolio(user_id, "Основной портфель")
+            logger.info("Default portfolio created for user: %s (id=%d)", username, user_id)
+        except Exception as e:
+            logger.warning("Failed to create default portfolio for user %d: %s", user_id, e)
+
         logger.info("User registered: %s (id=%d)", username, user_id)
         return {
             "user_id": user_id,
@@ -54,11 +61,12 @@ class AuthService:
         if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
             return None
 
-        logger.info("User logged in: %s", username)
+        logger.info("User logged in: %s (id=%d)", username, user["id"])
+        token = self.create_token(user["id"], user["username"])
         return {
             "user_id": user["id"],
             "username": user["username"],
-            "access_token": self.create_token(user["id"], user["username"]),
+            "access_token": token,
         }
 
     def create_token(self, user_id: int, username: str) -> str:
@@ -69,7 +77,7 @@ class AuthService:
         exp = now + timedelta(hours=settings.jwt_expiry_hours)
 
         payload = {
-            "sub": user_id,
+            "sub": str(user_id),  # Must be string per JWT spec
             "username": username,
             "exp": int(exp.timestamp()),
             "iat": int(now.timestamp()),
@@ -93,6 +101,8 @@ class AuthService:
                 settings.jwt_secret,
                 algorithms=[settings.jwt_algorithm],
             )
+            # Convert sub back to int (stored as string in JWT per spec)
+            payload["sub"] = int(payload["sub"])
             return payload
         except jwt.ExpiredSignatureError:
             logger.debug("Token expired")

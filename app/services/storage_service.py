@@ -10,7 +10,9 @@ class StorageService:
         self._ensure_db()
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
     def _ensure_db(self) -> None:
         import logging
@@ -52,7 +54,7 @@ class StorageService:
                 """
                 CREATE TABLE IF NOT EXISTS portfolio_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    portfolio_id INTEGER,
+                    portfolio_id INTEGER REFERENCES portfolios(id) ON DELETE CASCADE,
                     ticker TEXT NOT NULL,
                     instrument_type TEXT NOT NULL
                         CHECK(instrument_type IN ('stock', 'bond')),
@@ -215,6 +217,36 @@ class StorageService:
             }
             for row in rows
         ]
+
+    def get_item_by_ticker(
+        self, portfolio_id: int, ticker: str, instrument_type: str
+    ) -> dict | None:
+        """Get item by ticker and type in a specific portfolio."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, ticker, instrument_type, quantity, purchase_price
+                     , manual_coupon, company_rating, manual_coupon_rate
+                FROM portfolio_items
+                WHERE portfolio_id = ? AND ticker = ? AND instrument_type = ?
+                LIMIT 1
+                """,
+                (portfolio_id, ticker, instrument_type),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "id": int(row[0]),
+            "ticker": row[1],
+            "instrument_type": row[2],
+            "quantity": float(row[3]),
+            "purchase_price": float(row[4]),
+            "manual_coupon": float(row[5]) if row[5] is not None else None,
+            "company_rating": row[6],
+            "manual_coupon_rate": float(row[7]) if row[7] is not None else None,
+        }
 
     def delete_item(self, item_id: int, portfolio_id: int) -> int:
         with self._connect() as conn:
@@ -495,8 +527,8 @@ class StorageService:
         self,
         portfolio_id: int,
         name: str | None = None,
-        share_token: str | None = None,
-        share_password_hash: str | None = None,
+        share_token: str | None = ...,
+        share_password_hash: str | None = ...,
     ) -> int:
         updates = []
         values = []
@@ -504,10 +536,10 @@ class StorageService:
         if name is not None:
             updates.append("name = ?")
             values.append(name)
-        if share_token is not None:
+        if share_token is not ...:
             updates.append("share_token = ?")
             values.append(share_token)
-        if share_password_hash is not None:
+        if share_password_hash is not ...:
             updates.append("share_password_hash = ?")
             values.append(share_password_hash)
 

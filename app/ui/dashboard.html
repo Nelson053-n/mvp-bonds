@@ -371,6 +371,9 @@
       th.no-sort:hover { background: var(--slate-50); color: var(--slate-500); }
       th.wrap { white-space: normal; line-height: 1.3; }
 
+      /* Hide actions column in read-only mode */
+      body.read-only-mode .actions-column { display: none; }
+
       td {
         padding: 5px 7px;
         text-align: center;
@@ -512,9 +515,6 @@
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px;">
           <div id="table-status" class="status"></div>
-          <button id="btn-share-portfolio" class="btn" style="margin-left: auto; padding: 8px 16px; height: auto; font-size: 13px;">
-            📤 Поделиться
-          </button>
         </div>
 
         <div class="card" style="padding: 0;">
@@ -532,13 +532,13 @@
                   <th data-sort-key="profit">Прибыль</th>
                   <th data-sort-key="weight">Доля</th>
                   <th data-sort-key="coupon" style="max-width:48px;">Купон</th>
-                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">%<br>купона</th>
+                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">Купон<br>%</th>
                   <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;">Частота<br>выплат</th>
                   <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;">Годовой<br>купон</th>
                   <th data-sort-key="market_yield" class="wrap" style="min-width:52px;">Рын.<br>доход.</th>
                   <th data-sort-key="maturity_date">Погашение</th>
                   <th data-sort-key="offer_date">Оферта</th>
-                  <th class="no-sort">Действия</th>
+                  <th class="no-sort actions-column">Действия</th>
                 </tr>
               </thead>
               <tbody id="table-body"></tbody>
@@ -635,13 +635,19 @@
                 <h3>Экспорт</h3>
                 <p>Скачать все позиции в формате CSV.</p>
                 <div class="io-actions">
-                  <a href="/portfolio/export" class="btn" style="text-decoration:none;">Скачать CSV</a>
+                  <button class="btn" id="export-btn">Скачать CSV</button>
                 </div>
               </div>
               <div class="io-section">
                 <h3>Импорт</h3>
                 <p>CSV с колонками: <code>ticker, instrument_type, quantity, purchase_price</code><br>instrument_type: <code>bond</code> или <code>stock</code></p>
                 <div class="io-actions">
+                  <div style="margin-bottom: 12px;">
+                    <label for="import-portfolio" style="display: block; margin-bottom: 6px; font-size: 13px; color: var(--slate-600); font-weight: 500;">Портфель для импорта:</label>
+                    <select id="import-portfolio" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff; color: #333; font-size: 13px;">
+                      <option value="">Выберите портфель</option>
+                    </select>
+                  </div>
                   <label class="file-label" for="import-file">Выбрать файл</label>
                   <input type="file" id="import-file" accept=".csv,text/csv" />
                   <button class="btn" id="import-btn">Импортировать</button>
@@ -677,8 +683,64 @@
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closeShareModal();">Закрыть</button>
-          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Сохранить настройки</button>
+          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Поделиться портфелем</button>
           <button class="btn-danger" id="share-revoke-btn" onclick="revokeShare();" style="display: none;">Отозвать ссылку</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password Entry Modal for Shared View -->
+    <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
+      <div class="modal" style="max-width: 300px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Введите пароль</h2>
+        </div>
+        <div class="modal-body">
+          <p style="margin: 0 0 12px 0; font-size: 13px;">Портфель защищен паролем. Введите пароль для доступа:</p>
+          <input type="password" id="password-modal-input" placeholder="Пароль" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 13px;">
+          <div id="password-modal-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closePasswordModal();">Закрыть</button>
+          <button class="btn-primary" onclick="submitPasswordModal();">Продолжить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Portfolio Modal -->
+    <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+      <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Создать новый портфель</h2>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>Название портфеля:</label>
+            <input type="text" id="create-portfolio-name" placeholder="Например: Мои облигации" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 13px;">
+            <div id="create-portfolio-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeCreatePortfolioModal();">Отмена</button>
+          <button class="btn-primary" onclick="submitCreatePortfolio();">Создать</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Portfolio Modal -->
+    <div id="delete-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+      <div class="modal" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Удалить портфель</h2>
+        </div>
+        <div class="modal-body">
+          <p style="margin: 0 0 12px 0; font-size: 13px;">Вы уверены, что хотите удалить портфель <strong id="delete-portfolio-name"></strong>?</p>
+          <p style="margin: 0; font-size: 12px; color: #dc2626;">⚠️ Это действие нельзя отменить. Будут удалены все позиции в портфеле и все ссылки для совместного доступа.</p>
+          <div id="delete-portfolio-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeDeletePortfolioModal();">Отмена</button>
+          <button class="btn-danger" onclick="submitDeletePortfolio();">Удалить портфель</button>
         </div>
       </div>
     </div>
@@ -710,23 +772,52 @@
 
       // ── PARSE URL ────────────────────────────────────────────────
       function parseShareUrl() {
+        // Check if share token was injected by the backend
+        if (window.shareToken && window.isSharedView) {
+          shareToken = window.shareToken;
+          // Try to load cached password from sessionStorage
+          const cachedPassword = sessionStorage.getItem(`mvp_share_password_${shareToken}`);
+          if (cachedPassword) {
+            sharePassword = cachedPassword;
+          }
+          return true;
+        }
+        // Fallback to URL query parameters or hash (for backward compatibility)
         const params = new URLSearchParams(window.location.search);
         const hash = window.location.hash.slice(1);
         shareToken = params.get('share') || (hash.startsWith('share=') ? hash.substring(6) : null);
+        if (shareToken) {
+          // Try to load cached password from sessionStorage
+          const cachedPassword = sessionStorage.getItem(`mvp_share_password_${shareToken}`);
+          if (cachedPassword) {
+            sharePassword = cachedPassword;
+          }
+        }
         return !!shareToken;
       }
 
       // ── API HELPER ───────────────────────────────────────────────
       async function apiFetch(url, opts = {}) {
-        const token = localStorage.getItem('mvp_auth_token');
         const headers = { ...(opts.headers || {}) };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-          console.log('apiFetch - Sending token for', url);
+
+        // For shared views, only send share password, not auth token
+        if (isReadOnly && shareToken) {
+          if (sharePassword) {
+            headers['X-Share-Password'] = sharePassword;
+            console.log('apiFetch - Sending share password for', url);
+          } else {
+            console.log('apiFetch - No password for shared view', url);
+          }
         } else {
-          console.log('apiFetch - NO TOKEN FOUND for', url);
+          // For authenticated views, send auth token
+          const token = localStorage.getItem('mvp_auth_token');
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            console.log('apiFetch - Sending auth token for', url);
+          } else {
+            console.log('apiFetch - NO TOKEN FOUND for', url);
+          }
         }
-        if (sharePassword) { headers['X-Share-Password'] = sharePassword; }
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
         console.log(`apiFetch ${url}:`, response.status);
@@ -905,23 +996,26 @@
         const scs = document.getElementById('stat-coupon-sub');
         const sys = document.getElementById('stat-ytm-sub');
 
-        sv.textContent  = fmt(roundTo2(summary.totalAssets)) + ' ₽';
-        sv.className    = 'stat-value';
-        svs.textContent = tableRows.length + ' позиц' + (tableRows.length === 1 ? 'ия' : tableRows.length < 5 ? 'ии' : 'ий');
+        // For empty portfolio, show 0 instead of —
+        const isEmpty = tableRows.length === 0;
 
-        sp.textContent  = (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
-        sp.className    = 'stat-value ' + (summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
-        sps.textContent = summary.totalAssets > 0
+        sv.textContent  = isEmpty ? '0 ₽' : fmt(roundTo2(summary.totalAssets)) + ' ₽';
+        sv.className    = 'stat-value';
+        svs.textContent = isEmpty ? 'портфель пуст' : tableRows.length + ' позиц' + (tableRows.length === 1 ? 'ия' : tableRows.length < 5 ? 'ии' : 'ий');
+
+        sp.textContent  = isEmpty ? '0 ₽' : (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
+        sp.className    = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
+        sps.textContent = isEmpty ? 'добавьте бумаги' : summary.totalAssets > 0
           ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля'
           : '\u00a0';
 
-        sc.textContent  = fmt(roundTo2(summary.annualIncome)) + ' ₽';
+        sc.textContent  = '0 ₽';
         sc.className    = 'stat-value';
-        scs.textContent = fmt(roundTo2(summary.annualYield)) + '% от стоимости';
+        scs.textContent = isEmpty ? 'нечего ждать' : fmt(roundTo2(summary.annualYield)) + '% от стоимости';
 
-        sy.textContent  = fmt(roundTo2(summary.totalBondYield)) + '%';
+        sy.textContent  = '0%';
         sy.className    = 'stat-value';
-        sys.textContent = 'средневзвешенная YTM';
+        sys.textContent = isEmpty ? 'в пустом портфеле' : 'средневзвешенная YTM';
       }
 
       // ── MONTHLY CHART ─────────────────────────────────────────────
@@ -1021,16 +1115,14 @@
         }
 
         // Bars
-        const now = new Date();
         const bottomBase = H - PAD_B; // baseline for text rows at bottom
         data.forEach((d, i) => {
           const x    = PAD_L + i * slotW + (slotW - barW) / 2;
           const barH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
           const y    = PAD_T + chartH - barH;
-          const isCurrent = d.year === now.getFullYear() && d.month === now.getMonth();
 
           if (barH > 0) {
-            ctx.fillStyle = isCurrent ? '#1d4ed8' : '#60a5fa';
+            ctx.fillStyle = '#60a5fa';
             const radius = Math.min(4, barH / 2);
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
@@ -1045,14 +1137,15 @@
           }
 
           // Row 1 at bottom: month name
-          ctx.fillStyle  = isCurrent ? '#1d4ed8' : '#64748b';
-          ctx.font       = isCurrent ? 'bold 9px Inter, system-ui, sans-serif' : '9px Inter, system-ui, sans-serif';
+          ctx.fillStyle  = '#64748b';
+          ctx.font       = '9px Inter, system-ui, sans-serif';
           ctx.textAlign  = 'center';
+          const now = new Date();
           const lbl = MONTH_NAMES[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
           ctx.fillText(lbl, x + barW / 2, bottomBase + 13);
 
           // Row 2 at bottom: income amount
-          ctx.fillStyle = d.income > 0 ? (isCurrent ? '#1d4ed8' : '#475569') : '#cbd5e1';
+          ctx.fillStyle = d.income > 0 ? '#475569' : '#cbd5e1';
           ctx.font      = d.income > 0 ? 'bold 8.5px Inter, system-ui, sans-serif' : '8px Inter, system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—', x + barW / 2, bottomBase + 27);
@@ -1215,6 +1308,27 @@
         const rows = getSortedRows(tableRows);
         tableBody.innerHTML = '';
 
+        // Show add form button if portfolio is empty
+        if (rows.length === 0 && !isReadOnly) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 20;
+          td.style.cssText = 'padding: 60px 20px; text-align: center; border: none;';
+          const div = document.createElement('div');
+          div.style.cssText = 'color: var(--slate-400); font-size: 16px; margin-bottom: 24px;';
+          div.textContent = 'Портфель пуст. Добавьте первую бумагу!';
+          td.appendChild(div);
+          const btn = document.createElement('button');
+          btn.className = 'btn';
+          btn.style.cssText = 'background: var(--blue-600); color: #fff; padding: 12px 24px; font-size: 14px;';
+          btn.textContent = '+ Добавить бумагу';
+          btn.onclick = () => showPanel('panel-add');
+          td.appendChild(btn);
+          tr.appendChild(td);
+          tableBody.appendChild(tr);
+          return;
+        }
+
         for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
           const tr  = document.createElement('tr');
@@ -1263,9 +1377,9 @@
           addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
           addCell(tr, row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : '');  // Оферта
 
-          // Actions
-          const actionTd = document.createElement('td');
+          // Actions (only in edit mode)
           if (!isReadOnly) {
+            const actionTd = document.createElement('td');
             const delBtn   = document.createElement('button');
             delBtn.className = 'btn-sm'; delBtn.textContent = 'Удалить';
             delBtn.addEventListener('click', async () => {
@@ -1280,8 +1394,8 @@
               } catch (err) { setStatus(tableStatusEl, err.message || 'Ошибка удаления.', true); }
             });
             actionTd.appendChild(delBtn);
+            tr.appendChild(actionTd);
           }
-          tr.appendChild(actionTd);
           tableBody.appendChild(tr);
         }
 
@@ -1354,11 +1468,26 @@
         }
         const resp = await apiFetch(url, { cache: 'no-store' });
         if (resp.status === 403) {
-          // Password required
-          const password = prompt('Портфель защищен паролем. Введите пароль:');
-          if (!password) throw new Error('Пароль не введен');
-          sharePassword = password;
-          return syncTableFromServer(); // Retry with password
+          // Password required - show modal instead of prompt
+          return new Promise((resolve, reject) => {
+            // Store the resolve/reject for later use in password modal
+            window._passwordModalResolve = () => {
+              const password = document.getElementById('password-modal-input').value;
+              if (!password) {
+                document.getElementById('password-modal-status').textContent = 'Введите пароль';
+                return;
+              }
+              sharePassword = password;
+              // Store password in sessionStorage for this share token
+              if (shareToken) {
+                sessionStorage.setItem(`mvp_share_password_${shareToken}`, password);
+              }
+              closePasswordModal();
+              syncTableFromServer().then(resolve).catch(reject);
+            };
+            window._passwordModalReject = reject;
+            showPasswordModal();
+          });
         }
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
@@ -1445,20 +1574,46 @@
       // ── IMPORT ───────────────────────────────────────────────────
       const ioStatusEl    = document.getElementById('io-status');
       const importFileInp = document.getElementById('import-file');
-      document.getElementById('import-btn').addEventListener('click', async () => {
+      document.getElementById('export-btn').addEventListener('click', async () => {
         if (!portfolioId) { setStatus(ioStatusEl, 'Портфель не выбран.', true); return; }
+        setStatus(ioStatusEl, 'Экспорт...');
+        try {
+          const r = await apiFetch(`/portfolios/${portfolioId}/export`);
+          if (!r.ok) throw new Error('Ошибка экспорта.');
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'portfolio.csv';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          setStatus(ioStatusEl, 'Экспорт завершен.');
+        } catch (err) { setStatus(ioStatusEl, err.message, true); }
+      });
+
+      document.getElementById('import-btn').addEventListener('click', async () => {
+        const importPortfolioSel = document.getElementById('import-portfolio');
+        const selectedPortfolioId = importPortfolioSel.value;
+        if (!selectedPortfolioId) { setStatus(ioStatusEl, 'Выберите портфель для импорта.', true); return; }
         const file = importFileInp.files[0];
         if (!file) { setStatus(ioStatusEl, 'Выберите CSV-файл.', true); return; }
         setStatus(ioStatusEl, 'Импорт...');
         const fd = new FormData(); fd.append('file', file);
         try {
-          const r = await apiFetch(`/portfolios/${portfolioId}/import`, { method: 'POST', body: fd });
+          const r = await apiFetch(`/portfolios/${selectedPortfolioId}/import`, { method: 'POST', body: fd });
           const res = await r.json();
           if (!r.ok) throw new Error(res.detail || 'Ошибка импорта.');
           let msg = 'Импортировано: ' + res.added + ' позиций.';
           if (res.errors > 0) msg += ' Ошибок: ' + res.errors + '.';
           setStatus(ioStatusEl, msg, res.errors > 0);
-          if (res.added > 0) syncTableFromServer().catch(() => {});
+          if (res.added > 0) {
+            // Reload current portfolio view if we imported to it
+            if (Number(selectedPortfolioId) === portfolioId) {
+              syncTableFromServer().catch(() => {});
+            }
+          }
           importFileInp.value = '';
         } catch (err) { setStatus(ioStatusEl, err.message, true); }
       });
@@ -1509,7 +1664,7 @@
         if (!loginHtml) {
           const div = document.createElement('div');
           div.id = 'login-screen-template';
-          div.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f8fafc; display: flex; align-items: center; justify-content: center; z-index: 9999;';
+          div.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f8fafc; z-index: 9999; width: 100%; height: 100%;';
 
           const handleLogin = async () => {
             const username = document.getElementById('auth-username').value.trim();
@@ -1532,6 +1687,7 @@
                 console.log('Login successful, saving token');
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
+                localStorage.setItem('mvp_last_username', username);
                 console.log('Token saved:', { token: data.access_token.substring(0, 20) + '...', username: data.username });
                 document.getElementById('auth-message').textContent = 'Вход успешен, загрузка...';
                 setTimeout(() => location.reload(), 500);
@@ -1547,39 +1703,59 @@
           const handleRegister = async () => {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
+            console.log('Register attempt:', { username, passwordLength: password.length });
+
             if (!username || !password) {
               document.getElementById('auth-message').textContent = 'Введите логин и пароль';
               return;
             }
+            if (username.length < 3) {
+              document.getElementById('auth-message').textContent = 'Логин минимум 3 символа';
+              return;
+            }
+            if (password.length < 6) {
+              document.getElementById('auth-message').textContent = 'Пароль минимум 6 символов';
+              return;
+            }
+
             try {
               const res = await fetch('/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
               });
+              console.log('Register response status:', res.status);
               const data = await res.json();
+              console.log('Register response data:', data);
               if (res.ok) {
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
+                localStorage.setItem('mvp_last_username', username);
+                console.log('Registration successful');
                 location.reload();
               } else {
-                document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
+                const errorMsg = (typeof data === 'object' && data.detail) ? String(data.detail) : 'Ошибка регистрации';
+                console.error('Registration failed:', errorMsg);
+                document.getElementById('auth-message').textContent = errorMsg;
               }
             } catch (err) {
-              document.getElementById('auth-message').textContent = 'Ошибка: ' + (err.message || 'неизвестная ошибка');
+              console.error('Register error:', err);
+              document.getElementById('auth-message').textContent = 'Ошибка сети: ' + (err.message || 'неизвестная ошибка');
             }
           };
 
+          const savedUsername = localStorage.getItem('mvp_last_username') || '';
+
           div.innerHTML = `
-            <div style="max-width: 400px; width: 90%; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <h2 style="text-align: center; margin: 0 0 20px 0; color: #334155;">Вход / Регистрация</h2>
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <input type="text" id="auth-username" placeholder="Имя пользователя" style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-                <input type="password" id="auth-password" placeholder="Пароль" style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
-                <button id="btn-login" style="background: #16a34a; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">Войти</button>
-                <button id="btn-register" style="background: #2563eb; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">Зарегистрироваться</button>
+            <div style="position: absolute; top: 100px; left: 50%; transform: translateX(-50%); max-width: 280px; width: 90%; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="text-align: center; margin: 0 0 18px 0; color: #334155; font-size: 16px;">Вход / Регистрация</h2>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="auth-username" placeholder="Имя пользователя" value="${savedUsername}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+                <input type="password" id="auth-password" placeholder="Пароль" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+                <button id="btn-login" style="width: 100%; background: #16a34a; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; box-sizing: border-box;">Войти</button>
+                <button id="btn-register" style="width: 100%; background: #2563eb; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; box-sizing: border-box;">Зарегистрироваться</button>
               </div>
-              <p id="auth-message" style="text-align: center; color: #dc2626; margin: 15px 0 0 0; font-size: 13px; min-height: 20px;"></p>
+              <p id="auth-message" style="text-align: center; color: #dc2626; margin: 12px 0 0 0; font-size: 12px; min-height: 18px;"></p>
             </div>
           `;
           document.body.insertBefore(div, document.body.firstChild);
@@ -1588,8 +1764,17 @@
           setTimeout(() => {
             const btn1 = document.getElementById('btn-login');
             const btn2 = document.getElementById('btn-register');
+            const usernameInput = document.getElementById('auth-username');
+            const passwordInput = document.getElementById('auth-password');
             if (btn1) btn1.onclick = handleLogin;
             if (btn2) btn2.onclick = handleRegister;
+            if (usernameInput) usernameInput.focus();
+            // Enter key submits login if there's a username
+            if (passwordInput) {
+              passwordInput.onkeypress = (e) => {
+                if (e.key === 'Enter') handleLogin();
+              };
+            }
           }, 10);
         }
         loginHtml.style.display = 'block';
@@ -1603,27 +1788,44 @@
         // Setup portfolio selector
         setupPortfolioSelector();
 
-        // Add logout button if not exists
-        if (!document.getElementById('btn-logout')) {
-          const topbar = document.querySelector('.topbar') || document.querySelector('header');
-          if (topbar) {
-            const btn = document.createElement('button');
-            btn.id = 'btn-logout';
-            btn.textContent = 'Выйти';
-            btn.style.marginLeft = '16px';
-            btn.style.padding = '4px 12px';
-            btn.style.background = '#dc2626';
-            btn.style.color = '#fff';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '4px';
-            btn.style.cursor = 'pointer';
-            btn.style.fontSize = '13px';
-            btn.onclick = () => {
-              localStorage.removeItem('mvp_auth_token');
-              localStorage.removeItem('mvp_username');
-              location.reload();
-            };
-            topbar.appendChild(btn);
+        // Add share and logout buttons if not in shared view
+        if (!isReadOnly && !document.getElementById('btn-logout')) {
+          const topbarNav = document.querySelector('.topbar-nav');
+          if (topbarNav) {
+            // Add share button
+            if (!document.getElementById('btn-share-portfolio')) {
+              const shareBtn = document.createElement('button');
+              shareBtn.id = 'btn-share-portfolio';
+              shareBtn.className = 'nav-btn';
+              shareBtn.textContent = '📤 Поделиться';
+              shareBtn.style.marginLeft = 'auto';
+              shareBtn.onclick = openShareModal;
+              topbarNav.appendChild(shareBtn);
+            }
+
+            // Add logout button to topbar-inner
+            const topbarInner = document.querySelector('.topbar-inner');
+            if (topbarInner) {
+              const btn = document.createElement('button');
+              btn.id = 'btn-logout';
+              btn.textContent = 'Выйти';
+              btn.style.marginLeft = '12px';
+              btn.style.padding = '8px 16px';
+              btn.style.background = '#dc2626';
+              btn.style.color = '#fff';
+              btn.style.border = 'none';
+              btn.style.borderRadius = '4px';
+              btn.style.cursor = 'pointer';
+              btn.style.fontSize = '13px';
+              btn.style.height = 'auto';
+              btn.style.alignSelf = 'center';
+              btn.onclick = () => {
+                localStorage.removeItem('mvp_auth_token');
+                localStorage.removeItem('mvp_username');
+                location.reload();
+              };
+              topbarInner.appendChild(btn);
+            }
           }
         }
       }
@@ -1649,9 +1851,26 @@
           option.selected = p.id === portfolioId;
           selector.appendChild(option);
         }
+
+        // Also update import portfolio selector
+        const importSelector = document.getElementById('import-portfolio');
+        if (importSelector) {
+          const currentValue = importSelector.value;
+          importSelector.innerHTML = '<option value="">Выберите портфель</option>';
+          for (const p of portfolios) {
+            const option = document.createElement('option');
+            option.value = String(p.id);
+            option.textContent = p.name;
+            option.selected = String(p.id) === currentValue;
+            importSelector.appendChild(option);
+          }
+        }
       }
 
       function setupPortfolioSelector() {
+        // Don't show portfolio selector in read-only shared view
+        if (isReadOnly) return;
+
         const selector = document.getElementById('portfolio-selector');
         if (!selector) {
           // Create selector if doesn't exist
@@ -1679,6 +1898,32 @@
               }
             });
             container.appendChild(sel);
+
+            // Add "New portfolio" button
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '+ Новый';
+            addBtn.style.padding = '4px 12px';
+            addBtn.style.background = '#3b82f6';
+            addBtn.style.color = '#fff';
+            addBtn.style.border = 'none';
+            addBtn.style.borderRadius = '4px';
+            addBtn.style.cursor = 'pointer';
+            addBtn.style.fontSize = '12px';
+            addBtn.onclick = openCreatePortfolioModal;
+            container.appendChild(addBtn);
+
+            // Add "Delete portfolio" button
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '- Удалить';
+            delBtn.style.padding = '4px 12px';
+            delBtn.style.background = '#ef4444';
+            delBtn.style.color = '#fff';
+            delBtn.style.border = 'none';
+            delBtn.style.borderRadius = '4px';
+            delBtn.style.cursor = 'pointer';
+            delBtn.style.fontSize = '12px';
+            delBtn.onclick = openDeletePortfolioModal;
+            container.appendChild(delBtn);
             topbarNav.insertBefore(container, topbarNav.firstChild);
           }
         }
@@ -1697,6 +1942,151 @@
         if (overlay) overlay.classList.remove('show');
       }
 
+      function showPasswordModal() {
+        const overlay = document.getElementById('password-modal-overlay');
+        if (overlay) {
+          overlay.style.display = 'flex';
+          document.getElementById('password-modal-input').value = '';
+          document.getElementById('password-modal-status').textContent = '';
+          setTimeout(() => document.getElementById('password-modal-input').focus(), 100);
+        }
+      }
+
+      function closePasswordModal() {
+        const overlay = document.getElementById('password-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      function submitPasswordModal() {
+        if (window._passwordModalResolve) {
+          window._passwordModalResolve();
+        }
+      }
+
+      // Handle Enter key in password modal
+      document.addEventListener('DOMContentLoaded', () => {
+        const passInput = document.getElementById('password-modal-input');
+        if (passInput) {
+          passInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitPasswordModal();
+          });
+        }
+        // Handle Enter key in create portfolio modal
+        const createInput = document.getElementById('create-portfolio-name');
+        if (createInput) {
+          createInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitCreatePortfolio();
+          });
+        }
+      });
+
+      function openCreatePortfolioModal() {
+        const overlay = document.getElementById('create-portfolio-modal-overlay');
+        if (overlay) {
+          overlay.style.display = 'flex';
+          document.getElementById('create-portfolio-name').value = '';
+          document.getElementById('create-portfolio-status').textContent = '';
+          setTimeout(() => document.getElementById('create-portfolio-name').focus(), 100);
+        }
+      }
+
+      function closeCreatePortfolioModal() {
+        const overlay = document.getElementById('create-portfolio-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      async function submitCreatePortfolio() {
+        const nameInput = document.getElementById('create-portfolio-name');
+        const statusEl = document.getElementById('create-portfolio-status');
+        const name = nameInput.value.trim();
+
+        if (!name) {
+          statusEl.textContent = 'Введите название портфеля';
+          return;
+        }
+
+        statusEl.textContent = 'Создание...';
+        try {
+          const res = await apiFetch('/portfolios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Ошибка создания портфеля');
+          }
+          await loadPortfolios();
+          const newP = portfolios[portfolios.length - 1];
+          if (newP) {
+            portfolioId = newP.id;
+            localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+            updatePortfolioSelector();
+            await syncTableFromServer();
+          }
+          closeCreatePortfolioModal();
+        } catch (err) {
+          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось создать');
+        }
+      }
+
+      function openDeletePortfolioModal() {
+        const overlay = document.getElementById('delete-portfolio-modal-overlay');
+        if (overlay) {
+          const currentPortfolio = portfolios.find(p => p.id === portfolioId);
+          if (currentPortfolio) {
+            document.getElementById('delete-portfolio-name').textContent = currentPortfolio.name;
+          }
+          document.getElementById('delete-portfolio-status').textContent = '';
+          overlay.style.display = 'flex';
+        }
+      }
+
+      function closeDeletePortfolioModal() {
+        const overlay = document.getElementById('delete-portfolio-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      async function submitDeletePortfolio() {
+        if (!portfolioId) {
+          alert('Портфель не выбран');
+          return;
+        }
+
+        const statusEl = document.getElementById('delete-portfolio-status');
+        statusEl.textContent = 'Удаление...';
+
+        try {
+          const res = await apiFetch(`/portfolios/${portfolioId}`, {
+            method: 'DELETE'
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            let msg = 'Ошибка удаления';
+            try {
+              const err = JSON.parse(text);
+              msg = err.detail || msg;
+            } catch {}
+            throw new Error(msg);
+          }
+          await loadPortfolios();
+          // Switch to first available portfolio or clear if none left
+          if (portfolios.length > 0) {
+            portfolioId = portfolios[0].id;
+            localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+            updatePortfolioSelector();
+            await syncTableFromServer();
+          } else {
+            portfolioId = null;
+            localStorage.removeItem('mvp_active_portfolio_id');
+            updatePortfolioSelector();
+          }
+          closeDeletePortfolioModal();
+        } catch (err) {
+          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось удалить');
+        }
+      }
+
       async function loadShareStatus() {
         try {
           const res = await apiFetch(`/portfolios/${portfolioId}`);
@@ -1709,7 +2099,7 @@
             urlTextarea.value = shareUrl;
             revokeBtn.style.display = 'block';
           } else {
-            urlTextarea.value = 'Портфель еще не опубликован. Установите пароль (или оставьте пусто) и нажмите "Сохранить".';
+            urlTextarea.value = 'Портфель еще не опубликован. Установите пароль (или оставьте пусто) и нажмите "Поделиться портфелем".';
             revokeBtn.style.display = 'none';
           }
           passwordInput.value = '';
@@ -1768,32 +2158,47 @@
         }
       }
 
-      // Share button click handler - attach when DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          const shareBtn = document.getElementById('btn-share-portfolio');
-          if (shareBtn) {
-            shareBtn.addEventListener('click', openShareModal);
-          }
-        });
-      } else {
-        const shareBtn = document.getElementById('btn-share-portfolio');
-        if (shareBtn) {
-          shareBtn.addEventListener('click', openShareModal);
-        }
-      }
 
       // ── INIT ─────────────────────────────────────────────────────
       (async () => {
         if (parseShareUrl()) {
           // Read-only shared view
           isReadOnly = true;
+          document.body.classList.add('read-only-mode');
           showDashboard();
           document.querySelector('.topbar-nav').style.display = 'none';
-          document.getElementById('btn-share-portfolio').style.display = 'none';
+          const shareBtn = document.getElementById('btn-share-portfolio');
+          if (shareBtn) shareBtn.style.display = 'none';
+          const logoutBtn = document.getElementById('btn-logout');
+          if (logoutBtn) logoutBtn.style.display = 'none';
           const navBtns = document.querySelectorAll('.nav-btn:not([data-panel="panel-table"])');
           navBtns.forEach(btn => btn.style.display = 'none');
-          if (loadTableCache()) renderTable();
+
+          // Add "Create your own portfolio" button in topbar
+          const topbarInner = document.querySelector('.topbar-inner');
+          if (topbarInner && !document.getElementById('btn-create-portfolio')) {
+            const createBtn = document.createElement('button');
+            createBtn.id = 'btn-create-portfolio';
+            createBtn.textContent = '+ Создать портфель';
+            createBtn.style.marginLeft = 'auto';
+            createBtn.style.padding = '8px 16px';
+            createBtn.style.background = '#3b82f6';
+            createBtn.style.color = '#fff';
+            createBtn.style.border = 'none';
+            createBtn.style.borderRadius = '4px';
+            createBtn.style.cursor = 'pointer';
+            createBtn.style.fontSize = '13px';
+            createBtn.style.fontWeight = '500';
+            createBtn.style.height = 'auto';
+            createBtn.style.alignSelf = 'center';
+            createBtn.onclick = () => {
+              window.location.href = '/';
+            };
+            topbarInner.appendChild(createBtn);
+          }
+
+          // Don't load cache for shared views - always fetch from server
+          // This ensures password-protected portfolios don't show data in background
           try {
             await syncTableFromServer();
           } catch (err) {
