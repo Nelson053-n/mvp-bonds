@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MVP Portfolio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>P</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -457,12 +458,12 @@
             <div class="stat-sub" id="stat-profit-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Год. купонный доход</div>
+            <div class="stat-label">Годовой купонный доход</div>
             <div class="stat-value" id="stat-coupon">—</div>
             <div class="stat-sub" id="stat-coupon-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">YTM облигаций</div>
+            <div class="stat-label">Доходность к погашению</div>
             <div class="stat-value" id="stat-ytm">—</div>
             <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
           </div>
@@ -475,7 +476,7 @@
             <table>
               <thead>
                 <tr>
-                  <th data-sort-key="id">&#8470;</th>
+                  <th data-sort-key="id" style="min-width:32px;">&#8470;</th>
                   <th data-sort-key="name">Название</th>
                   <th data-sort-key="company_rating">Рейтинг</th>
                   <th data-sort-key="current_price">Тек.&nbsp;цена</th>
@@ -485,11 +486,12 @@
                   <th data-sort-key="profit">Прибыль</th>
                   <th data-sort-key="weight">Доля</th>
                   <th data-sort-key="coupon" style="max-width:48px;">Купон</th>
-                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:56px;">Год.<br>купон</th>
-                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">Дох.<br>купона</th>
+                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">%<br>купона</th>
                   <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;">Частота<br>выплат</th>
+                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;">Годовой<br>купон</th>
                   <th data-sort-key="market_yield" class="wrap" style="min-width:52px;">Рын.<br>доход.</th>
                   <th data-sort-key="maturity_date">Погашение</th>
+                  <th data-sort-key="buyback_date">Оферта</th>
                   <th class="no-sort">Действия</th>
                 </tr>
               </thead>
@@ -659,18 +661,36 @@
       }
 
       // ── RATING ───────────────────────────────────────────────────
+      // Canonical order from highest to lowest (matches АКРА/Эксперт РА шкала)
+      const RATING_ORDER = [
+        'AAA','AA+','AA','AA-',
+        'A+','A','A-',
+        'BBB+','BBB','BBB-',
+        'BB+','BB','BB-',
+        'B+','B','B-',
+        'CCC','CC','C',
+        'RD','SD','D',
+      ];
+
       function parseRating(raw) {
         if (!raw) return null;
-        const m = String(raw).toUpperCase().match(/\b(?:RU)?(AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|CCC|CC|C|D)\b/);
-        return m ? m[1] : null;
+        // Uppercase, strip whitespace, remove date/agency suffix like " (15.03.2024)" or "(RU)"
+        let s = String(raw).toUpperCase().replace(/\s+/g, '').replace(/\([^)]*\)/g, '');
+        // Strip leading "RU" prefix that MOEX adds (ruAAA → AAA, ruAA+ → AA+)
+        s = s.replace(/^RU(?=[A-Z])/, '');
+        // Match longest first to avoid 'AA' matching 'AAA'
+        const sorted = [...RATING_ORDER].sort((a, b) => b.length - a.length);
+        for (const r of sorted) {
+          if (s === r) return r;
+        }
+        return null;
       }
       function ratingToScore(r) {
         if (!r) return null;
-        const bases = { AAA:100, AA:85, A:70, BBB:55, BB:35, B:25, CCC:12, CC:8, C:4, D:0 };
-        const base = bases[r.replace(/[+-]/g,'')];
-        if (base === undefined) return null;
-        const mod = r.endsWith('+') ? 4 : r.endsWith('-') ? -4 : 0;
-        return Math.max(0, Math.min(100, base + mod));
+        const idx = RATING_ORDER.indexOf(r);
+        if (idx === -1) return null;
+        // 100 = best (AAA), 0 = worst (D)
+        return Math.round(100 - (idx / (RATING_ORDER.length - 1)) * 100);
       }
       function createRatingCell(raw) {
         const td = document.createElement('td');
@@ -724,6 +744,7 @@
         const totalProfit  = rows.reduce((s, r) =>
           s + roundTo2((Number(r.current_price) - Number(r.purchase_price)) * Number(r.quantity)), 0);
         let annualIncome = 0, weightedYield = 0, bondWeightSum = 0;
+        let weightedCouponRate = 0, couponRateWeightSum = 0;
         for (const row of rows) {
           if (row.type !== 'bond') continue;
           const qty = Number(row.quantity || 0), cp = Number(row.current_price || 0);
@@ -732,10 +753,13 @@
           if (coupon > 0 && qty > 0) annualIncome += coupon * qty * freq;
           const pv = cp * qty, my = Number(row.market_yield || 0);
           if (pv > 0 && my > 0) { weightedYield += my * pv; bondWeightSum += pv; }
+          const cr = Number(row.coupon_rate || 0);
+          if (pv > 0 && cr > 0) { weightedCouponRate += cr * pv; couponRateWeightSum += pv; }
         }
         const annualYield    = totalAssets > 0 ? (annualIncome / totalAssets) * 100 : 0;
         const totalBondYield = bondWeightSum > 0 ? weightedYield / bondWeightSum : 0;
-        return { totalAssets, totalProfit, annualIncome, annualYield, totalBondYield };
+        const avgCouponRate  = couponRateWeightSum > 0 ? weightedCouponRate / couponRateWeightSum : 0;
+        return { totalAssets, totalProfit, annualIncome, annualYield, totalBondYield, avgCouponRate };
       }
 
       // ── UPDATE STAT CARDS ────────────────────────────────────────
@@ -756,7 +780,7 @@
         sp.textContent  = (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
         sp.className    = 'stat-value ' + (summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
         sps.textContent = summary.totalAssets > 0
-          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '%'
+          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля'
           : '\u00a0';
 
         sc.textContent  = fmt(roundTo2(summary.annualIncome)) + ' ₽';
@@ -822,7 +846,7 @@
 
         const dpr  = window.devicePixelRatio || 1;
         const W    = canvas.parentElement.clientWidth || 800;
-        const H    = 190;
+        const H    = 260;
         canvas.style.width  = W + 'px';
         canvas.style.height = H + 'px';
         canvas.width  = W * dpr;
@@ -831,7 +855,8 @@
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
 
-        const PAD_L = 64, PAD_R = 12, PAD_T = 36, PAD_B = 28;
+        // PAD_B increased to fit: income amount (row1) + month label (row2)
+        const PAD_L = 64, PAD_R = 12, PAD_T = 30, PAD_B = 44;
         const chartW = W - PAD_L - PAD_R;
         const chartH = H - PAD_T - PAD_B;
         const slotW  = chartW / data.length;
@@ -858,6 +883,7 @@
 
         // Bars
         const now = new Date();
+        const bottomBase = H - PAD_B; // baseline for text rows at bottom
         data.forEach((d, i) => {
           const x    = PAD_L + i * slotW + (slotW - barW) / 2;
           const barH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
@@ -865,7 +891,6 @@
           const isCurrent = d.year === now.getFullYear() && d.month === now.getMonth();
 
           if (barH > 0) {
-            // Bar with subtle gradient effect
             ctx.fillStyle = isCurrent ? '#1d4ed8' : '#60a5fa';
             const radius = Math.min(4, barH / 2);
             ctx.beginPath();
@@ -880,20 +905,18 @@
             ctx.fill();
           }
 
-          // Income label above bar
-          if (d.income > 0) {
-            ctx.fillStyle = '#334155';
-            ctx.font      = 'bold 8.5px Inter, system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(fmt(roundTo2(d.income)) + ' ₽', x + barW / 2, Math.max(y - 5, PAD_T + 9));
-          }
-
-          // Month label below
-          ctx.fillStyle  = isCurrent ? '#1d4ed8' : '#94a3b8';
+          // Row 1 at bottom: month name
+          ctx.fillStyle  = isCurrent ? '#1d4ed8' : '#64748b';
           ctx.font       = isCurrent ? 'bold 9px Inter, system-ui, sans-serif' : '9px Inter, system-ui, sans-serif';
           ctx.textAlign  = 'center';
           const lbl = MONTH_NAMES[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
-          ctx.fillText(lbl, x + barW / 2, H - PAD_B + 13);
+          ctx.fillText(lbl, x + barW / 2, bottomBase + 13);
+
+          // Row 2 at bottom: income amount
+          ctx.fillStyle = d.income > 0 ? (isCurrent ? '#1d4ed8' : '#475569') : '#cbd5e1';
+          ctx.font      = d.income > 0 ? 'bold 8.5px Inter, system-ui, sans-serif' : '8px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—', x + barW / 2, bottomBase + 27);
         });
 
         // Y-axis label
@@ -927,6 +950,15 @@
         if (!r.ok) throw new Error(p.detail || 'Не удалось обновить купон.');
         return p;
       }
+      async function saveCouponRateRow(id, coupon_rate) {
+        const r = await fetch('/portfolio/instruments/' + id + '/coupon-rate', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coupon_rate }),
+        });
+        const p = await r.json();
+        if (!r.ok) throw new Error(p.detail || 'Не удалось обновить ставку купона.');
+        return p;
+      }
 
       function createEditableCell(row, field, extraClass) {
         const td = document.createElement('td');
@@ -950,6 +982,42 @@
             recalculateRow(row, oQty, oPrice); recalculateWeights(tableRows);
             persistTableCache(); renderTable();
             setStatus(tableStatusEl, err.message || 'Ошибка обновления.', true);
+          }
+        };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        input.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+        td.appendChild(input); return td;
+      }
+
+      function createCouponRateCell(row) {
+        const td = document.createElement('td');
+        if (row.type !== 'bond') { td.textContent = '—'; return td; }
+        const cv = Number(row.coupon_rate);
+        const isEditable = row.manual_coupon_rate_set === true || !(Number.isFinite(cv) && cv > 0);
+        if (!isEditable) { td.textContent = fmt(roundTo2(cv)) + '%'; return td; }
+        const input = document.createElement('input');
+        input.type = 'number'; input.className = 'editable-input coupon-input';
+        input.min = '0'; input.step = '0.01'; input.value = Number.isFinite(cv) && cv > 0 ? String(cv) : '';
+        input.placeholder = '%';
+        const commit = async () => {
+          const orig   = Number.isFinite(Number(row.coupon_rate)) ? Number(row.coupon_rate) : 0;
+          const parsed = Number(input.value);
+          if (input.value === '') return;
+          if (!Number.isFinite(parsed) || parsed < 0) {
+            setStatus(tableStatusEl, 'Введите корректную ставку купона.', true);
+            input.value = orig > 0 ? String(orig) : ''; return;
+          }
+          try {
+            row.coupon_rate = parsed; row.manual_coupon_rate_set = true;
+            persistTableCache(); renderTable();
+            const upd = await saveCouponRateRow(row.id, parsed);
+            row.coupon_rate = Number(upd.coupon_rate); row.manual_coupon_rate_set = upd.manual_coupon_rate_set === true;
+            persistTableCache(); renderTable();
+            setStatus(tableStatusEl, 'Ставка купона установлена.');
+          } catch (err) {
+            row.coupon_rate = orig; persistTableCache(); renderTable();
+            setStatus(tableStatusEl, err.message || 'Ошибка обновления ставки купона.', true);
           }
         };
         input.addEventListener('blur', commit);
@@ -1038,18 +1106,18 @@
           if (row.type === 'bond') {
             const qty       = Number(row.quantity || 0);
             const couponRub = Number(row.coupon || 0);
-            const couponRate= Number(row.coupon_rate || 0);
             const period    = Number(row.coupon_period || 0);
             const freq      = period > 0 ? Math.round(365 / period) : 2;
-            addCell(tr, fmt(roundTo2(couponRub * qty * freq)));
-            addCell(tr, couponRate > 0 ? fmt(roundTo2(couponRate)) + '%' : '—');
-            addCell(tr, String(freq));
-            addCell(tr, row.market_yield != null ? fmt(row.market_yield) : '—');
+            tr.appendChild(createCouponRateCell(row));                             // % купона
+            addCell(tr, String(freq));                                              // Частота
+            addCell(tr, fmt(roundTo2(couponRub * qty * freq)));                    // Годовой купон
+            addCell(tr, row.market_yield != null ? fmt(row.market_yield) : '—');  // Рын.доход.
           } else {
             addCell(tr, '—'); addCell(tr, '—'); addCell(tr, '—'); addCell(tr, '—');
           }
 
-          addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');
+          addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
+          addCell(tr, row.type === 'bond' && row.buyback_date ? fmt(row.buyback_date) : '');  // Оферта
 
           // Actions
           const actionTd = document.createElement('td');
@@ -1079,23 +1147,27 @@
         const sumRow = document.createElement('tr');
         sumRow.className = 'summary-row';
 
+        // col 1-6 (colspan=6): label
         const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = 'Итого'; sumRow.appendChild(lbl);
+        // col 7: Стоимость
         addCell(sumRow, fmt(roundTo2(summary.totalAssets)) + ' ₽');
-
+        // col 8: Прибыль
         const p2 = document.createElement('td');
         p2.textContent = (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
         p2.className   = summary.totalProfit > 0 ? 'sum-positive' : summary.totalProfit < 0 ? 'sum-negative' : '';
         sumRow.appendChild(p2);
-
+        // cols 9-10: Доля + Купон (empty)
         const c1 = document.createElement('td'); c1.colSpan = 2; c1.textContent = ''; sumRow.appendChild(c1);
+        // col 11: % купона (средневзвешенная ставка купона)
+        addCell(sumRow, summary.avgCouponRate > 0 ? fmt(roundTo2(summary.avgCouponRate)) + '%' : '');
+        // col 12: Частота (empty)
+        addCell(sumRow, '');
+        // col 13: Годовой купон (сумма)
         addCell(sumRow, fmt(roundTo2(summary.annualIncome)) + ' ₽');
-        const c3 = document.createElement('td'); c3.colSpan = 2;
-        c3.textContent = fmt(roundTo2(summary.annualYield)) + '%';
-        sumRow.appendChild(c3);
-        const c4 = document.createElement('td'); c4.colSpan = 2;
-        c4.textContent = fmt(roundTo2(summary.totalBondYield)) + '%';
-        sumRow.appendChild(c4);
-        const c5 = document.createElement('td'); c5.textContent = ''; sumRow.appendChild(c5);
+        // col 14: Рын.доход. (средневзвешенная YTM)
+        addCell(sumRow, fmt(roundTo2(summary.totalBondYield)) + '%');
+        // cols 15-17: Погашение, Оферта, Действия (empty)
+        const c5 = document.createElement('td'); c5.colSpan = 3; c5.textContent = ''; sumRow.appendChild(c5);
         tableBody.appendChild(sumRow);
 
         drawMonthlyChart(tableRows);

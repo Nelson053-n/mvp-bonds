@@ -6,6 +6,7 @@ from app.models import (
     AddInstrumentInput,
     InstrumentMetrics,
     UpdateCouponInput,
+    UpdateCouponRateInput,
     UpdateInstrumentInput,
     ValidationResponse,
 )
@@ -25,6 +26,7 @@ class PortfolioItem:
     quantity: float
     purchase_price: float
     manual_coupon: float | None
+    manual_coupon_rate: float | None
 
 
 class PortfolioService:
@@ -141,6 +143,26 @@ class PortfolioService:
         )
         raise ValueError("Не удалось сформировать строку после обновления")
 
+    async def update_coupon_rate(
+        self,
+        item_id: int,
+        payload: UpdateCouponRateInput,
+    ) -> InstrumentMetrics:
+        updated = storage_service.update_coupon_rate(
+            item_id=item_id,
+            coupon_rate=payload.coupon_rate,
+        )
+        if updated == 0:
+            raise InstrumentNotFoundError(item_id)
+
+        from app.services.cache_service import cache_service
+        rows = await cache_service.refresh()
+        for row in rows:
+            if row.id == item_id:
+                return row
+
+        raise ValueError("Не удалось сформировать строку после обновления")
+
     async def remove_not_found_instruments(self) -> int:
         stored_items = [
             PortfolioItem(
@@ -152,6 +174,11 @@ class PortfolioService:
                 manual_coupon=(
                     float(item["manual_coupon"])
                     if item["manual_coupon"] is not None
+                    else None
+                ),
+                manual_coupon_rate=(
+                    float(item["manual_coupon_rate"])
+                    if item.get("manual_coupon_rate") is not None
                     else None
                 ),
             )
@@ -208,6 +235,11 @@ class PortfolioService:
                     if item["manual_coupon"] is not None
                     else None
                 ),
+                manual_coupon_rate=(
+                    float(item["manual_coupon_rate"])
+                    if item.get("manual_coupon_rate") is not None
+                    else None
+                ),
             )
             for item in storage_service.get_items()
         ]
@@ -251,9 +283,15 @@ class PortfolioService:
                                 else snapshot.coupon
                             ),
                             coupon_period=snapshot.coupon_period,
-                            coupon_rate=snapshot.coupon_rate,
+                            coupon_rate=(
+                                item.manual_coupon_rate
+                                if item.manual_coupon_rate is not None
+                                else snapshot.coupon_rate
+                            ),
                             manual_coupon_set=item.manual_coupon is not None,
+                            manual_coupon_rate_set=item.manual_coupon_rate is not None,
                             maturity_date=snapshot.maturity_date,
+                            buyback_date=snapshot.buyback_date,
                             aci=snapshot.aci,
                             market_yield=snapshot.market_yield,
                             ai_comment="",
