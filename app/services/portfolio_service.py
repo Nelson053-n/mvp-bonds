@@ -350,6 +350,10 @@ class PortfolioService:
                         profit=loss,
                         weight=0.0,
                         company_rating=None,
+                        coupon=item.manual_coupon,
+                        coupon_rate=item.manual_coupon_rate,
+                        manual_coupon_set=item.manual_coupon is not None,
+                        manual_coupon_rate_set=item.manual_coupon_rate is not None,
                         ai_comment=f"Нет рыночных данных: {str(exc)}",
                     )
 

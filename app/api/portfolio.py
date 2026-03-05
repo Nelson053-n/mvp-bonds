@@ -225,7 +225,7 @@ async def import_csv(
     portfolio_id: int,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-) -> dict[str, int]:
+) -> dict:
     """Import portfolio from CSV file.
 
     Expected columns: ticker, instrument_type, quantity, purchase_price
@@ -272,13 +272,27 @@ async def import_csv(
             continue
 
         try:
-            storage_service.add_item(
-                ticker=ticker,
-                instrument_type=instrument_type,
-                quantity=quantity,
-                purchase_price=purchase_price,
-                portfolio_id=portfolio_id,
+            # Check if item with same ticker and type already exists
+            existing = storage_service.get_item_by_ticker(
+                portfolio_id, ticker, instrument_type
             )
+            if existing:
+                # Update existing item
+                storage_service.update_item(
+                    existing["id"],
+                    portfolio_id,
+                    quantity,
+                    purchase_price,
+                )
+            else:
+                # Add new item
+                storage_service.add_item(
+                    ticker=ticker,
+                    instrument_type=instrument_type,
+                    quantity=quantity,
+                    purchase_price=purchase_price,
+                    portfolio_id=portfolio_id,
+                )
             added += 1
         except Exception as exc:
             errors.append(f"Строка {i}: {exc}")
