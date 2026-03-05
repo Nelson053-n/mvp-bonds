@@ -38,8 +38,13 @@ class PortfolioService:
     ) -> InstrumentMetrics:
         validation = await self.validate(payload)
         if not validation.validated:
-            warnings_msg = "; ".join(validation.warnings) or "Ошибка валидации данных"
-            logger.warning("Validation failed for %s: %s", payload.ticker, warnings_msg)
+            warnings_msg = (
+                "; ".join(validation.warnings)
+                or "Ошибка валидации данных"
+            )
+            logger.warning(
+                "Validation failed for %s: %s", payload.ticker, warnings_msg
+            )
             raise ValidationError("Ошибка валидации", warnings_msg)
 
         ticker = payload.ticker.upper().strip()
@@ -58,7 +63,9 @@ class PortfolioService:
             quantity=payload.quantity,
             purchase_price=payload.purchase_price,
         )
-        logger.info("Added instrument %s (ID: %d) to portfolio", ticker, new_id)
+        logger.info(
+            "Added instrument %s (ID: %d) to portfolio", ticker, new_id
+        )
 
         from app.services.cache_service import cache_service
         rows = await cache_service.refresh()
@@ -66,7 +73,9 @@ class PortfolioService:
             if row.id == new_id:
                 return row
 
-        logger.error("Failed to retrieve added instrument %s from cache", ticker)
+        logger.error(
+            "Failed to retrieve added instrument %s from cache", ticker
+        )
         raise ValueError(
             "Не удалось сформировать строку для добавленной бумаги"
         )
@@ -90,7 +99,9 @@ class PortfolioService:
             purchase_price=payload.purchase_price,
         )
         if updated == 0:
-            logger.warning("Update failed: instrument ID %d not found", item_id)
+            logger.warning(
+                "Update failed: instrument ID %d not found", item_id
+            )
             raise InstrumentNotFoundError(item_id)
 
         from app.services.cache_service import cache_service
@@ -113,7 +124,9 @@ class PortfolioService:
             coupon=payload.coupon,
         )
         if updated == 0:
-            logger.warning("Coupon update failed: instrument ID %d not found", item_id)
+            logger.warning(
+                "Coupon update failed: instrument ID %d not found", item_id
+            )
             raise InstrumentNotFoundError(item_id)
 
         from app.services.cache_service import cache_service
@@ -123,7 +136,9 @@ class PortfolioService:
                 logger.info("Updated coupon for instrument ID %d", item_id)
                 return row
 
-        logger.error("Failed to retrieve updated coupon for instrument ID %d", item_id)
+        logger.error(
+            "Failed to retrieve updated coupon for instrument ID %d", item_id
+        )
         raise ValueError("Не удалось сформировать строку после обновления")
 
     async def remove_not_found_instruments(self) -> int:
@@ -161,7 +176,11 @@ class PortfolioService:
 
         if missing_ids:
             deleted_count = storage_service.delete_items(missing_ids)
-            logger.info("Removed %d not-found instruments: %s", deleted_count, missing_ids)
+            logger.info(
+                "Removed %d not-found instruments: %s",
+                deleted_count,
+                missing_ids,
+            )
             return deleted_count
         return 0
 

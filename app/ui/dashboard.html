@@ -118,8 +118,8 @@
       td.col-frequency,
       th.col-market,
       td.col-market {
-        width: 90px;
-        min-width: 70px;
+        width: 60px;
+        min-width: 50px;
         text-align: center;
       }
       th.col-qty,
@@ -472,32 +472,80 @@
           0
         );
 
-        const annualIncomeRub = rows.reduce((sum, row) => {
-          if (row.type !== "bond") return sum;
-          const coupon = Number(row.coupon || 0);
+        let annualIncomeRub = 0;
+        let totalAnnualCouponYield = 0;
+        let totalAnnualPriceYield = 0;
+        let bondWeightSum = 0;
+
+        const today = new Date();
+
+        for (const row of rows) {
+          if (row.type !== "bond") continue;
+
           const quantity = Number(row.quantity || 0);
-          if (coupon > 0 && quantity > 0) {
-            const period = Number(row.coupon_period || 0);
-            // Расчет количества выплат в год на основе периода в днях
-            // Округляем до ближайшего целого для стандартных частот (1, 2, 4, 12)
-            const paymentsPerYearRaw = period > 0 ? 365 / period : 2;
-            // Округляем до ближайшего стандартного значения
-            const paymentsPerYear = Math.round(paymentsPerYearRaw);
-            return sum + coupon * paymentsPerYear * quantity;
+          const currentPrice = Number(row.current_price || 0);
+          const couponRub = Number(row.coupon || 0);
+          const couponRate = Number(row.coupon_rate || 0);
+          const period = Number(row.coupon_period || 0);
+          const maturityDate = row.maturity_date;
+
+          // Частота выплат = 365 / период купона в днях (округляем до целого)
+          const paymentsPerYear = period > 0 ? Math.round(365 / period) : 2;
+
+          // Купонный доход в рублях = купон × количество × частота
+          if (couponRub > 0 && quantity > 0) {
+            annualIncomeRub += couponRub * quantity * paymentsPerYear;
           }
-          return sum;
-        }, 0);
+
+          // Расчёт полной доходности для облигации
+          if (currentPrice > 0) {
+            const nominal = 1000;
+            
+            // Купонная составляющая (из MOEX)
+            const couponYield = couponRate > 0 ? couponRate : 0;
+
+            // Доходность от изменения цены
+            let priceYield = 0;
+            if (maturityDate) {
+              const maturity = new Date(maturityDate);
+              const yearsToMaturity = (maturity - today) / (1000 * 60 * 60 * 24 * 365.25);
+              if (yearsToMaturity > 0) {
+                priceYield = ((nominal - currentPrice) / currentPrice) / yearsToMaturity * 100;
+              }
+            }
+
+            // Взвешиваем по стоимости позиции
+            const positionValue = currentPrice * quantity;
+            totalAnnualCouponYield += couponYield * positionValue;
+            totalAnnualPriceYield += priceYield * positionValue;
+            bondWeightSum += positionValue;
+          }
+        }
 
         const annualYieldFromAssets =
           totalAssets > 0
             ? (annualIncomeRub / totalAssets) * 100
             : 0;
 
+        // Средневзвешенная полная доходность облигационной части
+        const totalBondYield = bondWeightSum > 0
+          ? (totalAnnualCouponYield + totalAnnualPriceYield) / bondWeightSum
+          : 0;
+
+        // Отладка
+        console.log('Bond yield calculation:', {
+          totalAnnualCouponYield: totalAnnualCouponYield.toFixed(2),
+          totalAnnualPriceYield: totalAnnualPriceYield.toFixed(2),
+          bondWeightSum: bondWeightSum.toFixed(2),
+          totalBondYield: totalBondYield.toFixed(2),
+        });
+
         return {
           totalAssets,
           totalProfit,
           annualIncomeRub,
           annualYieldFromAssets,
+          totalBondYield,
         };
       }
 
@@ -559,36 +607,31 @@
           tr.appendChild(couponTd);
 
           if (row.type === "bond") {
-            const couponNum = Number(row.coupon || 0);
             const qty = Number(row.quantity || 0);
-            const yourCoupon = couponNum * qty;
+            const couponRub = Number(row.coupon || 0);
+            const couponRate = Number(row.coupon_rate || 0);
             const period = Number(row.coupon_period || 0);
-            // Расчет количества выплат в год на основе периода в днях
-            const paymentsPerYearRaw = period > 0 ? 365 / period : 2;
-            const paymentsPerYear = Math.round(paymentsPerYearRaw);
-            const yourAnnualCoupon = yourCoupon * paymentsPerYear;
+            const currentPrice = Number(row.current_price || 0);
+            
+            // Частота выплат = 365 / период купона в днях (округляем до целого)
+            const paymentsPerYear = period > 0 ? Math.round(365 / period) : 2;
+            
+            // Годовой купон в рублях = купон × количество × частота
+            const yourAnnualCoupon = couponRub * qty * paymentsPerYear;
 
             const yourTd = document.createElement("td");
             yourTd.className = "col-your-annual";
             yourTd.textContent = fmt(roundTo2(yourAnnualCoupon));
             tr.appendChild(yourTd);
 
-            // Купонная доходность = (Купон × Частота выплат / 1000) × 100%
-            // Если есть coupon_rate из MOEX, используем его
+            // Купонная доходность из MOEX
             const couponYieldTd = document.createElement("td");
             couponYieldTd.className = "col-coupon-yield";
-            let couponYield;
-            if (row.coupon_rate != null && row.coupon_rate > 0) {
-              // Используем ставку купона из MOEX
-              couponYield = Number(row.coupon_rate);
-            } else {
-              // Расчет по старой формуле
-              const nominal = 1000;
-              couponYield = (couponNum * paymentsPerYear / nominal) * 100;
-            }
+            const couponYield = couponRate > 0 ? couponRate : 0;
             couponYieldTd.textContent = fmt(roundTo2(couponYield)) + "%";
             tr.appendChild(couponYieldTd);
 
+            // Частота выплат (информативно)
             const freqTd = document.createElement("td");
             freqTd.className = "col-frequency";
             freqTd.textContent = String(paymentsPerYear);
@@ -700,8 +743,13 @@
         annualYieldTd.textContent = `Годовая доходность: ${fmt(roundTo2(summary.annualYieldFromAssets))}%`;
         summaryRow.appendChild(annualYieldTd);
 
+        const totalYieldTd = document.createElement("td");
+        totalYieldTd.colSpan = 3;
+        totalYieldTd.textContent = `Полная доходность облигаций: ${fmt(roundTo2(summary.totalBondYield))}%`;
+        summaryRow.appendChild(totalYieldTd);
+
         const spacerTd = document.createElement("td");
-        spacerTd.colSpan = 5;  // Было 4, стало 5 (добавлена колонка купонной доходности)
+        spacerTd.colSpan = 2;
         spacerTd.textContent = "";
         summaryRow.appendChild(spacerTd);
 
