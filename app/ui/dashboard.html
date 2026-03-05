@@ -719,10 +719,11 @@
       // ── API HELPER ───────────────────────────────────────────────
       async function apiFetch(url, opts = {}) {
         const token = localStorage.getItem('mvp_auth_token');
-        const headers = opts.headers || {};
+        const headers = { ...(opts.headers || {}) };
         if (token) { headers['Authorization'] = `Bearer ${token}`; }
         if (sharePassword) { headers['X-Share-Password'] = sharePassword; }
-        const response = await fetch(url, { ...opts, headers });
+        const fetchOpts = { ...opts, headers };
+        const response = await fetch(url, fetchOpts);
         if (response.status === 401) {
           localStorage.removeItem('mvp_auth_token');
           localStorage.removeItem('mvp_username');
