@@ -68,3 +68,7 @@ class InstrumentNotFoundError(PortfolioError):
 
 class CacheError(AppError):
     """Base exception for cache service errors."""
+
+
+class AuthError(AppError):
+    """Raised when authentication fails."""

@@ -36,7 +36,7 @@ class PortfolioService:
         return await llm_service.validate_instrument(payload)
 
     async def add_instrument(
-        self, payload: AddInstrumentInput
+        self, portfolio_id: int, payload: AddInstrumentInput
     ) -> InstrumentMetrics:
         validation = await self.validate(payload)
         if not validation.validated:
@@ -64,13 +64,14 @@ class PortfolioService:
             instrument_type=validation.instrument_type,
             quantity=payload.quantity,
             purchase_price=payload.purchase_price,
+            portfolio_id=portfolio_id,
         )
         logger.info(
-            "Added instrument %s (ID: %d) to portfolio", ticker, new_id
+            "Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id
         )
 
         from app.services.cache_service import cache_service
-        rows = await cache_service.refresh()
+        rows = await cache_service.refresh(portfolio_id)
         for row in rows:
             if row.id == new_id:
                 return row
@@ -82,21 +83,23 @@ class PortfolioService:
             "Не удалось сформировать строку для добавленной бумаги"
         )
 
-    def delete_instrument(self, item_id: int) -> bool:
-        deleted = storage_service.delete_item(item_id)
+    def delete_instrument(self, portfolio_id: int, item_id: int) -> bool:
+        deleted = storage_service.delete_item(item_id, portfolio_id)
         if deleted > 0:
-            logger.info("Deleted instrument ID %d from portfolio", item_id)
+            logger.info("Deleted instrument ID %d from portfolio_id=%d", item_id, portfolio_id)
             from app.services.cache_service import cache_service
-            cache_service.invalidate()
+            cache_service.invalidate(portfolio_id)
         return deleted > 0
 
     async def update_instrument(
         self,
+        portfolio_id: int,
         item_id: int,
         payload: UpdateInstrumentInput,
     ) -> InstrumentMetrics:
         updated = storage_service.update_item(
             item_id=item_id,
+            portfolio_id=portfolio_id,
             quantity=payload.quantity,
             purchase_price=payload.purchase_price,
         )
@@ -107,7 +110,7 @@ class PortfolioService:
             raise InstrumentNotFoundError(item_id)
 
         from app.services.cache_service import cache_service
-        rows = await cache_service.refresh()
+        rows = await cache_service.refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 logger.info("Updated instrument ID %d", item_id)
@@ -118,11 +121,13 @@ class PortfolioService:
 
     async def update_coupon(
         self,
+        portfolio_id: int,
         item_id: int,
         payload: UpdateCouponInput,
     ) -> InstrumentMetrics:
         updated = storage_service.update_coupon(
             item_id=item_id,
+            portfolio_id=portfolio_id,
             coupon=payload.coupon,
         )
         if updated == 0:
@@ -132,7 +137,7 @@ class PortfolioService:
             raise InstrumentNotFoundError(item_id)
 
         from app.services.cache_service import cache_service
-        rows = await cache_service.refresh()
+        rows = await cache_service.refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 logger.info("Updated coupon for instrument ID %d", item_id)
@@ -145,25 +150,27 @@ class PortfolioService:
 
     async def update_coupon_rate(
         self,
+        portfolio_id: int,
         item_id: int,
         payload: UpdateCouponRateInput,
     ) -> InstrumentMetrics:
         updated = storage_service.update_coupon_rate(
             item_id=item_id,
+            portfolio_id=portfolio_id,
             coupon_rate=payload.coupon_rate,
         )
         if updated == 0:
             raise InstrumentNotFoundError(item_id)
 
         from app.services.cache_service import cache_service
-        rows = await cache_service.refresh()
+        rows = await cache_service.refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 return row
 
         raise ValueError("Не удалось сформировать строку после обновления")
 
-    async def remove_not_found_instruments(self) -> int:
+    async def remove_not_found_instruments(self, portfolio_id: int) -> int:
         stored_items = [
             PortfolioItem(
                 id=int(item["id"]),
@@ -182,7 +189,7 @@ class PortfolioService:
                     else None
                 ),
             )
-            for item in storage_service.get_items()
+            for item in storage_service.get_items(portfolio_id)
         ]
 
         missing_ids: list[int] = []
@@ -202,7 +209,7 @@ class PortfolioService:
                 missing_ids.append(item.id)
 
         if missing_ids:
-            deleted_count = storage_service.delete_items(missing_ids)
+            deleted_count = storage_service.delete_items(missing_ids, portfolio_id)
             logger.info(
                 "Removed %d not-found instruments: %s",
                 deleted_count,
@@ -211,18 +218,18 @@ class PortfolioService:
             return deleted_count
         return 0
 
-    async def get_table(self) -> list[InstrumentMetrics]:
+    async def get_table(self, portfolio_id: int) -> list[InstrumentMetrics]:
         """Return cached table (instant). Falls back to fresh fetch."""
         from app.services.cache_service import cache_service
 
-        if cache_service.is_warm:
-            return cache_service.rows
-        return await cache_service.refresh()
+        if cache_service.is_warm(portfolio_id):
+            return cache_service.rows(portfolio_id)
+        return await cache_service.refresh(portfolio_id)
 
     # ------------------------------------------------------------------
     # Heavy method: called ONLY by cache_service in background
     # ------------------------------------------------------------------
-    async def get_table_fresh(self) -> list[InstrumentMetrics]:
+    async def get_table_fresh(self, portfolio_id: int) -> list[InstrumentMetrics]:
         stored_items = [
             PortfolioItem(
                 id=int(item["id"]),
@@ -241,7 +248,7 @@ class PortfolioService:
                     else None
                 ),
             )
-            for item in storage_service.get_items()
+            for item in storage_service.get_items(portfolio_id)
         ]
 
         # Limit concurrent MOEX requests to avoid rate-limits/timeouts
@@ -366,7 +373,7 @@ class PortfolioService:
 
             # Persist rating to DB so we can detect changes across restarts
             if row.current_price > 0:
-                storage_service.update_rating(row.id, row.company_rating)
+                storage_service.update_rating(row.id, portfolio_id, row.company_rating)
 
         return finalized
 

@@ -1,9 +1,14 @@
+"""
+Portfolio instruments API: add, update, delete, export/import.
+"""
+
 import csv
 import io
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 
+from app.api.deps import get_current_user, get_portfolio_or_403
 from app.exceptions import AppError, InstrumentNotFoundError
 from app.models import (
     AddInstrumentInput,
@@ -14,23 +19,35 @@ from app.models import (
     ValidationRequest,
     ValidationResponse,
 )
+from app.services.cache_service import cache_service
 from app.services.portfolio_service import portfolio_service
 from app.services.storage_service import storage_service
-from app.services.cache_service import cache_service
+
+router = APIRouter(tags=["instruments"])
 
 
-router = APIRouter(prefix="/portfolio", tags=["portfolio"])
-
-
-@router.post("/validate", response_model=ValidationResponse)
-async def validate_input(payload: ValidationRequest) -> ValidationResponse:
+@router.post("/portfolios/{portfolio_id}/validate", response_model=ValidationResponse)
+async def validate_input(
+    portfolio_id: int,
+    payload: ValidationRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ValidationResponse:
+    """Validate instrument data."""
+    await get_portfolio_or_403(portfolio_id, current_user)
     return await portfolio_service.validate(payload.user_input)
 
 
-@router.post("/instruments")
-async def add_instrument(payload: AddInstrumentInput) -> dict:
+@router.post("/portfolios/{portfolio_id}/instruments")
+async def add_instrument(
+    portfolio_id: int,
+    payload: AddInstrumentInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Add instrument to portfolio."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
     try:
-        row = await portfolio_service.add_instrument(payload)
+        row = await portfolio_service.add_instrument(portfolio_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
@@ -50,21 +67,33 @@ async def add_instrument(payload: AddInstrumentInput) -> dict:
     }
 
 
-@router.delete("/instruments/{item_id}")
-async def delete_instrument(item_id: int) -> dict[str, bool]:
-    deleted = portfolio_service.delete_instrument(item_id)
+@router.delete("/portfolios/{portfolio_id}/instruments/{item_id}")
+async def delete_instrument(
+    portfolio_id: int,
+    item_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, bool]:
+    """Delete instrument from portfolio."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
+    deleted = portfolio_service.delete_instrument(portfolio_id, item_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Строка не найдена")
     return {"deleted": True}
 
 
-@router.patch("/instruments/{item_id}")
+@router.patch("/portfolios/{portfolio_id}/instruments/{item_id}")
 async def update_instrument(
+    portfolio_id: int,
     item_id: int,
     payload: UpdateInstrumentInput,
+    current_user: dict = Depends(get_current_user),
 ) -> dict:
+    """Update instrument in portfolio."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
     try:
-        row = await portfolio_service.update_instrument(item_id, payload)
+        row = await portfolio_service.update_instrument(portfolio_id, item_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
@@ -83,13 +112,18 @@ async def update_instrument(
     }
 
 
-@router.patch("/instruments/{item_id}/coupon")
+@router.patch("/portfolios/{portfolio_id}/instruments/{item_id}/coupon")
 async def update_coupon(
+    portfolio_id: int,
     item_id: int,
     payload: UpdateCouponInput,
+    current_user: dict = Depends(get_current_user),
 ) -> dict:
+    """Update coupon for bond instrument."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
     try:
-        row = await portfolio_service.update_coupon(item_id, payload)
+        row = await portfolio_service.update_coupon(portfolio_id, item_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
@@ -105,13 +139,18 @@ async def update_coupon(
     }
 
 
-@router.patch("/instruments/{item_id}/coupon-rate")
+@router.patch("/portfolios/{portfolio_id}/instruments/{item_id}/coupon-rate")
 async def update_coupon_rate(
+    portfolio_id: int,
     item_id: int,
     payload: UpdateCouponRateInput,
+    current_user: dict = Depends(get_current_user),
 ) -> dict:
+    """Update coupon rate for bond instrument."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
     try:
-        row = await portfolio_service.update_coupon_rate(item_id, payload)
+        row = await portfolio_service.update_coupon_rate(portfolio_id, item_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
@@ -124,55 +163,76 @@ async def update_coupon_rate(
     }
 
 
-@router.delete("/instruments/cleanup/not-found")
-async def delete_not_found_instruments() -> dict[str, int]:
-    deleted_count = await portfolio_service.remove_not_found_instruments()
+@router.delete("/portfolios/{portfolio_id}/instruments/cleanup/not-found")
+async def delete_not_found_instruments(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, int]:
+    """Remove instruments not found on MOEX."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
+    deleted_count = await portfolio_service.remove_not_found_instruments(portfolio_id)
     return {"deleted_count": deleted_count}
 
 
-@router.get("/table", response_model=PortfolioTableResponse)
-async def get_table() -> PortfolioTableResponse:
-    rows = await portfolio_service.get_table()
+@router.get(
+    "/portfolios/{portfolio_id}/table", response_model=PortfolioTableResponse
+)
+async def get_table(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> PortfolioTableResponse:
+    """Get portfolio table."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+
+    rows = await portfolio_service.get_table(portfolio_id)
     return PortfolioTableResponse(items=rows)
 
 
-# ── CSV Export ───────────────────────────────────────────────────────────────
-
-@router.get("/export")
-async def export_csv() -> StreamingResponse:
+@router.get("/portfolios/{portfolio_id}/export")
+async def export_csv(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> StreamingResponse:
     """Export portfolio as CSV file."""
-    items = storage_service.get_items()
+    await get_portfolio_or_403(portfolio_id, current_user)
+
+    items = storage_service.get_items(portfolio_id)
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ticker", "instrument_type", "quantity", "purchase_price"])
     for item in items:
-        writer.writerow([
-            item["ticker"],
-            item["instrument_type"],
-            item["quantity"],
-            item["purchase_price"],
-        ])
+        writer.writerow(
+            [
+                item["ticker"],
+                item["instrument_type"],
+                item["quantity"],
+                item["purchase_price"],
+            ]
+        )
 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": "attachment; filename=portfolio.csv"
-        },
+        headers={"Content-Disposition": "attachment; filename=portfolio.csv"},
     )
 
 
-# ── CSV Import ───────────────────────────────────────────────────────────────
-
-@router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict[str, int]:
+@router.post("/portfolios/{portfolio_id}/import")
+async def import_csv(
+    portfolio_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, int]:
     """Import portfolio from CSV file.
 
     Expected columns: ticker, instrument_type, quantity, purchase_price
     instrument_type must be 'bond' or 'stock'.
     """
+    await get_portfolio_or_403(portfolio_id, current_user)
+
     content = await file.read()
     try:
         text = content.decode("utf-8-sig")
@@ -217,12 +277,13 @@ async def import_csv(file: UploadFile = File(...)) -> dict[str, int]:
                 instrument_type=instrument_type,
                 quantity=quantity,
                 purchase_price=purchase_price,
+                portfolio_id=portfolio_id,
             )
             added += 1
         except Exception as exc:
             errors.append(f"Строка {i}: {exc}")
 
     if added > 0:
-        cache_service.invalidate()
+        cache_service.invalidate(portfolio_id)
 
     return {"added": added, "errors": len(errors), "error_details": errors}

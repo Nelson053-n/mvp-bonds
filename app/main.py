@@ -5,7 +5,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
+from app.api.auth import router as auth_router
 from app.api.portfolio import router as portfolio_router
+from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
 from app.services.cache_service import cache_service
 from app.logging_config import setup_logging
@@ -17,13 +19,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: warm cache and start background refresh
+    # Startup: start background refresh (portfolios are lazy-loaded)
     logger.info("Starting up application")
-    try:
-        await cache_service.refresh()
-        logger.info("Cache warmed successfully")
-    except Exception as exc:
-        logger.warning("Failed to warm cache on startup: %s", exc)
     cache_service.start_background()
     yield
     # Shutdown
@@ -36,6 +33,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.include_router(auth_router)
+app.include_router(portfolios_router)
 app.include_router(portfolio_router)
 app.include_router(settings_router)
 
