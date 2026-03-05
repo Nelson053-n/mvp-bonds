@@ -110,6 +110,7 @@ class CacheService:
                     update_data["coupon_rate"] = new_row.coupon_rate
                     update_data["coupon_period"] = new_row.coupon_period
                     update_data["maturity_date"] = new_row.maturity_date
+                    update_data["offer_date"] = new_row.offer_date
                     update_data["aci"] = new_row.aci
                     update_data["market_yield"] = new_row.market_yield
                 # Preserve stock-specific fields

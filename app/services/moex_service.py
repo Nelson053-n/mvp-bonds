@@ -75,6 +75,7 @@ class MOEXService:
         coupon_rate = sec_row.get("COUPONPERCENT")  # Ставка купона в %
         maturity_date = self._parse_date(sec_row.get("MATDATE"))
         buyback_date = self._parse_date(sec_row.get("BUYBACKDATE"))
+        offer_date = self._parse_date(sec_row.get("OFFERDATE"))
         aci = md_row.get("ACCINT")
         market_yield = md_row.get("YIELD")
         company_rating = await self._get_smartlab_credit_rating(secid)
@@ -99,6 +100,7 @@ class MOEXService:
             ),
             maturity_date=maturity_date,
             buyback_date=buyback_date,
+            offer_date=offer_date,
             aci=float(aci) if aci is not None else None,
             market_yield=(
                 float(market_yield)
