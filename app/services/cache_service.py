@@ -81,22 +81,32 @@ class CacheService:
                 and old_row.current_price > 0
             ):
                 # Keep old successful data, but update editable fields
-                patched = old_row.model_copy(
-                    update={
-                        "quantity": new_row.quantity,
-                        "purchase_price": new_row.purchase_price,
-                        "current_value": round(
-                            old_row.current_price * new_row.quantity, 2
-                        ),
-                        "profit": round(
-                            (old_row.current_price - new_row.purchase_price)
-                            * new_row.quantity,
-                            2,
-                        ),
-                        "coupon": new_row.coupon,
-                        "manual_coupon_set": new_row.manual_coupon_set,
-                    }
-                )
+                update_data = {
+                    "quantity": new_row.quantity,
+                    "purchase_price": new_row.purchase_price,
+                    "current_value": round(
+                        old_row.current_price * new_row.quantity, 2
+                    ),
+                    "profit": round(
+                        (old_row.current_price - new_row.purchase_price)
+                        * new_row.quantity,
+                        2,
+                    ),
+                    "coupon": new_row.coupon,
+                    "manual_coupon_set": new_row.manual_coupon_set,
+                }
+                # Preserve bond-specific fields if they exist in new_row
+                if new_row.type == "bond":
+                    update_data["coupon_rate"] = new_row.coupon_rate
+                    update_data["coupon_period"] = new_row.coupon_period
+                    update_data["maturity_date"] = new_row.maturity_date
+                    update_data["aci"] = new_row.aci
+                    update_data["market_yield"] = new_row.market_yield
+                # Preserve stock-specific fields
+                if new_row.type == "stock":
+                    update_data["dividend_yield"] = new_row.dividend_yield
+
+                patched = old_row.model_copy(update=update_data)
                 result.append(patched)
             else:
                 result.append(new_row)
