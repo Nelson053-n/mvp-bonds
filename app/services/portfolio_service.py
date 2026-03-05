@@ -292,6 +292,7 @@ class PortfolioService:
                             manual_coupon_rate_set=item.manual_coupon_rate is not None,
                             maturity_date=snapshot.maturity_date,
                             buyback_date=snapshot.buyback_date,
+                            offer_date=snapshot.offer_date,
                             aci=snapshot.aci,
                             market_yield=snapshot.market_yield,
                             ai_comment="",
