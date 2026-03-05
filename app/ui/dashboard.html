@@ -7,1063 +7,881 @@
     <style>
       :root {
         color-scheme: light;
+        --blue: #2563eb;
+        --red: #b91c1c;
+        --green-bg: #dcfce7;
+        --red-bg: #fee2e2;
+        --border: #e5e7eb;
+        --bg: #f5f6f8;
+        --card-bg: #fff;
+        --text: #1f2937;
+        --muted: #6b7280;
       }
-      body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #f5f6f8;
-        color: #1f2937;
-      }
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-      }
-      h1 {
-        margin: 0 0 16px;
-        font-size: 20px;
-      }
-      .card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 16px;
-      }
-      .add-card {
-        padding: 8px;
-        margin-bottom: 8px;
-      }
-      form {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 6px;
-        align-items: end;
-      }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        font-size: 10px;
-      }
-      input {
-        height: 22px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        padding: 0 6px;
-        font-size: 10px;
-      }
-      button {
-        height: 24px;
-        border: 0;
-        border-radius: 6px;
-        background: #2563eb;
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
+
+      /* ── TOPBAR (2 rows) ─────────────────────────────────────── */
+      .topbar {
+        background: #1e3a5f;
         color: #fff;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 6px rgba(0,0,0,.3);
+      }
+      .topbar-top {
+        padding: 8px 16px 0;
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: .5px;
+      }
+      .topbar-nav {
+        display: flex;
+        padding: 0 8px;
+        border-top: 1px solid rgba(255,255,255,.1);
+      }
+      .nav-btn {
+        background: none;
+        border: none;
+        color: rgba(255,255,255,.7);
+        font-size: 12px;
         font-weight: 600;
+        padding: 6px 12px;
         cursor: pointer;
-        font-size: 10px;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: default;
-      }
-      .status {
-        margin-top: 12px;
-        font-size: 12px;
-      }
-      .status.error {
-        color: #b91c1c;
-      }
-      .status.ok {
-        color: #065f46;
-      }
-      .table-wrap {
-        overflow-x: auto;
-      }
-      .rating-cell {
-        min-width: 112px;
-      }
-      .sortable {
-        cursor: pointer;
-        white-space: normal;
-      }
-      .sort-arrow {
-        font-size: 12px;
-        margin-left: 6px;
+        border-bottom: 2px solid transparent;
         white-space: nowrap;
+        transition: color .15s, border-color .15s;
       }
+      .nav-btn:hover { color: #fff; }
+      .nav-btn.active { color: #fff; border-bottom-color: #60a5fa; }
+
+      /* ── LAYOUT ──────────────────────────────────────────────── */
+      .container { max-width: 1400px; margin: 0 auto; padding: 12px 16px; }
+      .panel { display: none; }
+      .panel.active { display: block; }
+      .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+      .card h2 { margin: 0 0 12px; font-size: 13px; color: #374151; }
+
+      /* ── FORMS ───────────────────────────────────────────────── */
+      .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; align-items: end; }
+      label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
+      input[type="text"], input[type="number"], input[type="password"] {
+        height: 30px; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 8px; font-size: 12px; color: var(--text); width: 100%;
+      }
+      input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .btn {
+        height: 30px; border: 0; border-radius: 6px; background: var(--blue);
+        color: #fff; font-weight: 600; cursor: pointer; font-size: 12px; padding: 0 14px; white-space: nowrap;
+      }
+      .btn:disabled { opacity: 0.6; cursor: default; }
+      .btn-secondary { background: #f3f4f6; color: var(--text); border: 1px solid var(--border); }
+      .btn-sm { height: 18px; font-size: 9px; padding: 0 5px; border-radius: 3px; background: #fecaca; color: #991b1b; border: 1px solid #fca5a5; cursor: pointer; font-weight: 600; }
+      .status { margin-top: 8px; font-size: 12px; min-height: 16px; }
+      .status.error { color: var(--red); }
+      .status.ok { color: #065f46; }
+
+      /* ── NOTIFICATIONS ───────────────────────────────────────── */
+      .notif-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; align-items: end; margin-bottom: 10px; }
+      .notif-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      .notif-hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+      /* ── IMPORT/EXPORT ───────────────────────────────────────── */
+      .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .io-section h3 { margin: 0 0 8px; font-size: 13px; }
+      .io-section p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+      .io-section code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+      .file-label { display: inline-block; padding: 0 12px; height: 30px; line-height: 30px; background: #f3f4f6; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+      .file-label:hover { background: #e5e7eb; }
+      input[type="file"] { display: none; }
+
+      /* ── TABLE ───────────────────────────────────────────────── */
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; background: #fff; white-space: nowrap; }
+      th, td { border: 1px solid var(--border); padding: 3px 5px; text-align: center; vertical-align: middle; white-space: nowrap; }
+      th { background: #f9fafb; cursor: pointer; user-select: none; font-size: 10px; line-height: 1.3; }
+      th.no-sort { cursor: default; }
+      th.wrap { white-space: normal; }
+      td.col-name { text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+      .profit-positive { background: var(--green-bg); }
+      .profit-negative { background: var(--red-bg); }
+      .summary-row td { background: #f3f4f6; font-weight: 700; font-size: 11px; }
+
+      /* ── RATING ──────────────────────────────────────────────── */
+      .rating-cell { min-width: 80px; }
+      .rating-track { position: relative; width: 100%; height: 11px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+      .rating-fill { height: 100%; border-radius: 999px; }
+      .rating-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: #111827; text-shadow: 0 1px 0 rgba(255,255,255,.6); pointer-events: none; }
+
+      /* ── EDITABLE INPUTS IN TABLE ────────────────────────────── */
       .editable-input {
-        width: 56px;
-        height: 22px;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        text-align: center;
-        font-size: 11px;
-        padding: 0 4px;
-        appearance: textfield;
-        -moz-appearance: textfield;
+        width: 52px; height: 18px; border: 1px solid #d1d5db; border-radius: 3px;
+        text-align: center; font-size: 10px; padding: 0 2px;
+        appearance: textfield; -moz-appearance: textfield;
       }
       .editable-input::-webkit-outer-spin-button,
-      .editable-input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-      th.col-coupon,
-      td.col-coupon,
-      th.col-your-annual,
-      td.col-your-annual,
-      th.col-coupon-yield,
-      td.col-coupon-yield,
-      th.col-frequency,
-      td.col-frequency,
-      th.col-market,
-      td.col-market {
-        width: 60px;
-        min-width: 50px;
-        text-align: center;
-      }
-      th.col-qty,
-      td.col-qty,
-      th.col-purchase,
-      td.col-purchase {
-        width: 70px;
-        min-width: 70px;
-        max-width: 70px;
-      }
-      .rating-track {
-        position: relative;
-        width: 100%;
-        height: 12px;
-        border-radius: 999px;
-        background: #e5e7eb;
-        overflow: hidden;
-      }
-      .rating-fill {
-        height: 100%;
-        border-radius: 999px;
-      }
-      .rating-label {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 8px;
-        font-weight: 700;
-        color: #111827;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
-        pointer-events: none;
-      }
-      .danger-btn {
-        background: #b91c1c;
-      }
-      .danger-btn.small {
-        height: 16px;
-        padding: 0 5px;
-        font-size: 8px;
-        background: #fecaca;
-        color: #991b1b;
-        border: 1px solid #fca5a5;
-        border-radius: 4px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 11px;
-        background: #fff;
-      }
-      th,
-      td {
-        border: 1px solid #e5e7eb;
-        padding: 4px 6px;
-        text-align: center;
-        vertical-align: middle;
-        white-space: nowrap;
-      }
-      th {
-        background: #f9fafb;
-      }
-      .profit-positive {
-        background: #dcfce7;
-      }
-      .profit-negative {
-        background: #fee2e2;
-      }
-      .summary-row td {
-        background: #f3f4f6;
-        font-weight: 700;
-      }
+      .editable-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .coupon-input { width: 42px; }
+
+      /* ── MONTHLY CHART ───────────────────────────────────────── */
+      #monthly-chart { width: 100%; display: block; border-radius: 6px; }
+      .chart-empty { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+
+      /* ── RESPONSIVE ──────────────────────────────────────────── */
       @media (max-width: 900px) {
-        form {
-          grid-template-columns: 1fr;
-        }
+        .form-grid { grid-template-columns: repeat(2,1fr); }
+        .notif-grid { grid-template-columns: repeat(2,1fr); }
+        .io-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 600px) {
+        .container { padding: 8px; }
+        .topbar-top { font-size: 14px; }
+        .nav-btn { padding: 5px 8px; font-size: 11px; }
+        .form-grid { grid-template-columns: 1fr; }
+        table { font-size: 10px; }
       }
     </style>
   </head>
   <body>
+
+    <!-- TWO-ROW TOPBAR -->
+    <nav class="topbar">
+      <div class="topbar-top">Портфель</div>
+      <div class="topbar-nav">
+        <button class="nav-btn active" data-panel="panel-table">Портфель</button>
+        <button class="nav-btn" data-panel="panel-add">Добавить бумагу</button>
+        <button class="nav-btn" data-panel="panel-notifications">Уведомления</button>
+        <button class="nav-btn" data-panel="panel-io">Импорт / Экспорт</button>
+      </div>
+    </nav>
+
     <div class="container">
-      <h1>Портфель — MVP дашборд</h1>
 
-      <section class="card add-card">
-        <form id="add-form">
-          <label>
-            Тикер / название
-            <input id="ticker" name="ticker" required />
-          </label>
-          <label>
-            Количество
-            <input id="quantity" name="quantity" type="number" step="0.01" min="0.01" required style="appearance: textfield; -moz-appearance: textfield;" />
-          </label>
-          <label>
-            Цена покупки
-            <input id="purchase_price" name="purchase_price" type="number" step="0.01" min="0.01" required style="appearance: textfield; -moz-appearance: textfield;" />
-          </label>
-          <button id="submit-btn" type="submit">Добавить бумагу</button>
-        </form>
-        <div id="status" class="status"></div>
-      </section>
+      <!-- PANEL: TABLE -->
+      <div id="panel-table" class="panel active">
+        <div id="table-status" class="status"></div>
+        <div class="card" style="padding:6px;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-sort-key="id">&#8470;</th>
+                  <th data-sort-key="name">Название</th>
+                  <th data-sort-key="company_rating">Рейтинг</th>
+                  <th data-sort-key="current_price">Тек.&nbsp;цена</th>
+                  <th data-sort-key="quantity">Кол-во</th>
+                  <th data-sort-key="purchase_price">Цена&nbsp;покупки</th>
+                  <th data-sort-key="current_value">Стоимость</th>
+                  <th data-sort-key="profit">Прибыль</th>
+                  <th data-sort-key="weight">Доля</th>
+                  <th data-sort-key="coupon" style="max-width:48px;">Купон</th>
+                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:56px;">Год.<br>купон</th>
+                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">Дох.<br>купона</th>
+                  <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;">Частота<br>выплат</th>
+                  <th data-sort-key="market_yield" class="wrap" style="min-width:52px;">Рын.<br>доход.</th>
+                  <th data-sort-key="maturity_date">Погашение</th>
+                  <th class="no-sort">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+        </div>
 
-      <section class="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="sortable" data-sort-key="id">№</th>
-              <th class="sortable" data-sort-key="name">Название</th>
-              <th class="sortable" data-sort-key="company_rating">Рейтинг</th>
-              <th class="sortable" data-sort-key="current_price">Текущ. цена</th>
-              <th class="sortable col-qty" data-sort-key="quantity">Кол-во</th>
-              <th class="sortable col-purchase" data-sort-key="purchase_price">Цена покупки</th>
-              <th class="sortable" data-sort-key="current_value">Тек. стоимость</th>
-              <th class="sortable" data-sort-key="profit">Прибыль</th>
-              <th class="sortable" data-sort-key="weight">Доля</th>
-              <th class="sortable col-coupon" data-sort-key="coupon">Купон</th>
-              <th class="sortable col-your-annual" data-sort-key="your_annual_coupon">Ваш годовой купон</th>
-              <th class="sortable col-coupon-yield" data-sort-key="coupon_yield">Купонная доходн.</th>
-              <th class="sortable col-frequency" data-sort-key="coupon_frequency">Частота (в год)</th>
-              <th class="sortable col-market" data-sort-key="market_yield">Рын. доходность</th>
-              <th class="sortable" data-sort-key="maturity_date">Дата погашения</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody id="table-body"></tbody>
-        </table>
-      </section>
+        <!-- MONTHLY INCOME CHART -->
+        <div class="card" id="chart-card">
+          <h2>Купонный доход по месяцам</h2>
+          <div id="chart-empty" class="chart-empty" style="display:none;">Нет данных по купонным выплатам</div>
+          <canvas id="monthly-chart" height="190"></canvas>
+        </div>
+      </div>
+
+      <!-- PANEL: ADD INSTRUMENT -->
+      <div id="panel-add" class="panel">
+        <div class="card">
+          <h2>Добавить инструмент</h2>
+          <form id="add-form" class="form-grid">
+            <label>
+              Тикер / ISIN / название
+              <input id="ticker" name="ticker" type="text" required />
+            </label>
+            <label>
+              Количество
+              <input id="quantity" name="quantity" type="number" step="0.01" min="0.01" required />
+            </label>
+            <label>
+              Цена покупки
+              <input id="purchase_price" name="purchase_price" type="number" step="0.01" min="0.01" required />
+            </label>
+            <button class="btn" id="submit-btn" type="submit">Добавить</button>
+          </form>
+          <div id="add-status" class="status"></div>
+        </div>
+      </div>
+
+      <!-- PANEL: NOTIFICATIONS -->
+      <div id="panel-notifications" class="panel">
+        <div class="card">
+          <h2>Telegram-уведомления</h2>
+          <div class="notif-grid">
+            <label>Bot Token<input id="tg-token" type="password" placeholder="123456:ABC..." /></label>
+            <label>Chat ID<input id="tg-chat" type="text" placeholder="-100123456789" /></label>
+            <label>Порог просадки (%)<input id="tg-threshold" type="number" step="0.5" min="0.5" value="5" /></label>
+          </div>
+          <div class="notif-actions">
+            <button class="btn" id="notif-save-btn">Сохранить</button>
+            <button class="btn btn-secondary" id="notif-test-btn">Тест уведомления</button>
+          </div>
+          <div id="notif-status" class="status"></div>
+          <div class="notif-hint">
+            <b>Уведомления приходят при:</b><br>
+            &bull; Изменении кредитного рейтинга эмитента<br>
+            &bull; Просадке рыночной цены ниже заданного порога<br><br>
+            <b>Chat ID:</b> перешлите сообщение боту @userinfobot.
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL: IMPORT / EXPORT -->
+      <div id="panel-io" class="panel">
+        <div class="card">
+          <h2>Импорт и экспорт портфеля</h2>
+          <div class="io-grid">
+            <div class="io-section">
+              <h3>Экспорт</h3>
+              <p>Скачать все позиции в формате CSV.</p>
+              <a href="/portfolio/export" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;">Скачать CSV</a>
+            </div>
+            <div class="io-section">
+              <h3>Импорт</h3>
+              <p>CSV с колонками: <code>ticker, instrument_type, quantity, purchase_price</code><br>instrument_type: <code>bond</code> или <code>stock</code></p>
+              <label class="file-label" for="import-file">Выбрать файл</label>
+              <input type="file" id="import-file" accept=".csv,text/csv" />
+              <button class="btn" id="import-btn" style="margin-left:8px;">Импортировать</button>
+              <div id="io-status" class="status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <script>
-      const form = document.getElementById("add-form");
-      const statusEl = document.getElementById("status");
-      const tableBody = document.getElementById("table-body");
-      const submitBtn = document.getElementById("submit-btn");
-      const sortableHeaders = Array.from(
-        document.querySelectorAll("th.sortable")
-      );
-
-      // Preserve original header labels and render with optional line-break
-      for (const header of sortableHeaders) {
-        header.dataset.origLabel = header.textContent.trim();
+      // ── NAV ─────────────────────────────────────────────────────
+      const navBtns = document.querySelectorAll('.nav-btn');
+      const panels  = document.querySelectorAll('.panel');
+      function showPanel(id) {
+        panels.forEach(p => p.classList.toggle('active', p.id === id));
+        navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
       }
+      navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
 
-      function renderHeaderLabel(header) {
-        const label = (header.dataset.origLabel || '').trim();
-        const arrow = header.dataset.arrow || '';
-        const arrowHtml = arrow ? `<span class="sort-arrow">${arrow}</span>` : '';
-        const parts = label.split(/\s+/);
-        if (parts.length === 2) {
-          header.innerHTML = `${parts[0]}<br>${parts[1]} ${arrowHtml}`;
-        } else {
-          header.innerHTML = `${label} ${arrowHtml}`;
-        }
-      }
+      // ── CONSTANTS ────────────────────────────────────────────────
+      const TABLE_CACHE_KEY    = 'mvp_portfolio_table_cache_v2';
+      const TABLE_CACHE_TS_KEY = 'mvp_portfolio_table_cache_ts_v2';
+      const SYNC_INTERVAL_MS   = 120 * 1000;
+      const MONTH_NAMES = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
 
-      const TABLE_CACHE_KEY = "mvp_portfolio_table_cache_v1";
-      const TABLE_CACHE_TS_KEY = "mvp_portfolio_table_cache_ts_v1";
-      const SYNC_INTERVAL_MS = 120 * 1000;
-
+      // ── STATE ────────────────────────────────────────────────────
       let tableRows = [];
-      let sortState = {
-        key: null,
-        direction: "asc",
-      };
+      let sortState = { key: null, direction: 'asc' };
 
-      function roundTo2(value) {
-        return Math.round(value * 100) / 100;
+      // ── UTILS ────────────────────────────────────────────────────
+      function roundTo2(v) { return Math.round(v * 100) / 100; }
+      function fmt(v) {
+        if (v === null || v === undefined) return '—';
+        if (typeof v === 'number') return v.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+        return String(v);
+      }
+      function setStatus(el, msg, isError) {
+        el.textContent = msg;
+        el.className = isError ? 'status error' : 'status ok';
       }
 
+      // ── CACHE ────────────────────────────────────────────────────
       function persistTableCache() {
         localStorage.setItem(TABLE_CACHE_KEY, JSON.stringify(tableRows));
         localStorage.setItem(TABLE_CACHE_TS_KEY, String(Date.now()));
       }
-
       function loadTableCache() {
         try {
           const raw = localStorage.getItem(TABLE_CACHE_KEY);
-          if (!raw) {
-            return false;
-          }
-          const parsed = JSON.parse(raw);
-          if (!Array.isArray(parsed)) {
-            return false;
-          }
-          tableRows = parsed;
-          return true;
-        } catch {
-          return false;
-        }
+          if (!raw) return false;
+          const p = JSON.parse(raw);
+          if (!Array.isArray(p)) return false;
+          tableRows = p; return true;
+        } catch { return false; }
       }
-
       function getLastSyncTimestamp() {
-        const raw = localStorage.getItem(TABLE_CACHE_TS_KEY);
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? parsed : 0;
+        const p = Number(localStorage.getItem(TABLE_CACHE_TS_KEY));
+        return Number.isFinite(p) ? p : 0;
       }
 
-      function recalculateWeights(rows) {
-        const totalValue = rows.reduce(
-          (sum, row) => sum + Number(row.current_value || 0),
-          0
-        );
-        for (const row of rows) {
-          const weight =
-            totalValue > 0
-              ? roundTo2((Number(row.current_value || 0) / totalValue) * 100)
-              : 0;
-          row.weight = weight;
-        }
+      // ── RATING ───────────────────────────────────────────────────
+      function parseRating(raw) {
+        if (!raw) return null;
+        const m = String(raw).toUpperCase().match(/\b(?:RU)?(AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|CCC|CC|C|D)\b/);
+        return m ? m[1] : null;
       }
-
-      function recalculateRow(row, quantity, purchasePrice) {
-        const currentPrice = Number(row.current_price || 0);
-        row.quantity = quantity;
-        row.purchase_price = purchasePrice;
-        row.current_value = roundTo2(currentPrice * quantity);
-        row.profit = roundTo2((currentPrice - purchasePrice) * quantity);
-      }
-
-      function fmt(value) {
-        if (value === null || value === undefined) return "—";
-        if (typeof value === "number") {
-          return value.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
-        }
-        return String(value);
-      }
-
-      function setStatus(message, isError = false) {
-        statusEl.textContent = message;
-        statusEl.className = isError ? "status error" : "status ok";
-      }
-
-      function buildBondLink(ticker) {
-        return `https://smart-lab.ru/q/bonds/${encodeURIComponent(ticker)}/`;
-      }
-
-      function parseRating(rawRating) {
-        if (!rawRating) return null;
-        const text = String(rawRating).toUpperCase();
-        const match = text.match(
-          /\b(?:RU)?(AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|CCC|CC|C|D)\b/
-        );
-        if (!match) return null;
-        return match[1];
-      }
-
-      function ratingToScore(normalizedRating) {
-        if (!normalizedRating) return null;
-
-        const baseScores = {
-          AAA: 100,
-          AA: 85,
-          A: 70,
-          BBB: 55,
-          BB: 35,
-          B: 25,
-          CCC: 12,
-          CC: 8,
-          C: 4,
-          D: 0,
-        };
-
-        const baseKey = normalizedRating.replace(/[+-]/g, "");
-        const base = baseScores[baseKey];
+      function ratingToScore(r) {
+        if (!r) return null;
+        const bases = { AAA:100, AA:85, A:70, BBB:55, BB:35, B:25, CCC:12, CC:8, C:4, D:0 };
+        const base = bases[r.replace(/[+-]/g,'')];
         if (base === undefined) return null;
-
-        let modifier = 0;
-        if (normalizedRating.endsWith("+")) modifier = 4;
-        if (normalizedRating.endsWith("-")) modifier = -4;
-        return Math.max(0, Math.min(100, base + modifier));
+        const mod = r.endsWith('+') ? 4 : r.endsWith('-') ? -4 : 0;
+        return Math.max(0, Math.min(100, base + mod));
       }
-
-      function createRatingCell(rawRating) {
-        const td = document.createElement("td");
-        td.className = "rating-cell";
-
-        const normalizedRating = parseRating(rawRating);
-        const score = ratingToScore(normalizedRating);
-        if (score === null) {
-          td.textContent = fmt(rawRating);
-          return td;
-        }
-
-        const track = document.createElement("div");
-        track.className = "rating-track";
-
-        const fill = document.createElement("div");
-        fill.className = "rating-fill";
-        fill.style.width = `${score}%`;
-        fill.style.backgroundColor = `hsl(${Math.round(score * 1.2)} 75% 45%)`;
+      function createRatingCell(raw) {
+        const td = document.createElement('td');
+        td.className = 'rating-cell';
+        const score = ratingToScore(parseRating(raw));
+        if (score === null) { td.textContent = fmt(raw); return td; }
+        const track = document.createElement('div'); track.className = 'rating-track';
+        const fill = document.createElement('div'); fill.className = 'rating-fill';
+        fill.style.width = score + '%';
+        fill.style.backgroundColor = 'hsl(' + Math.round(score * 1.2) + ' 75% 45%)';
         track.appendChild(fill);
-
-        const label = document.createElement("span");
-        label.className = "rating-label";
-        label.textContent = String(rawRating);
-
-        track.appendChild(label);
-        td.appendChild(track);
-        return td;
+        const lbl = document.createElement('span'); lbl.className = 'rating-label'; lbl.textContent = String(raw);
+        track.appendChild(lbl);
+        td.appendChild(track); return td;
       }
 
-      function compareValues(left, right) {
-        const leftNumber = Number(left);
-        const rightNumber = Number(right);
-        const bothNumbers =
-          Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
-        if (bothNumbers) {
-          return leftNumber - rightNumber;
-        }
-
-        const leftText = String(left ?? "").toLowerCase();
-        const rightText = String(right ?? "").toLowerCase();
-        if (leftText < rightText) return -1;
-        if (leftText > rightText) return 1;
-        return 0;
+      // ── SORT ─────────────────────────────────────────────────────
+      function compareValues(a, b) {
+        const an = Number(a), bn = Number(b);
+        if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+        const as = String(a ?? '').toLowerCase(), bs = String(b ?? '').toLowerCase();
+        return as < bs ? -1 : as > bs ? 1 : 0;
       }
-
       function getSortValue(row, key) {
-        if (key === "company_rating") {
-          const normalizedRating = parseRating(row.company_rating);
-          const score = ratingToScore(normalizedRating);
-          return score === null ? -1 : score;
-        }
-        return row[key] ?? "";
+        if (key === 'company_rating') { const s = ratingToScore(parseRating(row.company_rating)); return s === null ? -1 : s; }
+        return row[key] ?? '';
       }
-
       function getSortedRows(rows) {
-        if (!sortState.key) {
-          return rows;
-        }
-
-        const sorted = [...rows].sort((left, right) => {
-          const result = compareValues(
-            getSortValue(left, sortState.key),
-            getSortValue(right, sortState.key)
-          );
-          return sortState.direction === "asc" ? result : -result;
+        if (!sortState.key) return rows;
+        return [...rows].sort((a, b) => {
+          const r = compareValues(getSortValue(a, sortState.key), getSortValue(b, sortState.key));
+          return sortState.direction === 'asc' ? r : -r;
         });
-        return sorted;
       }
 
+      // ── RECALC ───────────────────────────────────────────────────
+      function recalculateWeights(rows) {
+        const total = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
+        rows.forEach(r => { r.weight = total > 0 ? roundTo2(Number(r.current_value || 0) / total * 100) : 0; });
+      }
+      function recalculateRow(row, qty, price) {
+        const cp = Number(row.current_price || 0);
+        row.quantity = qty; row.purchase_price = price;
+        row.current_value = roundTo2(cp * qty);
+        row.profit = roundTo2((cp - price) * qty);
+      }
+
+      // ── SUMMARY ──────────────────────────────────────────────────
       function calculateSummary(rows) {
-        const totalAssets = rows.reduce(
-          (sum, row) => sum + Number(row.current_value || 0),
-          0
-        );
-        const totalProfit = rows.reduce(
-          (sum, row) => sum + Number(row.profit || 0),
-          0
-        );
-
-        let annualIncomeRub = 0;
-        let totalAnnualCouponYield = 0;
-        let totalAnnualPriceYield = 0;
-        let bondWeightSum = 0;
-
-        const today = new Date();
-
+        const totalAssets  = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
+        const totalProfit  = rows.reduce((s, r) =>
+          s + roundTo2((Number(r.current_price) - Number(r.purchase_price)) * Number(r.quantity)), 0);
+        let annualIncome = 0, weightedYield = 0, bondWeightSum = 0;
         for (const row of rows) {
-          if (row.type !== "bond") continue;
+          if (row.type !== 'bond') continue;
+          const qty = Number(row.quantity || 0), cp = Number(row.current_price || 0);
+          const coupon = Number(row.coupon || 0), period = Number(row.coupon_period || 0);
+          const freq = period > 0 ? Math.round(365 / period) : 2;
+          if (coupon > 0 && qty > 0) annualIncome += coupon * qty * freq;
+          const pv = cp * qty, my = Number(row.market_yield || 0);
+          if (pv > 0 && my > 0) { weightedYield += my * pv; bondWeightSum += pv; }
+        }
+        const annualYield    = totalAssets > 0 ? (annualIncome / totalAssets) * 100 : 0;
+        const totalBondYield = bondWeightSum > 0 ? weightedYield / bondWeightSum : 0;
+        return { totalAssets, totalProfit, annualIncome, annualYield, totalBondYield };
+      }
 
-          const quantity = Number(row.quantity || 0);
-          const currentPrice = Number(row.current_price || 0);
-          const couponRub = Number(row.coupon || 0);
-          const couponRate = Number(row.coupon_rate || 0);
-          const period = Number(row.coupon_period || 0);
-          const maturityDate = row.maturity_date;
+      // ── MONTHLY CHART ─────────────────────────────────────────────
+      function generatePaymentDates(maturityIso, periodDays) {
+        const dates = [];
+        const maturity = new Date(maturityIso);
+        if (isNaN(maturity.getTime()) || periodDays <= 0) return dates;
+        const now  = new Date();
+        const end  = new Date(now.getFullYear(), now.getMonth() + 13, 1);
 
-          // Частота выплат = 365 / период купона в днях (округляем до целого)
-          const paymentsPerYear = period > 0 ? Math.round(365 / period) : 2;
+        // Walk backwards from maturity until before today
+        let d = new Date(maturity);
+        while (d > now) d = new Date(d.getTime() - periodDays * 86400000);
+        // d is now the last payment on or before today — step forward
+        d = new Date(d.getTime() + periodDays * 86400000);
+        while (d < end) {
+          if (d >= now) dates.push(new Date(d));
+          d = new Date(d.getTime() + periodDays * 86400000);
+        }
+        return dates;
+      }
 
-          // Купонный доход в рублях = купон × количество × частота
-          if (couponRub > 0 && quantity > 0) {
-            annualIncomeRub += couponRub * quantity * paymentsPerYear;
-          }
+      function calculateMonthlyIncome(rows) {
+        const now = new Date();
+        const slots = [];
+        for (let i = 0; i < 12; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, label: '' });
+        }
+        for (const row of rows) {
+          if (row.type !== 'bond') continue;
+          const coupon  = Number(row.coupon || 0);
+          const qty     = Number(row.quantity || 0);
+          const period  = Number(row.coupon_period || 0);
+          if (!row.maturity_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
 
-          // Расчёт полной доходности для облигации
-          if (currentPrice > 0) {
-            const nominal = 1000;
-            
-            // Купонная составляющая (из MOEX)
-            const couponYield = couponRate > 0 ? couponRate : 0;
-
-            // Доходность от изменения цены
-            let priceYield = 0;
-            if (maturityDate) {
-              const maturity = new Date(maturityDate);
-              const yearsToMaturity = (maturity - today) / (1000 * 60 * 60 * 24 * 365.25);
-              if (yearsToMaturity > 0) {
-                priceYield = ((nominal - currentPrice) / currentPrice) / yearsToMaturity * 100;
+          const payDates = generatePaymentDates(row.maturity_date, period);
+          for (const pd of payDates) {
+            for (const slot of slots) {
+              if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
+                slot.income += coupon * qty;
+                break;
               }
             }
-
-            // Взвешиваем по стоимости позиции
-            const positionValue = currentPrice * quantity;
-            totalAnnualCouponYield += couponYield * positionValue;
-            totalAnnualPriceYield += priceYield * positionValue;
-            bondWeightSum += positionValue;
           }
         }
+        // Compute label: monthly income / portfolio value * 12 — just show rub amount
+        return slots;
+      }
 
-        const annualYieldFromAssets =
-          totalAssets > 0
-            ? (annualIncomeRub / totalAssets) * 100
-            : 0;
+      function drawMonthlyChart(rows) {
+        const canvas  = document.getElementById('monthly-chart');
+        const emptyEl = document.getElementById('chart-empty');
+        if (!canvas) return;
 
-        // Средневзвешенная полная доходность облигационной части
-        const totalBondYield = bondWeightSum > 0
-          ? (totalAnnualCouponYield + totalAnnualPriceYield) / bondWeightSum
-          : 0;
+        const data = calculateMonthlyIncome(rows);
+        const hasData = data.some(d => d.income > 0);
 
-        // Отладка
-        console.log('Bond yield calculation:', {
-          totalAnnualCouponYield: totalAnnualCouponYield.toFixed(2),
-          totalAnnualPriceYield: totalAnnualPriceYield.toFixed(2),
-          bondWeightSum: bondWeightSum.toFixed(2),
-          totalBondYield: totalBondYield.toFixed(2),
+        canvas.style.display = hasData ? 'block' : 'none';
+        emptyEl.style.display = hasData ? 'none' : 'block';
+        if (!hasData) return;
+
+        const dpr  = window.devicePixelRatio || 1;
+        const W    = canvas.parentElement.clientWidth || 800;
+        const H    = 190;
+        canvas.style.width  = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.width  = W * dpr;
+        canvas.height = H * dpr;
+
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+
+        const PAD_L = 62, PAD_R = 12, PAD_T = 36, PAD_B = 28;
+        const chartW = W - PAD_L - PAD_R;
+        const chartH = H - PAD_T - PAD_B;
+        const slotW  = chartW / data.length;
+        const barW   = slotW * 0.6;
+        const maxInc = Math.max(...data.map(d => d.income), 1);
+
+        // Background
+        ctx.fillStyle = '#f9fafb';
+        ctx.fillRect(0, 0, W, H);
+
+        // Grid lines + Y labels
+        const gridCount = 4;
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth   = 1;
+        ctx.font        = '9px Arial';
+        ctx.fillStyle   = '#6b7280';
+        ctx.textAlign   = 'right';
+        for (let i = 0; i <= gridCount; i++) {
+          const y    = PAD_T + chartH * (1 - i / gridCount);
+          const val  = maxInc * i / gridCount;
+          ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+          ctx.fillText(fmt(roundTo2(val)), PAD_L - 4, y + 3);
+        }
+
+        // Bars
+        const now = new Date();
+        data.forEach((d, i) => {
+          const x    = PAD_L + i * slotW + (slotW - barW) / 2;
+          const barH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
+          const y    = PAD_T + chartH - barH;
+
+          const isCurrent = d.year === now.getFullYear() && d.month === now.getMonth();
+          ctx.fillStyle = isCurrent ? '#1d4ed8' : (d.income > 0 ? '#60a5fa' : '#e5e7eb');
+          if (barH > 0) ctx.fillRect(x, y, barW, barH);
+
+          // Income label above bar
+          if (d.income > 0) {
+            ctx.fillStyle = '#1f2937';
+            ctx.font      = 'bold 9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(fmt(roundTo2(d.income)) + ' ₽', x + barW / 2, Math.max(y - 4, PAD_T + 10));
+          }
+
+          // Month label below
+          ctx.fillStyle  = isCurrent ? '#1d4ed8' : '#6b7280';
+          ctx.font       = isCurrent ? 'bold 9px Arial' : '9px Arial';
+          ctx.textAlign  = 'center';
+          const lbl = MONTH_NAMES[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
+          ctx.fillText(lbl, x + barW / 2, H - PAD_B + 12);
         });
 
-        return {
-          totalAssets,
-          totalProfit,
-          annualIncomeRub,
-          annualYieldFromAssets,
-          totalBondYield,
+        // Y-axis label
+        ctx.save();
+        ctx.translate(10, H / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle  = '#9ca3af';
+        ctx.font       = '9px Arial';
+        ctx.textAlign  = 'center';
+        ctx.fillText('Купонный доход, ₽', 0, 0);
+        ctx.restore();
+      }
+
+      // ── EDITABLE CELLS ───────────────────────────────────────────
+      const tableStatusEl = document.getElementById('table-status');
+
+      async function saveEditableRow(id, qty, price) {
+        const r = await fetch('/portfolio/instruments/' + id, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: qty, purchase_price: price }),
+        });
+        const p = await r.json();
+        if (!r.ok) throw new Error(p.detail || 'Не удалось обновить строку.');
+      }
+      async function saveCouponRow(id, coupon) {
+        const r = await fetch('/portfolio/instruments/' + id + '/coupon', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coupon }),
+        });
+        const p = await r.json();
+        if (!r.ok) throw new Error(p.detail || 'Не удалось обновить купон.');
+        return p;
+      }
+
+      function createEditableCell(row, field, extraClass) {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'number'; input.className = 'editable-input' + (extraClass ? ' ' + extraClass : '');
+        input.min = '0.01'; input.step = '0.01'; input.value = String(row[field]);
+        const commit = async () => {
+          const oQty   = Number(row.quantity), oPrice = Number(row.purchase_price);
+          const pQty   = Number(field === 'quantity'       ? input.value : row.quantity);
+          const pPrice = Number(field === 'purchase_price' ? input.value : row.purchase_price);
+          if (!Number.isFinite(pQty) || !Number.isFinite(pPrice) || pQty <= 0 || pPrice <= 0) {
+            setStatus(tableStatusEl, 'Введите корректные положительные значения.', true);
+            input.value = String(row[field]); return;
+          }
+          try {
+            recalculateRow(row, pQty, pPrice); recalculateWeights(tableRows);
+            persistTableCache(); renderTable();
+            await saveEditableRow(row.id, pQty, pPrice);
+            setStatus(tableStatusEl, 'Строка обновлена.');
+          } catch (err) {
+            recalculateRow(row, oQty, oPrice); recalculateWeights(tableRows);
+            persistTableCache(); renderTable();
+            setStatus(tableStatusEl, err.message || 'Ошибка обновления.', true);
+          }
         };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        input.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+        td.appendChild(input); return td;
+      }
+
+      function createCouponCell(row) {
+        const td = document.createElement('td');
+        if (row.type !== 'bond') { td.textContent = '—'; return td; }
+        const cv = Number(row.coupon);
+        const isEditable = row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0);
+        if (!isEditable) { td.textContent = fmt(row.coupon); return td; }
+        const input = document.createElement('input');
+        input.type = 'number'; input.className = 'editable-input coupon-input';
+        input.min = '0'; input.step = '0.01'; input.value = Number.isFinite(cv) ? String(cv) : '0';
+        const commit = async () => {
+          const orig   = Number.isFinite(Number(row.coupon)) ? Number(row.coupon) : 0;
+          const parsed = Number(input.value);
+          if (!Number.isFinite(parsed) || parsed < 0) {
+            setStatus(tableStatusEl, 'Введите корректный купон.', true);
+            input.value = String(orig); return;
+          }
+          try {
+            row.coupon = parsed; row.manual_coupon_set = true;
+            persistTableCache(); renderTable();
+            const upd = await saveCouponRow(row.id, parsed);
+            row.coupon = Number(upd.coupon); row.manual_coupon_set = upd.manual_coupon_set === true;
+            persistTableCache(); renderTable();
+            setStatus(tableStatusEl, 'Купон установлен.');
+          } catch (err) {
+            row.coupon = orig; persistTableCache(); renderTable();
+            setStatus(tableStatusEl, err.message || 'Ошибка обновления купона.', true);
+          }
+        };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        input.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+        td.appendChild(input); return td;
+      }
+
+      // ── RENDER TABLE ─────────────────────────────────────────────
+      const tableBody = document.getElementById('table-body');
+
+      function addCell(tr, val) {
+        const td = document.createElement('td'); td.textContent = val; tr.appendChild(td); return td;
       }
 
       function renderTable() {
         const rows = getSortedRows(tableRows);
-        tableBody.innerHTML = "";
+        tableBody.innerHTML = '';
 
-        for (let idx = 0; idx < rows.length; idx += 1) {
+        for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
-          const tr = document.createElement("tr");
+          const tr  = document.createElement('tr');
 
-          const addCell = (value) => {
-            const td = document.createElement("td");
-            td.textContent = value;
-            tr.appendChild(td);
-          };
+          addCell(tr, String(idx + 1));
 
-          addCell(String(idx + 1));
-
-          const nameTd = document.createElement("td");
-          const link = document.createElement("a");
-          link.href = buildBondLink(row.ticker);
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = fmt(row.name);
-          nameTd.appendChild(link);
-          tr.appendChild(nameTd);
+          // Name with link
+          const nameTd = document.createElement('td');
+          nameTd.className = 'col-name';
+          const link = document.createElement('a');
+          link.href    = 'https://smart-lab.ru/q/bonds/' + encodeURIComponent(row.ticker) + '/';
+          link.target  = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = fmt(row.name); link.title = fmt(row.name);
+          nameTd.appendChild(link); tr.appendChild(nameTd);
 
           tr.appendChild(createRatingCell(row.company_rating));
-          addCell(fmt(row.current_price));
-          tr.appendChild(
-            createEditableCell(row, "quantity", {
-              min: 0.01,
-              step: 0.01,
-              cellClass: "col-qty",
-            })
-          );
-          tr.appendChild(
-            createEditableCell(row, "purchase_price", {
-              min: 0.01,
-              step: 0.01,
-              cellClass: "col-purchase",
-            })
-          );
-          addCell(fmt(row.current_value));
+          addCell(tr, fmt(row.current_price));
+          tr.appendChild(createEditableCell(row, 'quantity', ''));
+          tr.appendChild(createEditableCell(row, 'purchase_price', ''));
+          addCell(tr, fmt(row.current_value));
 
-          const profitTd = document.createElement("td");
-          profitTd.textContent = fmt(row.profit);
-          if (Number(row.profit) > 0) {
-            profitTd.classList.add("profit-positive");
-          } else if (Number(row.profit) < 0) {
-            profitTd.classList.add("profit-negative");
-          }
+          // Profit
+          const computedProfit = roundTo2((Number(row.current_price) - Number(row.purchase_price)) * Number(row.quantity));
+          const profitTd = document.createElement('td');
+          profitTd.textContent = fmt(computedProfit);
+          if (computedProfit > 0) profitTd.classList.add('profit-positive');
+          else if (computedProfit < 0) profitTd.classList.add('profit-negative');
           tr.appendChild(profitTd);
 
-          addCell(`${fmt(row.weight)}%`);
-          const couponTd = createCouponCell(row);
-          couponTd.classList.add("col-coupon");
-          tr.appendChild(couponTd);
+          addCell(tr, fmt(row.weight) + '%');
+          tr.appendChild(createCouponCell(row));
 
-          if (row.type === "bond") {
-            const qty = Number(row.quantity || 0);
+          if (row.type === 'bond') {
+            const qty       = Number(row.quantity || 0);
             const couponRub = Number(row.coupon || 0);
-            const couponRate = Number(row.coupon_rate || 0);
-            const period = Number(row.coupon_period || 0);
-            const currentPrice = Number(row.current_price || 0);
-            
-            // Частота выплат = 365 / период купона в днях (округляем до целого)
-            const paymentsPerYear = period > 0 ? Math.round(365 / period) : 2;
-            
-            // Годовой купон в рублях = купон × количество × частота
-            const yourAnnualCoupon = couponRub * qty * paymentsPerYear;
-
-            const yourTd = document.createElement("td");
-            yourTd.className = "col-your-annual";
-            yourTd.textContent = fmt(roundTo2(yourAnnualCoupon));
-            tr.appendChild(yourTd);
-
-            // Купонная доходность из MOEX
-            const couponYieldTd = document.createElement("td");
-            couponYieldTd.className = "col-coupon-yield";
-            const couponYield = couponRate > 0 ? couponRate : 0;
-            couponYieldTd.textContent = fmt(roundTo2(couponYield)) + "%";
-            tr.appendChild(couponYieldTd);
-
-            // Частота выплат (информативно)
-            const freqTd = document.createElement("td");
-            freqTd.className = "col-frequency";
-            freqTd.textContent = String(paymentsPerYear);
-            tr.appendChild(freqTd);
-
-            const marketTd = document.createElement("td");
-            marketTd.className = "col-market";
-            marketTd.textContent = fmt(row.market_yield);
-            tr.appendChild(marketTd);
+            const couponRate= Number(row.coupon_rate || 0);
+            const period    = Number(row.coupon_period || 0);
+            const freq      = period > 0 ? Math.round(365 / period) : 2;
+            addCell(tr, fmt(roundTo2(couponRub * qty * freq)));
+            addCell(tr, couponRate > 0 ? fmt(roundTo2(couponRate)) + '%' : '—');
+            addCell(tr, String(freq));
+            addCell(tr, row.market_yield != null ? fmt(row.market_yield) : '—');
           } else {
-            const yourTd = document.createElement("td");
-            yourTd.className = "col-your-annual";
-            yourTd.textContent = "—";
-            tr.appendChild(yourTd);
-
-            const couponYieldTd = document.createElement("td");
-            couponYieldTd.className = "col-coupon-yield";
-            couponYieldTd.textContent = "—";
-            tr.appendChild(couponYieldTd);
-
-            const freqTd = document.createElement("td");
-            freqTd.className = "col-frequency";
-            freqTd.textContent = "—";
-            tr.appendChild(freqTd);
-
-            const marketTd = document.createElement("td");
-            marketTd.className = "col-market";
-            marketTd.textContent = "—";
-            tr.appendChild(marketTd);
+            addCell(tr, '—'); addCell(tr, '—'); addCell(tr, '—'); addCell(tr, '—');
           }
 
-          addCell(row.type === "bond" ? fmt(row.maturity_date) : "—");
+          addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');
 
-          const actionTd = document.createElement("td");
-          const deleteBtn = document.createElement("button");
-          deleteBtn.type = "button";
-          deleteBtn.className = "danger-btn small";
-          deleteBtn.textContent = "Х";
-          deleteBtn.addEventListener("click", async () => {
-            const confirmed = window.confirm(
-              "Удалить эту строку из портфеля?"
-            );
-            if (!confirmed) {
-              return;
-            }
-
+          // Actions
+          const actionTd = document.createElement('td');
+          const delBtn   = document.createElement('button');
+          delBtn.className = 'btn-sm'; delBtn.textContent = 'X';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm('Удалить эту строку из портфеля?')) return;
             try {
-              const response = await fetch(
-                `/portfolio/instruments/${row.id}`,
-                { method: "DELETE" }
-              );
-              const body = await response.json();
-              if (!response.ok) {
-                throw new Error(body.detail || "Не удалось удалить строку.");
-              }
-
-              tableRows = tableRows.filter((item) => item.id !== row.id);
-              recalculateWeights(tableRows);
-              persistTableCache();
-              renderTable();
-              setStatus("Строка удалена.");
-            } catch (error) {
-              setStatus(error.message || "Ошибка удаления строки.", true);
-            }
+              const resp = await fetch('/portfolio/instruments/' + row.id, { method: 'DELETE' });
+              const body = await resp.json();
+              if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
+              tableRows = tableRows.filter(r => r.id !== row.id);
+              recalculateWeights(tableRows); persistTableCache(); renderTable();
+              setStatus(tableStatusEl, 'Строка удалена.');
+            } catch (err) { setStatus(tableStatusEl, err.message || 'Ошибка удаления.', true); }
           });
-          actionTd.appendChild(deleteBtn);
-          tr.appendChild(actionTd);
-
+          actionTd.appendChild(delBtn); tr.appendChild(actionTd);
           tableBody.appendChild(tr);
         }
 
+        if (rows.length === 0) { drawMonthlyChart(tableRows); return; }
+
+        // ── Summary row ──
         const summary = calculateSummary(rows);
 
-        const spacerRow = document.createElement("tr");
-        const spacerCell = document.createElement("td");
-        spacerCell.colSpan = 16;
-        spacerCell.innerHTML = "&nbsp;";
-        spacerRow.appendChild(spacerCell);
-        tableBody.appendChild(spacerRow);
+        const spacerRow = document.createElement('tr');
+        const sc = document.createElement('td'); sc.colSpan = 16; sc.innerHTML = '&nbsp;';
+        spacerRow.appendChild(sc); tableBody.appendChild(spacerRow);
 
-        const summaryRow = document.createElement("tr");
-        summaryRow.className = "summary-row";
+        const sumRow = document.createElement('tr');
+        sumRow.className = 'summary-row';
 
-        const summaryLabel = document.createElement("td");
-        summaryLabel.colSpan = 6;
-        summaryLabel.textContent = "Итого";
-        summaryRow.appendChild(summaryLabel);
+        // Label col (covers #, Name, Rating, Price, Qty, Purchase = 6 cols)
+        const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = 'Итого'; sumRow.appendChild(lbl);
 
-        const totalAssetsTd = document.createElement("td");
-        totalAssetsTd.textContent = fmt(roundTo2(summary.totalAssets));
-        summaryRow.appendChild(totalAssetsTd);
+        // Стоимость
+        addCell(sumRow, fmt(roundTo2(summary.totalAssets)));
 
-        const totalProfitTd = document.createElement("td");
-        totalProfitTd.textContent = fmt(roundTo2(summary.totalProfit));
-        if (summary.totalProfit > 0) {
-          totalProfitTd.classList.add("profit-positive");
-        } else if (summary.totalProfit < 0) {
-          totalProfitTd.classList.add("profit-negative");
-        }
-        summaryRow.appendChild(totalProfitTd);
+        // Прибыль
+        const p2 = document.createElement('td');
+        p2.textContent = fmt(roundTo2(summary.totalProfit));
+        if (summary.totalProfit > 0) p2.classList.add('profit-positive');
+        else if (summary.totalProfit < 0) p2.classList.add('profit-negative');
+        sumRow.appendChild(p2);
 
-        const annualIncomeTd = document.createElement("td");
-        annualIncomeTd.colSpan = 2;
-        annualIncomeTd.textContent = `Доход за год: ${fmt(roundTo2(summary.annualIncomeRub))}`;
-        summaryRow.appendChild(annualIncomeTd);
+        // Доля (пустая) + Купон = 2 cols
+        const c1 = document.createElement('td'); c1.colSpan = 2; c1.textContent = ''; sumRow.appendChild(c1);
 
-        const annualYieldTd = document.createElement("td");
-        annualYieldTd.colSpan = 2;
-        annualYieldTd.textContent = `Годовая доходность: ${fmt(roundTo2(summary.annualYieldFromAssets))}%`;
-        summaryRow.appendChild(annualYieldTd);
+        // Годовой купон (сумма)
+        const c2 = document.createElement('td');
+        c2.textContent = 'Год. купоны: ' + fmt(roundTo2(summary.annualIncome)) + ' ₽';
+        sumRow.appendChild(c2);
 
-        const totalYieldTd = document.createElement("td");
-        totalYieldTd.colSpan = 3;
-        totalYieldTd.textContent = `Полная доходность облигаций: ${fmt(roundTo2(summary.totalBondYield))}%`;
-        summaryRow.appendChild(totalYieldTd);
+        // Годовая доходность (colspan 2 — дох.купона + частота)
+        const c3 = document.createElement('td'); c3.colSpan = 2;
+        c3.textContent = 'Год. дох.: ' + fmt(roundTo2(summary.annualYield)) + '%';
+        sumRow.appendChild(c3);
 
-        const spacerTd = document.createElement("td");
-        spacerTd.colSpan = 2;
-        spacerTd.textContent = "";
-        summaryRow.appendChild(spacerTd);
+        // YTM (colspan 2 — рын.доход. + погашение)
+        const c4 = document.createElement('td'); c4.colSpan = 2;
+        c4.textContent = 'YTM: ' + fmt(roundTo2(summary.totalBondYield)) + '%';
+        sumRow.appendChild(c4);
 
-        tableBody.appendChild(summaryRow);
+        // Действия (пустая)
+        const c5 = document.createElement('td'); c5.textContent = ''; sumRow.appendChild(c5);
+
+        tableBody.appendChild(sumRow);
+
+        // Redraw chart
+        drawMonthlyChart(tableRows);
       }
 
-      async function syncTableFromServer() {
-        const response = await fetch(`/portfolio/table?ts=${Date.now()}`, {
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить таблицу портфеля.");
-        }
-        const payload = await response.json();
-        tableRows = payload.items || [];
-        persistTableCache();
-        renderTable();
-      }
-
-      async function saveEditableRow(rowId, quantity, purchasePrice) {
-        const response = await fetch(`/portfolio/instruments/${rowId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            quantity,
-            purchase_price: purchasePrice,
-          }),
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.detail || "Не удалось обновить строку.");
-        }
-      }
-
-      async function saveCouponRow(rowId, coupon) {
-        const response = await fetch(`/portfolio/instruments/${rowId}/coupon`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coupon }),
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.detail || "Не удалось обновить купон.");
-        }
-        return payload;
-      }
-
-      function createCouponCell(row) {
-        if (row.type !== "bond") {
-          const td = document.createElement("td");
-          td.textContent = "—";
-          td.classList.add("col-coupon");
-          return td;
-        }
-
-        const couponValue = Number(row.coupon);
-        const isEditableCoupon =
-          row.manual_coupon_set === true
-          || (Number.isFinite(couponValue) && couponValue <= 0);
-
-        if (!isEditableCoupon) {
-          const td = document.createElement("td");
-          td.textContent = fmt(row.coupon);
-          td.classList.add("col-coupon");
-          return td;
-        }
-
-        const td = document.createElement("td");
-        td.classList.add("col-coupon");
-        const input = document.createElement("input");
-        input.type = "number";
-        input.className = "editable-input";
-        input.min = "0";
-        input.step = "0.01";
-        input.value = Number.isFinite(couponValue)
-          ? String(couponValue)
-          : "0";
-
-        const commit = async () => {
-          const originalCoupon = Number.isFinite(Number(row.coupon))
-            ? Number(row.coupon)
-            : 0;
-          const parsedCoupon = Number(input.value);
-
-          if (!Number.isFinite(parsedCoupon) || parsedCoupon < 0) {
-            setStatus("Введите корректный купон (0 или больше).", true);
-            input.value = String(originalCoupon);
-            return;
-          }
-
-          try {
-            row.coupon = parsedCoupon;
-            row.manual_coupon_set = true;
-            persistTableCache();
-            renderTable();
-
-            const updated = await saveCouponRow(row.id, parsedCoupon);
-            row.coupon = Number(updated.coupon);
-            row.manual_coupon_set =
-              updated.manual_coupon_set === true;
-            persistTableCache();
-            renderTable();
-            setStatus("Купон установлен.");
-          } catch (error) {
-            row.coupon = originalCoupon;
-            persistTableCache();
-            renderTable();
-            setStatus(error.message || "Ошибка обновления купона.", true);
-            input.value = String(originalCoupon);
-          }
-        };
-
-        input.addEventListener("blur", commit);
-        input.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            input.blur();
-          }
-        });
-        input.addEventListener(
-          "wheel",
-          (event) => {
-            event.preventDefault();
-          },
-          { passive: false }
-        );
-
-        td.appendChild(input);
-        return td;
-      }
-
-      function createEditableCell(
-        row,
-        field,
-        options = { min: 0.01, step: 0.01, cellClass: "" }
-      ) {
-        const td = document.createElement("td");
-        if (options.cellClass) {
-          td.className = options.cellClass;
-        }
-        const input = document.createElement("input");
-        input.type = "number";
-        input.className = "editable-input";
-        input.min = String(options.min);
-        input.step = String(options.step);
-        input.value = String(row[field]);
-
-        const commit = async () => {
-          const originalQuantity = Number(row.quantity);
-          const originalPurchasePrice = Number(row.purchase_price);
-
-          const parsedQuantity = Number(
-            field === "quantity" ? input.value : row.quantity
-          );
-          const parsedPurchasePrice = Number(
-            field === "purchase_price"
-              ? input.value
-              : row.purchase_price
-          );
-
-          if (
-            !Number.isFinite(parsedQuantity)
-            || !Number.isFinite(parsedPurchasePrice)
-            || parsedQuantity <= 0
-            || parsedPurchasePrice <= 0
-          ) {
-            setStatus("Введите корректные положительные значения.", true);
-            input.value = String(row[field]);
-            return;
-          }
-
-          try {
-            recalculateRow(row, parsedQuantity, parsedPurchasePrice);
-            recalculateWeights(tableRows);
-            persistTableCache();
-            renderTable();
-
-            await saveEditableRow(row.id, parsedQuantity, parsedPurchasePrice);
-            setStatus("Строка обновлена.");
-          } catch (error) {
-            // rollback on backend error
-            recalculateRow(row, originalQuantity, originalPurchasePrice);
-            recalculateWeights(tableRows);
-            persistTableCache();
-            renderTable();
-            setStatus(error.message || "Ошибка обновления строки.", true);
-            input.value = String(row[field]);
-          }
-        };
-
-        input.addEventListener("blur", commit);
-        input.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            input.blur();
-          }
-        });
-        input.addEventListener(
-          "wheel",
-          (event) => {
-            event.preventDefault();
-          },
-          { passive: false }
-        );
-
-        td.appendChild(input);
-        return td;
-      }
-
-      function updateHeaderSortIndicators() {
-        for (const header of sortableHeaders) {
-          const key = header.dataset.sortKey;
-          header.dataset.arrow = key === sortState.key ? (sortState.direction === 'asc' ? '↑' : '↓') : '';
-          renderHeaderLabel(header);
-        }
-      }
-
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        setStatus("Проверка данных...");
-        submitBtn.disabled = true;
-
-        const payload = {
-          ticker: form.ticker.value.trim(),
-          quantity: Number(form.quantity.value),
-          purchase_price: Number(form.purchase_price.value),
-        };
-
-        try {
-          const validateResponse = await fetch("/portfolio/validate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_input: payload }),
+      // ── SORT HEADERS ─────────────────────────────────────────────
+      document.querySelectorAll('th[data-sort-key]').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sortKey;
+          if (sortState.key === key) sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+          else { sortState.key = key; sortState.direction = 'asc'; }
+          document.querySelectorAll('th[data-sort-key]').forEach(h => {
+            const arrow = h.dataset.sortKey === key ? (sortState.direction === 'asc' ? ' ↑' : ' ↓') : '';
+            if (!h.dataset.origLabel) h.dataset.origLabel = h.innerHTML.replace(/\s[↑↓]$/, '').trim();
+            h.innerHTML = h.dataset.origLabel + arrow;
           });
-
-          const validation = await validateResponse.json();
-          if (!validateResponse.ok) {
-            throw new Error("Ошибка валидации запроса.");
-          }
-
-          if (!validation.validated) {
-            const warnings = (validation.warnings || []).join(" ");
-            setStatus(`Проверка не пройдена: ${warnings}`, true);
-            submitBtn.disabled = false;
-            return;
-          }
-
-          const instrumentTypeLabel =
-            validation.instrument_type === "bond"
-              ? "облигация"
-              : validation.instrument_type === "stock"
-                ? "акция"
-                : validation.instrument_type;
-
-          setStatus(`Тип инструмента: ${instrumentTypeLabel}. Добавление...`);
-
-          const addResponse = await fetch("/portfolio/instruments", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          const addResult = await addResponse.json();
-          if (!addResponse.ok) {
-            throw new Error(addResult.detail || "Не удалось добавить бумагу.");
-          }
-
-          await syncTableFromServer();
-          setStatus("Бумага добавлена.");
-          form.reset();
-        } catch (error) {
-          setStatus(error.message || "Ошибка запроса.", true);
-        } finally {
-          submitBtn.disabled = false;
-        }
-      });
-
-      for (const header of sortableHeaders) {
-        header.addEventListener("click", () => {
-          const key = header.dataset.sortKey;
-          if (!key) {
-            return;
-          }
-
-          if (sortState.key === key) {
-            sortState.direction =
-              sortState.direction === "asc" ? "desc" : "asc";
-          } else {
-            sortState.key = key;
-            sortState.direction = "asc";
-          }
-
-          updateHeaderSortIndicators();
           renderTable();
         });
-      }
-
-      if (loadTableCache()) {
-        renderTable();
-      }
-
-      syncTableFromServer().catch((error) => {
-        const isCacheFresh =
-          Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
-        if (!isCacheFresh || tableRows.length === 0) {
-          setStatus(error.message || "Ошибка загрузки таблицы.", true);
-        }
       });
 
-      setInterval(() => {
-        syncTableFromServer().catch(() => {
-          // silent background refresh failure
-        });
-      }, SYNC_INTERVAL_MS);
+      // ── RESIZE: redraw chart ──────────────────────────────────────
+      if (typeof ResizeObserver !== 'undefined') {
+        const chartCard = document.getElementById('chart-card');
+        new ResizeObserver(() => drawMonthlyChart(tableRows)).observe(chartCard);
+      } else {
+        window.addEventListener('resize', () => drawMonthlyChart(tableRows));
+      }
+
+      // ── SYNC ─────────────────────────────────────────────────────
+      async function syncTableFromServer() {
+        const resp = await fetch('/portfolio/table?ts=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
+        const payload = await resp.json();
+        tableRows = payload.items || [];
+        persistTableCache(); renderTable();
+      }
+
+      // ── ADD FORM ─────────────────────────────────────────────────
+      const addStatusEl = document.getElementById('add-status');
+      const submitBtn   = document.getElementById('submit-btn');
+      document.getElementById('add-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setStatus(addStatusEl, 'Проверка данных...');
+        submitBtn.disabled = true;
+        const frm = e.target;
+        const payload = {
+          ticker:         frm.ticker.value.trim(),
+          quantity:       Number(frm.quantity.value),
+          purchase_price: Number(frm.purchase_price.value),
+        };
+        try {
+          const vResp = await fetch('/portfolio/validate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_input: payload }),
+          });
+          const v = await vResp.json();
+          if (!vResp.ok) throw new Error('Ошибка валидации запроса.');
+          if (!v.validated) { setStatus(addStatusEl, 'Не пройдена: ' + (v.warnings || []).join(' '), true); return; }
+          const typeLabel = v.instrument_type === 'bond' ? 'облигация' : v.instrument_type === 'stock' ? 'акция' : v.instrument_type;
+          setStatus(addStatusEl, 'Тип: ' + typeLabel + '. Добавление...');
+          const aResp = await fetch('/portfolio/instruments', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const ar = await aResp.json();
+          if (!aResp.ok) throw new Error(ar.detail || 'Не удалось добавить бумагу.');
+          await syncTableFromServer();
+          setStatus(addStatusEl, 'Бумага добавлена.');
+          frm.reset(); showPanel('panel-table');
+        } catch (err) { setStatus(addStatusEl, err.message || 'Ошибка запроса.', true); }
+        finally { submitBtn.disabled = false; }
+      });
+
+      // ── NOTIFICATIONS ─────────────────────────────────────────────
+      const notifStatusEl = document.getElementById('notif-status');
+      const tgTokenInput  = document.getElementById('tg-token');
+      const tgChatInput   = document.getElementById('tg-chat');
+      const tgThreshInput = document.getElementById('tg-threshold');
+      async function loadNotifSettings() {
+        try {
+          const r = await fetch('/settings/notifications');
+          if (!r.ok) return;
+          const s = await r.json();
+          tgTokenInput.value  = s.tg_bot_token || '';
+          tgChatInput.value   = s.tg_chat_id   || '';
+          tgThreshInput.value = s.price_drop_threshold ?? 5;
+        } catch {}
+      }
+      document.getElementById('notif-save-btn').addEventListener('click', async () => {
+        setStatus(notifStatusEl, 'Сохранение...');
+        try {
+          const r = await fetch('/settings/notifications', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
+          });
+          if (!r.ok) throw new Error('Ошибка сохранения настроек.');
+          setStatus(notifStatusEl, 'Настройки сохранены.');
+        } catch (err) { setStatus(notifStatusEl, err.message, true); }
+      });
+      document.getElementById('notif-test-btn').addEventListener('click', async () => {
+        setStatus(notifStatusEl, 'Отправка тестового сообщения...');
+        try {
+          const r = await fetch('/settings/notifications/test', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
+          });
+          const res = await r.json();
+          if (!r.ok || !res.success) throw new Error('Не удалось отправить. Проверьте токен и chat_id.');
+          setStatus(notifStatusEl, 'Тестовое сообщение отправлено!');
+        } catch (err) { setStatus(notifStatusEl, err.message, true); }
+      });
+
+      // ── IMPORT ───────────────────────────────────────────────────
+      const ioStatusEl    = document.getElementById('io-status');
+      const importFileInp = document.getElementById('import-file');
+      document.getElementById('import-btn').addEventListener('click', async () => {
+        const file = importFileInp.files[0];
+        if (!file) { setStatus(ioStatusEl, 'Выберите CSV-файл.', true); return; }
+        setStatus(ioStatusEl, 'Импорт...');
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          const r = await fetch('/portfolio/import', { method: 'POST', body: fd });
+          const res = await r.json();
+          if (!r.ok) throw new Error(res.detail || 'Ошибка импорта.');
+          let msg = 'Импортировано: ' + res.added + ' позиций.';
+          if (res.errors > 0) msg += ' Ошибок: ' + res.errors + '.';
+          setStatus(ioStatusEl, msg, res.errors > 0);
+          if (res.added > 0) syncTableFromServer().catch(() => {});
+          importFileInp.value = '';
+        } catch (err) { setStatus(ioStatusEl, err.message, true); }
+      });
+
+      // ── INIT ─────────────────────────────────────────────────────
+      loadNotifSettings();
+      if (loadTableCache()) renderTable();
+      syncTableFromServer().catch(err => {
+        const fresh = Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
+        if (!fresh || tableRows.length === 0) setStatus(tableStatusEl, err.message || 'Ошибка загрузки таблицы.', true);
+      });
+      setInterval(() => { syncTableFromServer().catch(() => {}); }, SYNC_INTERVAL_MS);
     </script>
   </body>
 </html>

@@ -39,7 +39,7 @@ class MOEXService:
 
         name = sec_row.get("SHORTNAME") or sec_row.get("SECNAME") or secid
         current_price = md_row.get("LAST") or md_row.get("LCLOSE")
-        if current_price == 0:
+        if not current_price:
             logger.error("Не удалось получить цену акции %s", secid)
             raise PriceNotFoundError(secid, "акция")
         company_rating = await self._get_credit_rating(secid)

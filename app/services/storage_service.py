@@ -24,17 +24,44 @@ class StorageService:
                         CHECK(instrument_type IN ('stock', 'bond')),
                     quantity REAL NOT NULL,
                     purchase_price REAL NOT NULL,
-                    manual_coupon REAL
+                    manual_coupon REAL,
+                    company_rating TEXT
                 )
                 """
             )
-            try:
-                conn.execute(
-                    "ALTER TABLE portfolio_items ADD COLUMN manual_coupon REAL"
+            # Migrations for existing databases
+            for col, col_def in [
+                ("manual_coupon", "REAL"),
+                ("company_rating", "TEXT"),
+            ]:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS price_snapshots (
+                    item_id INTEGER PRIMARY KEY,
+                    last_price REAL NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
-            except sqlite3.OperationalError:
-                pass
+                """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
             conn.commit()
+
+    # ── Portfolio items ─────────────────────────────────────────────────────
 
     def add_item(
         self,
@@ -63,7 +90,7 @@ class StorageService:
             rows = conn.execute(
                 """
                 SELECT id, ticker, instrument_type, quantity, purchase_price
-                     , manual_coupon
+                     , manual_coupon, company_rating
                 FROM portfolio_items
                 ORDER BY id ASC
                 """
@@ -79,6 +106,7 @@ class StorageService:
                 "manual_coupon": (
                     float(row[5]) if row[5] is not None else None
                 ),
+                "company_rating": row[6],
             }
             for row in rows
         ]
@@ -123,6 +151,14 @@ class StorageService:
             conn.commit()
             return int(cursor.rowcount)
 
+    def update_rating(self, item_id: int, rating: str | None) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_items SET company_rating = ? WHERE id = ?",
+                (rating, item_id),
+            )
+            conn.commit()
+
     def delete_items(self, item_ids: list[int]) -> int:
         if not item_ids:
             return 0
@@ -136,6 +172,66 @@ class StorageService:
             cursor = conn.execute(query, item_ids)
             conn.commit()
             return int(cursor.rowcount)
+
+    # ── Price snapshots ─────────────────────────────────────────────────────
+
+    def get_price_snapshot(self, item_id: int) -> float | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT last_price FROM price_snapshots WHERE item_id = ?",
+                (item_id,),
+            ).fetchone()
+        return float(row[0]) if row else None
+
+    def upsert_price_snapshot(self, item_id: int, price: float) -> None:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO price_snapshots (item_id, last_price, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(item_id) DO UPDATE SET
+                    last_price = excluded.last_price,
+                    updated_at = excluded.updated_at
+                """,
+                (item_id, price, now),
+            )
+            conn.commit()
+
+    def delete_price_snapshot(self, item_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM price_snapshots WHERE item_id = ?", (item_id,)
+            )
+            conn.commit()
+
+    # ── App settings (key-value) ────────────────────────────────────────────
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", (key,)
+            ).fetchone()
+        return row[0] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO app_settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, value),
+            )
+            conn.commit()
+
+    def get_all_settings(self) -> dict[str, str]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM app_settings"
+            ).fetchall()
+        return {row[0]: row[1] for row in rows}
 
 
 storage_service = StorageService()

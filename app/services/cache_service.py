@@ -42,8 +42,10 @@ class CacheService:
         failed this time.
         """
         from app.services.portfolio_service import portfolio_service
+        from app.services.notification_service import notification_service
 
         async with self._lock:
+            old_rows = list(self._rows)
             try:
                 new_rows = await portfolio_service.get_table_fresh()
                 merged = self._merge(new_rows)
@@ -58,6 +60,14 @@ class CacheService:
                     ok_count,
                     len(merged),
                 )
+                # Check for rating/price changes and notify
+                if old_rows:
+                    try:
+                        await notification_service.check_and_notify(
+                            old_rows, merged
+                        )
+                    except Exception:
+                        logger.exception("Notification check failed")
             except Exception:
                 logger.exception("Cache refresh failed")
                 if not self._rows:
