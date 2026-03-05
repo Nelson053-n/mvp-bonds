@@ -231,6 +231,47 @@
       input[type="number"].input::-webkit-outer-spin-button,
       input[type="number"].input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
+      /* ── MODAL ───────────────────────────────────────────────── */
+      .modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        align-items: center; justify-content: center;
+      }
+      .modal-overlay.show { display: flex; }
+      .modal {
+        background: #fff; border-radius: var(--radius-lg);
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        padding: 24px; max-width: 500px; width: 90%;
+        max-height: 80vh; overflow-y: auto;
+      }
+      .modal-header { margin-bottom: 16px; }
+      .modal-title {
+        font-size: 18px; font-weight: 700; color: var(--slate-900); margin: 0;
+      }
+      .modal-body { margin: 16px 0; }
+      .modal-field {
+        margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;
+      }
+      .modal-field label { font-size: 12px; font-weight: 600; color: var(--slate-600); }
+      .modal-field input, .modal-field textarea {
+        padding: 8px; border: 1px solid var(--slate-300); border-radius: var(--radius);
+        font-family: 'Courier New', monospace; font-size: 12px;
+        background: var(--slate-50);
+      }
+      .modal-field textarea {
+        min-height: 60px; resize: vertical; white-space: pre-wrap; word-break: break-all;
+      }
+      .modal-actions {
+        display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
+      }
+      .modal-actions button {
+        padding: 8px 16px; border: none; border-radius: var(--radius);
+        font-size: 13px; font-weight: 600; cursor: pointer;
+      }
+      .modal-actions .btn-primary { background: var(--blue-600); color: #fff; }
+      .modal-actions .btn-secondary { background: var(--slate-200); color: var(--slate-800); }
+      .modal-actions .btn-danger { background: var(--red-600); color: #fff; }
+
       /* ── BUTTONS ─────────────────────────────────────────────── */
       .btn {
         display: inline-flex; align-items: center; justify-content: center;
@@ -469,7 +510,12 @@
           </div>
         </div>
 
-        <div id="table-status" class="status"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px;">
+          <div id="table-status" class="status"></div>
+          <button id="btn-share-portfolio" class="btn" style="margin-left: auto; padding: 8px 16px; height: auto; font-size: 13px;">
+            📤 Поделиться
+          </button>
+        </div>
 
         <div class="card" style="padding: 0;">
           <div class="table-wrap">
@@ -609,6 +655,34 @@
 
     </div><!-- /container -->
 
+    <!-- Share Portfolio Modal -->
+    <div id="share-modal-overlay" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Поделиться портфелем</h2>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label>Ссылка для поделиться:</label>
+            <textarea id="share-url-textarea" readonly></textarea>
+            <button style="padding: 6px 12px; background: var(--blue-600); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 4px;"
+              onclick="document.getElementById('share-url-textarea').select(); document.execCommand('copy');">Копировать ссылку</button>
+          </div>
+          <div class="modal-field">
+            <label>Защита паролем (опционально):</label>
+            <input type="password" id="share-password-input" placeholder="Оставить пусто для доступа без пароля">
+            <div style="font-size: 11px; color: var(--slate-500); margin-top: 4px;">Если установить пароль, посетителям нужно будет его ввести для просмотра портфеля.</div>
+          </div>
+          <div id="share-status" style="margin-top: 8px; font-size: 12px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeShareModal();">Закрыть</button>
+          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Сохранить настройки</button>
+          <button class="btn-danger" id="share-revoke-btn" onclick="revokeShare();" style="display: none;">Отозвать ссылку</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       // ── NAV ─────────────────────────────────────────────────────
       const navBtns = document.querySelectorAll('.nav-btn');
@@ -630,12 +704,24 @@
       let sortState = { key: null, direction: 'asc' };
       let portfolioId = null;
       let portfolios = [];
+      let isReadOnly = false;
+      let shareToken = null;
+      let sharePassword = null;
+
+      // ── PARSE URL ────────────────────────────────────────────────
+      function parseShareUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const hash = window.location.hash.slice(1);
+        shareToken = params.get('share') || (hash.startsWith('share=') ? hash.substring(6) : null);
+        return !!shareToken;
+      }
 
       // ── API HELPER ───────────────────────────────────────────────
       async function apiFetch(url, opts = {}) {
         const token = localStorage.getItem('mvp_auth_token');
         const headers = opts.headers || {};
         if (token) { headers['Authorization'] = `Bearer ${token}`; }
+        if (sharePassword) { headers['X-Share-Password'] = sharePassword; }
         const response = await fetch(url, { ...opts, headers });
         if (response.status === 401) {
           localStorage.removeItem('mvp_auth_token');
@@ -1007,6 +1093,10 @@
 
       function createEditableCell(row, field, extraClass) {
         const td = document.createElement('td');
+        if (isReadOnly) {
+          td.textContent = fmt(row[field]);
+          return td;
+        }
         const input = document.createElement('input');
         input.type = 'number'; input.className = 'editable-input' + (extraClass ? ' ' + extraClass : '');
         input.min = '0.01'; input.step = '0.01'; input.value = String(row[field]);
@@ -1039,7 +1129,7 @@
         const td = document.createElement('td');
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon_rate);
-        const isEditable = row.manual_coupon_rate_set === true || !(Number.isFinite(cv) && cv > 0);
+        const isEditable = !isReadOnly && (row.manual_coupon_rate_set === true || !(Number.isFinite(cv) && cv > 0));
         if (!isEditable) { td.textContent = fmt(roundTo2(cv)) + '%'; return td; }
         const input = document.createElement('input');
         input.type = 'number'; input.className = 'editable-input coupon-input';
@@ -1075,7 +1165,7 @@
         const td = document.createElement('td');
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon);
-        const isEditable = row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0);
+        const isEditable = !isReadOnly && (row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0));
         if (!isEditable) { td.textContent = fmt(row.coupon); return td; }
         const input = document.createElement('input');
         input.type = 'number'; input.className = 'editable-input coupon-input';
@@ -1167,22 +1257,24 @@
 
           // Actions
           const actionTd = document.createElement('td');
-          const delBtn   = document.createElement('button');
-          delBtn.className = 'btn-sm'; delBtn.textContent = 'Удалить';
-          delBtn.addEventListener('click', async () => {
-            if (!confirm('Удалить эту строку из портфеля?')) return;
-            try {
-              const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
-              const body = await resp.json();
-              if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
-              tableRows = tableRows.filter(r => r.id !== row.id);
-              recalculateWeights(tableRows); persistTableCache(); renderTable();
-              setStatus(tableStatusEl, 'Строка удалена.');
-            } catch (err) { setStatus(tableStatusEl, err.message || 'Ошибка удаления.', true); }
-          });
-          actionTd.appendChild(delBtn); tr.appendChild(actionTd);
+          if (!isReadOnly) {
+            const delBtn   = document.createElement('button');
+            delBtn.className = 'btn-sm'; delBtn.textContent = 'Удалить';
+            delBtn.addEventListener('click', async () => {
+              if (!confirm('Удалить эту строку из портфеля?')) return;
+              try {
+                const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
+                const body = await resp.json();
+                if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
+                tableRows = tableRows.filter(r => r.id !== row.id);
+                recalculateWeights(tableRows); persistTableCache(); renderTable();
+                setStatus(tableStatusEl, 'Строка удалена.');
+              } catch (err) { setStatus(tableStatusEl, err.message || 'Ошибка удаления.', true); }
+            });
+            actionTd.appendChild(delBtn);
+          }
+          tr.appendChild(actionTd);
           tableBody.appendChild(tr);
-        }
 
         if (rows.length === 0) { drawMonthlyChart(tableRows); return; }
 
@@ -1244,8 +1336,21 @@
 
       // ── SYNC ─────────────────────────────────────────────────────
       async function syncTableFromServer() {
-        if (!portfolioId) throw new Error('Портфель не выбран.');
-        const resp = await apiFetch(`/portfolios/${portfolioId}/table?ts=${Date.now()}`, { cache: 'no-store' });
+        let url;
+        if (isReadOnly && shareToken) {
+          url = `/share/${shareToken}/table?ts=${Date.now()}`;
+        } else {
+          if (!portfolioId) throw new Error('Портфель не выбран.');
+          url = `/portfolios/${portfolioId}/table?ts=${Date.now()}`;
+        }
+        const resp = await apiFetch(url, { cache: 'no-store' });
+        if (resp.status === 403) {
+          // Password required
+          const password = prompt('Портфель защищен паролем. Введите пароль:');
+          if (!password) throw new Error('Пароль не введен');
+          sharePassword = password;
+          return syncTableFromServer(); // Retry with password
+        }
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
         tableRows = payload.items || [];
@@ -1555,15 +1660,127 @@
         updatePortfolioSelector();
       }
 
-      // ── INIT ─────────────────────────────────────────────────────
-      initAuth().then(() => {
-        loadNotifSettings();
-        if (loadTableCache()) renderTable();
-        // syncTableFromServer is called in initAuth after portfolio is selected
-        setInterval(() => {
-          if (portfolioId) syncTableFromServer().catch(() => {});
-        }, SYNC_INTERVAL_MS);
+      // ── SHARE PORTFOLIO ──────────────────────────────────────────
+      function openShareModal() {
+        const overlay = document.getElementById('share-modal-overlay');
+        if (overlay) overlay.classList.add('show');
+        loadShareStatus();
+      }
+
+      function closeShareModal() {
+        const overlay = document.getElementById('share-modal-overlay');
+        if (overlay) overlay.classList.remove('show');
+      }
+
+      async function loadShareStatus() {
+        try {
+          const res = await apiFetch(`/portfolios/${portfolioId}`);
+          const portfolio = await res.json();
+          const urlTextarea = document.getElementById('share-url-textarea');
+          const passwordInput = document.getElementById('share-password-input');
+          const revokeBtn = document.getElementById('share-revoke-btn');
+          if (portfolio.share_token) {
+            const shareUrl = `${window.location.origin}/share/${portfolio.share_token}`;
+            urlTextarea.value = shareUrl;
+            revokeBtn.style.display = 'block';
+          } else {
+            urlTextarea.value = 'Портфель еще не опубликован. Установите пароль (или оставьте пусто) и нажмите "Сохранить".';
+            revokeBtn.style.display = 'none';
+          }
+          passwordInput.value = '';
+          document.getElementById('share-status').textContent = '';
+        } catch (err) {
+          document.getElementById('share-status').textContent = 'Ошибка загрузки данных: ' + err.message;
+        }
+      }
+
+      async function applySharePassword() {
+        const passwordInput = document.getElementById('share-password-input');
+        const statusEl = document.getElementById('share-status');
+        statusEl.textContent = 'Сохранение...';
+        try {
+          const payload = { password: passwordInput.value.trim() || null };
+          const res = await apiFetch(`/portfolios/${portfolioId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Ошибка сохранения');
+          }
+          const data = await res.json();
+          const urlTextarea = document.getElementById('share-url-textarea');
+          urlTextarea.value = `${window.location.origin}${data.share_url}`;
+          document.getElementById('share-revoke-btn').style.display = 'block';
+          statusEl.textContent = 'Ссылка поделиться создана!';
+          setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } catch (err) {
+          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось сохранить');
+          statusEl.style.color = 'var(--red-600)';
+        }
+      }
+
+      async function revokeShare() {
+        if (!confirm('Отозвать доступ к портфелю? Ссылка перестанет работать.')) return;
+        const statusEl = document.getElementById('share-status');
+        statusEl.textContent = 'Отзыв доступа...';
+        try {
+          const res = await apiFetch(`/portfolios/${portfolioId}/share`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Ошибка отзыва');
+          const urlTextarea = document.getElementById('share-url-textarea');
+          const passwordInput = document.getElementById('share-password-input');
+          const revokeBtn = document.getElementById('share-revoke-btn');
+          urlTextarea.value = 'Портфель более не опубликован.';
+          passwordInput.value = '';
+          revokeBtn.style.display = 'none';
+          statusEl.textContent = 'Доступ отозван';
+          statusEl.style.color = 'var(--green-600)';
+          setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } catch (err) {
+          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось отозвать доступ');
+          statusEl.style.color = 'var(--red-600)';
+        }
+      }
+
+      // Share button click handler
+      document.addEventListener('DOMContentLoaded', () => {
+        const shareBtn = document.getElementById('btn-share-portfolio');
+        if (shareBtn) {
+          shareBtn.addEventListener('click', openShareModal);
+        }
       });
+
+      // ── INIT ─────────────────────────────────────────────────────
+      (async () => {
+        if (parseShareUrl()) {
+          // Read-only shared view
+          isReadOnly = true;
+          showDashboard();
+          document.querySelector('.topbar-nav').style.display = 'none';
+          document.getElementById('btn-share-portfolio').style.display = 'none';
+          const navBtns = document.querySelectorAll('.nav-btn:not([data-panel="panel-table"])');
+          navBtns.forEach(btn => btn.style.display = 'none');
+          if (loadTableCache()) renderTable();
+          try {
+            await syncTableFromServer();
+          } catch (err) {
+            setStatus(tableStatusEl, err.message || 'Ошибка загрузки портфеля.', true);
+          }
+          setInterval(() => {
+            syncTableFromServer().catch(() => {});
+          }, SYNC_INTERVAL_MS);
+        } else {
+          // Authenticated view
+          initAuth().then(() => {
+            loadNotifSettings();
+            if (loadTableCache()) renderTable();
+            setInterval(() => {
+              if (portfolioId) syncTableFromServer().catch(() => {});
+            }, SYNC_INTERVAL_MS);
+          });
+        }
+      })();
     </script>
   </body>
 </html>

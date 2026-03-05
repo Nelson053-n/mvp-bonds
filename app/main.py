@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+import bcrypt
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
 from app.api.auth import router as auth_router
@@ -10,6 +11,8 @@ from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
 from app.services.cache_service import cache_service
+from app.services.storage_service import storage_service
+from app.services.portfolio_service import portfolio_service
 from app.logging_config import setup_logging
 
 
@@ -61,6 +64,28 @@ async def api_info() -> dict[str, str]:
         "health": "/health",
         "dashboard": "/",
     }
+
+
+@app.get("/share/{share_token}/table")
+async def get_shared_portfolio_table(
+    share_token: str,
+    x_share_password: str | None = None,
+) -> dict:
+    """View a shared portfolio (public endpoint, no auth required)."""
+    portfolio = storage_service.get_portfolio_by_share_token(share_token)
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Портфель не найден")
+
+    # Check password if required
+    if portfolio["share_password_hash"]:
+        if not x_share_password:
+            raise HTTPException(status_code=403, detail="Требуется пароль")
+        if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
+            raise HTTPException(status_code=403, detail="Неверный пароль")
+
+    # Return table data
+    rows = await portfolio_service.get_table(portfolio["id"])
+    return {"items": rows}
 
 
 @app.get("/health")
