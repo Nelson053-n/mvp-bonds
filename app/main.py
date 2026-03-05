@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from app.api.portfolio import router as portfolio_router
+from app.api.settings import router as settings_router
 from app.services.cache_service import cache_service
 from app.logging_config import setup_logging
 
@@ -36,6 +37,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(portfolio_router)
+app.include_router(settings_router)
 
 dashboard_path = Path(__file__).parent / "ui" / "dashboard.html"
 

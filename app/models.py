@@ -45,6 +45,7 @@ class InstrumentMetrics(BaseModel):
     coupon_rate: float | None = None  # Ставка купона в % от номинала
     manual_coupon_set: bool = False
     maturity_date: date | None = None
+    nominal: float | None = None
     aci: float | None = None
     market_yield: float | None = None
     dividend_yield: float | None = None

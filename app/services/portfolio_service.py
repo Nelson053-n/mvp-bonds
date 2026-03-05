@@ -244,6 +244,7 @@ class PortfolioService:
                             profit=round(profit, 2),
                             weight=0.0,
                             company_rating=snapshot.company_rating,
+                            nominal=nominal,
                             coupon=(
                                 item.manual_coupon
                                 if item.manual_coupon is not None
@@ -323,6 +324,10 @@ class PortfolioService:
             if not row.ai_comment:
                 row.ai_comment = await llm_service.generate_comment(row)
             finalized.append(row)
+
+            # Persist rating to DB so we can detect changes across restarts
+            if row.current_price > 0:
+                storage_service.update_rating(row.id, row.company_rating)
 
         return finalized
 
