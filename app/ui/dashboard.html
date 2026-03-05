@@ -1502,85 +1502,81 @@
         if (!loginHtml) {
           const div = document.createElement('div');
           div.id = 'login-screen-template';
+          div.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f8fafc; display: flex; align-items: center; justify-content: center; z-index: 9999;';
+
+          const handleLogin = async () => {
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            if (!username || !password) {
+              document.getElementById('auth-message').textContent = 'Введите логин и пароль';
+              return;
+            }
+            try {
+              const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_username', data.username);
+                location.reload();
+              } else {
+                document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
+              }
+            } catch (err) {
+              document.getElementById('auth-message').textContent = 'Ошибка: ' + (err.message || 'неизвестная ошибка');
+            }
+          };
+
+          const handleRegister = async () => {
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            if (!username || !password) {
+              document.getElementById('auth-message').textContent = 'Введите логин и пароль';
+              return;
+            }
+            try {
+              const res = await fetch('/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_username', data.username);
+                location.reload();
+              } else {
+                document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
+              }
+            } catch (err) {
+              document.getElementById('auth-message').textContent = 'Ошибка: ' + (err.message || 'неизвестная ошибка');
+            }
+          };
+
           div.innerHTML = `
-            <div style="max-width: 400px; margin: 100px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-              <h2 style="text-align: center;">Вход / Регистрация</h2>
-              <form id="auth-form" style="display: flex; flex-direction: column; gap: 10px;">
-                <input type="text" id="auth-username" placeholder="Имя пользователя" required>
-                <input type="password" id="auth-password" placeholder="Пароль" required>
-                <button type="button" id="btn-login" style="background: #4CAF50; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">Войти</button>
-                <button type="button" id="btn-register" style="background: #2196F3; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">Зарегистрироваться</button>
-              </form>
-              <p id="auth-message" style="text-align: center; color: red; margin-top: 10px;"></p>
+            <div style="max-width: 400px; width: 90%; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <h2 style="text-align: center; margin: 0 0 20px 0; color: #334155;">Вход / Регистрация</h2>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <input type="text" id="auth-username" placeholder="Имя пользователя" style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                <input type="password" id="auth-password" placeholder="Пароль" style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+                <button id="btn-login" style="background: #16a34a; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">Войти</button>
+                <button id="btn-register" style="background: #2563eb; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">Зарегистрироваться</button>
+              </div>
+              <p id="auth-message" style="text-align: center; color: #dc2626; margin: 15px 0 0 0; font-size: 13px; min-height: 20px;"></p>
             </div>
           `;
           document.body.insertBefore(div, document.body.firstChild);
           loginHtml = div;
 
           setTimeout(() => {
-            const loginBtn = document.getElementById('btn-login');
-            const registerBtn = document.getElementById('btn-register');
-
-            if (loginBtn) {
-              loginBtn.addEventListener('click', async () => {
-                const username = document.getElementById('auth-username').value.trim();
-                const password = document.getElementById('auth-password').value.trim();
-                if (!username || !password) {
-                  document.getElementById('auth-message').textContent = 'Введите логин и пароль';
-                  return;
-                }
-
-                try {
-                  const res = await fetch('/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    localStorage.setItem('mvp_auth_token', data.access_token);
-                    localStorage.setItem('mvp_username', data.username);
-                    loginHtml.style.display = 'none';
-                    location.reload();
-                  } else {
-                    document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
-                  }
-                } catch (err) {
-                  document.getElementById('auth-message').textContent = 'Ошибка сети: ' + err.message;
-                }
-              });
-            }
-
-            if (registerBtn) {
-              registerBtn.addEventListener('click', async () => {
-                const username = document.getElementById('auth-username').value.trim();
-                const password = document.getElementById('auth-password').value.trim();
-                if (!username || !password) {
-                  document.getElementById('auth-message').textContent = 'Введите логин и пароль';
-                  return;
-                }
-
-                try {
-                  const res = await fetch('/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    localStorage.setItem('mvp_auth_token', data.access_token);
-                    localStorage.setItem('mvp_username', data.username);
-                    loginHtml.style.display = 'none';
-                    location.reload();
-                  } else {
-                    document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
-                  }
-                } catch (err) {
-                  document.getElementById('auth-message').textContent = 'Ошибка сети: ' + err.message;
-                }
-              });
-            }
-          }, 0);
+            const btn1 = document.getElementById('btn-login');
+            const btn2 = document.getElementById('btn-register');
+            if (btn1) btn1.onclick = handleLogin;
+            if (btn2) btn2.onclick = handleRegister;
+          }, 10);
         }
         loginHtml.style.display = 'block';
       }
