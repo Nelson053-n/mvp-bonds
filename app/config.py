@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     log_level: str = "INFO"
     log_format: str = "json"  # json | text
+    jwt_secret: str  # Required, no default — fail fast if not set
+    jwt_algorithm: str = "HS256"
+    jwt_expiry_hours: int = 72
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 

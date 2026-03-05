@@ -1,41 +1,57 @@
 """
-Server-side in-memory cache for portfolio table rows.
-Background task refreshes MOEX data periodically so that
-/portfolio/table returns instantly.
+Server-side in-memory cache for portfolio table rows, keyed by portfolio_id.
+Background task refreshes MOEX data periodically so that endpoints return instantly.
 """
 
 import asyncio
 import logging
 import time
+from dataclasses import dataclass, field
 
 from app.models import InstrumentMetrics
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class PortfolioCache:
+    """State for a single portfolio's cache."""
+
+    rows: list[InstrumentMetrics] = field(default_factory=list)
+    rows_by_id: dict[int, InstrumentMetrics] = field(default_factory=dict)
+    last_refresh: float = 0.0
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
 class CacheService:
     def __init__(self) -> None:
-        self._rows: list[InstrumentMetrics] = []
-        self._rows_by_id: dict[int, InstrumentMetrics] = {}
-        self._last_refresh: float = 0.0
-        self._lock = asyncio.Lock()
+        self._caches: dict[int, PortfolioCache] = {}  # portfolio_id -> cache
         self._refresh_task: asyncio.Task[None] | None = None
         self.refresh_interval: int = 120  # seconds
 
-    @property
-    def rows(self) -> list[InstrumentMetrics]:
-        return list(self._rows)
+    def get_cache(self, portfolio_id: int) -> PortfolioCache:
+        """Get or create cache for a portfolio."""
+        if portfolio_id not in self._caches:
+            self._caches[portfolio_id] = PortfolioCache()
+        return self._caches[portfolio_id]
 
-    @property
-    def last_refresh(self) -> float:
-        return self._last_refresh
+    def rows(self, portfolio_id: int) -> list[InstrumentMetrics]:
+        """Get cached rows for a portfolio."""
+        cache = self.get_cache(portfolio_id)
+        return list(cache.rows)
 
-    @property
-    def is_warm(self) -> bool:
-        return self._last_refresh > 0
+    def last_refresh(self, portfolio_id: int) -> float:
+        """Get last refresh time for a portfolio."""
+        cache = self.get_cache(portfolio_id)
+        return cache.last_refresh
 
-    async def refresh(self) -> list[InstrumentMetrics]:
-        """Fetch fresh data from MOEX and merge into cache.
+    def is_warm(self, portfolio_id: int) -> bool:
+        """Check if cache is warm for a portfolio."""
+        cache = self.get_cache(portfolio_id)
+        return cache.last_refresh > 0
+
+    async def refresh(self, portfolio_id: int) -> list[InstrumentMetrics]:
+        """Fetch fresh data from MOEX and merge into cache for a portfolio.
 
         Only overwrites a row if the new fetch was successful
         (current_price > 0).  Keeps old good data for rows that
@@ -44,19 +60,20 @@ class CacheService:
         from app.services.portfolio_service import portfolio_service
         from app.services.notification_service import notification_service
 
-        async with self._lock:
-            old_rows = list(self._rows)
+        cache = self.get_cache(portfolio_id)
+
+        async with cache.lock:
+            old_rows = list(cache.rows)
             try:
-                new_rows = await portfolio_service.get_table_fresh()
-                merged = self._merge(new_rows)
-                self._rows = merged
-                self._rows_by_id = {r.id: r for r in merged}
-                self._last_refresh = time.time()
-                ok_count = sum(
-                    1 for r in merged if r.current_price > 0
-                )
+                new_rows = await portfolio_service.get_table_fresh(portfolio_id)
+                merged = self._merge(new_rows, cache.rows_by_id)
+                cache.rows = merged
+                cache.rows_by_id = {r.id: r for r in merged}
+                cache.last_refresh = time.time()
+                ok_count = sum(1 for r in merged if r.current_price > 0)
                 logger.info(
-                    "Cache refreshed: %d/%d rows OK",
+                    "Cache refreshed [portfolio_id=%d]: %d/%d rows OK",
+                    portfolio_id,
                     ok_count,
                     len(merged),
                 )
@@ -69,13 +86,14 @@ class CacheService:
                     except Exception:
                         logger.exception("Notification check failed")
             except Exception:
-                logger.exception("Cache refresh failed")
-                if not self._rows:
+                logger.exception("Cache refresh failed for portfolio_id=%d", portfolio_id)
+                if not cache.rows:
                     raise
-        return list(self._rows)
+        return list(cache.rows)
 
     def _merge(
-        self, new_rows: list[InstrumentMetrics]
+        self, new_rows: list[InstrumentMetrics],
+        rows_by_id: dict[int, InstrumentMetrics]
     ) -> list[InstrumentMetrics]:
         """Merge new rows with existing cache:
         - keep old good row if new row has current_price == 0
@@ -84,7 +102,7 @@ class CacheService:
         """
         result: list[InstrumentMetrics] = []
         for new_row in new_rows:
-            old_row = self._rows_by_id.get(new_row.id)
+            old_row = rows_by_id.get(new_row.id)
             if (
                 new_row.current_price == 0
                 and old_row is not None
@@ -123,24 +141,35 @@ class CacheService:
                 result.append(new_row)
         return result
 
-    def invalidate(self) -> None:
-        """Mark cache stale so the next periodic tick refreshes early."""
-        self._last_refresh = 0.0
+    def invalidate(self, portfolio_id: int) -> None:
+        """Mark cache stale for a portfolio so the next periodic tick refreshes early."""
+        cache = self.get_cache(portfolio_id)
+        cache.last_refresh = 0.0
 
     def start_background(self) -> None:
+        """Start background refresh task."""
         logger.info("Starting background cache refresh (interval: %ds)", self.refresh_interval)
         self._refresh_task = asyncio.create_task(self._background_loop())
 
     def stop_background(self) -> None:
+        """Stop background refresh task."""
         if self._refresh_task is not None:
             self._refresh_task.cancel()
             self._refresh_task = None
             logger.debug("Background cache refresh stopped")
 
     async def _background_loop(self) -> None:
+        """Background loop that refreshes all cached portfolios periodically."""
         while True:
             try:
-                await self.refresh()
+                # Refresh all portfolios that have been accessed
+                for portfolio_id in list(self._caches.keys()):
+                    try:
+                        await self.refresh(portfolio_id)
+                    except Exception:
+                        logger.exception(
+                            "Background refresh error for portfolio_id=%d", portfolio_id
+                        )
             except Exception:
                 logger.exception("Background cache refresh error")
             await asyncio.sleep(self.refresh_interval)

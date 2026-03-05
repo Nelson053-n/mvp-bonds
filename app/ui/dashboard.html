@@ -1329,14 +1329,159 @@
         } catch (err) { setStatus(ioStatusEl, err.message, true); }
       });
 
+      // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
+
+      // Check authentication and render app
+      async function initAuth() {
+        const token = localStorage.getItem('mvp_auth_token');
+        const username = localStorage.getItem('mvp_username');
+        const portfolioId = localStorage.getItem('mvp_active_portfolio_id');
+
+        if (!token) {
+          showLoginScreen();
+          return;
+        }
+
+        // Try to verify token and load app
+        try {
+          const res = await fetch('/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.status === 401) {
+            localStorage.removeItem('mvp_auth_token');
+            localStorage.removeItem('mvp_username');
+            showLoginScreen();
+            return;
+          }
+          showDashboard();
+          await loadPortfolios();
+        } catch (err) {
+          showLoginScreen();
+        }
+      }
+
+      function showLoginScreen() {
+        document.querySelector('.container').style.display = 'none';
+        let loginHtml = document.getElementById('login-screen-template');
+        if (!loginHtml) {
+          const div = document.createElement('div');
+          div.id = 'login-screen-template';
+          div.innerHTML = `
+            <div style="max-width: 400px; margin: 100px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+              <h2 style="text-align: center;">Вход / Регистрация</h2>
+              <form id="auth-form" style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="auth-username" placeholder="Имя пользователя" required>
+                <input type="password" id="auth-password" placeholder="Пароль" required>
+                <button type="button" id="btn-login" style="background: #4CAF50; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">Войти</button>
+                <button type="button" id="btn-register" style="background: #2196F3; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer;">Зарегистрироваться</button>
+              </form>
+              <p id="auth-message" style="text-align: center; color: red; margin-top: 10px;"></p>
+            </div>
+          `;
+          document.body.insertBefore(div, document.body.firstChild);
+          loginHtml = div;
+
+          document.getElementById('btn-login').onclick = async () => {
+            const username = document.getElementById('auth-username').value;
+            const password = document.getElementById('auth-password').value;
+            if (!username || !password) return;
+
+            try {
+              const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_username', data.username);
+                loginHtml.style.display = 'none';
+                showDashboard();
+                await loadPortfolios();
+              } else {
+                document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
+              }
+            } catch (err) {
+              document.getElementById('auth-message').textContent = 'Ошибка сети';
+            }
+          };
+
+          document.getElementById('btn-register').onclick = async () => {
+            const username = document.getElementById('auth-username').value;
+            const password = document.getElementById('auth-password').value;
+            if (!username || !password) return;
+
+            try {
+              const res = await fetch('/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_username', data.username);
+                loginHtml.style.display = 'none';
+                showDashboard();
+                await loadPortfolios();
+              } else {
+                document.getElementById('auth-message').textContent = data.detail || 'Ошибка регистрации';
+              }
+            } catch (err) {
+              document.getElementById('auth-message').textContent = 'Ошибка сети';
+            }
+          };
+        }
+        loginHtml.style.display = 'block';
+      }
+
+      function showDashboard() {
+        document.querySelector('.container').style.display = 'block';
+        const loginScreen = document.getElementById('login-screen-template');
+        if (loginScreen) loginScreen.style.display = 'none';
+
+        // Add logout button if not exists
+        if (!document.getElementById('btn-logout')) {
+          const topbar = document.querySelector('.topbar') || document.querySelector('header');
+          if (topbar) {
+            const btn = document.createElement('button');
+            btn.id = 'btn-logout';
+            btn.textContent = 'Выйти';
+            btn.style.marginLeft = 'auto';
+            btn.onclick = () => {
+              localStorage.removeItem('mvp_auth_token');
+              localStorage.removeItem('mvp_username');
+              location.reload();
+            };
+            topbar.appendChild(btn);
+          }
+        }
+      }
+
+      async function loadPortfolios() {
+        const token = localStorage.getItem('mvp_auth_token');
+        try {
+          const res = await fetch('/portfolios', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          // TODO: Render portfolio selector
+        } catch (err) {
+          console.error('Failed to load portfolios:', err);
+        }
+      }
+
       // ── INIT ─────────────────────────────────────────────────────
-      loadNotifSettings();
-      if (loadTableCache()) renderTable();
-      syncTableFromServer().catch(err => {
-        const fresh = Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
-        if (!fresh || tableRows.length === 0) setStatus(tableStatusEl, err.message || 'Ошибка загрузки таблицы.', true);
+      initAuth().then(() => {
+        loadNotifSettings();
+        if (loadTableCache()) renderTable();
+        syncTableFromServer().catch(err => {
+          const fresh = Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
+          if (!fresh || tableRows.length === 0) setStatus(tableStatusEl, err.message || 'Ошибка загрузки таблицы.', true);
+        });
+        setInterval(() => { syncTableFromServer().catch(() => {}); }, SYNC_INTERVAL_MS);
       });
-      setInterval(() => { syncTableFromServer().catch(() => {}); }, SYNC_INTERVAL_MS);
     </script>
   </body>
 </html>
