@@ -1275,6 +1275,7 @@
           }
           tr.appendChild(actionTd);
           tableBody.appendChild(tr);
+        }
 
         if (rows.length === 0) { drawMonthlyChart(tableRows); return; }
 
@@ -1743,13 +1744,20 @@
         }
       }
 
-      // Share button click handler
-      document.addEventListener('DOMContentLoaded', () => {
+      // Share button click handler - attach when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          const shareBtn = document.getElementById('btn-share-portfolio');
+          if (shareBtn) {
+            shareBtn.addEventListener('click', openShareModal);
+          }
+        });
+      } else {
         const shareBtn = document.getElementById('btn-share-portfolio');
         if (shareBtn) {
           shareBtn.addEventListener('click', openShareModal);
         }
-      });
+      }
 
       // ── INIT ─────────────────────────────────────────────────────
       (async () => {
