@@ -491,7 +491,7 @@
                   <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;">Годовой<br>купон</th>
                   <th data-sort-key="market_yield" class="wrap" style="min-width:52px;">Рын.<br>доход.</th>
                   <th data-sort-key="maturity_date">Погашение</th>
-                  <th data-sort-key="buyback_date">Оферта</th>
+                  <th data-sort-key="offer_date">Оферта</th>
                   <th class="no-sort">Действия</th>
                 </tr>
               </thead>
@@ -717,6 +717,21 @@
       function getSortValue(row, key) {
         if (key === 'company_rating') { const s = ratingToScore(parseRating(row.company_rating)); return s === null ? -1 : s; }
         return row[key] ?? '';
+      }
+      function computeSortFields(row) {
+        if (row.type === 'bond') {
+          const coupon = Number(row.coupon || 0);
+          const period = Number(row.coupon_period || 0);
+          const qty = Number(row.quantity || 0);
+          const freq = period > 0 ? Math.round(365 / period) : 2;
+          row.coupon_yield = Number(row.coupon_rate || 0);
+          row.coupon_frequency = freq;
+          row.your_annual_coupon = coupon > 0 && qty > 0 ? roundTo2(coupon * qty * freq) : 0;
+        } else {
+          row.coupon_yield = 0;
+          row.coupon_frequency = 0;
+          row.your_annual_coupon = 0;
+        }
       }
       function getSortedRows(rows) {
         if (!sortState.key) return rows;
@@ -1068,6 +1083,7 @@
       }
 
       function renderTable() {
+        tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
         tableBody.innerHTML = '';
 
@@ -1117,7 +1133,7 @@
           }
 
           addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
-          addCell(tr, row.type === 'bond' && row.buyback_date ? fmt(row.buyback_date) : '');  // Оферта
+          addCell(tr, row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : '');  // Оферта
 
           // Actions
           const actionTd = document.createElement('td');
