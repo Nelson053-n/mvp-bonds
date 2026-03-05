@@ -720,11 +720,18 @@
       async function apiFetch(url, opts = {}) {
         const token = localStorage.getItem('mvp_auth_token');
         const headers = { ...(opts.headers || {}) };
-        if (token) { headers['Authorization'] = `Bearer ${token}`; }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          console.log('apiFetch - Sending token for', url);
+        } else {
+          console.log('apiFetch - NO TOKEN FOUND for', url);
+        }
         if (sharePassword) { headers['X-Share-Password'] = sharePassword; }
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
+        console.log(`apiFetch ${url}:`, response.status);
         if (response.status === 401) {
+          console.log('Got 401, clearing auth');
           localStorage.removeItem('mvp_auth_token');
           localStorage.removeItem('mvp_username');
           showLoginScreen();
@@ -1507,6 +1514,7 @@
           const handleLogin = async () => {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
+            console.log('Login attempt:', { username, passwordLength: password.length });
             if (!username || !password) {
               document.getElementById('auth-message').textContent = 'Введите логин и пароль';
               return;
@@ -1517,15 +1525,21 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
               });
+              console.log('Login response status:', res.status);
               const data = await res.json();
+              console.log('Login response data:', data);
               if (res.ok) {
+                console.log('Login successful, saving token');
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
-                location.reload();
+                console.log('Token saved:', { token: data.access_token.substring(0, 20) + '...', username: data.username });
+                document.getElementById('auth-message').textContent = 'Вход успешен, загрузка...';
+                setTimeout(() => location.reload(), 500);
               } else {
                 document.getElementById('auth-message').textContent = data.detail || 'Ошибка входа';
               }
             } catch (err) {
+              console.error('Login error:', err);
               document.getElementById('auth-message').textContent = 'Ошибка: ' + (err.message || 'неизвестная ошибка');
             }
           };
