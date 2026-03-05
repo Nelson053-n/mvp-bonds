@@ -628,6 +628,23 @@
       // ── STATE ────────────────────────────────────────────────────
       let tableRows = [];
       let sortState = { key: null, direction: 'asc' };
+      let portfolioId = null;
+      let portfolios = [];
+
+      // ── API HELPER ───────────────────────────────────────────────
+      async function apiFetch(url, opts = {}) {
+        const token = localStorage.getItem('mvp_auth_token');
+        const headers = opts.headers || {};
+        if (token) { headers['Authorization'] = `Bearer ${token}`; }
+        const response = await fetch(url, { ...opts, headers });
+        if (response.status === 401) {
+          localStorage.removeItem('mvp_auth_token');
+          localStorage.removeItem('mvp_username');
+          showLoginScreen();
+          throw new Error('Сессия истекла. Пожалуйста, повторно войдите.');
+        }
+        return response;
+      }
 
       // ── UTILS ────────────────────────────────────────────────────
       function roundTo2(v) { return Math.round(v * 100) / 100; }
@@ -962,7 +979,7 @@
       const tableStatusEl = document.getElementById('table-status');
 
       async function saveEditableRow(id, qty, price) {
-        const r = await fetch('/portfolio/instruments/' + id, {
+        const r = await apiFetch(`/portfolios/${portfolioId}/instruments/${id}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity: qty, purchase_price: price }),
         });
@@ -970,7 +987,7 @@
         if (!r.ok) throw new Error(p.detail || 'Не удалось обновить строку.');
       }
       async function saveCouponRow(id, coupon) {
-        const r = await fetch('/portfolio/instruments/' + id + '/coupon', {
+        const r = await apiFetch(`/portfolios/${portfolioId}/instruments/${id}/coupon`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ coupon }),
         });
@@ -979,7 +996,7 @@
         return p;
       }
       async function saveCouponRateRow(id, coupon_rate) {
-        const r = await fetch('/portfolio/instruments/' + id + '/coupon-rate', {
+        const r = await apiFetch(`/portfolios/${portfolioId}/instruments/${id}/coupon-rate`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ coupon_rate }),
         });
@@ -1155,7 +1172,7 @@
           delBtn.addEventListener('click', async () => {
             if (!confirm('Удалить эту строку из портфеля?')) return;
             try {
-              const resp = await fetch('/portfolio/instruments/' + row.id, { method: 'DELETE' });
+              const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
               const body = await resp.json();
               if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
               tableRows = tableRows.filter(r => r.id !== row.id);
@@ -1227,7 +1244,8 @@
 
       // ── SYNC ─────────────────────────────────────────────────────
       async function syncTableFromServer() {
-        const resp = await fetch('/portfolio/table?ts=' + Date.now(), { cache: 'no-store' });
+        if (!portfolioId) throw new Error('Портфель не выбран.');
+        const resp = await apiFetch(`/portfolios/${portfolioId}/table?ts=${Date.now()}`, { cache: 'no-store' });
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
         tableRows = payload.items || [];
@@ -1239,6 +1257,7 @@
       const submitBtn   = document.getElementById('submit-btn');
       document.getElementById('add-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!portfolioId) { setStatus(addStatusEl, 'Портфель не выбран.', true); return; }
         setStatus(addStatusEl, 'Проверка данных...');
         submitBtn.disabled = true;
         const frm = e.target;
@@ -1248,7 +1267,7 @@
           purchase_price: Number(frm.purchase_price.value),
         };
         try {
-          const vResp = await fetch('/portfolio/validate', {
+          const vResp = await apiFetch(`/portfolios/${portfolioId}/validate`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_input: payload }),
           });
@@ -1257,7 +1276,7 @@
           if (!v.validated) { setStatus(addStatusEl, 'Не пройдена: ' + (v.warnings || []).join(' '), true); return; }
           const typeLabel = v.instrument_type === 'bond' ? 'облигация' : v.instrument_type === 'stock' ? 'акция' : v.instrument_type;
           setStatus(addStatusEl, 'Тип: ' + typeLabel + '. Добавление...');
-          const aResp = await fetch('/portfolio/instruments', {
+          const aResp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
@@ -1277,7 +1296,7 @@
       const tgThreshInput = document.getElementById('tg-threshold');
       async function loadNotifSettings() {
         try {
-          const r = await fetch('/settings/notifications');
+          const r = await apiFetch('/settings/notifications');
           if (!r.ok) return;
           const s = await r.json();
           tgTokenInput.value  = s.tg_bot_token || '';
@@ -1288,7 +1307,7 @@
       document.getElementById('notif-save-btn').addEventListener('click', async () => {
         setStatus(notifStatusEl, 'Сохранение...');
         try {
-          const r = await fetch('/settings/notifications', {
+          const r = await apiFetch('/settings/notifications', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
           });
@@ -1299,7 +1318,7 @@
       document.getElementById('notif-test-btn').addEventListener('click', async () => {
         setStatus(notifStatusEl, 'Отправка тестового сообщения...');
         try {
-          const r = await fetch('/settings/notifications/test', {
+          const r = await apiFetch('/settings/notifications/test', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
           });
@@ -1313,12 +1332,13 @@
       const ioStatusEl    = document.getElementById('io-status');
       const importFileInp = document.getElementById('import-file');
       document.getElementById('import-btn').addEventListener('click', async () => {
+        if (!portfolioId) { setStatus(ioStatusEl, 'Портфель не выбран.', true); return; }
         const file = importFileInp.files[0];
         if (!file) { setStatus(ioStatusEl, 'Выберите CSV-файл.', true); return; }
         setStatus(ioStatusEl, 'Импорт...');
         const fd = new FormData(); fd.append('file', file);
         try {
-          const r = await fetch('/portfolio/import', { method: 'POST', body: fd });
+          const r = await apiFetch(`/portfolios/${portfolioId}/import`, { method: 'POST', body: fd });
           const res = await r.json();
           if (!r.ok) throw new Error(res.detail || 'Ошибка импорта.');
           let msg = 'Импортировано: ' + res.added + ' позиций.';
@@ -1335,7 +1355,7 @@
       async function initAuth() {
         const token = localStorage.getItem('mvp_auth_token');
         const username = localStorage.getItem('mvp_username');
-        const portfolioId = localStorage.getItem('mvp_active_portfolio_id');
+        const savedPortfolioId = localStorage.getItem('mvp_active_portfolio_id');
 
         if (!token) {
           showLoginScreen();
@@ -1344,9 +1364,7 @@
 
         // Try to verify token and load app
         try {
-          const res = await fetch('/auth/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await apiFetch('/auth/me');
           if (res.status === 401) {
             localStorage.removeItem('mvp_auth_token');
             localStorage.removeItem('mvp_username');
@@ -1355,6 +1373,17 @@
           }
           showDashboard();
           await loadPortfolios();
+          // Set portfolioId from saved value or first portfolio
+          if (savedPortfolioId && portfolios.some(p => p.id === Number(savedPortfolioId))) {
+            portfolioId = Number(savedPortfolioId);
+          } else if (portfolios.length > 0) {
+            portfolioId = portfolios[0].id;
+            localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+          }
+          if (portfolioId) {
+            updatePortfolioSelector();
+            await syncTableFromServer();
+          }
         } catch (err) {
           showLoginScreen();
         }
@@ -1441,6 +1470,9 @@
         const loginScreen = document.getElementById('login-screen-template');
         if (loginScreen) loginScreen.style.display = 'none';
 
+        // Setup portfolio selector
+        setupPortfolioSelector();
+
         // Add logout button if not exists
         if (!document.getElementById('btn-logout')) {
           const topbar = document.querySelector('.topbar') || document.querySelector('header');
@@ -1448,7 +1480,14 @@
             const btn = document.createElement('button');
             btn.id = 'btn-logout';
             btn.textContent = 'Выйти';
-            btn.style.marginLeft = 'auto';
+            btn.style.marginLeft = '16px';
+            btn.style.padding = '4px 12px';
+            btn.style.background = '#dc2626';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '4px';
+            btn.style.cursor = 'pointer';
+            btn.style.fontSize = '13px';
             btn.onclick = () => {
               localStorage.removeItem('mvp_auth_token');
               localStorage.removeItem('mvp_username');
@@ -1460,27 +1499,70 @@
       }
 
       async function loadPortfolios() {
-        const token = localStorage.getItem('mvp_auth_token');
         try {
-          const res = await fetch('/portfolios', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await apiFetch('/portfolios');
           const data = await res.json();
-          // TODO: Render portfolio selector
+          portfolios = data.portfolios || [];
         } catch (err) {
           console.error('Failed to load portfolios:', err);
         }
+      }
+
+      function updatePortfolioSelector() {
+        const selector = document.getElementById('portfolio-selector');
+        if (!selector) return;
+        selector.innerHTML = '';
+        for (const p of portfolios) {
+          const option = document.createElement('option');
+          option.value = String(p.id);
+          option.textContent = p.name;
+          option.selected = p.id === portfolioId;
+          selector.appendChild(option);
+        }
+      }
+
+      function setupPortfolioSelector() {
+        const selector = document.getElementById('portfolio-selector');
+        if (!selector) {
+          // Create selector if doesn't exist
+          const topbarNav = document.querySelector('.topbar-nav');
+          if (topbarNav) {
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.gap = '8px';
+            container.style.marginLeft = 'auto';
+            container.style.marginRight = '16px';
+            const sel = document.createElement('select');
+            sel.id = 'portfolio-selector';
+            sel.style.padding = '4px 8px';
+            sel.style.borderRadius = '4px';
+            sel.style.border = '1px solid #ddd';
+            sel.style.background = '#fff';
+            sel.style.color = '#333';
+            sel.addEventListener('change', (e) => {
+              const newId = Number(e.target.value);
+              if (newId !== portfolioId) {
+                portfolioId = newId;
+                localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+                syncTableFromServer().catch(err => console.error('Failed to sync:', err));
+              }
+            });
+            container.appendChild(sel);
+            topbarNav.insertBefore(container, topbarNav.firstChild);
+          }
+        }
+        updatePortfolioSelector();
       }
 
       // ── INIT ─────────────────────────────────────────────────────
       initAuth().then(() => {
         loadNotifSettings();
         if (loadTableCache()) renderTable();
-        syncTableFromServer().catch(err => {
-          const fresh = Date.now() - getLastSyncTimestamp() < SYNC_INTERVAL_MS;
-          if (!fresh || tableRows.length === 0) setStatus(tableStatusEl, err.message || 'Ошибка загрузки таблицы.', true);
-        });
-        setInterval(() => { syncTableFromServer().catch(() => {}); }, SYNC_INTERVAL_MS);
+        // syncTableFromServer is called in initAuth after portfolio is selected
+        setInterval(() => {
+          if (portfolioId) syncTableFromServer().catch(() => {});
+        }, SYNC_INTERVAL_MS);
       });
     </script>
   </body>
