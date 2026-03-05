@@ -33,6 +33,7 @@ class StorageService:
             for col, col_def in [
                 ("manual_coupon", "REAL"),
                 ("company_rating", "TEXT"),
+                ("manual_coupon_rate", "REAL"),
             ]:
                 try:
                     conn.execute(
@@ -90,7 +91,7 @@ class StorageService:
             rows = conn.execute(
                 """
                 SELECT id, ticker, instrument_type, quantity, purchase_price
-                     , manual_coupon, company_rating
+                     , manual_coupon, company_rating, manual_coupon_rate
                 FROM portfolio_items
                 ORDER BY id ASC
                 """
@@ -107,6 +108,9 @@ class StorageService:
                     float(row[5]) if row[5] is not None else None
                 ),
                 "company_rating": row[6],
+                "manual_coupon_rate": (
+                    float(row[7]) if row[7] is not None else None
+                ),
             }
             for row in rows
         ]
@@ -147,6 +151,19 @@ class StorageService:
                 WHERE id = ?
                 """,
                 (coupon, item_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def update_coupon_rate(self, item_id: int, coupon_rate: float) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE portfolio_items
+                SET manual_coupon_rate = ?
+                WHERE id = ?
+                """,
+                (coupon_rate, item_id),
             )
             conn.commit()
             return int(cursor.rowcount)

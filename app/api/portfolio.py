@@ -9,6 +9,7 @@ from app.models import (
     AddInstrumentInput,
     PortfolioTableResponse,
     UpdateCouponInput,
+    UpdateCouponRateInput,
     UpdateInstrumentInput,
     ValidationRequest,
     ValidationResponse,
@@ -101,6 +102,25 @@ async def update_coupon(
         "current_value": row.current_value,
         "profit": row.profit,
         "weight": row.weight,
+    }
+
+
+@router.patch("/instruments/{item_id}/coupon-rate")
+async def update_coupon_rate(
+    item_id: int,
+    payload: UpdateCouponRateInput,
+) -> dict:
+    try:
+        row = await portfolio_service.update_coupon_rate(item_id, payload)
+    except InstrumentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.detail) from exc
+    except AppError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+
+    return {
+        "id": row.id,
+        "coupon_rate": row.coupon_rate,
+        "manual_coupon_rate_set": row.manual_coupon_rate_set,
     }
 
 
