@@ -814,9 +814,15 @@
       }
 
       // ── MONTHLY CHART ─────────────────────────────────────────────
+      function parseLocalDate(dateStr) {
+        // Parse YYYY-MM-DD as local date, not UTC
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      }
+
       function generatePaymentDates(maturityIso, periodDays) {
         const dates = [];
-        const maturity = new Date(maturityIso);
+        const maturity = parseLocalDate(maturityIso);
         if (isNaN(maturity.getTime()) || periodDays <= 0) return dates;
         const now  = new Date();
         const end  = new Date(now.getFullYear(), now.getMonth() + 13, 1);
@@ -844,6 +850,7 @@
           const period  = Number(row.coupon_period || 0);
           if (!row.maturity_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
           const payDates = generatePaymentDates(row.maturity_date, period);
+          console.log(`${row.ticker}: coupon=${coupon}, qty=${qty}, period=${period}, maturity=${row.maturity_date}, payDates:`, payDates.map(d => d.toISOString()));
           for (const pd of payDates) {
             for (const slot of slots) {
               if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
