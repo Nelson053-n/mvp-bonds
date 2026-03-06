@@ -1642,11 +1642,11 @@
       function buildWizardHTML() {
         return `
         <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background:var(--slate-900,#0f172a);border-radius:0 0 var(--radius,8px) var(--radius,8px);">
-          <div style="text-align:center;margin-bottom:32px;">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:32px;">
             <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;">
               Подберём портфель за вас
             </div>
-            <div style="font-size:14px;color:var(--slate-400);max-width:480px;margin:0 auto;line-height:1.6;">
+            <div style="font-size:14px;color:var(--slate-400);max-width:480px;width:100%;margin:0 auto;line-height:1.6;">
               Укажите сумму, желаемую доходность и уровень риска — система подберёт до 10 облигаций с MOEX.
             </div>
           </div>
@@ -1886,8 +1886,9 @@
         const freqLabel = f => f === 12 ? '12×/год' : f === 4 ? '4×/год' : f === 2 ? '2×/год' : f === 1 ? '1×/год' : `${f}×/год`;
 
         let cardsHtml = bonds.map(b => {
-          const ratingHtml = b.rating
-            ? `<span class="pw-rating-badge">${b.rating}</span>`
+          const ratingValue = b.rating || b.company_rating || null;
+          const ratingHtml = ratingValue
+            ? `<span class="pw-rating-badge">${ratingValue}</span>`
             : `<span class="pw-rating-badge" style="background:rgba(100,116,139,.15);color:#64748b;border-color:rgba(100,116,139,.2);">—</span>`;
           const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
           const offerNote = b.offer_date ? ` · оферта ${b.offer_date.substring(0,7)}` : '';

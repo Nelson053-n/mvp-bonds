@@ -22,6 +22,9 @@ from app.models import (
 from app.services.cache_service import cache_service
 from app.services.portfolio_service import portfolio_service
 from app.services.storage_service import storage_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["instruments"])
 
@@ -45,13 +48,16 @@ async def add_instrument(
 ) -> dict:
     """Add instrument to portfolio."""
     await get_portfolio_or_403(portfolio_id, current_user)
-
+    logger.info("Add instrument request: portfolio_id=%s payload=%s", portfolio_id, getattr(payload, 'model_dump', lambda: payload)())
     try:
         row = await portfolio_service.add_instrument(portfolio_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
         raise HTTPException(status_code=400, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error while adding instrument to portfolio_id=%s", portfolio_id)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера") from exc
 
     return {
         "id": row.id,
