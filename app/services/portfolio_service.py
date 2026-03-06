@@ -300,6 +300,7 @@ class PortfolioService:
                             maturity_date=snapshot.maturity_date,
                             buyback_date=snapshot.buyback_date,
                             offer_date=snapshot.offer_date,
+                            next_coupon_date=snapshot.next_coupon_date,
                             aci=snapshot.aci,
                             market_yield=snapshot.market_yield,
                             ai_comment="",

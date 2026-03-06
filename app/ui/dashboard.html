@@ -470,13 +470,12 @@
     <!-- TOPBAR -->
     <nav class="topbar">
       <div class="topbar-inner">
-        <div class="topbar-brand">
+        <div class="topbar-brand" data-panel="panel-table" style="cursor:pointer;">
           <div class="brand-mark">P</div>
           <span class="brand-name">Портфель</span>
           <span class="brand-badge">MVP</span>
         </div>
         <div class="topbar-nav">
-          <button class="nav-btn active" data-panel="panel-table">Портфель</button>
           <button class="nav-btn" data-panel="panel-add">Добавить бумагу</button>
           <button class="nav-btn" data-panel="panel-notifications">Уведомления</button>
           <button class="nav-btn" data-panel="panel-io">Импорт / Экспорт</button>
@@ -854,6 +853,7 @@
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
       }
       navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
+      document.querySelector('.topbar-brand').addEventListener('click', () => showPanel('panel-table'));
 
       // ── CONSTANTS ────────────────────────────────────────────────
       const TABLE_CACHE_KEY    = 'mvp_portfolio_table_cache_v2';
@@ -1125,17 +1125,26 @@
         return new Date(year, month - 1, day);
       }
 
-      function generatePaymentDates(maturityIso, periodDays) {
+      function generatePaymentDates(nextCouponIso, periodDays) {
         const dates = [];
-        const maturity = parseLocalDate(maturityIso);
-        if (isNaN(maturity.getTime()) || periodDays <= 0) return dates;
-        const now  = new Date();
-        const end  = new Date(now.getFullYear(), now.getMonth() + 13, 1);
-        let d = new Date(maturity);
-        while (d > now) d = new Date(d.getTime() - periodDays * 86400000);
-        d = new Date(d.getTime() + periodDays * 86400000);
+        if (!nextCouponIso || periodDays <= 0) return dates;
+        const anchor     = parseLocalDate(nextCouponIso);
+        if (isNaN(anchor.getTime())) return dates;
+        const now        = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end        = new Date(now.getFullYear(), now.getMonth() + 13, 1);
+        // Откатываемся от якоря назад до начала текущего месяца
+        let d = new Date(anchor);
+        while (d > monthStart) d = new Date(d.getTime() - periodDays * 86400000);
+        if (d < monthStart) d = new Date(d.getTime() + periodDays * 86400000);
+        // Собираем даты — не более одной выплаты в месяц на облигацию
+        const seenMonths = new Set();
         while (d < end) {
-          if (d >= now) dates.push(new Date(d));
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          if (!seenMonths.has(key)) {
+            seenMonths.add(key);
+            dates.push(new Date(d));
+          }
           d = new Date(d.getTime() + periodDays * 86400000);
         }
         return dates;
@@ -1146,20 +1155,30 @@
         const slots = [];
         for (let i = 0; i < 12; i++) {
           const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0 });
+          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, hasOffer: false });
         }
         for (const row of rows) {
           if (row.type !== 'bond') continue;
           const coupon  = Number(row.coupon || 0);
           const qty     = Number(row.quantity || 0);
           const period  = Number(row.coupon_period || 0);
-          if (!row.maturity_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
-          const payDates = generatePaymentDates(row.maturity_date, period);
-          console.log(`${row.ticker}: coupon=${coupon}, qty=${qty}, period=${period}, maturity=${row.maturity_date}, payDates:`, payDates.map(d => d.toISOString()));
+          if (!row.next_coupon_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
+          const payDates = generatePaymentDates(row.next_coupon_date, period);
           for (const pd of payDates) {
             for (const slot of slots) {
               if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
                 slot.income += coupon * qty; break;
+              }
+            }
+          }
+          // Mark months with offer dates
+          if (row.offer_date) {
+            const od = parseLocalDate(row.offer_date);
+            if (!isNaN(od.getTime())) {
+              for (const slot of slots) {
+                if (od.getFullYear() === slot.year && od.getMonth() === slot.month) {
+                  slot.hasOffer = true; break;
+                }
               }
             }
           }
@@ -1188,8 +1207,8 @@
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
 
-        // PAD_B increased to fit: income amount (row1) + month label (row2)
-        const PAD_L = 64, PAD_R = 12, PAD_T = 30, PAD_B = 44;
+        // PAD_T increased to fit "оферта" label above bars; PAD_B for month + income labels
+        const PAD_L = 64, PAD_R = 12, PAD_T = 44, PAD_B = 44;
         const chartW = W - PAD_L - PAD_R;
         const chartH = H - PAD_T - PAD_B;
         const slotW  = chartW / data.length;
@@ -1222,7 +1241,7 @@
           const y    = PAD_T + chartH - barH;
 
           if (barH > 0) {
-            ctx.fillStyle = '#60a5fa';
+            ctx.fillStyle = d.hasOffer ? '#f59e0b' : '#60a5fa';
             const radius = Math.min(4, barH / 2);
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
@@ -1234,6 +1253,15 @@
             ctx.quadraticCurveTo(x, y, x + radius, y);
             ctx.closePath();
             ctx.fill();
+          }
+
+          // "Оферта" label above bar
+          if (d.hasOffer) {
+            const labelY = barH > 0 ? y - 5 : PAD_T - 5;
+            ctx.fillStyle  = '#d97706';
+            ctx.font       = 'bold 8px Inter, system-ui, sans-serif';
+            ctx.textAlign  = 'center';
+            ctx.fillText('оферта', x + barW / 2, labelY);
           }
 
           // Row 1 at bottom: month name
@@ -2352,16 +2380,16 @@
           users.forEach(u => {
             const date = u.created_at ? u.created_at.substring(0, 10) : '—';
             const role = u.is_admin
-              ? '<span style="color:#f59e0b;font-weight:600;">Админ</span>'
+              ? '<span style="color:#f59e0b;font-weight:600;">Администратор</span>'
               : '<span style="color:var(--slate-400);">Пользователь</span>';
             const isPrimary = u.id === 1;
             const roleBtn = u.is_admin
               ? (isPrimary ? '' : `<button onclick="adminSetRole(${u.id}, false, this)"
                   style="padding:3px 8px;font-size:11px;background:#92400e;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                  Снять админа</button>`)
+                  Снять администратора</button>`)
               : `<button onclick="adminSetRole(${u.id}, true, this)"
                   style="padding:3px 8px;font-size:11px;background:#d97706;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                  Сделать админом</button>`;
+                  Сделать администратором</button>`;
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td>${u.id}</td>

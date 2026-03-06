@@ -52,6 +52,7 @@ class InstrumentMetrics(BaseModel):
     maturity_date: date | None = None
     buyback_date: date | None = None
     offer_date: date | None = None
+    next_coupon_date: date | None = None
     nominal: float | None = None
     aci: float | None = None
     market_yield: float | None = None
@@ -78,6 +79,7 @@ class BondSnapshot(BaseModel):
     maturity_date: date | None = None
     buyback_date: date | None = None
     offer_date: date | None = None
+    next_coupon_date: date | None = None
     aci: float | None = None
     market_yield: float | None = None
     company_rating: str | None = None
