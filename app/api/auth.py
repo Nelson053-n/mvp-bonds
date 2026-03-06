@@ -26,11 +26,13 @@ class AuthResponse(BaseModel):
     access_token: str
     user_id: int
     username: str
+    is_admin: bool = False
 
 
 class UserResponse(BaseModel):
     user_id: int
     username: str
+    is_admin: bool = False
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -64,4 +66,5 @@ async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
     return {
         "user_id": current_user["sub"],
         "username": current_user["username"],
+        "is_admin": current_user.get("is_admin", False),
     }
