@@ -52,9 +52,23 @@ class PortfolioService:
         ticker = payload.ticker.upper().strip()
         try:
             if validation.instrument_type == "bond":
-                await moex_service.get_bond_snapshot(ticker)
+                snapshot = await moex_service.get_bond_snapshot(ticker)
+                if payload.purchase_price is None:
+                    nominal = snapshot.nominal or 1000.0
+                    purchase_price = round(
+                        (snapshot.clean_price_percent / 100.0) * nominal
+                        + (snapshot.aci or 0.0),
+                        2,
+                    )
+                else:
+                    purchase_price = payload.purchase_price
             else:
-                await moex_service.get_stock_snapshot(ticker)
+                snapshot = await moex_service.get_stock_snapshot(ticker)
+                purchase_price = (
+                    payload.purchase_price
+                    if payload.purchase_price is not None
+                    else snapshot.current_price
+                )
         except Exception as exc:
             logger.error("Failed to fetch market data for %s: %s", ticker, exc)
             raise
@@ -63,7 +77,7 @@ class PortfolioService:
             ticker=ticker,
             instrument_type=validation.instrument_type,
             quantity=payload.quantity,
-            purchase_price=payload.purchase_price,
+            purchase_price=purchase_price,
             portfolio_id=portfolio_id,
         )
         logger.info(

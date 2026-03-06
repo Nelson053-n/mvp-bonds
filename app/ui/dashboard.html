@@ -501,6 +501,7 @@
       @keyframes rippleWave {
         to { transform: scale(4); opacity: 0; }
       }
+      @keyframes spinBtn { to { transform: rotate(360deg); } }
 
       /* Panel enter animation */
       .panel.active { animation: fadeSlideIn .18s ease-out both; }
@@ -1611,6 +1612,369 @@
         td.appendChild(input); return td;
       }
 
+      // ── PORTFOLIO WIZARD ─────────────────────────────────────────
+
+      const RISK_LABELS = {
+        ultra_low: { label: 'Минимальный', desc: 'ОФЗ — государственные облигации', color: '#22c55e', yieldMin: 5, yieldMax: 10 },
+        low:       { label: 'Низкий',      desc: 'Рейтинг AAA–AA, крупнейшие эмитенты', color: '#84cc16', yieldMin: 5, yieldMax: 13 },
+        moderate:  { label: 'Умеренный',   desc: 'Рейтинг A–BBB, надёжный корпоратив', color: '#eab308', yieldMin: 8, yieldMax: 18 },
+        elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 23 },
+        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#ef4444', yieldMin: 15, yieldMax: 27 },
+      };
+      const RISK_KEYS = Object.keys(RISK_LABELS);
+
+      function fmtAmount(v) {
+        if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1) + ' млн ₽';
+        if (v >= 1_000)    return (v / 1_000).toFixed(0) + ' тыс ₽';
+        return v + ' ₽';
+      }
+
+      // Logarithmic slider: 10k..100M mapped to 0..100
+      function sliderToAmount(s) {
+        const min = Math.log10(10_000), max = Math.log10(100_000_000);
+        return Math.round(Math.pow(10, min + (s / 100) * (max - min)));
+      }
+      function amountToSlider(a) {
+        const min = Math.log10(10_000), max = Math.log10(100_000_000);
+        return Math.round(((Math.log10(a) - min) / (max - min)) * 100);
+      }
+
+      function buildWizardHTML() {
+        return `
+        <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background:var(--slate-900,#0f172a);border-radius:0 0 var(--radius,8px) var(--radius,8px);">
+          <div style="text-align:center;margin-bottom:32px;">
+            <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;">
+              Подберём портфель за вас
+            </div>
+            <div style="font-size:14px;color:var(--slate-400);max-width:480px;margin:0 auto;line-height:1.6;">
+              Укажите сумму, желаемую доходность и уровень риска — система подберёт до 10 облигаций с MOEX.
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:900px;margin:0 auto 28px;">
+
+            <!-- Slider 1: Amount -->
+            <div class="pw-card">
+              <div class="pw-card-label">Сумма портфеля</div>
+              <div id="pw-amount-val" class="pw-card-value">500 тыс ₽</div>
+              <input id="pw-amount" type="range" min="0" max="100" value="59" class="pw-slider">
+              <div class="pw-slider-hints"><span>10 тыс</span><span>100 млн</span></div>
+            </div>
+
+            <!-- Slider 2: Yield -->
+            <div class="pw-card">
+              <div class="pw-card-label">Ожидаемая доходность</div>
+              <div id="pw-yield-val" class="pw-card-value">12%</div>
+              <input id="pw-yield" type="range" min="5" max="30" step="0.5" value="12" class="pw-slider">
+              <div class="pw-slider-hints"><span id="pw-yield-min">5%</span><span id="pw-yield-max">30%</span></div>
+              <div id="pw-yield-range-note" style="font-size:11px;color:var(--slate-500);margin-top:6px;min-height:14px;"></div>
+            </div>
+
+            <!-- Slider 3: Risk -->
+            <div class="pw-card">
+              <div class="pw-card-label">Уровень риска</div>
+              <div id="pw-risk-val" class="pw-card-value" style="color:#eab308;">Умеренный</div>
+              <input id="pw-risk" type="range" min="0" max="4" step="1" value="2" class="pw-slider">
+              <div class="pw-slider-hints"><span>Мин.</span><span>Высокий</span></div>
+              <div id="pw-risk-desc" style="font-size:11px;color:var(--slate-500);margin-top:6px;">Рейтинг A–BBB, надёжный корпоратив</div>
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-bottom:32px;">
+            <button id="pw-submit" class="btn" style="background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;padding:12px 36px;font-size:14px;font-weight:600;border-radius:8px;min-width:200px;">
+              Подобрать портфель
+            </button>
+            <div style="margin-top:12px;">
+              <button onclick="showPanel('panel-add')" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;">
+                Добавить бумагу вручную
+              </button>
+            </div>
+          </div>
+
+          <div id="pw-result" style="display:none;max-width:900px;margin:0 auto;"></div>
+
+          <style>
+            .pw-card {
+              background: var(--slate-800,#1e293b);
+              border: 1px solid var(--slate-700,#334155);
+              border-radius: 12px;
+              padding: 20px 20px 16px;
+            }
+            .pw-card-label {
+              font-size: 11px; font-weight: 600; text-transform: uppercase;
+              letter-spacing: .5px; color: var(--slate-400,#94a3b8); margin-bottom: 8px;
+            }
+            .pw-card-value {
+              font-size: 26px; font-weight: 700; color: var(--slate-100,#f1f5f9);
+              letter-spacing: -.5px; margin-bottom: 14px;
+            }
+            .pw-slider {
+              -webkit-appearance: none; appearance: none;
+              width: 100%; height: 4px;
+              background: var(--slate-600,#475569);
+              border-radius: 2px; outline: none; cursor: pointer;
+            }
+            .pw-slider::-webkit-slider-thumb {
+              -webkit-appearance: none; appearance: none;
+              width: 18px; height: 18px; border-radius: 50%;
+              background: #3b82f6;
+              box-shadow: 0 0 0 3px rgba(59,130,246,.25);
+              cursor: pointer; transition: box-shadow .15s;
+            }
+            .pw-slider::-webkit-slider-thumb:hover {
+              box-shadow: 0 0 0 5px rgba(59,130,246,.3);
+            }
+            .pw-slider::-moz-range-thumb {
+              width: 18px; height: 18px; border-radius: 50%;
+              background: #3b82f6; border: none; cursor: pointer;
+            }
+            .pw-slider-hints {
+              display: flex; justify-content: space-between;
+              font-size: 10px; color: var(--slate-500,#64748b); margin-top: 6px;
+            }
+            .pw-bond-card {
+              background: var(--slate-800,#1e293b);
+              border: 1px solid var(--slate-700,#334155);
+              border-radius: 10px; padding: 14px 16px;
+              display: flex; align-items: center; gap: 14px;
+              transition: border-color .15s;
+            }
+            .pw-bond-card:hover { border-color: #3b82f6; }
+            .pw-rating-badge {
+              flex-shrink: 0; min-width: 38px; padding: 3px 7px;
+              border-radius: 5px; font-size: 11px; font-weight: 700;
+              text-align: center; background: rgba(59,130,246,.15); color: #60a5fa;
+              border: 1px solid rgba(59,130,246,.25);
+            }
+          </style>
+        </div>`;
+      }
+
+      function initWizard() {
+        const amountSlider = document.getElementById('pw-amount');
+        const yieldSlider  = document.getElementById('pw-yield');
+        const riskSlider   = document.getElementById('pw-risk');
+        const amountVal    = document.getElementById('pw-amount-val');
+        const yieldVal     = document.getElementById('pw-yield-val');
+        const riskVal      = document.getElementById('pw-risk-val');
+        const riskDesc     = document.getElementById('pw-risk-desc');
+        const submitBtn    = document.getElementById('pw-submit');
+        const resultEl     = document.getElementById('pw-result');
+
+        if (!amountSlider) return;
+
+        const updateAmount = () => {
+          const a = sliderToAmount(+amountSlider.value);
+          amountVal.textContent = fmtAmount(a);
+        };
+        const yieldMinEl  = document.getElementById('pw-yield-min');
+        const yieldMaxEl  = document.getElementById('pw-yield-max');
+        const yieldRangeNote = document.getElementById('pw-yield-range-note');
+
+        // Flag to prevent mutual recursion between yield↔risk updates
+        let _updatingFromYield = false;
+        let _updatingFromRisk  = false;
+
+        // Find best-matching risk index for a given yield value
+        // Picks the risk level whose midpoint is closest to the yield
+        const yieldToRiskIndex = (yv) => {
+          let bestIdx = 0, bestDist = Infinity;
+          RISK_KEYS.forEach((key, idx) => {
+            const info = RISK_LABELS[key];
+            const mid = (info.yieldMin + info.yieldMax) / 2;
+            const dist = Math.abs(mid - yv);
+            if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
+          });
+          return bestIdx;
+        };
+
+        const applyRiskYieldBounds = (info, animate) => {
+          const cur = +yieldSlider.value;
+          yieldSlider.min = info.yieldMin;
+          yieldSlider.max = info.yieldMax;
+          yieldMinEl.textContent = info.yieldMin + '%';
+          yieldMaxEl.textContent = info.yieldMax + '%';
+
+          const clamped = Math.min(info.yieldMax, Math.max(info.yieldMin, cur));
+          if (clamped !== cur) {
+            yieldSlider.value = clamped;
+            updateYieldDisplay();
+            if (animate) {
+              yieldVal.style.transition = 'color .3s';
+              yieldVal.style.color = info.color;
+              setTimeout(() => { yieldVal.style.color = ''; yieldVal.style.transition = ''; }, 600);
+            }
+            yieldRangeNote.textContent = `Для этого уровня риска: ${info.yieldMin}–${info.yieldMax}%`;
+          } else {
+            yieldRangeNote.textContent = `Диапазон для этого уровня: ${info.yieldMin}–${info.yieldMax}%`;
+          }
+        };
+
+        const updateYieldDisplay = () => {
+          yieldVal.textContent = (+yieldSlider.value).toFixed(1).replace('.0','') + '%';
+        };
+
+        const updateYield = () => {
+          updateYieldDisplay();
+          if (_updatingFromRisk) return;
+          // Adjust risk to match the new yield
+          _updatingFromYield = true;
+          const newIdx = yieldToRiskIndex(+yieldSlider.value);
+          if (+riskSlider.value !== newIdx) {
+            riskSlider.value = newIdx;
+            const info = RISK_LABELS[RISK_KEYS[newIdx]];
+            riskVal.textContent = info.label;
+            riskVal.style.color  = info.color;
+            riskDesc.textContent = info.desc;
+            // Update yield bounds silently (no clamp expected since we just set from yield)
+            yieldSlider.min = info.yieldMin;
+            yieldSlider.max = info.yieldMax;
+            yieldMinEl.textContent = info.yieldMin + '%';
+            yieldMaxEl.textContent = info.yieldMax + '%';
+            yieldRangeNote.textContent = `Диапазон для этого уровня: ${info.yieldMin}–${info.yieldMax}%`;
+          }
+          _updatingFromYield = false;
+        };
+
+        const updateRisk = (animate = true) => {
+          const key  = RISK_KEYS[+riskSlider.value];
+          const info = RISK_LABELS[key];
+          riskVal.textContent = info.label;
+          riskVal.style.color  = info.color;
+          riskDesc.textContent = info.desc;
+          if (_updatingFromYield) return;
+          _updatingFromRisk = true;
+          applyRiskYieldBounds(info, animate);
+          _updatingFromRisk = false;
+        };
+
+        amountSlider.addEventListener('input', updateAmount);
+        yieldSlider.addEventListener('input', updateYield);
+        riskSlider.addEventListener('input', () => updateRisk(true));
+
+        updateAmount(); updateYieldDisplay(); updateRisk(false);
+
+        submitBtn.addEventListener('click', async () => {
+          const amount = sliderToAmount(+amountSlider.value);
+          const yieldT = +yieldSlider.value;
+          const riskKey = RISK_KEYS[+riskSlider.value];
+
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spinBtn .6s linear infinite;display:inline-block;margin-right:6px;vertical-align:middle;"></span>Подбираем...';
+          resultEl.style.display = 'none';
+
+          try {
+            const res = await apiFetch(`/bonds/suggest?amount=${amount}&yield=${yieldT}&risk=${riskKey}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Ошибка подбора');
+            renderWizardResult(data, resultEl, amount);
+          } catch(err) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = `<div style="text-align:center;color:#f87171;padding:16px;">${err.message}</div>`;
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Подобрать портфель';
+          }
+        });
+      }
+
+      function renderWizardResult(data, container, budget) {
+        const { bonds, summary } = data;
+        const riskInfo = RISK_LABELS[summary.risk] || RISK_LABELS[summary.original_risk] || { label: summary.risk, color: '#94a3b8' };
+        const fmt = v => new Intl.NumberFormat('ru-RU').format(Math.round(v));
+
+        const freqLabel = f => f === 12 ? '12×/год' : f === 4 ? '4×/год' : f === 2 ? '2×/год' : f === 1 ? '1×/год' : `${f}×/год`;
+
+        let cardsHtml = bonds.map(b => {
+          const ratingHtml = b.rating
+            ? `<span class="pw-rating-badge">${b.rating}</span>`
+            : `<span class="pw-rating-badge" style="background:rgba(100,116,139,.15);color:#64748b;border-color:rgba(100,116,139,.2);">—</span>`;
+          const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
+          const offerNote = b.offer_date ? ` · оферта ${b.offer_date.substring(0,7)}` : '';
+          const freq = freqLabel(b.coupon_frequency || 2);
+          return `
+          <div class="pw-bond-card">
+            ${ratingHtml}
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:13px;color:var(--slate-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
+              <div style="font-size:11px;color:var(--slate-400);margin-top:2px;">${b.ticker} · погашение ${maturity}${offerNote}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:13px;font-weight:700;color:#4ade80;">${b.coupon_percent}% <span style="font-size:10px;font-weight:400;color:var(--slate-400);">${freq}</span></div>
+              <div style="font-size:11px;color:var(--slate-400);">${b.lots} лот × ${fmt(b.purchase_price)} ₽</div>
+              <div style="font-size:12px;color:var(--slate-300);font-weight:600;">${fmt(b.total_cost)} ₽</div>
+            </div>
+          </div>`;
+        }).join('');
+
+        const leftover = budget - summary.total_cost;
+
+        container.style.display = 'block';
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+            <div>
+              <div style="font-size:17px;font-weight:700;color:var(--slate-100);">Подобранный портфель</div>
+              <div style="font-size:12px;color:var(--slate-400);margin-top:3px;">
+                ${summary.bonds_count} бумаг · риск: <span style="color:${riskInfo.color};">${riskInfo.label}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:24px;">
+              <div style="text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:var(--slate-100);">${fmt(summary.total_cost)} ₽</div>
+                <div style="font-size:11px;color:var(--slate-400);">итого</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#4ade80;">${summary.avg_yield.toFixed(1)}%</div>
+                <div style="font-size:11px;color:var(--slate-400);">средний купон</div>
+              </div>
+              ${leftover > 0 ? `<div style="text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:var(--slate-400);">${fmt(leftover)} ₽</div>
+                <div style="font-size:11px;color:var(--slate-400);">остаток</div>
+              </div>` : ''}
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-bottom:24px;">
+            ${cardsHtml}
+          </div>
+          <div style="text-align:center;">
+            <button id="pw-add-all" class="btn" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;padding:11px 32px;font-size:14px;font-weight:600;border-radius:8px;">
+              Добавить всё в портфель
+            </button>
+            <button onclick="document.getElementById('pw-result').style.display='none'" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;margin-left:16px;">
+              Изменить параметры
+            </button>
+          </div>
+        `;
+
+        document.getElementById('pw-add-all').addEventListener('click', async () => {
+          const addBtn = document.getElementById('pw-add-all');
+          addBtn.disabled = true;
+          addBtn.textContent = 'Добавляем...';
+          let added = 0;
+          for (const b of bonds) {
+            try {
+              await apiFetch(`/portfolios/${portfolioId}/instruments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ticker: b.ticker,
+                  quantity: b.lots * b.lot_size,
+                  // purchase_price omitted → backend auto-fetches current MOEX price
+                }),
+              });
+              added++;
+            } catch(e) {
+              console.warn('Failed to add', b.ticker, e);
+            }
+          }
+          addBtn.textContent = `✓ Добавлено ${added} бумаг`;
+          addBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+          await syncTableFromServer();
+        });
+
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
       // ── RENDER TABLE ─────────────────────────────────────────────
       const tableBody = document.getElementById('table-body');
 
@@ -1637,31 +2001,44 @@
         const td = document.createElement('td'); td.textContent = val; tr.appendChild(td); return td;
       }
 
+      function setEmptyState(isEmpty) {
+        const statGrid    = document.querySelector('.stat-grid');
+        const chartCard   = document.getElementById('chart-card');
+        const tableStatus = document.getElementById('table-status')?.parentElement;
+        const thead       = document.querySelector('#panel-table table thead');
+        const tableCard   = document.querySelector('.table-wrap')?.closest('.card');
+        [statGrid, chartCard, tableStatus].forEach(el => {
+          if (el) el.style.display = isEmpty ? 'none' : '';
+        });
+        if (thead) thead.style.display = isEmpty ? 'none' : '';
+        // Убираем белый фон и бордер карточки таблицы когда показывается wizard
+        if (tableCard) {
+          tableCard.style.background  = isEmpty ? 'transparent' : '';
+          tableCard.style.border      = isEmpty ? 'none' : '';
+          tableCard.style.borderRadius = isEmpty ? '0' : '';
+        }
+      }
+
       function renderTable() {
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
         tableBody.innerHTML = '';
 
-        // Show add form button if portfolio is empty
+        // Show portfolio wizard if empty
         if (rows.length === 0 && !isReadOnly) {
+          setEmptyState(true);
           const tr = document.createElement('tr');
           const td = document.createElement('td');
           td.colSpan = 20;
-          td.style.cssText = 'padding: 60px 20px; text-align: center; border: none;';
-          const div = document.createElement('div');
-          div.style.cssText = 'color: var(--slate-400); font-size: 16px; margin-bottom: 24px;';
-          div.textContent = 'Портфель пуст. Добавьте первую бумагу!';
-          td.appendChild(div);
-          const btn = document.createElement('button');
-          btn.className = 'btn';
-          btn.style.cssText = 'background: var(--blue-600); color: #fff; padding: 12px 24px; font-size: 14px;';
-          btn.textContent = '+ Добавить бумагу';
-          btn.onclick = () => showPanel('panel-add');
-          td.appendChild(btn);
+          td.style.cssText = 'padding: 0; border: none;';
+          td.innerHTML = buildWizardHTML();
           tr.appendChild(td);
           tableBody.appendChild(tr);
+          initWizard();
           return;
         }
+
+        setEmptyState(false);
 
         for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
@@ -1736,7 +2113,7 @@
           tableBody.appendChild(tr);
         }
 
-        if (rows.length === 0) { drawMonthlyChart(tableRows); return; }
+        if (rows.length === 0) { setEmptyState(true); drawMonthlyChart(tableRows); return; }
 
         // ── Summary row ──
         const summary = calculateSummary(rows);
@@ -2115,12 +2492,12 @@
               }
               .l-orb {
                 position: absolute; border-radius: 50%;
-                filter: blur(70px); pointer-events: none; will-change: transform;
+                filter: blur(50px); pointer-events: none; will-change: transform;
               }
-              .l-orb-1 { width:520px;height:520px;top:-120px;left:-100px;background:radial-gradient(circle,rgba(37,99,235,.35) 0%,transparent 70%);animation:orbDrift1 18s ease-in-out infinite; }
-              .l-orb-2 { width:420px;height:420px;bottom:-80px;right:-80px;background:radial-gradient(circle,rgba(99,102,241,.3) 0%,transparent 70%);animation:orbDrift2 22s ease-in-out infinite; }
-              .l-orb-3 { width:300px;height:300px;top:40%;left:55%;background:radial-gradient(circle,rgba(14,165,233,.2) 0%,transparent 70%);animation:orbDrift3 16s ease-in-out infinite; }
-              .l-orb-4 { width:250px;height:250px;top:20%;right:25%;background:radial-gradient(circle,rgba(168,85,247,.15) 0%,transparent 70%);animation:orbDrift4 20s ease-in-out infinite; }
+              .l-orb-1 { width:600px;height:600px;top:-150px;left:-120px;background:radial-gradient(circle,rgba(37,99,235,.7) 0%,rgba(37,99,235,.25) 45%,transparent 70%);animation:orbDrift1 11s ease-in-out infinite; }
+              .l-orb-2 { width:500px;height:500px;bottom:-100px;right:-100px;background:radial-gradient(circle,rgba(99,102,241,.65) 0%,rgba(99,102,241,.18) 45%,transparent 70%);animation:orbDrift2 14s ease-in-out infinite; }
+              .l-orb-3 { width:360px;height:360px;top:35%;left:50%;background:radial-gradient(circle,rgba(14,165,233,.55) 0%,rgba(14,165,233,.15) 45%,transparent 70%);animation:orbDrift3 9s ease-in-out infinite; }
+              .l-orb-4 { width:320px;height:320px;top:15%;right:20%;background:radial-gradient(circle,rgba(168,85,247,.5) 0%,rgba(168,85,247,.12) 45%,transparent 70%);animation:orbDrift4 12s ease-in-out infinite; }
               .l-grid {
                 position: fixed; inset: 0; pointer-events: none;
                 background-image: linear-gradient(rgba(148,163,184,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.04) 1px,transparent 1px);
@@ -2493,6 +2870,7 @@
             addBtn.style.borderRadius = '4px';
             addBtn.style.cursor = 'pointer';
             addBtn.style.fontSize = '12px';
+            addBtn.style.whiteSpace = 'nowrap';
             addBtn.onclick = openCreatePortfolioModal;
             container.appendChild(addBtn);
 
@@ -2506,6 +2884,7 @@
             delBtn.style.borderRadius = '4px';
             delBtn.style.cursor = 'pointer';
             delBtn.style.fontSize = '12px';
+            delBtn.style.whiteSpace = 'nowrap';
             delBtn.onclick = openDeletePortfolioModal;
             container.appendChild(delBtn);
             topbarNav.insertBefore(container, topbarNav.firstChild);
