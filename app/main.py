@@ -79,82 +79,109 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Портфель не найден</title>
+    <title>Портфель не найден — Портфель MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
-        * { box-sizing: border-box; }
+        *, *::before, *::after { box-sizing: border-box; }
         body {
             margin: 0;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0f172a;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        nav {
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #1e293b;
+        }
+        .brand-mark {
+            width: 30px; height: 30px;
+            background: #2563eb; border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 15px; color: #fff;
+        }
+        .brand-name { font-weight: 700; font-size: 14px; color: #f1f5f9; letter-spacing: -.2px; }
+        .brand-badge {
+            background: #1e3a8a; color: #93c5fd;
+            font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+        }
+        main {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 60px 24px;
         }
-        .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 60px 40px;
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 48px 40px;
             text-align: center;
-            max-width: 500px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 25px 50px rgba(0,0,0,.5);
         }
-        .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
+        .card-icon {
+            width: 64px; height: 64px;
+            background: #1e3a8a; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; margin: 0 auto 24px;
         }
         h1 {
-            margin: 0 0 16px;
-            font-size: 28px;
-            color: #1e293b;
+            margin: 0 0 12px;
+            font-size: 22px; font-weight: 700;
+            color: #f1f5f9; letter-spacing: -.3px;
         }
         p {
-            margin: 0 0 12px;
-            font-size: 16px;
-            color: #64748b;
-            line-height: 1.6;
-        }
-        .details {
-            background: #f1f5f9;
-            border-left: 4px solid #ef4444;
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin: 24px 0;
-            text-align: left;
-            font-size: 14px;
-            color: #475569;
-            font-family: 'Courier New', monospace;
-            word-break: break-all;
+            margin: 0 0 10px;
+            font-size: 14px; color: #94a3b8; line-height: 1.65;
         }
         .back-link {
             display: inline-block;
-            margin-top: 24px;
-            padding: 10px 20px;
-            background: #3b82f6;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.2s;
+            margin-top: 20px;
+            padding: 10px 24px;
+            background: #2563eb; color: #fff;
+            text-decoration: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600;
+            transition: background .15s;
         }
-        .back-link:hover {
-            background: #2563eb;
+        .back-link:hover { background: #1d4ed8; }
+        footer {
+            border-top: 1px solid #1e293b;
+            padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 8px;
         }
+        footer span { font-size: 11px; color: #475569; }
+        footer a { color: #3b82f6; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="icon">🔗</div>
-        <h1>Ссылка истекла или неверна</h1>
-        <p>Портфель по этой ссылке больше не доступен. Возможно, владелец удалил портфель или отозвал доступ.</p>
-        <div class="details">
-            Share token: {share_token}
+    <nav>
+        <div class="brand-mark">P</div>
+        <span class="brand-name">Портфель</span>
+        <span class="brand-badge">MVP</span>
+    </nav>
+    <main>
+        <div class="card">
+            <div class="card-icon">🔗</div>
+            <h1>Ссылка истекла или неверна</h1>
+            <p>Портфель по этой ссылке больше не доступен.<br>Владелец мог удалить его или отозвать общий доступ.</p>
+            <p style="font-size: 12px; color: #475569;">Если вы считаете, что это ошибка — обратитесь к владельцу портфеля.</p>
+            <a href="/" class="back-link">← На главную</a>
         </div>
-        <p style="font-size: 13px; color: #94a3b8;">Если вы считаете, что это ошибка, обратитесь к владельцу портфеля.</p>
-        <a href="/" class="back-link">← На главную</a>
-    </div>
+    </main>
+    <footer>
+        <span>© Портфель MVP · Не является инвестиционной рекомендацией</span>
+        <span>Откройте счёт: <a href="https://www.tinkoff.ru/invest/" target="_blank" rel="noopener">Т‑Инвестиции</a></span>
+    </footer>
 </body>
 </html>"""
         return HTMLResponse(error_html, status_code=404)

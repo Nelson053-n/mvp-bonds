@@ -253,13 +253,18 @@
         margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;
       }
       .modal-field label { font-size: 12px; font-weight: 600; color: var(--slate-600); }
-      .modal-field input, .modal-field textarea {
-        padding: 8px; border: 1px solid var(--slate-300); border-radius: var(--radius);
-        font-family: 'Courier New', monospace; font-size: 12px;
-        background: var(--slate-50);
+      .modal-field input:not(.input), .modal-field textarea {
+        padding: 8px 10px; border: 1px solid var(--slate-300); border-radius: var(--radius);
+        font-family: inherit; font-size: 13px;
+        background: var(--slate-50); color: var(--slate-800);
+        width: 100%; box-sizing: border-box; outline: none;
+        transition: border-color .15s;
       }
+      .modal-field input:not(.input):focus { border-color: var(--blue-500); }
       .modal-field textarea {
+        font-family: 'Courier New', monospace; font-size: 12px;
         min-height: 60px; resize: vertical; white-space: pre-wrap; word-break: break-all;
+        width: 100%; box-sizing: border-box;
       }
       .modal-actions {
         display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
@@ -305,30 +310,59 @@
       }
       .btn-sm:hover { background: var(--red-100); }
 
-      /* ── NOTIFICATIONS ───────────────────────────────────────── */
-      .notif-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; align-items: end; margin-bottom: 14px; }
-      .notif-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .notif-hint {
-        font-size: 12px;
-        color: var(--slate-600);
-        margin-top: 14px;
-        line-height: 1.6;
-        background: var(--blue-50);
-        border: 1px solid var(--blue-100);
-        border-radius: var(--radius);
-        padding: 12px 14px;
+      /* ── SECTION HEADER ─────────────────────────────────────── */
+      .section-header {
+        padding: 24px 0 20px;
+        border-bottom: 1px solid var(--slate-200);
+        margin-bottom: 20px;
       }
-      .notif-hint b { color: var(--slate-700); }
+      .section-title {
+        font-size: 18px; font-weight: 700;
+        color: var(--slate-900); letter-spacing: -.4px;
+        margin: 0 0 4px 0;
+      }
+      .section-desc {
+        font-size: 13px; color: var(--slate-500); margin: 0;
+        line-height: 1.55;
+      }
+
+      /* ── PANEL COLS ──────────────────────────────────────────── */
+      .panel-cols { display: grid; gap: 16px; }
+      .panel-cols-2 { grid-template-columns: repeat(2, 1fr); }
+      .panel-cols-auto { grid-template-columns: 1fr 1.6fr; }
+      @media (max-width: 860px) {
+        .panel-cols-2, .panel-cols-auto { grid-template-columns: 1fr; }
+      }
+
+      /* ── INFO BOX ────────────────────────────────────────────── */
+      .info-box {
+        background: var(--blue-50); border: 1px solid var(--blue-100);
+        border-radius: var(--radius); padding: 14px 16px;
+        font-size: 12px; color: var(--slate-600); line-height: 1.65;
+      }
+      .info-box b { color: var(--slate-700); }
+      .info-box code {
+        background: #fff; border: 1px solid var(--blue-100);
+        border-radius: 3px; padding: 1px 5px; font-size: 11px;
+        color: var(--slate-700);
+      }
+
+      /* ── INLINE SELECT ───────────────────────────────────────── */
+      .select-input {
+        height: 36px; border: 1px solid var(--slate-300);
+        border-radius: var(--radius); padding: 0 10px;
+        font-size: 13px; font-family: inherit;
+        color: var(--slate-800); background: #fff; width: 100%;
+        outline: none; cursor: pointer;
+        transition: border-color .15s;
+      }
+      .select-input:focus { border-color: var(--blue-500); }
+
+      /* ── NOTIFICATIONS ───────────────────────────────────────── */
+      .notif-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; align-items: end; margin-bottom: 16px; }
+      .notif-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
       /* ── IMPORT/EXPORT ───────────────────────────────────────── */
-      .io-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-      .io-section h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--slate-700); }
-      .io-section p  { margin: 0 0 12px; font-size: 12px; color: var(--slate-500); line-height: 1.6; }
-      .io-section code {
-        background: var(--slate-100); padding: 1px 5px;
-        border-radius: 4px; font-size: 11px; color: var(--slate-700);
-        border: 1px solid var(--slate-200);
-      }
       .io-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
       .file-label {
         display: inline-flex; align-items: center;
@@ -560,44 +594,79 @@
 
       <!-- ── PANEL: ADD INSTRUMENT ──────────────────────────────── -->
       <div id="panel-add" class="panel">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Добавить инструмент</h2>
+        <div class="section-header">
+          <h1 class="section-title">Добавить инструмент</h1>
+          <p class="section-desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
+        </div>
+        <div class="panel-cols panel-cols-auto">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Параметры позиции</h2>
+            </div>
+            <div class="card-body">
+              <form id="add-form">
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                  <div class="field">
+                    <label for="ticker">Тикер / ISIN / название</label>
+                    <input id="ticker" name="ticker" type="text" class="input" placeholder="Например: SBER, RU000A106SK2" required />
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="field">
+                      <label for="quantity">Количество</label>
+                      <input id="quantity" name="quantity" type="number" class="input" step="0.01" min="0.01" placeholder="0" required />
+                    </div>
+                    <div class="field">
+                      <label for="purchase_price">Цена покупки</label>
+                      <input id="purchase_price" name="purchase_price" type="number" class="input" step="0.01" min="0.01" placeholder="0.00" required />
+                    </div>
+                  </div>
+                  <div>
+                    <button class="btn" id="submit-btn" type="submit" style="width:100%;">Добавить в портфель</button>
+                  </div>
+                </div>
+              </form>
+              <div id="add-status" class="status" style="margin-top:12px;"></div>
+            </div>
           </div>
-          <div class="card-body">
-            <form id="add-form" class="form-grid">
-              <div class="field">
-                <label for="ticker">Тикер / ISIN / название</label>
-                <input id="ticker" name="ticker" type="text" class="input" required />
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Подсказки</h2>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="info-box">
+                <b>Акции (TQBR)</b><br>
+                Введите тикер торгуемого на Московской бирже инструмента: <code>SBER</code>, <code>LKOH</code>, <code>YNDX</code> и т.д.
               </div>
-              <div class="field">
-                <label for="quantity">Количество</label>
-                <input id="quantity" name="quantity" type="number" class="input" step="0.01" min="0.01" required />
+              <div class="info-box">
+                <b>Облигации</b><br>
+                Поддерживаются корпоративные (TQCB) и ОФЗ (TQOB).<br>
+                Введите тикер <code>SU26238RMFS4</code> или ISIN <code>RU000A106SK2</code>.
               </div>
-              <div class="field">
-                <label for="purchase_price">Цена покупки</label>
-                <input id="purchase_price" name="purchase_price" type="number" class="input" step="0.01" min="0.01" required />
+              <div class="info-box">
+                <b>Цена покупки</b><br>
+                Для акций — цена в рублях за штуку.<br>
+                Для облигаций — полная цена в рублях (чистая + НКД).
               </div>
-              <div class="field" style="justify-content: flex-end;">
-                <button class="btn" id="submit-btn" type="submit">Добавить</button>
-              </div>
-            </form>
-            <div id="add-status" class="status"></div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- ── PANEL: NOTIFICATIONS ───────────────────────────────── -->
       <div id="panel-notifications" class="panel">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Telegram-уведомления</h2>
-          </div>
-          <div class="card-body">
-            <div class="notif-grid">
+        <div class="section-header">
+          <h1 class="section-title">Telegram-уведомления</h1>
+          <p class="section-desc">Получайте оповещения об изменениях рейтинга и просадке позиций прямо в Telegram.</p>
+        </div>
+        <div class="panel-cols panel-cols-auto">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Настройки бота</h2>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
               <div class="field">
                 <label for="tg-token">Bot Token</label>
-                <input id="tg-token" type="password" class="input" placeholder="123456:ABC..." />
+                <input id="tg-token" type="password" class="input" placeholder="123456:ABC-DEF..." />
               </div>
               <div class="field">
                 <label for="tg-chat">Chat ID</label>
@@ -607,17 +676,31 @@
                 <label for="tg-threshold">Порог просадки (%)</label>
                 <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
               </div>
+              <div class="notif-actions">
+                <button class="btn" id="notif-save-btn">Сохранить</button>
+                <button class="btn btn-secondary" id="notif-test-btn">Тест уведомления</button>
+              </div>
+              <div id="notif-status" class="status"></div>
             </div>
-            <div class="notif-actions">
-              <button class="btn" id="notif-save-btn">Сохранить</button>
-              <button class="btn btn-secondary" id="notif-test-btn">Тест уведомления</button>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Когда приходят уведомления</h2>
             </div>
-            <div id="notif-status" class="status"></div>
-            <div class="notif-hint">
-              <b>Уведомления приходят при:</b><br>
-              &bull; Изменении кредитного рейтинга эмитента<br>
-              &bull; Просадке рыночной цены ниже заданного порога<br><br>
-              <b>Как узнать Chat ID:</b> перешлите любое сообщение боту <b>@userinfobot</b>.
+            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="info-box">
+                <b>Изменение кредитного рейтинга</b><br>
+                Бот пришлёт сообщение, если рейтинг эмитента повысился или понизился с момента последней проверки.
+              </div>
+              <div class="info-box">
+                <b>Просадка рыночной цены</b><br>
+                Если текущая цена упала ниже цены покупки на установленный порог (%), придёт предупреждение.
+              </div>
+              <div class="info-box">
+                <b>Как получить Chat ID</b><br>
+                Перешлите любое сообщение боту <b>@userinfobot</b> — он ответит вашим ID.<br>
+                Для группы/канала добавьте бота и используйте ID группы.
+              </div>
             </div>
           </div>
         </div>
@@ -625,36 +708,44 @@
 
       <!-- ── PANEL: IMPORT / EXPORT ─────────────────────────────── -->
       <div id="panel-io" class="panel">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Импорт и экспорт портфеля</h2>
-          </div>
-          <div class="card-body">
-            <div class="io-section">
-              <h3>Экспорт</h3>
-              <p>Скачать все позиции в формате CSV.</p>
-              <div class="io-actions">
-                <button class="btn" id="export-btn">Скачать CSV</button>
+        <div class="section-header">
+          <h1 class="section-title">Импорт и экспорт</h1>
+          <p class="section-desc">Выгружайте портфель в CSV или загружайте позиции из файла.</p>
+        </div>
+        <div class="panel-cols panel-cols-2">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Экспорт</h2>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+              <div class="info-box">
+                Скачайте все позиции текущего портфеля в формате CSV.<br>
+                Файл содержит: тикер, тип, количество, цену покупки.
+              </div>
+              <div>
+                <button class="btn" id="export-btn">⬇ Скачать CSV</button>
               </div>
             </div>
-
-            <div style="border-top: 1px solid var(--slate-200); margin: 24px 0;"></div>
-
-            <div class="io-section">
-              <h3>Импорт</h3>
-              <p>CSV с колонками: <code>ticker, instrument_type, quantity, purchase_price</code><br>instrument_type: <code>bond</code> или <code>stock</code></p>
-              <div style="display: flex; flex-direction: column; gap: 12px; max-width: 320px;">
-                <div>
-                  <label for="import-portfolio" style="display: block; margin-bottom: 6px; font-size: 13px; color: var(--slate-600); font-weight: 500;">Портфель для импорта:</label>
-                  <select id="import-portfolio" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff; color: #333; font-size: 13px;">
-                    <option value="">Выберите портфель</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="file-label" for="import-file" style="width: 100%; box-sizing: border-box; justify-content: center;">Выбрать файл</label>
-                  <input type="file" id="import-file" accept=".csv,text/csv" />
-                </div>
-                <button class="btn" id="import-btn">Импортировать</button>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Импорт</h2>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+              <div class="info-box">
+                Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code><br>
+                Значения instrument_type: <code>bond</code> или <code>stock</code>
+              </div>
+              <div class="field">
+                <label for="import-portfolio">Портфель для импорта</label>
+                <select id="import-portfolio" class="select-input">
+                  <option value="">Выберите портфель</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <label class="file-label" for="import-file" style="justify-content:center;">📂 Выбрать файл CSV</label>
+                <input type="file" id="import-file" accept=".csv,text/csv" />
+                <button class="btn" id="import-btn">⬆ Импортировать</button>
               </div>
               <div id="io-status" class="status"></div>
             </div>
@@ -665,6 +756,11 @@
 
       <!-- ── PANEL: ADMIN ───────────────────────────────────────── -->
       <div id="panel-admin" class="panel">
+
+        <div class="section-header">
+          <h1 class="section-title">Панель администратора</h1>
+          <p class="section-desc">Управление пользователями, портфелями и общими ссылками.</p>
+        </div>
 
         <!-- Stat cards -->
         <div class="stat-grid" style="margin-bottom:20px;">
@@ -690,7 +786,7 @@
         <div class="card" style="margin-bottom:16px;">
           <div class="card-header">
             <h2 class="card-title">Пользователи</h2>
-            <button class="btn btn-secondary" style="height:30px;font-size:12px;" onclick="adminLoadUsers()">↺ Обновить</button>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadUsers()">↺ Обновить</button>
           </div>
           <div class="card-body" style="padding:0;">
             <div class="table-wrap">
@@ -715,7 +811,7 @@
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Все портфели</h2>
-            <button class="btn btn-secondary" style="height:30px;font-size:12px;" onclick="adminLoadPortfolios()">↺ Обновить</button>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadPortfolios()">↺ Обновить</button>
           </div>
           <div class="card-body" style="padding:0;">
             <div class="table-wrap">
@@ -747,9 +843,9 @@
           <div class="modal-body">
             <div class="modal-field">
               <label>Новый пароль</label>
-              <input type="password" id="adm-pwd-input" placeholder="Минимум 6 символов" style="padding:8px;border:1px solid var(--slate-300);border-radius:6px;font-size:13px;width:100%;box-sizing:border-box;">
+              <input type="password" id="adm-pwd-input" class="input" placeholder="Минимум 6 символов">
             </div>
-            <p id="adm-pwd-status" style="color:var(--red-600);font-size:12px;min-height:18px;margin:4px 0 0;"></p>
+            <p id="adm-pwd-status" class="status error" style="min-height:18px;margin:4px 0 0;"></p>
           </div>
           <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('adm-pwd-modal').style.display='none'">Отмена</button>
@@ -760,6 +856,12 @@
 
     </div><!-- /container -->
 
+    <!-- Site Footer -->
+    <footer style="border-top: 1px solid #1e293b; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px;">
+      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Портфель MVP &nbsp;·&nbsp; Не является инвестиционной рекомендацией</span>
+      <span style="font-size: 11px; color: #475569;">Откройте брокерский счёт: <a href="https://www.tinkoff.ru/invest/" target="_blank" rel="noopener" style="color: #3b82f6; text-decoration: none;">Т‑Инвестиции</a></span>
+    </footer>
+
     <!-- Share Portfolio Modal -->
     <div id="share-modal-overlay" class="modal-overlay">
       <div class="modal">
@@ -768,21 +870,21 @@
         </div>
         <div class="modal-body">
           <div class="modal-field">
-            <label>Ссылка для поделиться:</label>
+            <label>Публичная ссылка</label>
             <textarea id="share-url-textarea" readonly></textarea>
-            <button style="padding: 6px 12px; background: var(--blue-600); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-top: 4px;"
+            <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;margin-top:6px;"
               onclick="document.getElementById('share-url-textarea').select(); document.execCommand('copy');">Копировать ссылку</button>
           </div>
           <div class="modal-field">
-            <label>Защита паролем (опционально):</label>
-            <input type="password" id="share-password-input" placeholder="Оставить пусто для доступа без пароля">
-            <div style="font-size: 11px; color: var(--slate-500); margin-top: 4px;">Если установить пароль, посетителям нужно будет его ввести для просмотра портфеля.</div>
+            <label>Защита паролем <span style="font-weight:400;color:var(--slate-400);">(необязательно)</span></label>
+            <input type="password" id="share-password-input" class="input" placeholder="Оставить пусто — доступ без пароля">
+            <div style="font-size: 11px; color: var(--slate-400); margin-top: 4px;">Если установить пароль, посетитель введёт его один раз для просмотра.</div>
           </div>
-          <div id="share-status" style="margin-top: 8px; font-size: 12px;"></div>
+          <div id="share-status" class="status" style="margin-top:4px;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closeShareModal();">Закрыть</button>
-          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Поделиться портфелем</button>
+          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Поделиться</button>
           <button class="btn-danger" id="share-revoke-btn" onclick="revokeShare();" style="display: none;">Отозвать ссылку</button>
         </div>
       </div>
@@ -790,14 +892,14 @@
 
     <!-- Password Entry Modal for Shared View -->
     <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
-      <div class="modal" style="max-width: 300px;">
+      <div class="modal" style="max-width: 320px;">
         <div class="modal-header">
-          <h2 class="modal-title">Введите пароль</h2>
+          <h2 class="modal-title">Защищённый портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 12px 0; font-size: 13px;">Портфель защищен паролем. Введите пароль для доступа:</p>
-          <input type="password" id="password-modal-input" placeholder="Пароль" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 13px;">
-          <div id="password-modal-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+          <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--slate-600);">Для просмотра этого портфеля необходим пароль:</p>
+          <input type="password" id="password-modal-input" class="input" placeholder="Введите пароль">
+          <div id="password-modal-status" class="status error" style="min-height:18px;margin-top:6px;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closePasswordModal();">Закрыть</button>
@@ -810,13 +912,13 @@
     <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
-          <h2 class="modal-title">Создать новый портфель</h2>
+          <h2 class="modal-title">Новый портфель</h2>
         </div>
         <div class="modal-body">
           <div class="modal-field">
-            <label>Название портфеля:</label>
-            <input type="text" id="create-portfolio-name" placeholder="Например: Мои облигации" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 13px;">
-            <div id="create-portfolio-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+            <label>Название</label>
+            <input type="text" id="create-portfolio-name" class="input" placeholder="Например: Мои облигации">
+            <div id="create-portfolio-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
           </div>
         </div>
         <div class="modal-actions">
@@ -833,13 +935,15 @@
           <h2 class="modal-title">Удалить портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 12px 0; font-size: 13px;">Вы уверены, что хотите удалить портфель <strong id="delete-portfolio-name"></strong>?</p>
-          <p style="margin: 0; font-size: 12px; color: #dc2626;">⚠️ Это действие нельзя отменить. Будут удалены все позиции в портфеле и все ссылки для совместного доступа.</p>
-          <div id="delete-portfolio-status" style="margin-top: 8px; font-size: 12px; color: #dc2626; min-height: 18px;"></div>
+          <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--slate-700);">Вы уверены, что хотите удалить <strong id="delete-portfolio-name"></strong>?</p>
+          <div class="info-box" style="background:var(--red-50);border-color:#fecaca;">
+            ⚠️ Это действие нельзя отменить. Все позиции и ссылки для совместного доступа будут удалены.
+          </div>
+          <div id="delete-portfolio-status" class="status error" style="min-height:18px;margin-top:8px;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closeDeletePortfolioModal();">Отмена</button>
-          <button class="btn-danger" onclick="submitDeletePortfolio();">Удалить портфель</button>
+          <button class="btn-danger" onclick="submitDeletePortfolio();">Удалить</button>
         </div>
       </div>
     </div>
@@ -1467,7 +1571,9 @@
           const nameTd = document.createElement('td');
           nameTd.className = 'col-name';
           const link = document.createElement('a');
-          link.href    = 'https://smart-lab.ru/q/bonds/' + encodeURIComponent(row.ticker) + '/';
+          link.href    = row.type === 'stock'
+            ? 'https://smart-lab.ru/forum/' + encodeURIComponent(row.ticker)
+            : 'https://smart-lab.ru/q/bonds/' + encodeURIComponent(row.ticker) + '/';
           link.target  = '_blank'; link.rel = 'noopener noreferrer';
           link.textContent = fmt(row.name); link.title = fmt(row.name);
           nameTd.appendChild(link); tr.appendChild(nameTd);
@@ -1794,7 +1900,7 @@
         if (!loginHtml) {
           const div = document.createElement('div');
           div.id = 'login-screen-template';
-          div.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f8fafc; z-index: 9999; width: 100%; height: 100%;';
+          div.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; z-index: 9999; width: 100%; height: 100%; overflow-y: auto;';
 
           const handleLogin = async () => {
             const username = document.getElementById('auth-username').value.trim();
@@ -1877,15 +1983,185 @@
           const savedUsername = localStorage.getItem('mvp_last_username') || '';
 
           div.innerHTML = `
-            <div style="position: absolute; top: 100px; left: 50%; transform: translateX(-50%); max-width: 280px; width: 90%; padding: 24px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <h2 style="text-align: center; margin: 0 0 18px 0; color: #334155; font-size: 16px;">Вход / Регистрация</h2>
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <input type="text" id="auth-username" placeholder="Имя пользователя" value="${savedUsername}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
-                <input type="password" id="auth-password" placeholder="Пароль" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
-                <button id="btn-login" style="width: 100%; background: #16a34a; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; box-sizing: border-box;">Войти</button>
-                <button id="btn-register" style="width: 100%; background: #2563eb; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; box-sizing: border-box;">Зарегистрироваться</button>
+            <style>
+              .landing-wrap {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+              }
+              .landing-hero {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 80px;
+                padding: 60px 40px;
+                flex-wrap: wrap;
+              }
+              .landing-left { max-width: 480px; }
+              .landing-brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 40px;
+              }
+              .landing-brand-mark {
+                width: 36px; height: 36px;
+                background: #2563eb;
+                border-radius: 8px;
+                display: flex; align-items: center; justify-content: center;
+                font-weight: 700; font-size: 18px; color: #fff;
+                font-family: Inter, sans-serif;
+              }
+              .landing-brand-name {
+                font-weight: 700; font-size: 16px; color: #f1f5f9;
+                font-family: Inter, sans-serif; letter-spacing: -.3px;
+              }
+              .landing-brand-badge {
+                background: #1e3a8a; color: #93c5fd;
+                font-size: 10px; font-weight: 600; padding: 2px 6px;
+                border-radius: 4px; font-family: Inter, sans-serif;
+              }
+              .landing-heading {
+                font-family: Inter, sans-serif;
+                font-size: clamp(28px, 4vw, 44px);
+                font-weight: 800;
+                color: #f8fafc;
+                line-height: 1.15;
+                letter-spacing: -1px;
+                margin: 0 0 20px 0;
+              }
+              .landing-heading span { color: #60a5fa; }
+              .landing-sub {
+                font-family: Inter, sans-serif;
+                font-size: 16px; color: #94a3b8;
+                line-height: 1.65;
+                margin: 0 0 36px 0;
+              }
+              .landing-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+              .landing-features li {
+                display: flex; align-items: flex-start; gap: 12px;
+                font-family: Inter, sans-serif; font-size: 14px; color: #cbd5e1;
+              }
+              .feat-icon {
+                flex-shrink: 0;
+                width: 22px; height: 22px;
+                background: #1e3a8a; border-radius: 6px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 12px; margin-top: 1px;
+              }
+              .landing-right { flex-shrink: 0; }
+              .auth-card {
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 16px;
+                padding: 36px 32px;
+                width: 320px;
+                box-shadow: 0 25px 50px rgba(0,0,0,.5);
+              }
+              .auth-title {
+                font-family: Inter, sans-serif;
+                font-size: 18px; font-weight: 700; color: #f1f5f9;
+                margin: 0 0 6px 0; text-align: center;
+              }
+              .auth-desc {
+                font-family: Inter, sans-serif;
+                font-size: 13px; color: #64748b;
+                text-align: center; margin: 0 0 24px 0;
+              }
+              .auth-input {
+                width: 100%; padding: 10px 12px;
+                background: #0f172a; border: 1px solid #334155;
+                border-radius: 8px; color: #f1f5f9;
+                font-size: 13px; font-family: Inter, sans-serif;
+                outline: none; box-sizing: border-box;
+                transition: border-color .15s;
+              }
+              .auth-input:focus { border-color: #3b82f6; }
+              .auth-input::placeholder { color: #475569; }
+              .auth-btn-primary {
+                width: 100%; padding: 11px;
+                background: #2563eb; color: #fff; border: none;
+                border-radius: 8px; cursor: pointer;
+                font-weight: 600; font-size: 14px;
+                font-family: Inter, sans-serif;
+                transition: background .15s;
+              }
+              .auth-btn-primary:hover { background: #1d4ed8; }
+              .auth-divider {
+                display: flex; align-items: center; gap: 12px;
+                color: #475569; font-size: 12px; font-family: Inter, sans-serif;
+              }
+              .auth-divider::before, .auth-divider::after {
+                content: ''; flex: 1; height: 1px; background: #334155;
+              }
+              .auth-btn-secondary {
+                width: 100%; padding: 11px;
+                background: transparent; color: #94a3b8;
+                border: 1px solid #334155;
+                border-radius: 8px; cursor: pointer;
+                font-weight: 500; font-size: 14px;
+                font-family: Inter, sans-serif;
+                transition: border-color .15s, color .15s;
+              }
+              .auth-btn-secondary:hover { border-color: #94a3b8; color: #f1f5f9; }
+              .landing-footer-bar {
+                border-top: 1px solid #1e293b;
+                padding: 20px 40px;
+                display: flex; align-items: center; justify-content: space-between;
+                flex-wrap: wrap; gap: 12px;
+              }
+              .landing-footer-bar p {
+                font-family: Inter, sans-serif;
+                font-size: 12px; color: #475569; margin: 0;
+              }
+              .landing-footer-bar a {
+                color: #3b82f6; text-decoration: none;
+              }
+              .landing-footer-bar a:hover { text-decoration: underline; }
+            </style>
+            <div class="landing-wrap">
+              <div class="landing-hero">
+                <div class="landing-left">
+                  <div class="landing-brand">
+                    <div class="landing-brand-mark">P</div>
+                    <span class="landing-brand-name">Портфель</span>
+                    <span class="landing-brand-badge">MVP</span>
+                  </div>
+                  <h1 class="landing-heading">
+                    Контроль над<br><span>инвестиционным</span><br>портфелем
+                  </h1>
+                  <p class="landing-sub">
+                    Отслеживайте акции и облигации в одном месте.<br>
+                    Рыночные данные MOEX, купонный доход, рейтинги эмитентов и AI-комментарии.
+                  </p>
+                  <ul class="landing-features">
+                    <li><span class="feat-icon">📊</span><span>Актуальные цены и доходность по данным Московской биржи</span></li>
+                    <li><span class="feat-icon">💰</span><span>Расчёт купонного дохода с учётом праздников и оферт</span></li>
+                    <li><span class="feat-icon">🏅</span><span>Кредитные рейтинги эмитентов облигаций</span></li>
+                    <li><span class="feat-icon">🤖</span><span>AI-комментарии по каждой позиции от Claude</span></li>
+                    <li><span class="feat-icon">🔗</span><span>Публичные ссылки для совместного просмотра портфеля</span></li>
+                  </ul>
+                </div>
+                <div class="landing-right">
+                  <div class="auth-card">
+                    <p class="auth-title">Добро пожаловать</p>
+                    <p class="auth-desc">Войдите или создайте аккаунт</p>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                      <input type="text" id="auth-username" class="auth-input" placeholder="Имя пользователя" value="${savedUsername}" autocomplete="username">
+                      <input type="password" id="auth-password" class="auth-input" placeholder="Пароль" autocomplete="current-password">
+                      <button id="btn-login" class="auth-btn-primary">Войти</button>
+                      <div class="auth-divider">или</div>
+                      <button id="btn-register" class="auth-btn-secondary">Зарегистрироваться</button>
+                    </div>
+                    <p id="auth-message" style="text-align:center;color:#f87171;margin:14px 0 0 0;font-size:12px;font-family:Inter,sans-serif;min-height:18px;"></p>
+                  </div>
+                </div>
               </div>
-              <p id="auth-message" style="text-align: center; color: #dc2626; margin: 12px 0 0 0; font-size: 12px; min-height: 18px;"></p>
+              <div class="landing-footer-bar">
+                <p>© ${new Date().getFullYear()} Портфель MVP · Не является инвестиционной рекомендацией</p>
+                <p>Откройте счёт на <a href="https://www.tinkoff.ru/invest/" target="_blank" rel="noopener">Т‑Инвестиции</a></p>
+              </div>
             </div>
           `;
           document.body.insertBefore(div, document.body.firstChild);
@@ -1940,14 +2216,13 @@
               btn.id = 'btn-logout';
               btn.textContent = 'Выйти';
               btn.style.marginLeft = '12px';
-              btn.style.padding = '8px 16px';
+              btn.style.padding = '4px 12px';
               btn.style.background = '#dc2626';
               btn.style.color = '#fff';
               btn.style.border = 'none';
               btn.style.borderRadius = '4px';
               btn.style.cursor = 'pointer';
-              btn.style.fontSize = '13px';
-              btn.style.height = 'auto';
+              btn.style.fontSize = '12px';
               btn.style.alignSelf = 'center';
               btn.onclick = () => {
                 localStorage.removeItem('mvp_auth_token');
@@ -2016,9 +2291,12 @@
             sel.id = 'portfolio-selector';
             sel.style.padding = '4px 8px';
             sel.style.borderRadius = '4px';
-            sel.style.border = '1px solid #ddd';
-            sel.style.background = '#fff';
-            sel.style.color = '#333';
+            sel.style.border = '1px solid #334155';
+            sel.style.background = '#1e293b';
+            sel.style.color = '#f1f5f9';
+            sel.style.fontSize = '12px';
+            sel.style.lineHeight = '1';
+            sel.style.height = '26px';
             sel.addEventListener('change', (e) => {
               const newId = Number(e.target.value);
               if (newId !== portfolioId) {
