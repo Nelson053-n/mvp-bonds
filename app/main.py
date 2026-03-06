@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 
 from app.api.auth import router as auth_router
+from app.api.bonds import router as bonds_router
 from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
@@ -38,6 +39,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(auth_router)
+app.include_router(bonds_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
 app.include_router(settings_router)
