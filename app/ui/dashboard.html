@@ -43,6 +43,7 @@
       }
 
       *, *::before, *::after { box-sizing: border-box; }
+      button, input, select, textarea { font-family: inherit; }
 
       body {
         margin: 0;
@@ -116,14 +117,15 @@
         border: none;
         color: var(--slate-400);
         font-family: inherit;
-        font-size: 12.5px;
-        font-weight: 500;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
         padding: 0 14px;
         cursor: pointer;
         border-bottom: 2px solid transparent;
         white-space: nowrap;
         transition: color .15s, border-color .15s;
-        letter-spacing: -.1px;
+        letter-spacing: .5px;
       }
       .nav-btn:hover { color: var(--slate-200); }
       .nav-btn.active { color: #fff; border-bottom-color: var(--blue-500); }
@@ -164,7 +166,7 @@
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
       }
       .stat-card {
         background: #fff;
@@ -547,7 +549,7 @@
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 12px;">
           <div id="table-status" class="status"></div>
         </div>
 
@@ -634,18 +636,18 @@
             </div>
             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
               <div class="info-box">
-                <b>Акции (TQBR)</b><br>
-                Введите тикер торгуемого на Московской бирже инструмента: <code>SBER</code>, <code>LKOH</code>, <code>YNDX</code> и т.д.
+                <b>Корпоративные облигации</b><br>
+                Введите тикер или ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> и т.д.<br>
+                <a href="https://www.moex.com/ru/listing/securities-list.aspx?trade=1&type=bonds" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;">Список облигаций на Мосбирже →</a>
               </div>
               <div class="info-box">
-                <b>Облигации</b><br>
-                Поддерживаются корпоративные (TQCB) и ОФЗ (TQOB).<br>
-                Введите тикер <code>SU26238RMFS4</code> или ISIN <code>RU000A106SK2</code>.
+                <b>Облигации федерального займа (ОФЗ)</b><br>
+                Введите тикер: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> и т.д.<br>
+                <a href="https://www.moex.com/s3079" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;">Список ОФЗ на Мосбирже →</a>
               </div>
               <div class="info-box">
                 <b>Цена покупки</b><br>
-                Для акций — цена в рублях за штуку.<br>
-                Для облигаций — полная цена в рублях (чистая + НКД).
+                Полная цена в рублях: чистая цена + НКД на дату сделки.
               </div>
             </div>
           </div>
