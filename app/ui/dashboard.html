@@ -480,6 +480,7 @@
           <button class="nav-btn" data-panel="panel-add">Добавить бумагу</button>
           <button class="nav-btn" data-panel="panel-notifications">Уведомления</button>
           <button class="nav-btn" data-panel="panel-io">Импорт / Экспорт</button>
+          <button class="nav-btn" id="nav-admin" data-panel="panel-admin" style="display:none; color:#f59e0b;">Администратор</button>
         </div>
       </div>
     </nav>
@@ -630,31 +631,130 @@
             <h2 class="card-title">Импорт и экспорт портфеля</h2>
           </div>
           <div class="card-body">
-            <div class="io-grid">
-              <div class="io-section">
-                <h3>Экспорт</h3>
-                <p>Скачать все позиции в формате CSV.</p>
-                <div class="io-actions">
-                  <button class="btn" id="export-btn">Скачать CSV</button>
-                </div>
-              </div>
-              <div class="io-section">
-                <h3>Импорт</h3>
-                <p>CSV с колонками: <code>ticker, instrument_type, quantity, purchase_price</code><br>instrument_type: <code>bond</code> или <code>stock</code></p>
-                <div class="io-actions">
-                  <div style="margin-bottom: 12px;">
-                    <label for="import-portfolio" style="display: block; margin-bottom: 6px; font-size: 13px; color: var(--slate-600); font-weight: 500;">Портфель для импорта:</label>
-                    <select id="import-portfolio" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff; color: #333; font-size: 13px;">
-                      <option value="">Выберите портфель</option>
-                    </select>
-                  </div>
-                  <label class="file-label" for="import-file">Выбрать файл</label>
-                  <input type="file" id="import-file" accept=".csv,text/csv" />
-                  <button class="btn" id="import-btn">Импортировать</button>
-                </div>
-                <div id="io-status" class="status"></div>
+            <div class="io-section">
+              <h3>Экспорт</h3>
+              <p>Скачать все позиции в формате CSV.</p>
+              <div class="io-actions">
+                <button class="btn" id="export-btn">Скачать CSV</button>
               </div>
             </div>
+
+            <div style="border-top: 1px solid var(--slate-200); margin: 24px 0;"></div>
+
+            <div class="io-section">
+              <h3>Импорт</h3>
+              <p>CSV с колонками: <code>ticker, instrument_type, quantity, purchase_price</code><br>instrument_type: <code>bond</code> или <code>stock</code></p>
+              <div style="display: flex; flex-direction: column; gap: 12px; max-width: 320px;">
+                <div>
+                  <label for="import-portfolio" style="display: block; margin-bottom: 6px; font-size: 13px; color: var(--slate-600); font-weight: 500;">Портфель для импорта:</label>
+                  <select id="import-portfolio" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff; color: #333; font-size: 13px;">
+                    <option value="">Выберите портфель</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="file-label" for="import-file" style="width: 100%; box-sizing: border-box; justify-content: center;">Выбрать файл</label>
+                  <input type="file" id="import-file" accept=".csv,text/csv" />
+                </div>
+                <button class="btn" id="import-btn">Импортировать</button>
+              </div>
+              <div id="io-status" class="status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ── PANEL: ADMIN ───────────────────────────────────────── -->
+      <div id="panel-admin" class="panel">
+
+        <!-- Stat cards -->
+        <div class="stat-grid" style="margin-bottom:20px;">
+          <div class="stat-card">
+            <div class="stat-label">Пользователей</div>
+            <div class="stat-value" id="adm-stat-users">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Портфелей</div>
+            <div class="stat-value" id="adm-stat-portfolios">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Расшаренных ссылок</div>
+            <div class="stat-value" id="adm-stat-shared">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Инструментов всего</div>
+            <div class="stat-value" id="adm-stat-instruments">—</div>
+          </div>
+        </div>
+
+        <!-- Users table -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <h2 class="card-title">Пользователи</h2>
+            <button class="btn btn-secondary" style="height:30px;font-size:12px;" onclick="adminLoadUsers()">↺ Обновить</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Имя пользователя</th>
+                    <th>Портфелей</th>
+                    <th>Дата регистрации</th>
+                    <th>Роль</th>
+                    <th class="no-sort">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="adm-users-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Portfolios table -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Все портфели</h2>
+            <button class="btn btn-secondary" style="height:30px;font-size:12px;" onclick="adminLoadPortfolios()">↺ Обновить</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Владелец</th>
+                    <th>Инструментов</th>
+                    <th>Шеринг</th>
+                    <th>Создан</th>
+                    <th class="no-sort">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="adm-portfolios-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="adm-status" class="status" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- Change password modal -->
+      <div id="adm-pwd-modal" class="modal-overlay" style="display:none;">
+        <div class="modal" style="max-width:360px;">
+          <div class="modal-header"><h2 class="modal-title">Сменить пароль</h2></div>
+          <div class="modal-body">
+            <div class="modal-field">
+              <label>Новый пароль</label>
+              <input type="password" id="adm-pwd-input" placeholder="Минимум 6 символов" style="padding:8px;border:1px solid var(--slate-300);border-radius:6px;font-size:13px;width:100%;box-sizing:border-box;">
+            </div>
+            <p id="adm-pwd-status" style="color:var(--red-600);font-size:12px;min-height:18px;margin:4px 0 0;"></p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="document.getElementById('adm-pwd-modal').style.display='none'">Отмена</button>
+            <button class="btn-primary" onclick="adminSubmitPassword()">Сохранить</button>
           </div>
         </div>
       </div>
@@ -1009,11 +1109,11 @@
           ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля'
           : '\u00a0';
 
-        sc.textContent  = '0 ₽';
+        sc.textContent  = isEmpty ? '0 ₽' : fmt(roundTo2(summary.annualIncome)) + ' ₽';
         sc.className    = 'stat-value';
         scs.textContent = isEmpty ? 'нечего ждать' : fmt(roundTo2(summary.annualYield)) + '% от стоимости';
 
-        sy.textContent  = '0%';
+        sy.textContent  = isEmpty ? '0%' : fmt(roundTo2(summary.totalBondYield)) + '%';
         sy.className    = 'stat-value';
         sys.textContent = isEmpty ? 'в пустом портфеле' : 'средневзвешенная YTM';
       }
@@ -1634,12 +1734,14 @@
         // Try to verify token and load app
         try {
           const res = await apiFetch('/auth/me');
-          if (res.status === 401) {
+          if (res.status === 401 || res.status === 403 || !res.ok) {
             localStorage.removeItem('mvp_auth_token');
             localStorage.removeItem('mvp_username');
             showLoginScreen();
             return;
           }
+          const meData = await res.json();
+          setupAdminNav(meData.is_admin || false);
           showDashboard();
           await loadPortfolios();
           // Set portfolioId from saved value or first portfolio
@@ -2217,7 +2319,199 @@
             }, SYNC_INTERVAL_MS);
           });
         }
+
       })();
+
+      // ── ADMIN PANEL ──────────────────────────────────────────────
+      let _admPwdUserId = null;
+
+      async function adminInit() {
+        await adminLoadStats();
+        await adminLoadUsers();
+        await adminLoadPortfolios();
+      }
+
+      async function adminLoadStats() {
+        try {
+          const r = await apiFetch('/admin/stats');
+          const s = await r.json();
+          document.getElementById('adm-stat-users').textContent = s.users;
+          document.getElementById('adm-stat-portfolios').textContent = s.portfolios;
+          document.getElementById('adm-stat-shared').textContent = s.shared_links;
+          document.getElementById('adm-stat-instruments').textContent = s.total_instruments;
+        } catch(e) {}
+      }
+
+      async function adminLoadUsers() {
+        const tbody = document.getElementById('adm-users-body');
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        try {
+          const r = await apiFetch('/admin/users');
+          const users = await r.json();
+          tbody.innerHTML = '';
+          users.forEach(u => {
+            const date = u.created_at ? u.created_at.substring(0, 10) : '—';
+            const role = u.is_admin
+              ? '<span style="color:#f59e0b;font-weight:600;">Админ</span>'
+              : '<span style="color:var(--slate-400);">Пользователь</span>';
+            const isPrimary = u.id === 1;
+            const roleBtn = u.is_admin
+              ? (isPrimary ? '' : `<button onclick="adminSetRole(${u.id}, false, this)"
+                  style="padding:3px 8px;font-size:11px;background:#92400e;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                  Снять админа</button>`)
+              : `<button onclick="adminSetRole(${u.id}, true, this)"
+                  style="padding:3px 8px;font-size:11px;background:#d97706;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                  Сделать админом</button>`;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${u.id}</td>
+              <td style="font-weight:600;">${u.username}${isPrimary ? ' <span style="font-size:10px;color:#f59e0b;">★</span>' : ''}</td>
+              <td>${u.portfolio_count}</td>
+              <td>${date}</td>
+              <td>${role}</td>
+              <td>
+                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+                  <button onclick="adminOpenPwdModal(${u.id}, '${u.username}')"
+                    style="padding:3px 8px;font-size:11px;background:var(--blue-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                    Пароль
+                  </button>
+                  ${roleBtn}
+                  ${!u.is_admin ? `<button onclick="adminDeleteUser(${u.id}, '${u.username}')"
+                    style="padding:3px 8px;font-size:11px;background:var(--red-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                    Удалить
+                  </button>` : ''}
+                </div>
+              </td>`;
+            tbody.appendChild(tr);
+          });
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+        }
+      }
+
+      async function adminLoadPortfolios() {
+        const tbody = document.getElementById('adm-portfolios-body');
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        try {
+          const r = await apiFetch('/admin/portfolios');
+          const portfolios = await r.json();
+          tbody.innerHTML = '';
+          portfolios.forEach(p => {
+            const date = p.created_at ? p.created_at.substring(0, 10) : '—';
+            const shared = p.share_token
+              ? `<a href="/share/${p.share_token}" target="_blank" style="color:var(--blue-600);font-size:11px;">Открыть</a>`
+              : '<span style="color:var(--slate-400);">—</span>';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${p.id}</td>
+              <td style="font-weight:500;">${p.name}</td>
+              <td>${p.username} <span style="color:var(--slate-400);font-size:10px;">#${p.user_id}</span></td>
+              <td>${p.item_count}</td>
+              <td>${shared}</td>
+              <td>${date}</td>
+              <td>
+                <button onclick="adminDeletePortfolio(${p.id}, '${p.name}')"
+                  style="padding:3px 8px;font-size:11px;background:var(--red-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                  Удалить
+                </button>
+              </td>`;
+            tbody.appendChild(tr);
+          });
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+        }
+      }
+
+      function adminOpenPwdModal(userId, username) {
+        _admPwdUserId = userId;
+        document.getElementById('adm-pwd-modal').style.display = 'flex';
+        document.getElementById('adm-pwd-input').value = '';
+        document.getElementById('adm-pwd-status').textContent = '';
+        document.getElementById('adm-pwd-modal').querySelector('.modal-title').textContent =
+          `Пароль: ${username}`;
+        setTimeout(() => document.getElementById('adm-pwd-input').focus(), 50);
+      }
+
+      async function adminSubmitPassword() {
+        const pwd = document.getElementById('adm-pwd-input').value.trim();
+        const status = document.getElementById('adm-pwd-status');
+        if (pwd.length < 6) { status.textContent = 'Минимум 6 символов'; return; }
+        try {
+          const r = await apiFetch(`/admin/users/${_admPwdUserId}/password`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: pwd}),
+          });
+          if (r.ok) {
+            document.getElementById('adm-pwd-modal').style.display = 'none';
+            document.getElementById('adm-status').textContent = 'Пароль изменён';
+            document.getElementById('adm-status').style.color = 'var(--green-600)';
+          } else {
+            const e = await r.json();
+            status.textContent = e.detail || 'Ошибка';
+          }
+        } catch(e) { status.textContent = 'Ошибка сети'; }
+      }
+
+      async function adminSetRole(userId, makeAdmin, btn) {
+        const action = makeAdmin ? 'назначить администратором' : 'снять права администратора';
+        if (!confirm(`Вы уверены, что хотите ${action} для этого пользователя?`)) return;
+        btn.disabled = true;
+        try {
+          const r = await apiFetch(`/admin/users/${userId}/role`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({is_admin: makeAdmin}),
+          });
+          if (r.ok) {
+            await adminLoadUsers();
+          } else {
+            const e = await r.json();
+            alert(e.detail || 'Ошибка');
+            btn.disabled = false;
+          }
+        } catch(e) { alert('Ошибка сети'); btn.disabled = false; }
+      }
+
+      async function adminDeleteUser(userId, username) {
+        if (!confirm(`Удалить пользователя «${username}» и все его данные?`)) return;
+        try {
+          const r = await apiFetch(`/admin/users/${userId}`, {method: 'DELETE'});
+          if (r.ok) {
+            await adminLoadUsers();
+            await adminLoadPortfolios();
+            await adminLoadStats();
+          } else {
+            const e = await r.json();
+            alert(e.detail || 'Ошибка');
+          }
+        } catch(e) { alert('Ошибка сети'); }
+      }
+
+      async function adminDeletePortfolio(portfolioId, name) {
+        if (!confirm(`Удалить портфель «${name}»?`)) return;
+        try {
+          const r = await apiFetch(`/admin/portfolios/${portfolioId}`, {method: 'DELETE'});
+          if (r.ok) {
+            await adminLoadPortfolios();
+            await adminLoadStats();
+          } else {
+            const e = await r.json();
+            alert(e.detail || 'Ошибка');
+          }
+        } catch(e) { alert('Ошибка сети'); }
+      }
+
+      // Show admin panel tab if user is admin
+      function setupAdminNav(isAdmin) {
+        const btn = document.getElementById('nav-admin');
+        if (btn && isAdmin) btn.style.display = '';
+      }
+
+      // Lazy-load admin data when tab is clicked
+      document.getElementById('nav-admin').addEventListener('click', () => {
+        setTimeout(() => adminInit(), 0);
+      });
+
+
     </script>
-  </body>
-</html>

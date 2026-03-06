@@ -79,6 +79,15 @@ class StorageService:
                 except sqlite3.OperationalError:
                     pass
 
+            # Migrate users table
+            try:
+                conn.execute(
+                    "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+                )
+                conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_snapshots (
@@ -410,7 +419,7 @@ class StorageService:
     def get_user_by_username(self, username: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+                "SELECT id, username, password_hash, created_at, is_admin FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
 
@@ -421,12 +430,13 @@ class StorageService:
             "username": row[1],
             "password_hash": row[2],
             "created_at": row[3],
+            "is_admin": bool(row[4]),
         }
 
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -437,6 +447,7 @@ class StorageService:
             "username": row[1],
             "password_hash": row[2],
             "created_at": row[3],
+            "is_admin": bool(row[4]),
         }
 
     # ── Portfolios ──────────────────────────────────────────────────────────
@@ -563,5 +574,97 @@ class StorageService:
             conn.commit()
             return int(cursor.rowcount)
 
+
+
+    # ── Admin ───────────────────────────────────────────────────────────────
+
+    def get_all_users(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT u.id, u.username, u.is_admin, u.created_at,
+                       COUNT(p.id) as portfolio_count
+                FROM users u
+                LEFT JOIN portfolios p ON p.user_id = u.id
+                GROUP BY u.id
+                ORDER BY u.id ASC
+                """
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "username": row[1],
+                "is_admin": bool(row[2]),
+                "created_at": row[3],
+                "portfolio_count": int(row[4]),
+            }
+            for row in rows
+        ]
+
+    def delete_user(self, user_id: int) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def set_user_admin(self, user_id: int, is_admin: bool) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET is_admin = ? WHERE id = ?",
+                (1 if is_admin else 0, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def update_user_password(self, user_id: int, password_hash: str) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (password_hash, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def get_all_portfolios_with_users(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT p.id, p.name, p.user_id, u.username,
+                       p.share_token, p.created_at,
+                       COUNT(pi.id) as item_count
+                FROM portfolios p
+                JOIN users u ON u.id = p.user_id
+                LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
+                GROUP BY p.id
+                ORDER BY p.user_id ASC, p.id ASC
+                """
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "name": row[1],
+                "user_id": int(row[2]),
+                "username": row[3],
+                "share_token": row[4],
+                "created_at": row[5],
+                "item_count": int(row[6]),
+            }
+            for row in rows
+        ]
+
+    def get_stats(self) -> dict:
+        with self._connect() as conn:
+            users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            portfolios = conn.execute("SELECT COUNT(*) FROM portfolios").fetchone()[0]
+            shared = conn.execute(
+                "SELECT COUNT(*) FROM portfolios WHERE share_token IS NOT NULL"
+            ).fetchone()[0]
+            items = conn.execute("SELECT COUNT(*) FROM portfolio_items").fetchone()[0]
+        return {
+            "users": int(users),
+            "portfolios": int(portfolios),
+            "shared_links": int(shared),
+            "total_instruments": int(items),
+        }
 
 storage_service = StorageService()

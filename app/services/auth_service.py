@@ -46,7 +46,8 @@ class AuthService:
         return {
             "user_id": user_id,
             "username": username,
-            "access_token": self.create_token(user_id, username),
+            "is_admin": False,
+            "access_token": self.create_token(user_id, username, False),
         }
 
     def login(self, username: str, password: str) -> dict | None:
@@ -62,14 +63,16 @@ class AuthService:
             return None
 
         logger.info("User logged in: %s (id=%d)", username, user["id"])
-        token = self.create_token(user["id"], user["username"])
+        is_admin = bool(user.get("is_admin", False))
+        token = self.create_token(user["id"], user["username"], is_admin)
         return {
             "user_id": user["id"],
             "username": user["username"],
+            "is_admin": is_admin,
             "access_token": token,
         }
 
-    def create_token(self, user_id: int, username: str) -> str:
+    def create_token(self, user_id: int, username: str, is_admin: bool = False) -> str:
         """
         Create a JWT access token.
         """
@@ -79,6 +82,7 @@ class AuthService:
         payload = {
             "sub": str(user_id),  # Must be string per JWT spec
             "username": username,
+            "is_admin": is_admin,
             "exp": int(exp.timestamp()),
             "iat": int(now.timestamp()),
         }
@@ -103,6 +107,7 @@ class AuthService:
             )
             # Convert sub back to int (stored as string in JWT per spec)
             payload["sub"] = int(payload["sub"])
+            payload["is_admin"] = bool(payload.get("is_admin", False))
             return payload
         except jwt.ExpiredSignatureError:
             logger.debug("Token expired")
