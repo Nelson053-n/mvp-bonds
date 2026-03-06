@@ -56,15 +56,21 @@ class MOEXService:
         secid = ticker.upper().strip()
         url = (
             f"{settings.moex_base_url}/engines/stock/markets/"
-            f"bonds/boards/TQCB/securities/{secid}.json"
+            f"bonds/securities/{secid}.json"
         )
         data = await self._fetch(url)
 
         sec_row = self._get_first_row(data.get("securities", {}))
-        md_row = self._get_first_row(data.get("marketdata", {}))
+        md_row = self._get_row_with_price(data.get("marketdata", {}))
 
         name = sec_row.get("SHORTNAME") or sec_row.get("SECNAME") or secid
-        clean_price_percent = md_row.get("LAST") or md_row.get("LCLOSE")
+        clean_price_percent = (
+            md_row.get("LAST")
+            or md_row.get("LCLOSE")
+            or sec_row.get("PREVPRICE")
+            or sec_row.get("PREVWAPRICE")
+            or sec_row.get("PREVLEGALCLOSEPRICE")
+        )
         if clean_price_percent is None:
             logger.error("Не удалось получить цену облигации %s", secid)
             raise PriceNotFoundError(secid, "облигация")
@@ -76,8 +82,9 @@ class MOEXService:
         maturity_date = self._parse_date(sec_row.get("MATDATE"))
         buyback_date = self._parse_date(sec_row.get("BUYBACKDATE"))
         offer_date = self._parse_date(sec_row.get("OFFERDATE"))
-        aci = md_row.get("ACCINT")
-        market_yield = md_row.get("YIELD")
+        next_coupon_date = self._parse_date(sec_row.get("NEXTCOUPON"))
+        aci = md_row.get("ACCINT") or sec_row.get("ACCRUEDINT")
+        market_yield = md_row.get("YIELD") or sec_row.get("YIELDATPREVWAPRICE")
         company_rating = await self._get_smartlab_credit_rating(secid)
         if company_rating is None:
             company_rating = await self._get_credit_rating(secid)
@@ -101,6 +108,7 @@ class MOEXService:
             maturity_date=maturity_date,
             buyback_date=buyback_date,
             offer_date=offer_date,
+            next_coupon_date=next_coupon_date,
             aci=float(aci) if aci is not None else None,
             market_yield=(
                 float(market_yield)
@@ -136,6 +144,22 @@ class MOEXService:
         values = rows[0]
         max_index = min(len(columns), len(values))
         return {columns[idx]: values[idx] for idx in range(max_index)}
+
+    @staticmethod
+    def _get_row_with_price(dataset: dict[str, Any]) -> dict[str, Any]:
+        """Return the first row where LAST or LCLOSE is set; fall back to first row."""
+        columns = dataset.get("columns", [])
+        rows = dataset.get("data", [])
+        if not rows:
+            return {}
+        best = rows[0]
+        for values in rows:
+            max_index = min(len(columns), len(values))
+            row = {columns[idx]: values[idx] for idx in range(max_index)}
+            if row.get("LAST") is not None or row.get("LCLOSE") is not None:
+                return row
+        max_index = min(len(columns), len(best))
+        return {columns[idx]: best[idx] for idx in range(max_index)}
 
     @staticmethod
     def _parse_date(value: str | None) -> date | None:
