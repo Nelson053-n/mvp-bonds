@@ -481,6 +481,64 @@
         margin: 0;
       }
 
+      /* ── ANIMATIONS ─────────────────────────────────────────── */
+      @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes modalScaleIn {
+        from { opacity: 0; transform: scale(.94) translateY(-6px); }
+        to   { opacity: 1; transform: scale(1)   translateY(0); }
+      }
+      @keyframes rowFadeIn {
+        from { opacity: 0; transform: translateX(-6px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes shimmer {
+        0%   { background-position: -600px 0; }
+        100% { background-position:  600px 0; }
+      }
+      @keyframes rippleWave {
+        to { transform: scale(4); opacity: 0; }
+      }
+
+      /* Panel enter animation */
+      .panel.active { animation: fadeSlideIn .18s ease-out both; }
+
+      /* Modal animations */
+      .modal-overlay { backdrop-filter: blur(0px); transition: backdrop-filter .2s; }
+      .modal-overlay.show { backdrop-filter: blur(3px); }
+      .modal-overlay.show .modal { animation: modalScaleIn .22s cubic-bezier(.34,1.4,.64,1) both; }
+
+      /* Card hover lift */
+      .stat-card {
+        transition: box-shadow .2s, transform .2s;
+        cursor: default;
+      }
+      .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px -4px rgb(0 0 0 / .12), 0 2px 6px -2px rgb(0 0 0 / .08);
+      }
+
+      /* Button ripple */
+      .btn { position: relative; overflow: hidden; }
+      .ripple-wave {
+        position: absolute; border-radius: 50%;
+        background: rgba(255,255,255,.32);
+        transform: scale(0);
+        animation: rippleWave .55s linear;
+        pointer-events: none;
+      }
+
+      /* Skeleton rows */
+      .skel-cell {
+        display: inline-block; width: 60%; height: 11px; border-radius: 5px;
+        background: linear-gradient(90deg, var(--slate-100) 25%, var(--slate-200) 50%, var(--slate-100) 75%);
+        background-size: 600px 100%;
+        animation: shimmer 1.3s infinite linear;
+        vertical-align: middle;
+      }
+
       /* ── RESPONSIVE ──────────────────────────────────────────── */
       @media (max-width: 1024px) {
         .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -955,7 +1013,15 @@
       const navBtns = document.querySelectorAll('.nav-btn');
       const panels  = document.querySelectorAll('.panel');
       function showPanel(id) {
-        panels.forEach(p => p.classList.toggle('active', p.id === id));
+        panels.forEach(p => {
+          if (p.id === id) {
+            p.classList.remove('active');
+            void p.offsetWidth; // force reflow → restart animation
+            p.classList.add('active');
+          } else {
+            p.classList.remove('active');
+          }
+        });
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
       }
       navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
@@ -1192,35 +1258,50 @@
       }
 
       // ── UPDATE STAT CARDS ────────────────────────────────────────
+      function animateCounter(el, toValue, format) {
+        const duration = 550;
+        const from = parseFloat(el.dataset.counterFrom || '0') || 0;
+        el.dataset.counterFrom = toValue;
+        if (cancelAnimationFrame) cancelAnimationFrame(el._raf);
+        const startTime = performance.now();
+        function step(now) {
+          const t = Math.min((now - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+          el.textContent = format(from + (toValue - from) * eased);
+          if (t < 1) { el._raf = requestAnimationFrame(step); }
+          else el.textContent = format(toValue);
+        }
+        el._raf = requestAnimationFrame(step);
+      }
+
       function updateStatCards(summary) {
-        const sv = document.getElementById('stat-value');
-        const sp = document.getElementById('stat-profit');
-        const sc = document.getElementById('stat-coupon');
-        const sy = document.getElementById('stat-ytm');
+        const sv  = document.getElementById('stat-value');
+        const sp  = document.getElementById('stat-profit');
+        const sc  = document.getElementById('stat-coupon');
+        const sy  = document.getElementById('stat-ytm');
         const svs = document.getElementById('stat-value-sub');
         const sps = document.getElementById('stat-profit-sub');
         const scs = document.getElementById('stat-coupon-sub');
         const sys = document.getElementById('stat-ytm-sub');
 
-        // For empty portfolio, show 0 instead of —
         const isEmpty = tableRows.length === 0;
 
-        sv.textContent  = isEmpty ? '0 ₽' : fmt(roundTo2(summary.totalAssets)) + ' ₽';
-        sv.className    = 'stat-value';
+        sv.className = 'stat-value';
+        animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
         svs.textContent = isEmpty ? 'портфель пуст' : tableRows.length + ' позиц' + (tableRows.length === 1 ? 'ия' : tableRows.length < 5 ? 'ии' : 'ий');
 
-        sp.textContent  = isEmpty ? '0 ₽' : (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
-        sp.className    = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
+        sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
+        animateCounter(sp, isEmpty ? 0 : roundTo2(summary.totalProfit),
+          v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
         sps.textContent = isEmpty ? 'добавьте бумаги' : summary.totalAssets > 0
-          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля'
-          : '\u00a0';
+          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля' : '\u00a0';
 
-        sc.textContent  = isEmpty ? '0 ₽' : fmt(roundTo2(summary.annualIncome)) + ' ₽';
-        sc.className    = 'stat-value';
+        sc.className = 'stat-value';
+        animateCounter(sc, isEmpty ? 0 : roundTo2(summary.annualIncome), v => fmt(roundTo2(v)) + ' ₽');
         scs.textContent = isEmpty ? 'нечего ждать' : fmt(roundTo2(summary.annualYield)) + '% от стоимости';
 
-        sy.textContent  = isEmpty ? '0%' : fmt(roundTo2(summary.totalBondYield)) + '%';
-        sy.className    = 'stat-value';
+        sy.className = 'stat-value';
+        animateCounter(sy, isEmpty ? 0 : roundTo2(summary.totalBondYield), v => fmt(roundTo2(v)) + '%');
         sys.textContent = isEmpty ? 'в пустом портфеле' : 'средневзвешенная YTM';
       }
 
@@ -1533,6 +1614,25 @@
       // ── RENDER TABLE ─────────────────────────────────────────────
       const tableBody = document.getElementById('table-body');
 
+      const SKEL_WIDTHS = ['30%','70%','55%','45%','35%','45%','50%','50%','35%','40%','40%','40%','50%','40%','50%','50%','30%'];
+      function showSkeletonRows(count = 7) {
+        tableBody.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+          const tr = document.createElement('tr');
+          tr.className = 'skeleton-row';
+          SKEL_WIDTHS.forEach((w, ci) => {
+            const td = document.createElement('td');
+            const s  = document.createElement('span');
+            s.className = 'skel-cell';
+            s.style.width = w;
+            s.style.animationDelay = `${i * 60 + ci * 10}ms`;
+            td.appendChild(s);
+            tr.appendChild(td);
+          });
+          tableBody.appendChild(tr);
+        }
+      }
+
       function addCell(tr, val) {
         const td = document.createElement('td'); td.textContent = val; tr.appendChild(td); return td;
       }
@@ -1566,6 +1666,7 @@
         for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
           const tr  = document.createElement('tr');
+          tr.style.animation = `rowFadeIn .18s ease-out ${Math.min(idx * 25, 400)}ms both`;
 
           addCell(tr, String(idx + 1));
 
@@ -1695,6 +1796,7 @@
 
       // ── SYNC ─────────────────────────────────────────────────────
       async function syncTableFromServer() {
+        showSkeletonRows();
         let url;
         if (isReadOnly && shareToken) {
           url = `/share/${shareToken}/table?ts=${Date.now()}`;
@@ -2819,6 +2921,21 @@
       // Lazy-load admin data when tab is clicked
       document.getElementById('nav-admin').addEventListener('click', () => {
         setTimeout(() => adminInit(), 0);
+      });
+
+      // ── RIPPLE ON .btn ────────────────────────────────────────────
+      document.addEventListener('pointerdown', (e) => {
+        const btn = e.target.closest('.btn');
+        if (!btn || btn.disabled) return;
+        const rect = btn.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const wave = document.createElement('span');
+        wave.className = 'ripple-wave';
+        wave.style.cssText = `width:${size}px;height:${size}px;`
+          + `left:${e.clientX - rect.left - size / 2}px;`
+          + `top:${e.clientY - rect.top - size / 2}px`;
+        btn.appendChild(wave);
+        wave.addEventListener('animationend', () => wave.remove(), { once: true });
       });
 
 
