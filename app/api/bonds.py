@@ -291,37 +291,66 @@ async def suggest_portfolio(
         _rating_score(b.get("rating")),
     ))
 
-    # Step 8: greedy budget allocation, ~amount/10 per bond
-    budget_per_bond = amount / 10.0
+    # Step 8: budget allocation with weighted random sampling to increase diversity
+    max_items = 10
     selected: list[dict] = []
     total_cost = 0.0
+    remaining = amount
 
+    # Precompute candidate purchase metadata
+    pool = []
     for bond in candidates:
-        if len(selected) >= 10:
-            break
-
         lot_price = (bond["price"] / 100.0) * bond["face_value"] * bond["lot_size"]
         if lot_price <= 0:
             continue
-
-        remaining = amount - total_cost
-        if remaining < lot_price:
-            continue
-
-        lots = max(1, round(budget_per_bond / lot_price))
-        cost = lots * lot_price
-
-        if cost > remaining:
-            lots = max(1, int(remaining / lot_price))
-            cost = lots * lot_price
-
-        if total_cost + cost > amount * 1.02:
-            continue
-
-        # Actual purchase price per bond (1 bond, not lot)
+        # Estimate lots similarly to previous logic (budget per bond heuristic)
+        est_lots = max(1, round((amount / max_items) / lot_price))
+        est_cost = est_lots * lot_price
         purchase_price = round((bond["price"] / 100.0) * bond["face_value"], 2)
+        pool.append({
+            "bond": bond,
+            "lot_price": lot_price,
+            "est_lots": est_lots,
+            "est_cost": est_cost,
+            "purchase_price": purchase_price,
+        })
 
-        selected.append({
+    import random
+
+    # Continue selecting while budget allows and we have candidates
+    while len(selected) < max_items and pool and remaining >= 1:
+        # Filter feasible candidates given remaining budget (at least one lot)
+        feasible = [p for p in pool if p["lot_price"] <= remaining]
+        if not feasible:
+            break
+
+        # Compute weights: prefer closer to target yield and better rating; add small randomness
+        weights = []
+        for p in feasible:
+            b = p["bond"]
+            yield_diff = abs(b["coupon_percent"] - yield_target)
+            yield_score = 1.0 / (1.0 + yield_diff)
+            rating_score = 1.0 / (1.0 + _rating_score(b.get("rating") ) / 10.0)
+            w = yield_score * rating_score * (1.0 + random.random() * 0.25)
+            weights.append(max(w, 1e-6))
+
+        # Choose one candidate by weight (without replacement)
+        chosen = random.choices(feasible, weights=weights, k=1)[0]
+
+        # Determine lots to buy for chosen candidate within remaining budget
+        lots = chosen["est_lots"]
+        cost = lots * chosen["lot_price"]
+        if cost > remaining:
+            lots = max(1, int(remaining / chosen["lot_price"]))
+            cost = lots * chosen["lot_price"]
+
+        # Skip if somehow cost is zero
+        if cost <= 0:
+            pool = [p for p in pool if p is not chosen]
+            continue
+
+        bond = chosen["bond"]
+        item = {
             "ticker": bond["ticker"],
             "name": bond["name"],
             "rating": bond.get("rating"),
@@ -332,12 +361,17 @@ async def suggest_portfolio(
             "lot_size": bond["lot_size"],
             "lots": lots,
             "total_cost": round(cost, 2),
-            "purchase_price": purchase_price,
+            "purchase_price": chosen["purchase_price"],
             "maturity": bond["maturity"],
             "offer_date": bond.get("offer_date"),
             "market_yield": round(bond.get("market_yield") or bond["coupon_percent"], 2),
-        })
+        }
+        selected.append(item)
         total_cost += cost
+        remaining = amount - total_cost
+
+        # Remove chosen from pool
+        pool = [p for p in pool if p is not chosen]
 
     if not selected:
         raise HTTPException(404, "Не удалось подобрать бумаги под заданные параметры")

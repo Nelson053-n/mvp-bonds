@@ -38,6 +38,8 @@ class PortfolioService:
     async def add_instrument(
         self, portfolio_id: int, payload: AddInstrumentInput
     ) -> InstrumentMetrics:
+        logger.info("add_instrument called: portfolio_id=%s ticker=%s quantity=%s purchase_price=%s",
+                    portfolio_id, payload.ticker, payload.quantity, payload.purchase_price)
         validation = await self.validate(payload)
         if not validation.validated:
             warnings_msg = (
@@ -70,7 +72,7 @@ class PortfolioService:
                     else snapshot.current_price
                 )
         except Exception as exc:
-            logger.error("Failed to fetch market data for %s: %s", ticker, exc)
+            logger.exception("Failed to fetch market data for %s", ticker)
             raise
 
         new_id = storage_service.add_item(
@@ -80,9 +82,7 @@ class PortfolioService:
             purchase_price=purchase_price,
             portfolio_id=portfolio_id,
         )
-        logger.info(
-            "Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id
-        )
+        logger.info("Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id)
 
         from app.services.cache_service import cache_service
         rows = await cache_service.refresh(portfolio_id)
