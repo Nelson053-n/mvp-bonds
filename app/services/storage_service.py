@@ -93,6 +93,11 @@ class StorageService:
             except sqlite3.OperationalError:
                 pass
 
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN tg_chat_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_snapshots (
@@ -441,7 +446,7 @@ class StorageService:
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -453,6 +458,8 @@ class StorageService:
             "password_hash": row[2],
             "created_at": row[3],
             "is_admin": bool(row[4]),
+            "email": row[5],
+            "tg_chat_id": row[6],
         }
 
     # ── Portfolios ──────────────────────────────────────────────────────────
@@ -630,6 +637,42 @@ class StorageService:
             conn.commit()
             return int(cursor.rowcount)
 
+    def update_user_username(self, user_id: int, new_username: str) -> bool:
+        """Returns False if username already taken."""
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM users WHERE username = ? AND id != ?",
+                (new_username, user_id),
+            ).fetchone()
+            if existing:
+                return False
+            conn.execute(
+                "UPDATE users SET username = ? WHERE id = ?",
+                (new_username, user_id),
+            )
+            conn.commit()
+            return True
+
+    def update_user_tg_chat_id(self, user_id: int, tg_chat_id: str | None) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET tg_chat_id = ? WHERE id = ?",
+                (tg_chat_id, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def get_user_by_username_for_reset(self, username: str) -> dict | None:
+        """Returns minimal user info for password reset (email, tg_chat_id)."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, email, tg_chat_id FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+        if not row:
+            return None
+        return {"id": int(row[0]), "email": row[1], "tg_chat_id": row[2]}
+
     def update_user_email(self, user_id: int, email: str | None) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
@@ -638,6 +681,16 @@ class StorageService:
             )
             conn.commit()
             return int(cursor.rowcount)
+
+    def move_instrument(self, item_id: int, from_portfolio_id: int, to_portfolio_id: int) -> bool:
+        """Move an instrument from one portfolio to another. Returns True if moved."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET portfolio_id = ? WHERE id = ? AND portfolio_id = ?",
+                (to_portfolio_id, item_id, from_portfolio_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount) > 0
 
     def get_portfolios_with_item_counts(self, user_id: int) -> list[dict]:
         with self._connect() as conn:
