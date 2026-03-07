@@ -40,6 +40,6 @@ async def test_notification(payload: NotificationSettings) -> dict[str, bool]:
     ok = await notification_service.send_telegram(
         payload.tg_bot_token,
         payload.tg_chat_id,
-        "✅ Тестовое уведомление от MVP Bonds Portfolio",
+        "✅ Тестовое уведомление от Bond AI",
     )
     return {"success": ok}

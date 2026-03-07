@@ -81,7 +81,7 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Портфель не найден — Портфель MVP</title>
+    <title>Портфель не найден — Bond AI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -167,9 +167,8 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
 </head>
 <body>
     <nav>
-        <div class="brand-mark">P</div>
-        <span class="brand-name">Портфель</span>
-        <span class="brand-badge">MVP</span>
+        <div class="brand-mark">B</div>
+        <span class="brand-name">Bond AI</span>
     </nav>
     <main>
         <div class="card">
@@ -181,7 +180,7 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
         </div>
     </main>
     <footer>
-        <span>© Портфель MVP · Не является инвестиционной рекомендацией</span>
+        <span>© Bond AI · Не является инвестиционной рекомендацией</span>
         <span>Откройте счёт: <a href="https://www.tinkoff.ru/invest/" target="_blank" rel="noopener">Т‑Инвестиции</a></span>
     </footer>
 </body>
