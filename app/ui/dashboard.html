@@ -304,21 +304,92 @@
         box-shadow: var(--shadow-sm);
       }
       .btn-secondary:hover { background: var(--slate-50); box-shadow: var(--shadow); }
+      .btn-danger, .btn.btn-danger { background: var(--red-600); color: #fff; border: none; }
+      .btn-danger:hover, .btn.btn-danger:hover { background: #b91c1c; }
 
       .btn-sm {
         height: 22px; font-size: 10px; padding: 0 8px; border-radius: var(--radius-sm);
-        background: var(--red-50); color: var(--red-600);
-        border: 1px solid #fecaca; cursor: pointer; font-family: inherit;
+        background: var(--slate-100); color: var(--slate-500);
+        border: 1px solid var(--slate-200); cursor: pointer; font-family: inherit;
         font-weight: 600; box-shadow: none;
-        transition: background .15s;
+        transition: background .15s, color .15s, border-color .15s;
       }
-      .btn-sm:hover { background: var(--red-100); }
+      .btn-sm:hover { background: #fee2e2; color: var(--red-600); border-color: #fecaca; }
+
+      .btn-sm-move {
+        height: 22px; font-size: 10px; padding: 0 8px; border-radius: var(--radius-sm);
+        background: #ede9fe; color: #7c3aed;
+        border: 1px solid #c4b5fd; cursor: pointer; font-family: inherit;
+        font-weight: 600; box-shadow: none;
+        transition: background .15s, color .15s;
+      }
+      .btn-sm-move:hover { background: #7c3aed; color: #fff; }
+
+      /* ── SUGGEST CARDS ───────────────────────────────────────── */
+      .suggest-card {
+        background: #fff;
+        border: 1px solid var(--slate-200);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: border-color .15s, box-shadow .15s;
+      }
+      .suggest-card:hover { border-color: var(--blue-500); box-shadow: 0 2px 8px rgba(37,99,235,.1); }
+      .suggest-card-body { flex: 1; min-width: 0; }
+      .suggest-card-name { font-size: 13px; font-weight: 600; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .suggest-card-meta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+      .suggest-card-yield { font-size: 16px; font-weight: 700; color: var(--green-600); white-space: nowrap; }
+      .suggest-card-add {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: var(--blue-600); color: #fff;
+        border: none; cursor: pointer; font-size: 18px; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        transition: background .15s, transform .1s;
+      }
+      .suggest-card-add:hover { background: var(--blue-700); transform: scale(1.1); }
+      .suggest-card-add:disabled { background: var(--slate-300); cursor: default; transform: none; }
+
+      /* ── MOVE POPOVER ────────────────────────────────────────── */
+      #move-popover {
+        position: fixed; z-index: 9999;
+        min-width: 230px;
+        background: #fff;
+        border: 1px solid var(--slate-200);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 8px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.07);
+        padding: 14px 16px;
+        animation: popoverIn .12s ease;
+      }
+      @keyframes popoverIn {
+        from { opacity: 0; transform: translateY(-4px) scale(.97); }
+        to   { opacity: 1; transform: translateY(0)  scale(1); }
+      }
+      #move-popover-title {
+        font-size: 12px; font-weight: 700; color: var(--slate-700);
+        margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+      }
+      #move-popover-select {
+        width: 100%; font-size: 12px; padding: 5px 8px;
+        border: 1px solid var(--slate-200); border-radius: var(--radius-sm);
+        background: var(--slate-50); color: var(--slate-800);
+        margin-bottom: 10px; cursor: pointer;
+      }
+      #move-popover-select:focus { outline: 2px solid #7c3aed; outline-offset: 1px; }
+      #move-popover-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
       /* ── SECTION HEADER ─────────────────────────────────────── */
       .section-header {
         padding: 24px 0 20px;
         border-bottom: 1px solid var(--slate-200);
         margin-bottom: 20px;
+      }
+      .section-header-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
       }
       .section-title {
         font-size: 18px; font-weight: 700;
@@ -333,9 +404,10 @@
       /* ── PANEL COLS ──────────────────────────────────────────── */
       .panel-cols { display: grid; gap: 16px; }
       .panel-cols-2 { grid-template-columns: repeat(2, 1fr); }
+      .panel-cols-3 { grid-template-columns: repeat(3, 1fr); }
       .panel-cols-auto { grid-template-columns: 1fr 1.6fr; }
       @media (max-width: 860px) {
-        .panel-cols-2, .panel-cols-auto { grid-template-columns: 1fr; }
+        .panel-cols-2, .panel-cols-3, .panel-cols-auto { grid-template-columns: 1fr; }
       }
 
       /* ── INFO BOX ────────────────────────────────────────────── */
@@ -558,7 +630,11 @@
       .stab-btn:hover { color: var(--slate-800); }
       .stab-btn.stab-active { color: var(--blue-600); border-bottom-color: var(--blue-600); font-weight: 600; }
 
-      /* ── LANGUAGE SWITCHER ────────────────────────────────────── */
+      /* ── LANGUAGE SELECT ─────────────────────────────────────── */
+      #lang-select option { background: #1e293b; color: #f1f5f9; }
+      #lang-select:hover { border-color: rgba(148,163,184,.6); }
+
+      /* ── LANGUAGE SWITCHER (login page buttons) ───────────────── */
       .lang-btn {
         background: none;
         border: 1px solid var(--slate-700);
@@ -666,7 +742,10 @@
 
     <!-- Mobile nav (visible only in mobile-mode) -->
     <div class="mobile-nav" id="mobile-nav">
-      <button class="nav-btn" data-panel="panel-table">Портфель</button>
+      <div id="mobile-portfolio-wrap" style="display:none;width:100%;padding:6px 12px 0;box-sizing:border-box;">
+        <select id="mobile-portfolio-selector" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:13px;"></select>
+      </div>
+      <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
       <button class="nav-btn" data-panel="panel-add" data-i18n="nav.add">Добавить бумагу</button>
       <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
     </div>
@@ -739,7 +818,7 @@
             <h2 class="card-title" data-i18n="chart.title">Купонный доход по месяцам</h2>
           </div>
           <div style="padding: 12px 16px;">
-            <div id="chart-empty" class="chart-empty" style="display:none;">Нет данных по купонным выплатам</div>
+            <div id="chart-empty" class="chart-empty" style="display:none;" data-i18n="chart.noData">Нет данных по купонным выплатам</div>
             <canvas id="monthly-chart" height="190"></canvas>
           </div>
         </div>
@@ -747,21 +826,24 @@
 
       <!-- ── PANEL: ADD INSTRUMENT ──────────────────────────────── -->
       <div id="panel-add" class="panel">
-        <div class="section-header">
-          <h1 class="section-title" data-i18n="add.title">Добавить инструмент</h1>
-          <p class="section-desc" data-i18n="add.desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
+        <div class="section-header section-header-row">
+          <div style="flex:1;">
+            <h1 class="section-title" data-i18n="add.title">Добавить инструмент</h1>
+            <p class="section-desc" data-i18n="add.desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
+          </div>
+          <button class="btn" style="margin-top:24px;white-space:nowrap;flex-shrink:0;" onclick="openCreatePortfolioModal()" data-i18n="settings.portfolios.new">+ Новый портфель</button>
         </div>
         <div class="panel-cols panel-cols-auto">
           <div class="card">
             <div class="card-header">
               <h2 class="card-title" data-i18n="add.params">Параметры позиции</h2>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
               <form id="add-form">
                 <div style="display:flex;flex-direction:column;gap:14px;">
                   <div class="field">
                     <label for="ticker" data-i18n="add.ticker">Тикер / ISIN / название</label>
-                    <input id="ticker" name="ticker" type="text" class="input" placeholder="Например: SBER, RU000A106SK2" required />
+                    <input id="ticker" name="ticker" type="text" class="input" placeholder="Например: SBER, RU000A106SK2" data-i18n-placeholder="add.tickerPlaceholder" required />
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div class="field">
@@ -778,7 +860,11 @@
                   </div>
                 </div>
               </form>
-              <div id="add-status" class="status" style="margin-top:12px;"></div>
+              <div id="add-status" class="status"></div>
+              <div class="info-box" style="margin-top:auto;background:var(--slate-50);border-color:var(--slate-200);">
+                <b data-i18n="add.aiTitle">ИИ-валидация</b><br>
+                <span data-i18n="add.aiDesc" style="font-size:12px;color:var(--slate-600);">Перед добавлением система проверит тикер через MOEX, загрузит текущую цену, купон и дату погашения автоматически.</span>
+              </div>
             </div>
           </div>
           <div class="card">
@@ -787,21 +873,29 @@
             </div>
             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
               <div class="info-box">
-                <b>Корпоративные облигации</b><br>
-                Введите тикер или ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> и т.д.<br>
-                <a href="https://www.moex.com/ru/listing/securities-list.aspx?trade=1&type=bonds" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;">Список облигаций на Мосбирже →</a>
+                <b data-i18n="add.hint1title">Корпоративные облигации</b><br>
+                <span data-i18n-html="add.hint1body">Введите тикер или ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> и т.д.</span><br>
+                <a href="https://www.moex.com/ru/listing/securities-list.aspx?trade=1&type=bonds" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;" data-i18n="add.hint1link">Список облигаций на Мосбирже →</a>
               </div>
               <div class="info-box">
-                <b>Облигации федерального займа (ОФЗ)</b><br>
-                Введите тикер: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> и т.д.<br>
-                <a href="https://www.moex.com/s3079" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;">Список ОФЗ на Мосбирже →</a>
+                <b data-i18n="add.hint2title">Облигации федерального займа (ОФЗ)</b><br>
+                <span data-i18n-html="add.hint2body">Введите тикер: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> и т.д.</span><br>
+                <a href="https://www.moex.com/s3079" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;" data-i18n="add.hint2link">Список ОФЗ на Мосбирже →</a>
               </div>
               <div class="info-box">
-                <b>Цена покупки</b><br>
-                Полная цена в рублях: чистая цена + НКД на дату сделки.
+                <b data-i18n="add.hint3title">Цена покупки</b><br>
+                <span data-i18n="add.hint3body">Полная цена в рублях: чистая цена + НКД на дату сделки.</span>
               </div>
             </div>
           </div>
+        </div>
+        <!-- Suggestions section -->
+        <div id="add-suggestions-section" style="display:none;margin-top:24px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+            <h2 style="font-size:16px;font-weight:700;color:var(--slate-800);margin:0;" id="add-suggestions-title" data-i18n="add.suggestTitle">Рекомендуемые облигации</h2>
+            <span id="add-suggestions-risk" style="font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600;"></span>
+          </div>
+          <div id="add-suggestions-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;"></div>
         </div>
       </div>
 
@@ -822,23 +916,35 @@
 
         <!-- ── TAB: Account ── -->
         <div id="stab-account" class="stab-content">
-          <div class="panel-cols panel-cols-auto">
+          <div class="panel-cols panel-cols-2">
             <div class="card">
               <div class="card-header">
-                <h2 class="card-title" data-i18n="settings.account.pwTitle">Смена пароля</h2>
+                <h2 class="card-title" data-i18n="settings.account.usernameTitle">Имя пользователя</h2>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
                 <div class="field">
+                  <label for="acc-username-current" data-i18n="settings.account.usernameCurrent">Текущий логин</label>
+                  <input id="acc-username-current" type="text" class="input" disabled style="opacity:.6;" />
+                </div>
+                <div class="field">
+                  <label for="acc-username-new" data-i18n="settings.account.usernameNew">Новый логин</label>
+                  <input id="acc-username-new" type="text" class="input" autocomplete="off" data-i18n-placeholder="settings.account.usernameNewPlaceholder" placeholder="Минимум 3 символа" />
+                </div>
+                <button class="btn" id="acc-username-btn" data-i18n="settings.account.usernameSave">Сменить логин</button>
+                <div id="acc-username-status" class="status"></div>
+                <div style="height:8px;"></div>
+                <h2 class="card-title" data-i18n="settings.account.pwTitle">Смена пароля</h2>
+                <div class="field">
                   <label for="acc-old-pw" data-i18n="settings.account.oldPw">Текущий пароль</label>
-                  <input id="acc-old-pw" type="password" class="input" />
+                  <input id="acc-old-pw" type="password" class="input" data-i18n-placeholder="settings.account.oldPwPlaceholder" placeholder="Текущий пароль" />
                 </div>
                 <div class="field">
                   <label for="acc-new-pw" data-i18n="settings.account.newPw">Новый пароль</label>
-                  <input id="acc-new-pw" type="password" class="input" />
+                  <input id="acc-new-pw" type="password" class="input" data-i18n-placeholder="settings.account.newPwPlaceholder" placeholder="Минимум 6 символов" />
                 </div>
                 <div class="field">
                   <label for="acc-new-pw2" data-i18n="settings.account.newPw2">Повторите пароль</label>
-                  <input id="acc-new-pw2" type="password" class="input" />
+                  <input id="acc-new-pw2" type="password" class="input" data-i18n-placeholder="settings.account.newPw2Placeholder" placeholder="Повторите новый пароль" />
                 </div>
                 <button class="btn" id="acc-pw-btn" data-i18n="settings.account.pwSave">Сменить пароль</button>
                 <div id="acc-pw-status" class="status"></div>
@@ -846,15 +952,27 @@
             </div>
             <div class="card">
               <div class="card-header">
-                <h2 class="card-title" data-i18n="settings.account.emailTitle">Email</h2>
+                <h2 class="card-title" data-i18n="settings.account.recoveryTitle">Восстановление пароля</h2>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="info-box" style="font-size:12px;" data-i18n="settings.account.recoveryHint">
+                  Пароль можно восстановить только через Telegram-бота или Email, если они указаны. Код действителен 15 минут.
+                </div>
                 <div class="field">
                   <label for="acc-email" data-i18n="settings.account.emailLabel">Email адрес</label>
                   <input id="acc-email" type="email" class="input" placeholder="you@example.com" />
                 </div>
                 <button class="btn" id="acc-email-btn" data-i18n="settings.account.emailSave">Сохранить email</button>
                 <div id="acc-email-status" class="status"></div>
+                <div class="field" style="margin-top:6px;">
+                  <label for="acc-tg-chat" data-i18n="settings.account.tgLabel">Telegram Chat ID (для восстановления)</label>
+                  <input id="acc-tg-chat" type="text" class="input" placeholder="-100123456789 или ваш ID" data-i18n-placeholder="settings.account.tgPlaceholder" />
+                  <p style="font-size:11px;color:var(--slate-500);margin:4px 0 0;" data-i18n="settings.account.tgHint">
+                    Как узнать: напишите @userinfobot в Telegram. Используется глобальный Bot Token из раздела «Уведомления».
+                  </p>
+                </div>
+                <button class="btn" id="acc-tg-btn" data-i18n="settings.account.tgSave">Сохранить Telegram Chat ID</button>
+                <div id="acc-tg-status" class="status"></div>
               </div>
             </div>
           </div>
@@ -863,9 +981,13 @@
         <!-- ── TAB: Portfolios ── -->
         <div id="stab-portfolios" class="stab-content" style="display:none;">
           <div class="card">
-            <div class="card-header">
+            <div class="card-header" style="flex-wrap:wrap;gap:8px;">
               <h2 class="card-title" data-i18n="settings.portfolios.title">Мои портфели</h2>
-              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="settingsLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
+              <div style="display:flex;gap:6px;margin-left:auto;">
+                <button class="btn" style="height:28px;font-size:12px;padding:0 12px;background:var(--blue-600);color:#fff;" onclick="openCreatePortfolioModal()" data-i18n="settings.portfolios.new">+ Новый портфель</button>
+                <button class="btn btn-danger" style="height:28px;font-size:12px;padding:0 12px;" onclick="openDeletePortfolioModal()" data-i18n="settings.portfolios.delete">Удалить текущий</button>
+                <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="settingsLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
+              </div>
             </div>
             <div class="card-body" style="padding:0;">
               <div class="table-wrap">
@@ -893,11 +1015,11 @@
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
                 <div class="field">
-                  <label for="tg-token">Bot Token</label>
+                  <label for="tg-token" data-i18n="settings.notif.botToken">Bot Token</label>
                   <input id="tg-token" type="password" class="input" placeholder="123456:ABC-DEF..." />
                 </div>
                 <div class="field">
-                  <label for="tg-chat">Chat ID</label>
+                  <label for="tg-chat" data-i18n="settings.notif.chatId">Chat ID</label>
                   <input id="tg-chat" type="text" class="input" placeholder="-100123456789" />
                 </div>
                 <div class="field">
@@ -941,13 +1063,14 @@
                 <h2 class="card-title" data-i18n="io.exportTitle">Экспорт</h2>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                <div class="info-box" data-i18n="io.exportDesc">
+                <div class="info-box" data-i18n-html="io.exportDesc">
                   Скачайте все позиции текущего портфеля в формате CSV.<br>
                   Файл содержит: тикер, тип, количество, цену покупки.
                 </div>
                 <div>
                   <button class="btn" id="export-btn" data-i18n="io.exportBtn">⬇ Скачать CSV</button>
                 </div>
+                <div id="io-export-status" class="status"></div>
               </div>
             </div>
             <div class="card">
@@ -956,7 +1079,7 @@
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
                 <div class="info-box">
-                  <span data-i18n="io.importDesc">Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code></span>
+                  <span data-i18n-html="io.importDesc">Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code></span>
                 </div>
                 <div class="field">
                   <label for="import-portfolio" data-i18n="io.importPortfolio">Портфель для импорта</label>
@@ -969,7 +1092,7 @@
                   <input type="file" id="import-file" accept=".csv,text/csv" />
                   <button class="btn" id="import-btn" data-i18n="io.importBtn">⬆ Импортировать</button>
                 </div>
-                <div id="io-status" class="status"></div>
+                <div id="io-import-status" class="status"></div>
               </div>
             </div>
           </div>
@@ -1089,34 +1212,34 @@
 
     <!-- Site Footer -->
     <footer style="border-top: 1px solid #1e293b; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px;">
-      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Bond AI &nbsp;·&nbsp; Не является инвестиционной рекомендацией</span>
-      <span style="font-size: 11px; color: #475569;"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: #3b82f6; text-decoration: none;">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
+      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Bond AI &nbsp;·&nbsp; <span data-i18n="footer.disclaimer">Не является инвестиционной рекомендацией</span></span>
+      <span style="font-size: 11px; color: #475569;"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: #3b82f6; text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
     </footer>
 
     <!-- Share Portfolio Modal -->
     <div id="share-modal-overlay" class="modal-overlay">
       <div class="modal">
         <div class="modal-header">
-          <h2 class="modal-title">Поделиться портфелем</h2>
+          <h2 class="modal-title" data-i18n="share.title">Поделиться портфелем</h2>
         </div>
         <div class="modal-body">
           <div class="modal-field">
-            <label>Публичная ссылка</label>
+            <label data-i18n="share.linkLabel">Публичная ссылка</label>
             <textarea id="share-url-textarea" readonly></textarea>
             <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;margin-top:6px;"
-              onclick="document.getElementById('share-url-textarea').select(); document.execCommand('copy');">Копировать ссылку</button>
+              onclick="document.getElementById('share-url-textarea').select(); document.execCommand('copy');" data-i18n="share.copyBtn">Копировать ссылку</button>
           </div>
           <div class="modal-field">
-            <label>Защита паролем <span style="font-weight:400;color:var(--slate-400);">(необязательно)</span></label>
-            <input type="password" id="share-password-input" class="input" placeholder="Оставить пусто — доступ без пароля">
-            <div style="font-size: 11px; color: var(--slate-400); margin-top: 4px;">Если установить пароль, посетитель введёт его один раз для просмотра.</div>
+            <label data-i18n="share.pwLabel">Защита паролем <span style="font-weight:400;color:var(--slate-400);">(необязательно)</span></label>
+            <input type="password" id="share-password-input" class="input" placeholder="Оставить пусто — доступ без пароля" data-i18n-placeholder="share.pwPlaceholder">
+            <div style="font-size: 11px; color: var(--slate-400); margin-top: 4px;" data-i18n="share.pwHint">Если установить пароль, посетитель введёт его один раз для просмотра.</div>
           </div>
           <div id="share-status" class="status" style="margin-top:4px;"></div>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="closeShareModal();">Закрыть</button>
-          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();">Поделиться</button>
-          <button class="btn-danger" id="share-revoke-btn" onclick="revokeShare();" style="display: none;">Отозвать ссылку</button>
+          <button class="btn-secondary" onclick="closeShareModal();" data-i18n="share.closeBtn">Закрыть</button>
+          <button class="btn-primary" id="share-apply-btn" onclick="applySharePassword();" data-i18n="share.applyBtn">Поделиться</button>
+          <button class="btn-danger" id="share-revoke-btn" onclick="revokeShare();" style="display: none;" data-i18n="share.revokeBtn">Отозвать ссылку</button>
         </div>
       </div>
     </div>
@@ -1125,16 +1248,16 @@
     <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
       <div class="modal" style="max-width: 320px;">
         <div class="modal-header">
-          <h2 class="modal-title">Защищённый портфель</h2>
+          <h2 class="modal-title" data-i18n="shareView.pwTitle">Защищённый портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--slate-600);">Для просмотра этого портфеля необходим пароль:</p>
-          <input type="password" id="password-modal-input" class="input" placeholder="Введите пароль">
+          <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--slate-600);" data-i18n="shareView.pwDesc">Для просмотра этого портфеля необходим пароль:</p>
+          <input type="password" id="password-modal-input" class="input" placeholder="Введите пароль" data-i18n-placeholder="shareView.pwInput">
           <div id="password-modal-status" class="status error" style="min-height:18px;margin-top:6px;"></div>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="closePasswordModal();">Закрыть</button>
-          <button class="btn-primary" onclick="submitPasswordModal();">Продолжить</button>
+          <button class="btn-secondary" onclick="closePasswordModal();" data-i18n="share.closeBtn">Закрыть</button>
+          <button class="btn-primary" onclick="submitPasswordModal();" data-i18n="shareView.continueBtn">Продолжить</button>
         </div>
       </div>
     </div>
@@ -1143,18 +1266,18 @@
     <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
-          <h2 class="modal-title">Новый портфель</h2>
+          <h2 class="modal-title" data-i18n="modal.createPortfolio.title">Новый портфель</h2>
         </div>
         <div class="modal-body">
           <div class="modal-field">
-            <label>Название</label>
-            <input type="text" id="create-portfolio-name" class="input" placeholder="Например: Мои облигации">
+            <label data-i18n="modal.createPortfolio.nameLabel">Название</label>
+            <input type="text" id="create-portfolio-name" class="input" placeholder="Например: Мои облигации" data-i18n-placeholder="modal.createPortfolio.namePlaceholder">
             <div id="create-portfolio-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="closeCreatePortfolioModal();">Отмена</button>
-          <button class="btn-primary" onclick="submitCreatePortfolio();">Создать</button>
+          <button class="btn-secondary" onclick="closeCreatePortfolioModal();" data-i18n="btn.cancel">Отмена</button>
+          <button class="btn-primary" onclick="submitCreatePortfolio();" data-i18n="modal.createPortfolio.create">Создать</button>
         </div>
       </div>
     </div>
@@ -1163,19 +1286,29 @@
     <div id="delete-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
-          <h2 class="modal-title">Удалить портфель</h2>
+          <h2 class="modal-title" data-i18n="modal.deletePortfolio.title">Удалить портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--slate-700);">Вы уверены, что хотите удалить <strong id="delete-portfolio-name"></strong>?</p>
-          <div class="info-box" style="background:var(--red-50);border-color:#fecaca;">
+          <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--slate-700);"><span data-i18n="modal.deletePortfolio.confirmText">Вы уверены, что хотите удалить</span> <strong id="delete-portfolio-name"></strong>?</p>
+          <div class="info-box" style="background:var(--red-50);border-color:#fecaca;" data-i18n="modal.deletePortfolio.warning">
             ⚠️ Это действие нельзя отменить. Все позиции и ссылки для совместного доступа будут удалены.
           </div>
           <div id="delete-portfolio-status" class="status error" style="min-height:18px;margin-top:8px;"></div>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" onclick="closeDeletePortfolioModal();">Отмена</button>
-          <button class="btn-danger" onclick="submitDeletePortfolio();">Удалить</button>
+          <button class="btn-secondary" onclick="closeDeletePortfolioModal();" data-i18n="btn.cancel">Отмена</button>
+          <button class="btn-danger" onclick="submitDeletePortfolio();" data-i18n="modal.deletePortfolio.confirm">Удалить</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Move instrument popover -->
+    <div id="move-popover" style="display:none;">
+      <div id="move-popover-title">⇄ <span data-i18n="action.moveTitle">Перенести в портфель</span></div>
+      <select id="move-popover-select"></select>
+      <div id="move-popover-actions">
+        <button id="move-popover-cancel" class="btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" data-i18n="action.moveCancel">Отмена</button>
+        <button id="move-popover-confirm" class="btn" style="height:28px;font-size:12px;padding:0 12px;background:#7c3aed;color:#fff;" data-i18n="action.moveConfirm">Перенести →</button>
       </div>
     </div>
 
@@ -1194,6 +1327,7 @@
           }
         });
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
+        if (id === 'panel-add') loadAddSuggestions();
       }
       navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
       document.querySelector('.topbar-brand').addEventListener('click', () => showPanel('panel-table'));
@@ -1202,7 +1336,9 @@
       const TABLE_CACHE_KEY    = 'mvp_portfolio_table_cache_v2';
       const TABLE_CACHE_TS_KEY = 'mvp_portfolio_table_cache_ts_v2';
       const SYNC_INTERVAL_MS   = 120 * 1000;
-      const MONTH_NAMES = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      const MONTH_NAMES_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      const MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      function getMonthNames() { return window._lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_RU; }
 
       // ── STATE ────────────────────────────────────────────────────
       let tableRows = [];
@@ -1457,23 +1593,26 @@
 
         const isEmpty = tableRows.length === 0;
 
+        const n = tableRows.length;
+        const posSuffix = n === 1 ? t('stat.sub.pos1') : n < 5 ? t('stat.sub.pos2') : t('stat.sub.pos5');
+
         sv.className = 'stat-value';
         animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
-        svs.textContent = isEmpty ? 'портфель пуст' : tableRows.length + ' позиц' + (tableRows.length === 1 ? 'ия' : tableRows.length < 5 ? 'ии' : 'ий');
+        svs.textContent = isEmpty ? t('stat.sub.empty') : n + ' ' + t('stat.sub.positions') + posSuffix;
 
         sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
         animateCounter(sp, isEmpty ? 0 : roundTo2(summary.totalProfit),
           v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
-        sps.textContent = isEmpty ? 'добавьте бумаги' : summary.totalAssets > 0
-          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + '% от портфеля' : '\u00a0';
+        sps.textContent = isEmpty ? t('stat.sub.addItems') : summary.totalAssets > 0
+          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + t('stat.sub.ofPortfolio') : '\u00a0';
 
         sc.className = 'stat-value';
         animateCounter(sc, isEmpty ? 0 : roundTo2(summary.annualIncome), v => fmt(roundTo2(v)) + ' ₽');
-        scs.textContent = isEmpty ? 'нечего ждать' : fmt(roundTo2(summary.annualYield)) + '% от стоимости';
+        scs.textContent = isEmpty ? t('stat.sub.noCoupons') : fmt(roundTo2(summary.annualYield)) + t('stat.sub.ofValue');
 
         sy.className = 'stat-value';
         animateCounter(sy, isEmpty ? 0 : roundTo2(summary.totalBondYield), v => fmt(roundTo2(v)) + '%');
-        sys.textContent = isEmpty ? 'в пустом портфеле' : 'средневзвешенная YTM';
+        sys.textContent = isEmpty ? t('stat.sub.noYtm') : t('stat.sub.avgYtm');
       }
 
       // ── MONTHLY CHART ─────────────────────────────────────────────
@@ -1615,20 +1754,20 @@
             ctx.fill();
           }
 
-          // "Оферта" label above bar
+          // "Оферта/Offer" label above bar
           if (d.hasOffer) {
             const labelY = barH > 0 ? y - 5 : PAD_T - 5;
             ctx.fillStyle  = '#d97706';
             ctx.font       = 'bold 8px Inter, system-ui, sans-serif';
             ctx.textAlign  = 'center';
-            ctx.fillText('оферта', x + barW / 2, labelY);
+            ctx.fillText(t('chart.offer'), x + barW / 2, labelY);
           }
 
           // Row 1 at bottom: month name
           ctx.fillStyle  = '#64748b';
           ctx.font       = '9px Inter, system-ui, sans-serif';
           const now = new Date();
-          const lbl = MONTH_NAMES[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
+          const lbl = getMonthNames()[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
           const cx = x + barW / 2;
           if (rotateLabels) {
             ctx.save();
@@ -1666,7 +1805,7 @@
         ctx.fillStyle  = '#cbd5e1';
         ctx.font       = '9px Inter, system-ui, sans-serif';
         ctx.textAlign  = 'center';
-        ctx.fillText('Купонный доход, ₽', 0, 0);
+        ctx.fillText(t('chart.yLabel'), 0, 0);
         ctx.restore();
       }
 
@@ -1813,11 +1952,118 @@
         elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 22 },
         high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#ef4444', yieldMin: 23, yieldMax: 27 },
       };
+      const RISK_LABELS_EN = {
+        ultra_low: { label: 'Minimal',  desc: 'OFZ — government bonds' },
+        low:       { label: 'Low',      desc: 'AAA–AA rating, largest issuers' },
+        moderate:  { label: 'Moderate', desc: 'A–BBB rating, reliable corporates' },
+        elevated:  { label: 'Elevated', desc: 'BBB–BB+ rating, mid-size business' },
+        high:      { label: 'High',     desc: 'BB+ rating, high-yield bonds' },
+      };
+      function getRiskInfo(key) {
+        const base = RISK_LABELS[key];
+        if (!base) return { label: key, desc: '', color: '#94a3b8', yieldMin: 5, yieldMax: 30 };
+        if (window._lang === 'en') {
+          const en = RISK_LABELS_EN[key] || {};
+          return { ...base, label: en.label || base.label, desc: en.desc || base.desc };
+        }
+        return base;
+      }
       const RISK_KEYS = Object.keys(RISK_LABELS);
 
+      function yieldToRiskKey(yv) {
+        let best = 'moderate', bestDist = Infinity;
+        for (const key of RISK_KEYS) {
+          const info = RISK_LABELS[key];
+          const dist = Math.abs((info.yieldMin + info.yieldMax) / 2 - yv);
+          if (dist < bestDist) { bestDist = dist; best = key; }
+        }
+        return best;
+      }
+
+      let _suggestAbortCtrl = null;
+      async function loadAddSuggestions() {
+        const section = document.getElementById('add-suggestions-section');
+        const grid = document.getElementById('add-suggestions-grid');
+        const riskBadge = document.getElementById('add-suggestions-risk');
+        if (!section || !grid) return;
+
+        // Don't show if portfolio is empty
+        if (!tableRows || tableRows.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+
+        // Calculate avg yield from portfolio
+        const yields = tableRows.map(r => Number(r.market_yield || r.coupon_percent || 0)).filter(v => v > 0);
+        if (yields.length === 0) { section.style.display = 'none'; return; }
+        const avgYield = yields.reduce((a, b) => a + b, 0) / yields.length;
+        const riskKey = yieldToRiskKey(avgYield);
+        const riskInfo = getRiskInfo(riskKey);
+
+        // Cancel previous request
+        if (_suggestAbortCtrl) _suggestAbortCtrl.abort();
+        _suggestAbortCtrl = new AbortController();
+
+        section.style.display = 'block';
+        riskBadge.textContent = riskInfo.label;
+        riskBadge.style.cssText = `font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600;background:${riskInfo.color}22;color:${riskInfo.color};border:1px solid ${riskInfo.color}44;`;
+        grid.innerHTML = `<div style="color:var(--slate-400);font-size:13px;padding:8px 0;">${t('add.suggestLoading')}</div>`;
+
+        try {
+          const res = await apiFetch(`/bonds/suggest?amount=1000000&yield=${avgYield.toFixed(1)}&risk=${riskKey}`);
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          const bonds = (data.bonds || []).slice(0, 6);
+          if (bonds.length === 0) { section.style.display = 'none'; return; }
+
+          // Filter out bonds already in portfolio
+          const existingTickers = new Set(tableRows.map(r => r.ticker));
+          const filtered = bonds.filter(b => !existingTickers.has(b.ticker));
+          if (filtered.length === 0) { section.style.display = 'none'; return; }
+
+          grid.innerHTML = '';
+          filtered.slice(0, 6).forEach(b => {
+            const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
+            const offerNote = b.offer_date ? ` · ${window._lang === 'en' ? 'offer' : 'оферта'} ${b.offer_date.substring(0,7)}` : '';
+            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--slate-100);color:var(--slate-600);margin-right:6px;">${b.rating}</span>` : '';
+            const card = document.createElement('div');
+            card.className = 'suggest-card';
+            card.innerHTML = `
+              <div class="suggest-card-body">
+                <div class="suggest-card-name">${ratingHtml}${b.name}</div>
+                <div class="suggest-card-meta">${b.ticker} · ${window._lang === 'en' ? 'maturity' : 'погашение'} ${maturity}${offerNote}</div>
+              </div>
+              <div class="suggest-card-yield">${b.coupon_percent}%</div>
+              <button class="suggest-card-add" title="${t('add.btn')}">+</button>
+            `;
+            const addBtn = card.querySelector('.suggest-card-add');
+            addBtn.addEventListener('click', async () => {
+              addBtn.disabled = true;
+              addBtn.textContent = '…';
+              try {
+                const r = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
+                  method: 'POST', headers: {'Content-Type':'application/json'},
+                  body: JSON.stringify({ ticker: b.ticker, quantity: 1, purchase_price: b.purchase_price || b.current_price || 1000 })
+                });
+                if (!r.ok) throw new Error();
+                addBtn.textContent = '✓';
+                addBtn.style.background = 'var(--green-600)';
+                await syncTableFromServer();
+              } catch {
+                addBtn.disabled = false;
+                addBtn.textContent = '+';
+              }
+            });
+            grid.appendChild(card);
+          });
+        } catch {
+          section.style.display = 'none';
+        }
+      }
+
       function fmtAmount(v) {
-        if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1) + ' млн ₽';
-        if (v >= 1_000)    return (v / 1_000).toFixed(0) + ' тыс ₽';
+        if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1) + ' ' + t('wizard.amountM');
+        if (v >= 1_000)    return (v / 1_000).toFixed(0) + ' ' + t('wizard.amountK');
         return v + ' ₽';
       }
 
@@ -1835,10 +2081,10 @@
         return `
         <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background-color:#0f172a;background-image:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);background-size:44px 44px;border-radius:var(--radius,8px);width:100%;box-sizing:border-box;text-align:left;">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:32px;">
-            <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;">
+            <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;" data-i18n="wizard.title">
               Подберём портфель за вас
             </div>
-            <div style="font-size:14px;color:var(--slate-400);max-width:480px;width:100%;margin:0 auto;line-height:1.6;">
+            <div style="font-size:14px;color:var(--slate-400);max-width:480px;width:100%;margin:0 auto;line-height:1.6;" data-i18n="wizard.desc">
               Укажите сумму, желаемую доходность и уровень риска — система подберёт до 10 облигаций с MOEX.
             </div>
           </div>
@@ -1847,15 +2093,15 @@
 
             <!-- Slider 1: Amount -->
             <div class="pw-card">
-              <div class="pw-card-label">Сумма портфеля</div>
+              <div class="pw-card-label" data-i18n="wizard.amount">Сумма портфеля</div>
               <div id="pw-amount-val" class="pw-card-value">500 тыс ₽</div>
               <input id="pw-amount" type="range" min="0" max="100" value="59" class="pw-slider">
-              <div class="pw-slider-hints"><span>10 тыс</span><span>100 млн</span></div>
+              <div class="pw-slider-hints"><span data-i18n="wizard.amountMin">10 тыс</span><span data-i18n="wizard.amountMax">100 млн</span></div>
             </div>
 
             <!-- Slider 2: Yield -->
             <div class="pw-card">
-              <div class="pw-card-label">Ожидаемая доходность</div>
+              <div class="pw-card-label" data-i18n="wizard.yield">Ожидаемая доходность</div>
               <div id="pw-yield-val" class="pw-card-value">12%</div>
               <input id="pw-yield" type="range" min="5" max="30" step="0.5" value="12" class="pw-slider">
               <div class="pw-slider-hints"><span id="pw-yield-min">5%</span><span id="pw-yield-max">30%</span></div>
@@ -1864,20 +2110,20 @@
 
             <!-- Slider 3: Risk -->
             <div class="pw-card">
-              <div class="pw-card-label">Уровень риска</div>
+              <div class="pw-card-label" data-i18n="wizard.risk">Уровень риска</div>
               <div id="pw-risk-val" class="pw-card-value" style="color:#eab308;">Умеренный</div>
               <input id="pw-risk" type="range" min="0" max="4" step="1" value="2" class="pw-slider">
-              <div class="pw-slider-hints"><span>Мин.</span><span>Высокий</span></div>
+              <div class="pw-slider-hints"><span data-i18n="wizard.riskMin">Мин.</span><span data-i18n="wizard.riskHigh">Высокий</span></div>
               <div id="pw-risk-desc" style="font-size:11px;color:var(--slate-500);margin-top:6px;">Рейтинг A–BBB, надёжный корпоратив</div>
             </div>
           </div>
 
           <div style="text-align:center;margin-bottom:32px;">
-            <button id="pw-submit" class="btn" style="background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;padding:12px 36px;font-size:14px;font-weight:600;border-radius:8px;min-width:200px;">
+            <button id="pw-submit" class="btn" style="background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;padding:12px 36px;font-size:14px;font-weight:600;border-radius:8px;min-width:200px;" data-i18n="wizard.submit">
               Подобрать портфель
             </button>
             <div style="margin-top:12px;">
-              <button onclick="showPanel('panel-add')" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;">
+              <button onclick="showPanel('panel-add')" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;" data-i18n="wizard.addManual">
                 Добавить бумагу вручную
               </button>
             </div>
@@ -1989,11 +2235,11 @@
         const syncRiskFromYield = () => {
           const idx  = yieldToRiskIndex(+yieldSlider.value);
           const key  = RISK_KEYS[idx];
-          const info = RISK_LABELS[key];
+          const info = getRiskInfo(key);
           riskVal.textContent = info.label;
           riskVal.style.color  = info.color;
           riskDesc.textContent = info.desc;
-          yieldRangeNote.textContent = `Рекомендуем для ${info.label.toLowerCase()}: ${info.yieldMin}–${info.yieldMax}%`;
+          yieldRangeNote.textContent = t('wizard.yieldNote').replace('{label}', info.label.toLowerCase()).replace('{min}', info.yieldMin).replace('{max}', info.yieldMax);
           if (+riskSlider.value !== idx) {
             _syncingRisk = true;
             riskSlider.value = idx;
@@ -2032,7 +2278,7 @@
         const updateRisk = () => {
           if (_syncingRisk) return;
           const key  = RISK_KEYS[+riskSlider.value];
-          const info = RISK_LABELS[key];
+          const info = getRiskInfo(key);
           riskVal.textContent = info.label;
           riskVal.style.color  = info.color;
           riskDesc.textContent = info.desc;
@@ -2053,20 +2299,20 @@
 
           window._wizardBusy = true;
           submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spinBtn .6s linear infinite;display:inline-block;margin-right:6px;vertical-align:middle;"></span>Подбираем...';
+          submitBtn.innerHTML = '<span style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spinBtn .6s linear infinite;display:inline-block;margin-right:6px;vertical-align:middle;"></span>' + t('wizard.selecting');
           resultEl.style.display = 'none';
 
           try {
             const res = await apiFetch(`/bonds/suggest?amount=${amount}&yield=${yieldT}&risk=${riskKey}`);
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Ошибка подбора');
+            if (!res.ok) throw new Error(data.detail || t('wizard.selectError'));
             renderWizardResult(data, resultEl, amount);
           } catch(err) {
             resultEl.style.display = 'block';
             resultEl.innerHTML = `<div style="text-align:center;color:#f87171;padding:16px;">${err.message}</div>`;
           } finally {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Подобрать портфель';
+            submitBtn.textContent = t('wizard.submit');
             // _wizardBusy остаётся true пока результаты видны (сбрасывается при добавлении или "Изменить параметры")
           }
         });
@@ -2074,10 +2320,10 @@
 
       function renderWizardResult(data, container, budget) {
         const { bonds, summary } = data;
-        const riskInfo = RISK_LABELS[summary.risk] || RISK_LABELS[summary.original_risk] || { label: summary.risk, color: '#94a3b8' };
+        const riskInfo = getRiskInfo(summary.risk) || getRiskInfo(summary.original_risk) || { label: summary.risk, color: '#94a3b8' };
         const fmt = v => new Intl.NumberFormat('ru-RU').format(Math.round(v));
 
-        const freqLabel = f => f === 12 ? '12×/год' : f === 4 ? '4×/год' : f === 2 ? '2×/год' : f === 1 ? '1×/год' : `${f}×/год`;
+        const freqLabel = f => `${f}×${t('wizard.freqYear')}`;
 
         const skipped = new Set();
 
@@ -2087,7 +2333,7 @@
             ? `<span class="pw-rating-badge">${ratingValue}</span>`
             : `<span class="pw-rating-badge" style="background:rgba(100,116,139,.15);color:#64748b;border-color:rgba(100,116,139,.2);">—</span>`;
           const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
-          const offerNote = b.offer_date ? ` · оферта ${b.offer_date.substring(0,7)}` : '';
+          const offerNote = b.offer_date ? ` · ${t('wizard.offer')} ${b.offer_date.substring(0,7)}` : '';
           const freq = freqLabel(b.coupon_frequency || 2);
           return `
           <div class="pw-bond-card" data-bond-idx="${i}" style="position:relative;">
@@ -2095,11 +2341,11 @@
             ${ratingHtml}
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:13px;color:var(--slate-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
-              <div style="font-size:11px;color:var(--slate-400);margin-top:2px;">${b.ticker} · погашение ${maturity}${offerNote}</div>
+              <div style="font-size:11px;color:var(--slate-400);margin-top:2px;">${b.ticker} · ${t('wizard.maturity')} ${maturity}${offerNote}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
               <div style="font-size:13px;font-weight:700;color:#4ade80;">${b.coupon_percent}% <span style="font-size:10px;font-weight:400;color:var(--slate-400);">${freq}</span></div>
-              <div style="font-size:11px;color:var(--slate-400);">${b.lots} лот × ${fmt(b.purchase_price)} ₽</div>
+              <div style="font-size:11px;color:var(--slate-400);">${b.lots} ${t('wizard.lotX')} ${fmt(b.purchase_price)} ₽</div>
               <div style="font-size:12px;color:var(--slate-300);font-weight:600;">${fmt(b.total_cost)} ₽</div>
             </div>
           </div>`;
@@ -2111,23 +2357,23 @@
         container.innerHTML = `
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
             <div>
-              <div style="font-size:17px;font-weight:700;color:var(--slate-100);">Подобранный портфель</div>
+              <div style="font-size:17px;font-weight:700;color:var(--slate-100);">${t('wizard.result.title')}</div>
               <div style="font-size:12px;color:var(--slate-400);margin-top:3px;">
-                ${summary.bonds_count} бумаг · риск: <span style="color:${riskInfo.color};">${riskInfo.label}</span>
+                ${summary.bonds_count} ${t('wizard.result.bondsRisk')} <span style="color:${riskInfo.color};">${riskInfo.label}</span>
               </div>
             </div>
             <div style="display:flex;gap:24px;">
               <div style="text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:var(--slate-100);">${fmt(summary.total_cost)} ₽</div>
-                <div style="font-size:11px;color:var(--slate-400);">итого</div>
+                <div style="font-size:11px;color:var(--slate-400);">${t('wizard.result.total')}</div>
               </div>
               <div style="text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:#4ade80;">${summary.avg_yield.toFixed(1)}%</div>
-                <div style="font-size:11px;color:var(--slate-400);">средний купон</div>
+                <div style="font-size:11px;color:var(--slate-400);">${t('wizard.result.avgCoupon')}</div>
               </div>
               ${leftover > 0 ? `<div style="text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:var(--slate-400);">${fmt(leftover)} ₽</div>
-                <div style="font-size:11px;color:var(--slate-400);">остаток</div>
+                <div style="font-size:11px;color:var(--slate-400);">${t('wizard.result.leftover')}</div>
               </div>` : ''}
             </div>
           </div>
@@ -2136,10 +2382,10 @@
           </div>
           <div style="text-align:center;">
             <button id="pw-add-all" class="btn" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;padding:11px 32px;font-size:14px;font-weight:600;border-radius:8px;">
-              Добавить всё в портфель
+              ${t('wizard.result.addAll')}
             </button>
             <button onclick="document.getElementById('pw-result').style.display='none';window._wizardBusy=false;" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;margin-left:16px;">
-              Изменить параметры
+              ${t('wizard.result.changeParams')}
             </button>
           </div>
         `;
@@ -2281,6 +2527,7 @@
           tr.appendChild(td);
           tableBody.appendChild(tr);
           initWizard();
+          applyLang(window._lang);
           return;
         }
 
@@ -2340,20 +2587,51 @@
           // Actions (only in edit mode)
           if (!isReadOnly) {
             const actionTd = document.createElement('td');
-            const delBtn   = document.createElement('button');
-            delBtn.className = 'btn-sm'; delBtn.textContent = 'Удалить';
+            actionTd.style.cssText = 'white-space:nowrap; text-align:right;';
+
+            // Move button — shown only when user has more than one portfolio
+            if (portfolios.length > 1) {
+              const moveBtn = document.createElement('button');
+              moveBtn.className = 'btn-sm-move';
+              moveBtn.title = t('action.move');
+              // Split icon + translatable label so applyLang() can update the span
+              moveBtn.appendChild(document.createTextNode('⇄ '));
+              const moveLbl = document.createElement('span');
+              moveLbl.dataset.i18n = 'action.move';
+              moveLbl.textContent = t('action.move');
+              moveBtn.appendChild(moveLbl);
+              moveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const pop = document.getElementById('move-popover');
+                // Toggle: if already open for same item, close it
+                if (pop.style.display !== 'none' && _movePopoverItemId === row.id) {
+                  hideMovePopover();
+                } else {
+                  showMovePopover(moveBtn, row.id);
+                }
+              });
+              actionTd.appendChild(moveBtn);
+            }
+
+            // Delete button
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-sm';
+            delBtn.style.marginLeft = portfolios.length > 1 ? '4px' : '0';
+            delBtn.dataset.i18n = 'action.delete';
+            delBtn.textContent = t('action.delete');
             delBtn.addEventListener('click', async () => {
-              if (!confirm('Удалить эту строку из портфеля?')) return;
+              if (!confirm(t('action.confirmDelete'))) return;
               try {
                 const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
                 const body = await resp.json();
                 if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
                 tableRows = tableRows.filter(r => r.id !== row.id);
                 recalculateWeights(tableRows); persistTableCache(); renderTable();
-                setStatus(tableStatusEl, 'Строка удалена.');
-              } catch (err) { setStatus(tableStatusEl, err.message || 'Ошибка удаления.', true); }
+                setStatus(tableStatusEl, t('action.deleted'));
+              } catch (err) { setStatus(tableStatusEl, err.message || t('action.deleteError'), true); }
             });
             actionTd.appendChild(delBtn);
+
             tr.appendChild(actionTd);
           }
           tableBody.appendChild(tr);
@@ -2402,8 +2680,11 @@
           else { sortState.key = key; sortState.direction = 'asc'; }
           document.querySelectorAll('th[data-sort-key]').forEach(h => {
             const arrow = h.dataset.sortKey === key ? (sortState.direction === 'asc' ? ' ↑' : ' ↓') : '';
-            if (!h.dataset.origLabel) h.dataset.origLabel = h.innerHTML.replace(/\s[↑↓]$/, '').trim();
-            h.innerHTML = h.dataset.origLabel + arrow;
+            // Always use current-language label for translated headers
+            const base = h.dataset.i18n
+              ? (TRANSLATIONS[window._lang]?.[h.dataset.i18n] || h.textContent.replace(/\s[↑↓]$/, '').trim())
+              : (h.dataset.origLabel || (() => { h.dataset.origLabel = h.textContent.replace(/\s[↑↓]$/, '').trim(); return h.dataset.origLabel; })());
+            h.textContent = base + arrow;
           });
           renderTable();
         });
@@ -2509,35 +2790,36 @@
         } catch {}
       }
       document.getElementById('notif-save-btn').addEventListener('click', async () => {
-        setStatus(notifStatusEl, 'Сохранение...');
+        setStatus(notifStatusEl, t('settings.notif.saving'));
         try {
           const r = await apiFetch('/settings/notifications', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
           });
-          if (!r.ok) throw new Error('Ошибка сохранения настроек.');
-          setStatus(notifStatusEl, 'Настройки сохранены.');
+          if (!r.ok) throw new Error(t('settings.notif.saveError'));
+          setStatus(notifStatusEl, t('settings.notif.saved'));
         } catch (err) { setStatus(notifStatusEl, err.message, true); }
       });
       document.getElementById('notif-test-btn').addEventListener('click', async () => {
-        setStatus(notifStatusEl, 'Отправка тестового сообщения...');
+        setStatus(notifStatusEl, t('settings.notif.sending'));
         try {
           const r = await apiFetch('/settings/notifications/test', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
           });
           const res = await r.json();
-          if (!r.ok || !res.success) throw new Error('Не удалось отправить. Проверьте токен и chat_id.');
-          setStatus(notifStatusEl, 'Тестовое сообщение отправлено!');
+          if (!r.ok || !res.success) throw new Error(t('settings.notif.sendError'));
+          setStatus(notifStatusEl, t('settings.notif.sent'));
         } catch (err) { setStatus(notifStatusEl, err.message, true); }
       });
 
       // ── IMPORT ───────────────────────────────────────────────────
-      const ioStatusEl    = document.getElementById('io-status');
+      const ioExportStatusEl = document.getElementById('io-export-status');
+      const ioImportStatusEl = document.getElementById('io-import-status');
       const importFileInp = document.getElementById('import-file');
       document.getElementById('export-btn').addEventListener('click', async () => {
-        if (!portfolioId) { setStatus(ioStatusEl, 'Портфель не выбран.', true); return; }
-        setStatus(ioStatusEl, 'Экспорт...');
+        if (!portfolioId) { setStatus(ioExportStatusEl, 'Портфель не выбран.', true); return; }
+        setStatus(ioExportStatusEl, 'Экспорт...');
         try {
           const r = await apiFetch(`/portfolios/${portfolioId}/export`);
           if (!r.ok) throw new Error('Ошибка экспорта.');
@@ -2550,25 +2832,25 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          setStatus(ioStatusEl, 'Экспорт завершен.');
-        } catch (err) { setStatus(ioStatusEl, err.message, true); }
+          setStatus(ioExportStatusEl, t('io.exportDone'));
+        } catch (err) { setStatus(ioExportStatusEl, err.message, true); }
       });
 
       document.getElementById('import-btn').addEventListener('click', async () => {
         const importPortfolioSel = document.getElementById('import-portfolio');
         const selectedPortfolioId = importPortfolioSel.value;
-        if (!selectedPortfolioId) { setStatus(ioStatusEl, 'Выберите портфель для импорта.', true); return; }
+        if (!selectedPortfolioId) { setStatus(ioImportStatusEl, t('io.importPortfolio') + '.', true); return; }
         const file = importFileInp.files[0];
-        if (!file) { setStatus(ioStatusEl, 'Выберите CSV-файл.', true); return; }
-        setStatus(ioStatusEl, 'Импорт...');
+        if (!file) { setStatus(ioImportStatusEl, t('io.chooseFilePlaceholder'), true); return; }
+        setStatus(ioImportStatusEl, t('io.importing'));
         const fd = new FormData(); fd.append('file', file);
         try {
           const r = await apiFetch(`/portfolios/${selectedPortfolioId}/import`, { method: 'POST', body: fd });
           const res = await r.json();
-          if (!r.ok) throw new Error(res.detail || 'Ошибка импорта.');
-          let msg = 'Импортировано: ' + res.added + ' позиций.';
-          if (res.errors > 0) msg += ' Ошибок: ' + res.errors + '.';
-          setStatus(ioStatusEl, msg, res.errors > 0);
+          if (!r.ok) throw new Error(res.detail || t('io.importError'));
+          let msg = t('io.importedN').replace('{n}', res.added);
+          if (res.errors > 0) msg += ' ' + t('io.importErrors').replace('{n}', res.errors);
+          setStatus(ioImportStatusEl, msg, res.errors > 0);
           if (res.added > 0) {
             // Reload current portfolio view if we imported to it
             if (Number(selectedPortfolioId) === portfolioId) {
@@ -2576,7 +2858,7 @@
             }
           }
           importFileInp.value = '';
-        } catch (err) { setStatus(ioStatusEl, err.message, true); }
+        } catch (err) { setStatus(ioImportStatusEl, err.message, true); }
       });
 
       // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
@@ -2648,9 +2930,9 @@
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
             const loginBtn = document.getElementById('btn-login');
-            if (!username || !password) { shakeCard(); setAuthMsg('Введите логин и пароль', 'error'); return; }
+            if (!username || !password) { shakeCard(); setAuthMsg(t('auth.enterCreds'), 'error'); return; }
             loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="btn-spinner"></span>Проверяем...';
+            loginBtn.innerHTML = '<span class="btn-spinner"></span>' + t('auth.checking');
             setAuthMsg('', '');
             try {
               const res = await fetch('/auth/login', {
@@ -2662,21 +2944,21 @@
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
-                loginBtn.innerHTML = '<span class="btn-check">✓</span>Входим...';
+                loginBtn.innerHTML = '<span class="btn-check">✓</span>' + t('auth.signing');
                 loginBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
-                setAuthMsg('Успешно! Загружаем...', 'success');
+                setAuthMsg(t('auth.success'), 'success');
                 setTimeout(() => location.reload(), 700);
               } else {
                 shakeCard();
-                setAuthMsg(data.detail || 'Ошибка входа', 'error');
+                setAuthMsg(data.detail || t('auth.loginError'), 'error');
                 loginBtn.disabled = false;
-                loginBtn.innerHTML = 'Войти';
+                loginBtn.innerHTML = t('login.loginBtn');
               }
             } catch (err) {
               shakeCard();
-              setAuthMsg('Ошибка сети: ' + (err.message || 'неизвестная'), 'error');
+              setAuthMsg(t('auth.networkError') + ': ' + (err.message || ''), 'error');
               loginBtn.disabled = false;
-              loginBtn.innerHTML = 'Войти';
+              loginBtn.innerHTML = t('login.loginBtn');
             }
           };
 
@@ -2684,11 +2966,11 @@
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
             const regBtn = document.getElementById('btn-register');
-            if (!username || !password) { shakeCard(); setAuthMsg('Введите логин и пароль', 'error'); return; }
-            if (username.length < 3) { shakeCard(); setAuthMsg('Логин минимум 3 символа', 'error'); return; }
-            if (password.length < 6) { shakeCard(); setAuthMsg('Пароль минимум 6 символов', 'error'); return; }
+            if (!username || !password) { shakeCard(); setAuthMsg(t('auth.enterCreds'), 'error'); return; }
+            if (username.length < 3) { shakeCard(); setAuthMsg(t('auth.minLogin'), 'error'); return; }
+            if (password.length < 6) { shakeCard(); setAuthMsg(t('auth.minPassword'), 'error'); return; }
             regBtn.disabled = true;
-            regBtn.textContent = 'Регистрируем...';
+            regBtn.textContent = t('auth.registering');
             setAuthMsg('', '');
             try {
               const res = await fetch('/auth/register', {
@@ -2700,20 +2982,20 @@
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
-                regBtn.textContent = '✓ Готово!';
-                setAuthMsg('Аккаунт создан! Входим...', 'success');
+                regBtn.textContent = t('auth.registered');
+                setAuthMsg(t('auth.accountCreated'), 'success');
                 setTimeout(() => location.reload(), 700);
               } else {
                 shakeCard();
-                setAuthMsg((typeof data === 'object' && data.detail) ? String(data.detail) : 'Ошибка регистрации', 'error');
+                setAuthMsg((typeof data === 'object' && data.detail) ? String(data.detail) : t('auth.registerError'), 'error');
                 regBtn.disabled = false;
-                regBtn.textContent = 'Зарегистрироваться';
+                regBtn.textContent = t('login.registerBtn');
               }
             } catch (err) {
               shakeCard();
-              setAuthMsg('Ошибка сети: ' + (err.message || 'неизвестная'), 'error');
+              setAuthMsg(t('auth.networkError') + ': ' + (err.message || ''), 'error');
               regBtn.disabled = false;
-              regBtn.textContent = 'Зарегистрироваться';
+              regBtn.textContent = t('login.registerBtn');
             }
           };
 
@@ -2902,6 +3184,11 @@
               .l-footer a { color:#3b82f6;text-decoration:none; }
               .l-footer a:hover { text-decoration:underline; }
             </style>
+            <!-- Subtle language switcher -->
+            <div style="position:fixed;top:14px;right:18px;z-index:10002;display:flex;gap:4px;">
+              <button class="login-lang-btn" data-lang="ru" style="font-size:11px;font-weight:600;padding:3px 8px;border:1px solid rgba(148,163,184,.25);border-radius:4px;background:rgba(30,41,59,.6);color:rgba(241,245,249,.5);cursor:pointer;backdrop-filter:blur(4px);transition:.15s;" onmouseover="this.style.color='#f1f5f9'" onmouseout="this.style.color=this.dataset.lang===document.documentElement.getAttribute('data-lang')?'#f1f5f9':'rgba(241,245,249,.5)'">RU</button>
+              <button class="login-lang-btn" data-lang="en" style="font-size:11px;font-weight:600;padding:3px 8px;border:1px solid rgba(148,163,184,.25);border-radius:4px;background:rgba(30,41,59,.6);color:rgba(241,245,249,.5);cursor:pointer;backdrop-filter:blur(4px);transition:.15s;" onmouseover="this.style.color='#f1f5f9'" onmouseout="this.style.color=this.dataset.lang===document.documentElement.getAttribute('data-lang')?'#f1f5f9':'rgba(241,245,249,.5)'">EN</button>
+            </div>
             <div class="l-bg">
               <div class="l-orb l-orb-1"></div>
               <div class="l-orb l-orb-2"></div>
@@ -2916,42 +3203,65 @@
                     <div class="l-brand-mark">B</div>
                     <span class="l-brand-name">Bond AI</span>
                   </div>
-                  <h1 class="l-h1">Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ</h1>
-                  <p class="l-sub">Отслеживайте акции и облигации в одном месте.<br>ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.</p>
+                  <h1 class="l-h1" data-i18n-html="login.hero">Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ</h1>
+                  <p class="l-sub" data-i18n="login.sub">Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.</p>
                   <ul class="l-feats">
-                    <li><span class="l-feat-icon">🤖</span><span>ИИ-подбор облигаций по доходности и уровню риска</span></li>
-                    <li><span class="l-feat-icon">📊</span><span>Актуальные цены и доходность по данным MOEX</span></li>
-                    <li><span class="l-feat-icon">💰</span><span>Расчёт купонного дохода с учётом праздников и оферт</span></li>
-                    <li><span class="l-feat-icon">🏅</span><span>Кредитные рейтинги эмитентов облигаций</span></li>
-                    <li><span class="l-feat-icon">🔗</span><span>Публичные ссылки для совместного просмотра портфеля</span></li>
+                    <li><span class="l-feat-icon">🤖</span><span data-i18n="login.feat1">ИИ-подбор облигаций по доходности и уровню риска</span></li>
+                    <li><span class="l-feat-icon">📊</span><span data-i18n="login.feat2">Актуальные цены и доходность по данным MOEX</span></li>
+                    <li><span class="l-feat-icon">💰</span><span data-i18n="login.feat3">Расчёт купонного дохода с учётом праздников и оферт</span></li>
+                    <li><span class="l-feat-icon">🏅</span><span data-i18n="login.feat4">Кредитные рейтинги эмитентов облигаций</span></li>
+                    <li><span class="l-feat-icon">🔗</span><span data-i18n="login.feat5">Публичные ссылки для совместного просмотра портфеля</span></li>
                   </ul>
                 </div>
                 <div class="l-right">
                   <div class="auth-card-wrap">
                     <div id="auth-card">
-                      <p class="auth-title">Добро пожаловать</p>
-                      <p class="auth-desc">Войдите или создайте аккаунт</p>
-                      <div style="display:flex;flex-direction:column;gap:10px;">
+                      <p class="auth-title" data-i18n="login.welcome">Добро пожаловать</p>
+                      <p class="auth-desc" data-i18n="login.desc">Войдите или создайте аккаунт</p>
+                      <div style="display:flex;flex-direction:column;gap:18px;">
                         <div class="fl-wrap">
                           <input type="text" id="auth-username" class="fl-input${savedUsername ? ' has-val' : ''}" value="${savedUsername}" autocomplete="username">
-                          <label class="fl-label" for="auth-username">Имя пользователя</label>
+                          <label class="fl-label" for="auth-username" data-i18n="auth.username">Имя пользователя</label>
                         </div>
                         <div class="fl-wrap">
                           <input type="password" id="auth-password" class="fl-input" autocomplete="current-password">
-                          <label class="fl-label" for="auth-password">Пароль</label>
+                          <label class="fl-label" for="auth-password" data-i18n="login.password">Пароль</label>
                         </div>
-                        <button id="btn-login" class="auth-btn-primary">Войти</button>
-                        <div class="auth-divider">или</div>
-                        <button id="btn-register" class="auth-btn-secondary">Зарегистрироваться</button>
+                        <button id="btn-login" class="auth-btn-primary" data-i18n="login.loginBtn">Войти</button>
+                        <div class="auth-divider" data-i18n="login.or">или</div>
+                        <button id="btn-register" class="auth-btn-secondary" data-i18n="login.registerBtn">Зарегистрироваться</button>
+                        <button id="btn-forgot" class="auth-btn-secondary" style="margin-top:4px;font-size:12px;opacity:.8;" data-i18n="login.forgotBtn">Забыли пароль?</button>
                       </div>
                       <p id="auth-message" class="auth-msg"></p>
+                      <!-- Forgot password form (hidden by default) -->
+                      <div id="forgot-form" style="display:none;margin-top:16px;display:none;">
+                        <div class="auth-divider" style="margin-bottom:12px;" data-i18n="auth.forgotTitle">Восстановление пароля</div>
+                        <div class="fl-wrap" style="margin-bottom:10px;">
+                          <input type="text" id="forgot-username" class="fl-input" autocomplete="username">
+                          <label class="fl-label" for="forgot-username" data-i18n="auth.username">Имя пользователя</label>
+                        </div>
+                        <button id="btn-send-code" class="auth-btn-primary" style="margin-bottom:10px;" data-i18n="auth.sendCode">Отправить код</button>
+                        <div id="forgot-code-wrap" style="display:none;">
+                          <div class="fl-wrap" style="margin-bottom:10px;">
+                            <input type="text" id="forgot-code" class="fl-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                            <label class="fl-label" for="forgot-code" data-i18n="auth.codeLabel">Код из сообщения</label>
+                          </div>
+                          <div class="fl-wrap" style="margin-bottom:10px;">
+                            <input type="password" id="forgot-newpw" class="fl-input">
+                            <label class="fl-label" for="forgot-newpw" data-i18n="auth.newPassword">Новый пароль</label>
+                          </div>
+                          <button id="btn-do-reset" class="auth-btn-primary" data-i18n="auth.doReset">Сменить пароль</button>
+                        </div>
+                        <p id="forgot-message" class="auth-msg"></p>
+                        <button id="btn-back-login" class="auth-btn-secondary" style="margin-top:8px;font-size:12px;" data-i18n="auth.backToLogin">← Вернуться ко входу</button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="l-footer">
-                <p>© ${new Date().getFullYear()} Bond AI · Не является инвестиционной рекомендацией</p>
-                <p><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener">Откройте счёт и получите акции на 2000 ₽ →</a></p>
+                <p>© ${new Date().getFullYear()} Bond AI · <span data-i18n="footer.disclaimer">Не является инвестиционной рекомендацией</span></p>
+                <p><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" data-i18n="footer.broker">Откройте счёт и получите акции на 2000 ₽ →</a></p>
               </div>
             </div>
           `;
@@ -2979,6 +3289,107 @@
                 if (e.key === 'Enter') handleLogin();
               };
             }
+
+            // Float labels for forgot form
+            [document.getElementById('forgot-username'), document.getElementById('forgot-code'), document.getElementById('forgot-newpw')].forEach(inp => {
+              if (!inp) return;
+              const upd = () => inp.classList.toggle('has-val', !!inp.value);
+              inp.addEventListener('input', upd); inp.addEventListener('change', upd); upd();
+            });
+
+            // Forgot password toggle
+            const btnForgot = document.getElementById('btn-forgot');
+            const forgotForm = document.getElementById('forgot-form');
+            const authMainBtns = document.querySelector('#auth-card > div');
+            const btnBackLogin = document.getElementById('btn-back-login');
+            if (btnForgot) btnForgot.onclick = () => {
+              authMainBtns.style.display = 'none';
+              btnForgot.style.display = 'none';
+              forgotForm.style.display = 'block';
+            };
+            if (btnBackLogin) btnBackLogin.onclick = () => {
+              authMainBtns.style.display = '';
+              btnForgot.style.display = '';
+              forgotForm.style.display = 'none';
+              document.getElementById('forgot-code-wrap').style.display = 'none';
+              document.getElementById('forgot-message').textContent = '';
+            };
+
+            // Send reset code
+            const btnSendCode = document.getElementById('btn-send-code');
+            if (btnSendCode) btnSendCode.onclick = async () => {
+              const username = document.getElementById('forgot-username').value.trim();
+              const msg = document.getElementById('forgot-message');
+              if (!username) { msg.textContent = t('auth.enterUsername'); msg.className = 'auth-msg error'; return; }
+              btnSendCode.disabled = true;
+              btnSendCode.textContent = t('auth.sending');
+              try {
+                const r = await fetch('/auth/forgot-password', {
+                  method: 'POST', headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({ username })
+                });
+                const d = await r.json();
+                if (d.method === 'email_no_smtp') {
+                  msg.textContent = window._lang === 'en'
+                    ? 'Email is saved but SMTP is not configured on the server. Add your Telegram Chat ID in Settings for recovery.'
+                    : 'Email указан, но SMTP не настроен на сервере. Добавьте Telegram Chat ID в Настройках для восстановления.';
+                  msg.className = 'auth-msg error';
+                } else if (d.method === 'none') {
+                  msg.textContent = window._lang === 'en'
+                    ? 'No recovery method set. Add Telegram Chat ID or Email in Settings > Account.'
+                    : 'Нет способа восстановления. Укажите Telegram Chat ID или email в Настройках > Аккаунт.';
+                  msg.className = 'auth-msg error';
+                } else {
+                  const ch = d.method.includes('telegram') ? 'Telegram' : 'Email';
+                  msg.textContent = window._lang === 'en'
+                    ? `Code sent to ${ch}. Enter it below.`
+                    : `Код отправлен в ${ch}. Введите его ниже.`;
+                  msg.className = 'auth-msg success';
+                  document.getElementById('forgot-code-wrap').style.display = 'block';
+                }
+              } catch(e) {
+                msg.textContent = 'Ошибка соединения';
+                msg.className = 'auth-msg error';
+              }
+              btnSendCode.disabled = false;
+              btnSendCode.textContent = t('auth.sendCode');
+            };
+
+            // Apply reset code
+            const btnDoReset = document.getElementById('btn-do-reset');
+            if (btnDoReset) btnDoReset.onclick = async () => {
+              const code = document.getElementById('forgot-code').value.trim();
+              const pw = document.getElementById('forgot-newpw').value;
+              const msg = document.getElementById('forgot-message');
+              if (code.length !== 6 || !/^\d+$/.test(code)) { msg.textContent = t('auth.codeDigits'); msg.className = 'auth-msg error'; return; }
+              if (pw.length < 6) { msg.textContent = t('auth.minPassword'); msg.className = 'auth-msg error'; return; }
+              btnDoReset.disabled = true;
+              try {
+                const r = await fetch('/auth/reset-password', {
+                  method: 'POST', headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({ code, new_password: pw })
+                });
+                if (r.status === 204) {
+                  msg.textContent = t('auth.passwordChanged');
+                  msg.className = 'auth-msg success';
+                  document.getElementById('forgot-code-wrap').style.display = 'none';
+                  setTimeout(() => btnBackLogin.onclick(), 2500);
+                } else {
+                  const d = await r.json().catch(() => ({}));
+                  msg.textContent = d.detail || t('auth.invalidCode');
+                  msg.className = 'auth-msg error';
+                }
+              } catch(e) { msg.textContent = t('auth.networkError'); msg.className = 'auth-msg error'; }
+              btnDoReset.disabled = false;
+            };
+
+            // Apply language (safe here — TRANSLATIONS is initialized by now)
+            if (typeof window._lang !== 'undefined') applyLang(window._lang);
+
+            // Lang switcher buttons on login page
+            document.querySelectorAll('.login-lang-btn').forEach(b => {
+              b.onclick = () => { setLang(b.dataset.lang); };
+            });
           }, 10);
         }
         loginHtml.style.display = 'block';
@@ -3009,7 +3420,7 @@
           }
 
           if (topbarRight) {
-            // Language switcher
+            // Language switcher buttons
             const langWrap = document.createElement('div');
             langWrap.style.display = 'flex';
             langWrap.style.gap = '4px';
@@ -3036,6 +3447,8 @@
 
         // Init mobile mode
         initMobileMode();
+        // Re-apply current language (in case DOM was updated)
+        applyLang(window._lang);
       }
 
       async function loadPortfolios() {
@@ -3060,11 +3473,26 @@
           selector.appendChild(option);
         }
 
+        // Also update mobile selector
+        const mobileSel = document.getElementById('mobile-portfolio-selector');
+        const mobileWrap = document.getElementById('mobile-portfolio-wrap');
+        if (mobileSel && mobileWrap) {
+          mobileSel.innerHTML = '';
+          for (const p of portfolios) {
+            const opt = document.createElement('option');
+            opt.value = String(p.id);
+            opt.textContent = p.name;
+            opt.selected = p.id === portfolioId;
+            mobileSel.appendChild(opt);
+          }
+          mobileWrap.style.display = portfolios.length > 1 ? 'block' : 'none';
+        }
+
         // Also update import portfolio selector
         const importSelector = document.getElementById('import-portfolio');
         if (importSelector) {
           const currentValue = importSelector.value;
-          importSelector.innerHTML = '<option value="">Выберите портфель</option>';
+          importSelector.innerHTML = `<option value="">${t('io.importPortfolioPlaceholder')}</option>`;
           for (const p of portfolios) {
             const option = document.createElement('option');
             option.value = String(p.id);
@@ -3078,6 +3506,20 @@
       function setupPortfolioSelector() {
         // Don't show portfolio selector in read-only shared view
         if (isReadOnly) return;
+
+        // Mobile selector change handler
+        const mobileSel = document.getElementById('mobile-portfolio-selector');
+        if (mobileSel) {
+          mobileSel.addEventListener('change', (e) => {
+            const newId = Number(e.target.value);
+            if (newId !== portfolioId) {
+              portfolioId = newId;
+              localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+              showPanel('panel-table');
+              syncTableFromServer().catch(err => console.error('Failed to sync:', err));
+            }
+          });
+        }
 
         const selector = document.getElementById('portfolio-selector');
         if (!selector) {
@@ -3105,38 +3547,11 @@
               if (newId !== portfolioId) {
                 portfolioId = newId;
                 localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+                showPanel('panel-table');
                 syncTableFromServer().catch(err => console.error('Failed to sync:', err));
               }
             });
             container.appendChild(sel);
-
-            // Add "New portfolio" button
-            const addBtn = document.createElement('button');
-            addBtn.textContent = '+ Новый';
-            addBtn.style.padding = '4px 12px';
-            addBtn.style.background = '#3b82f6';
-            addBtn.style.color = '#fff';
-            addBtn.style.border = 'none';
-            addBtn.style.borderRadius = '4px';
-            addBtn.style.cursor = 'pointer';
-            addBtn.style.fontSize = '12px';
-            addBtn.style.whiteSpace = 'nowrap';
-            addBtn.onclick = openCreatePortfolioModal;
-            container.appendChild(addBtn);
-
-            // Add "Delete portfolio" button
-            const delBtn = document.createElement('button');
-            delBtn.textContent = '- Удалить';
-            delBtn.style.padding = '4px 12px';
-            delBtn.style.background = '#ef4444';
-            delBtn.style.color = '#fff';
-            delBtn.style.border = 'none';
-            delBtn.style.borderRadius = '4px';
-            delBtn.style.cursor = 'pointer';
-            delBtn.style.fontSize = '12px';
-            delBtn.style.whiteSpace = 'nowrap';
-            delBtn.onclick = openDeletePortfolioModal;
-            container.appendChild(delBtn);
             topbarNav.insertBefore(container, topbarNav.firstChild);
           }
         }
@@ -3214,11 +3629,11 @@
         const name = nameInput.value.trim();
 
         if (!name) {
-          statusEl.textContent = 'Введите название портфеля';
+          statusEl.textContent = t('modal.createPortfolio.nameRequired');
           return;
         }
 
-        statusEl.textContent = 'Создание...';
+        statusEl.textContent = t('modal.createPortfolio.creating');
         try {
           const res = await apiFetch('/portfolios', {
             method: 'POST',
@@ -3227,7 +3642,7 @@
           });
           if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.detail || 'Ошибка создания портфеля');
+            throw new Error(err.detail || t('modal.createPortfolio.createError'));
           }
           await loadPortfolios();
           const newP = portfolios[portfolios.length - 1];
@@ -3239,9 +3654,72 @@
           }
           closeCreatePortfolioModal();
         } catch (err) {
-          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось создать');
+          statusEl.textContent = t('error.prefix') + (err.message || t('modal.createPortfolio.createError'));
         }
       }
+
+      // ── MOVE POPOVER ─────────────────────────────────────────────
+      let _movePopoverItemId = null;
+
+      function showMovePopover(triggerBtn, itemId) {
+        const popover = document.getElementById('move-popover');
+        const sel     = document.getElementById('move-popover-select');
+
+        sel.innerHTML = '';
+        portfolios.filter(p => p.id !== portfolioId).forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = String(p.id);
+          opt.textContent = p.name;
+          sel.appendChild(opt);
+        });
+
+        _movePopoverItemId = itemId;
+
+        // Position near button, keep within viewport
+        const rect  = triggerBtn.getBoundingClientRect();
+        const popW  = 240;
+        const popH  = 130;
+        let left = rect.left;
+        let top  = rect.bottom + 6;
+        if (left + popW > window.innerWidth - 8)  left = window.innerWidth - popW - 8;
+        if (top  + popH > window.innerHeight - 8) top  = rect.top - popH - 6;
+
+        popover.style.left    = left + 'px';
+        popover.style.top     = top  + 'px';
+        popover.style.display = 'block';
+      }
+
+      function hideMovePopover() {
+        document.getElementById('move-popover').style.display = 'none';
+        _movePopoverItemId = null;
+      }
+
+      // Setup popover buttons once
+      document.getElementById('move-popover-cancel').addEventListener('click', hideMovePopover);
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') hideMovePopover(); });
+      document.addEventListener('click', e => {
+        const pop = document.getElementById('move-popover');
+        if (pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.classList.contains('btn-sm-move')) {
+          hideMovePopover();
+        }
+      });
+      document.getElementById('move-popover-confirm').addEventListener('click', async () => {
+        const targetId   = Number(document.getElementById('move-popover-select').value);
+        const itemId     = _movePopoverItemId;
+        if (!itemId || !targetId) return;
+        hideMovePopover();
+        try {
+          const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${itemId}/move`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_portfolio_id: targetId })
+          });
+          if (!resp.ok) throw new Error((await resp.json()).detail || 'Ошибка');
+          tableRows = tableRows.filter(r => r.id !== itemId);
+          recalculateWeights(tableRows); persistTableCache(); renderTable();
+          const targetName = portfolios.find(p => p.id === targetId)?.name || '';
+          setStatus(tableStatusEl, window._lang === 'en' ? `Moved to "${targetName}"` : `Перенесено в «${targetName}»`);
+        } catch (err) { setStatus(tableStatusEl, err.message, true); }
+      });
 
       function openDeletePortfolioModal() {
         const overlay = document.getElementById('delete-portfolio-modal-overlay');
@@ -3262,12 +3740,12 @@
 
       async function submitDeletePortfolio() {
         if (!portfolioId) {
-          alert('Портфель не выбран');
+          alert(t('modal.deletePortfolio.noPortfolio'));
           return;
         }
 
         const statusEl = document.getElementById('delete-portfolio-status');
-        statusEl.textContent = 'Удаление...';
+        statusEl.textContent = t('modal.deletePortfolio.deleting');
 
         try {
           const res = await apiFetch(`/portfolios/${portfolioId}`, {
@@ -3275,7 +3753,7 @@
           });
           if (!res.ok) {
             const text = await res.text();
-            let msg = 'Ошибка удаления';
+            let msg = t('modal.deletePortfolio.deleteError');
             try {
               const err = JSON.parse(text);
               msg = err.detail || msg;
@@ -3296,7 +3774,7 @@
           }
           closeDeletePortfolioModal();
         } catch (err) {
-          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось удалить');
+          statusEl.textContent = t('error.prefix') + (err.message || t('modal.deletePortfolio.deleteError'));
         }
       }
 
@@ -3312,7 +3790,7 @@
             urlTextarea.value = shareUrl;
             revokeBtn.style.display = 'block';
           } else {
-            urlTextarea.value = 'Портфель еще не опубликован. Установите пароль (или оставьте пусто) и нажмите "Поделиться портфелем".';
+            urlTextarea.value = t('share.notPublished');
             revokeBtn.style.display = 'none';
           }
           passwordInput.value = '';
@@ -3657,12 +4135,17 @@
 
       // Load account info
       async function settingsLoadAccount() {
+        // Fill current username
+        const unCurrent = document.getElementById('acc-username-current');
+        if (unCurrent) unCurrent.value = localStorage.getItem('mvp_username') || '';
         try {
           const r = await apiFetch('/auth/me/portfolios-stats');
           if (!r.ok) return;
           const d = await r.json();
           const emailInput = document.getElementById('acc-email');
           if (emailInput && d.email) emailInput.value = d.email;
+          const tgInput = document.getElementById('acc-tg-chat');
+          if (tgInput && d.tg_chat_id) tgInput.value = d.tg_chat_id;
         } catch(e) {}
       }
 
@@ -3687,10 +4170,10 @@
                 <div style="display:flex;gap:6px;">
                   <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;"
                     onclick="settingsEditPortfolio(${p.id})"
-                    id="sp-edit-${p.id}">Переименовать</button>
+                    id="sp-edit-${p.id}">${t('portfolio.rename')}</button>
                   <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;display:none;background:var(--blue-600);color:#fff;"
                     onclick="settingsSavePortfolio(${p.id})"
-                    id="sp-save-${p.id}">Сохранить</button>
+                    id="sp-save-${p.id}">${t('portfolio.save')}</button>
                 </div>
               </td>`;
             tbody.appendChild(tr);
@@ -3712,7 +4195,7 @@
         const newName = document.getElementById(`sp-input-${id}`).value.trim();
         if (!newName) return;
         try {
-          const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', body: JSON.stringify({ name: newName }) });
+          const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName }) });
           if (!r.ok) { alert('Ошибка сохранения'); return; }
           document.getElementById(`sp-name-${id}`).textContent = newName;
           document.getElementById(`sp-name-${id}`).style.display = '';
@@ -3725,40 +4208,83 @@
         } catch(e) { alert('Ошибка сохранения'); }
       }
 
+      // Change username
+      document.getElementById('acc-username-btn').addEventListener('click', async () => {
+        const newUsername = document.getElementById('acc-username-new').value.trim();
+        const status = document.getElementById('acc-username-status');
+        if (newUsername.length < 3) { status.textContent = t('settings.account.usernameMinLength'); status.className = 'status error'; return; }
+        try {
+          const r = await apiFetch('/auth/me/username', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ new_username: newUsername }) });
+          if (r.status === 204) {
+            localStorage.setItem('mvp_username', newUsername);
+            document.getElementById('acc-username-current').value = newUsername;
+            document.getElementById('acc-username-new').value = '';
+            status.textContent = t('settings.account.usernameChanged');
+            status.className = 'status ok';
+          } else {
+            const d = await r.json().catch(() => ({}));
+            status.textContent = d.detail || t('settings.account.usernameTaken');
+            status.className = 'status error';
+          }
+        } catch(e) { status.textContent = t('settings.account.pwConnError'); status.className = 'status error'; }
+      });
+
       // Change password
       document.getElementById('acc-pw-btn').addEventListener('click', async () => {
         const oldPw = document.getElementById('acc-old-pw').value;
         const newPw = document.getElementById('acc-new-pw').value;
         const newPw2 = document.getElementById('acc-new-pw2').value;
         const status = document.getElementById('acc-pw-status');
-        if (newPw !== newPw2) { status.textContent = 'Новые пароли не совпадают'; status.className = 'status error'; return; }
-        if (newPw.length < 6) { status.textContent = 'Минимум 6 символов'; status.className = 'status error'; return; }
+        if (newPw !== newPw2) { status.textContent = t('settings.account.pwMismatch'); status.className = 'status error'; return; }
+        if (newPw.length < 6) { status.textContent = t('settings.account.pwMinLength'); status.className = 'status error'; return; }
         try {
-          const r = await apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
+          const r = await apiFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
           if (r.status === 204) {
-            status.textContent = 'Пароль изменён';
+            status.textContent = t('settings.account.pwChanged');
             status.className = 'status ok';
             document.getElementById('acc-old-pw').value = '';
             document.getElementById('acc-new-pw').value = '';
             document.getElementById('acc-new-pw2').value = '';
           } else {
             const d = await r.json().catch(() => ({}));
-            status.textContent = d.detail || 'Ошибка';
+            status.textContent = d.detail || t('settings.account.pwError');
             status.className = 'status error';
           }
-        } catch(e) { status.textContent = 'Ошибка соединения'; status.className = 'status error'; }
+        } catch(e) { status.textContent = t('settings.account.pwConnError'); status.className = 'status error'; }
       });
 
       // Change email
       document.getElementById('acc-email-btn').addEventListener('click', async () => {
         const email = document.getElementById('acc-email').value.trim();
         const status = document.getElementById('acc-email-status');
-        if (!email) { status.textContent = 'Введите email'; status.className = 'status error'; return; }
+        if (!email) { status.textContent = t('settings.account.emailRequired'); status.className = 'status error'; return; }
         try {
-          const r = await apiFetch('/auth/change-email', { method: 'POST', body: JSON.stringify({ email }) });
-          if (r.status === 204) { status.textContent = 'Email сохранён'; status.className = 'status ok'; }
-          else { status.textContent = 'Ошибка'; status.className = 'status error'; }
-        } catch(e) { status.textContent = 'Ошибка соединения'; status.className = 'status error'; }
+          const r = await apiFetch('/auth/change-email', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email }) });
+          if (r.ok) {
+            const d = await r.json();
+            if (d.smtp_available) {
+              status.textContent = t('settings.account.emailSavedSmtp');
+            } else {
+              status.textContent = t('settings.account.emailSavedNoSmtp');
+            }
+            status.className = 'status ok';
+          } else {
+            status.textContent = t('settings.account.emailError');
+            status.className = 'status error';
+          }
+        } catch(e) { status.textContent = t('settings.account.emailConnError'); status.className = 'status error'; }
+      });
+
+      // Save Telegram Chat ID
+      document.getElementById('acc-tg-btn').addEventListener('click', async () => {
+        const tgId = document.getElementById('acc-tg-chat').value.trim();
+        const st = document.getElementById('acc-tg-status');
+        if (!tgId) { st.textContent = t('settings.account.tgRequired'); st.className = 'status error'; return; }
+        try {
+          const r = await apiFetch('/auth/me/telegram', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tg_chat_id: tgId }) });
+          if (r.status === 204) { st.textContent = t('settings.account.tgSaved'); st.className = 'status ok'; }
+          else { st.textContent = t('settings.account.tgError'); st.className = 'status error'; }
+        } catch(e) { st.textContent = t('settings.account.tgConnError'); st.className = 'status error'; }
       });
 
       // Load account on settings tab open
@@ -3777,7 +4303,36 @@
           'stat.profit': 'Прибыль / Убыток',
           'stat.coupon': 'Годовой купонный доход',
           'stat.ytm': 'Доходность к погашению',
+          'stat.sub.empty': 'портфель пуст',
+          'stat.sub.positions': 'позиц',
+          'stat.sub.pos1': 'ия', 'stat.sub.pos2': 'ии', 'stat.sub.pos5': 'ий',
+          'stat.sub.addItems': 'добавьте бумаги',
+          'stat.sub.ofPortfolio': '% от портфеля',
+          'stat.sub.noCoupons': 'нечего ждать',
+          'stat.sub.ofValue': '% от стоимости',
+          'stat.sub.noYtm': 'в пустом портфеле',
+          'stat.sub.avgYtm': 'средневзвешенная YTM',
           'chart.title': 'Купонный доход по месяцам',
+          'chart.offer': 'оферта',
+          'chart.noData': 'Нет данных по купонным выплатам',
+          'chart.yLabel': 'Купонный доход, ₽',
+          'auth.enterCreds': 'Введите логин и пароль',
+          'auth.checking': 'Проверяем...',
+          'auth.signing': 'Входим...',
+          'auth.success': 'Успешно! Загружаем...',
+          'auth.loginError': 'Ошибка входа',
+          'auth.networkError': 'Ошибка сети',
+          'auth.registering': 'Регистрируем...',
+          'auth.registered': '✓ Готово!',
+          'auth.accountCreated': 'Аккаунт создан! Входим...',
+          'auth.registerError': 'Ошибка регистрации',
+          'auth.minLogin': 'Логин минимум 3 символа',
+          'auth.minPassword': 'Пароль минимум 6 символов',
+          'auth.enterUsername': 'Введите имя пользователя',
+          'auth.sending': 'Отправка...',
+          'auth.codeDigits': 'Код должен быть 6 цифр',
+          'auth.passwordChanged': '✓ Пароль изменён. Войдите с новым паролем.',
+          'auth.invalidCode': 'Неверный или просроченный код',
           'tbl.name': 'Название',
           'tbl.rating': 'Рейтинг',
           'tbl.curPrice': 'Тек. цена',
@@ -3798,10 +4353,23 @@
           'add.desc': 'Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.',
           'add.params': 'Параметры позиции',
           'add.ticker': 'Тикер / ISIN / название',
+          'add.tickerPlaceholder': 'Например: SBER, RU000A106SK2',
           'add.qty': 'Количество',
           'add.price': 'Цена покупки',
           'add.btn': 'Добавить в портфель',
           'add.hints': 'Подсказки',
+          'add.hint1title': 'Корпоративные облигации',
+          'add.hint1body': 'Введите тикер или ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> и т.д.',
+          'add.hint1link': 'Список облигаций на Мосбирже →',
+          'add.hint2title': 'Облигации федерального займа (ОФЗ)',
+          'add.hint2body': 'Введите тикер: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> и т.д.',
+          'add.hint2link': 'Список ОФЗ на Мосбирже →',
+          'add.hint3title': 'Цена покупки',
+          'add.hint3body': 'Полная цена в рублях: чистая цена + НКД на дату сделки.',
+          'add.aiTitle': 'ИИ-валидация',
+          'add.aiDesc': 'Перед добавлением система проверит тикер через MOEX, загрузит текущую цену, купон и дату погашения автоматически.',
+          'add.suggestTitle': 'Рекомендуемые облигации',
+          'add.suggestLoading': 'Подбираем похожие облигации...',
           'adm.title': 'Панель администратора',
           'adm.desc': 'Управление пользователями, портфелями и общими ссылками.',
           'adm.statUsers': 'Пользователей',
@@ -3835,6 +4403,8 @@
           'settings.portfolios.col.name': 'Название',
           'settings.portfolios.col.count': 'Инструментов',
           'settings.portfolios.col.actions': 'Действия',
+          'settings.portfolios.new': '+ Новый портфель',
+          'settings.portfolios.delete': 'Удалить текущий',
           'settings.notif.botTitle': 'Настройки бота',
           'settings.notif.threshold': 'Порог просадки (%)',
           'settings.notif.test': 'Тест уведомления',
@@ -3845,6 +4415,14 @@
           'settings.notif.priceDropDesc': 'Если текущая цена упала ниже цены покупки на установленный порог (%), придёт предупреждение.',
           'settings.notif.chatIdTitle': 'Как получить Chat ID',
           'settings.notif.chatIdDesc': 'Перешлите любое сообщение боту @userinfobot — он ответит вашим ID. Для группы/канала добавьте бота и используйте ID группы.',
+          'settings.notif.botToken': 'Bot Token',
+          'settings.notif.chatId': 'Chat ID',
+          'settings.notif.saving': 'Сохранение...',
+          'settings.notif.saved': 'Настройки сохранены.',
+          'settings.notif.saveError': 'Ошибка сохранения настроек.',
+          'settings.notif.sending': 'Отправка тестового сообщения...',
+          'settings.notif.sent': 'Тестовое сообщение отправлено!',
+          'settings.notif.sendError': 'Не удалось отправить. Проверьте токен и chat_id.',
           'io.exportTitle': 'Экспорт',
           'io.exportBtn': '⬇ Скачать CSV',
           'io.importTitle': 'Импорт',
@@ -3857,9 +4435,139 @@
           'mobile.version': 'Версия:',
           'mobile.desktop': 'Полная',
           'mobile.mobile': 'Мобильная',
+          'action.delete': 'Удалить',
+          'action.confirmDelete': 'Удалить эту строку из портфеля?',
+          'action.deleted': 'Строка удалена.',
+          'action.deleteError': 'Ошибка удаления.',
+          'action.move': 'Перенести',
+          'action.moveTitle': 'Перенести в портфель',
+          'action.moveConfirm': 'Перенести →',
+          'action.moveCancel': 'Отмена',
+          'login.hero': 'Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ',
+          'login.sub': 'Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.',
+          'login.feat1': 'ИИ-подбор облигаций по доходности и уровню риска',
+          'login.feat2': 'Актуальные цены и доходность по данным MOEX',
+          'login.feat3': 'Расчёт купонного дохода с учётом праздников и оферт',
+          'login.feat4': 'Кредитные рейтинги эмитентов облигаций',
+          'login.feat5': 'Публичные ссылки для совместного просмотра портфеля',
+          'login.welcome': 'Добро пожаловать',
+          'login.desc': 'Войдите или создайте аккаунт',
+          'login.password': 'Пароль',
+          'login.loginBtn': 'Войти',
+          'login.or': 'или',
+          'login.registerBtn': 'Зарегистрироваться',
+          'login.forgotBtn': 'Забыли пароль?',
+          'settings.account.emailRequired': 'Введите email',
+          'settings.account.emailSavedSmtp': 'Email сохранён. Письмо-подтверждение отправлено.',
+          'settings.account.emailSavedNoSmtp': 'Email сохранён. SMTP не настроен — письмо-подтверждение не отправлено, но email будет использован при восстановлении пароля (если SMTP будет настроен).',
+          'settings.account.emailError': 'Ошибка сохранения',
+          'settings.account.emailConnError': 'Ошибка соединения',
+          'settings.account.recoveryTitle': 'Восстановление пароля',
+          'settings.account.recoveryHint': 'Пароль можно восстановить только через Telegram-бота или Email, если они указаны. Код действителен 15 минут.',
+          'settings.account.tgLabel': 'Telegram Chat ID (для восстановления)',
+          'settings.account.tgPlaceholder': '-100123456789 или ваш ID',
+          'settings.account.tgHint': 'Как узнать: напишите @userinfobot в Telegram. Используется глобальный Bot Token из раздела «Уведомления».',
+          'settings.account.tgSave': 'Сохранить Telegram Chat ID',
+          'settings.account.usernameNewPlaceholder': 'Минимум 3 символа',
+          'settings.account.oldPwPlaceholder': 'Текущий пароль',
+          'settings.account.newPwPlaceholder': 'Минимум 6 символов',
+          'settings.account.newPw2Placeholder': 'Повторите новый пароль',
+          'io.exportDesc': 'Скачайте все позиции текущего портфеля в формате CSV.<br>Файл содержит: тикер, тип, количество, цену покупки.',
+          'io.importDesc': 'Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>',
+          'footer.disclaimer': 'Не является инвестиционной рекомендацией',
+          'footer.broker': 'Откройте счёт и получите акции на 2000 ₽ →',
+          'auth.forgotTitle': 'Восстановление пароля',
+          'auth.username': 'Имя пользователя',
+          'auth.sendCode': 'Отправить код',
+          'auth.codeLabel': 'Код из сообщения',
+          'auth.newPassword': 'Новый пароль',
+          'auth.doReset': 'Сменить пароль',
+          'auth.backToLogin': '← Вернуться ко входу',
+          'share.title': 'Поделиться портфелем',
+          'share.linkLabel': 'Публичная ссылка',
+          'share.copyBtn': 'Копировать ссылку',
+          'share.pwLabel': 'Защита паролем (необязательно)',
+          'share.pwPlaceholder': 'Оставить пусто — доступ без пароля',
+          'share.pwHint': 'Если установить пароль, посетитель введёт его один раз для просмотра.',
+          'share.closeBtn': 'Закрыть',
+          'share.applyBtn': 'Поделиться',
+          'share.revokeBtn': 'Отозвать ссылку',
+          'share.notPublished': 'Портфель еще не опубликован. Установите пароль (или оставьте пусто) и нажмите "Поделиться портфелем".',
+          'portfolio.rename': 'Переименовать',
+          'portfolio.save': 'Сохранить',
+          'shareView.pwTitle': 'Защищённый портфель',
+          'shareView.pwDesc': 'Для просмотра этого портфеля необходим пароль:',
+          'shareView.pwInput': 'Введите пароль',
+          'shareView.continueBtn': 'Продолжить',
+          'btn.cancel': 'Отмена',
+          'error.prefix': 'Ошибка: ',
+          'nav.portfolio': 'Портфель',
+          'modal.createPortfolio.title': 'Новый портфель',
+          'modal.createPortfolio.nameLabel': 'Название',
+          'modal.createPortfolio.namePlaceholder': 'Например: Мои облигации',
+          'modal.createPortfolio.create': 'Создать',
+          'modal.createPortfolio.nameRequired': 'Введите название портфеля',
+          'modal.createPortfolio.creating': 'Создание...',
+          'modal.createPortfolio.createError': 'Не удалось создать',
+          'modal.deletePortfolio.title': 'Удалить портфель',
+          'modal.deletePortfolio.confirmText': 'Вы уверены, что хотите удалить',
+          'modal.deletePortfolio.warning': '⚠️ Это действие нельзя отменить. Все позиции и ссылки для совместного доступа будут удалены.',
+          'modal.deletePortfolio.confirm': 'Удалить',
+          'modal.deletePortfolio.noPortfolio': 'Портфель не выбран',
+          'modal.deletePortfolio.deleting': 'Удаление...',
+          'modal.deletePortfolio.deleteError': 'Ошибка удаления',
+          'settings.account.usernameTitle': 'Имя пользователя',
+          'settings.account.usernameCurrent': 'Текущий логин',
+          'settings.account.usernameNew': 'Новый логин',
+          'settings.account.usernameSave': 'Сменить логин',
+          'settings.account.usernameMinLength': 'Логин минимум 3 символа',
+          'settings.account.usernameChanged': 'Логин изменён',
+          'settings.account.usernameTaken': 'Логин уже занят',
+          'settings.account.pwMismatch': 'Новые пароли не совпадают',
+          'settings.account.pwMinLength': 'Минимум 6 символов',
+          'settings.account.pwChanged': 'Пароль изменён',
+          'settings.account.pwError': 'Ошибка',
+          'settings.account.pwConnError': 'Ошибка соединения',
+          'settings.account.tgRequired': 'Введите Chat ID',
+          'settings.account.tgSaved': 'Telegram Chat ID сохранён',
+          'settings.account.tgError': 'Ошибка',
+          'settings.account.tgConnError': 'Ошибка соединения',
+          'io.exportDone': 'Экспорт завершён.',
+          'io.chooseFilePlaceholder': 'Выберите CSV-файл.',
+          'io.importing': 'Импорт...',
+          'io.importError': 'Ошибка импорта.',
+          'io.importedN': 'Импортировано: {n} позиций.',
+          'io.importErrors': 'Ошибок: {n}.',
+          'wizard.risk': 'Уровень риска',
+          'wizard.title': 'Подберём портфель за вас',
+          'wizard.desc': 'Укажите сумму, желаемую доходность и уровень риска — система подберёт до 10 облигаций с MOEX.',
+          'wizard.amount': 'Сумма портфеля',
+          'wizard.yield': 'Ожидаемая доходность',
+          'wizard.riskMin': 'Мин.',
+          'wizard.riskHigh': 'Высокий',
+          'wizard.submit': 'Подобрать портфель',
+          'wizard.addManual': 'Добавить бумагу вручную',
+          'wizard.selecting': 'Подбираем...',
+          'wizard.selectError': 'Ошибка подбора',
+          'wizard.yieldNote': 'Рекомендуем для {label}: {min}–{max}%',
+          'wizard.amountM': 'млн ₽',
+          'wizard.amountK': 'тыс ₽',
+          'wizard.amountMin': '10 тыс',
+          'wizard.amountMax': '100 млн',
+          'wizard.freqYear': '×/год',
+          'wizard.offer': 'оферта',
+          'wizard.maturity': 'погашение',
+          'wizard.lotX': 'лот ×',
+          'wizard.result.title': 'Подобранный портфель',
+          'wizard.result.bondsRisk': 'бумаг · риск:',
+          'wizard.result.total': 'итого',
+          'wizard.result.avgCoupon': 'средний купон',
+          'wizard.result.leftover': 'остаток',
+          'wizard.result.addAll': 'Добавить всё в портфель',
+          'wizard.result.changeParams': 'Изменить параметры',
         },
         en: {
-          'nav.add': 'Add Security',
+          'nav.add': 'Add Bonds',
           'nav.settings': 'Settings',
           'nav.share': 'Share',
           'nav.logout': 'Logout',
@@ -3867,7 +4575,36 @@
           'stat.profit': 'Profit / Loss',
           'stat.coupon': 'Annual Coupon Income',
           'stat.ytm': 'Yield to Maturity',
+          'stat.sub.empty': 'portfolio empty',
+          'stat.sub.positions': 'position',
+          'stat.sub.pos1': '', 'stat.sub.pos2': 's', 'stat.sub.pos5': 's',
+          'stat.sub.addItems': 'add securities',
+          'stat.sub.ofPortfolio': '% of portfolio',
+          'stat.sub.noCoupons': 'no coupons yet',
+          'stat.sub.ofValue': '% of value',
+          'stat.sub.noYtm': 'empty portfolio',
+          'stat.sub.avgYtm': 'weighted avg YTM',
           'chart.title': 'Coupon Income by Month',
+          'chart.offer': 'offer',
+          'chart.noData': 'No coupon payment data',
+          'chart.yLabel': 'Coupon Income, ₽',
+          'auth.enterCreds': 'Enter username and password',
+          'auth.checking': 'Checking...',
+          'auth.signing': 'Signing in...',
+          'auth.success': 'Success! Loading...',
+          'auth.loginError': 'Login failed',
+          'auth.networkError': 'Network error',
+          'auth.registering': 'Registering...',
+          'auth.registered': '✓ Done!',
+          'auth.accountCreated': 'Account created! Signing in...',
+          'auth.registerError': 'Registration failed',
+          'auth.minLogin': 'Username must be at least 3 characters',
+          'auth.minPassword': 'Password must be at least 6 characters',
+          'auth.enterUsername': 'Enter username',
+          'auth.sending': 'Sending...',
+          'auth.codeDigits': 'Code must be 6 digits',
+          'auth.passwordChanged': '✓ Password changed. Sign in with your new password.',
+          'auth.invalidCode': 'Invalid or expired code',
           'tbl.name': 'Name',
           'tbl.rating': 'Rating',
           'tbl.curPrice': 'Cur. Price',
@@ -3884,14 +4621,27 @@
           'tbl.maturity': 'Maturity',
           'tbl.offer': 'Put Date',
           'tbl.actions': 'Actions',
-          'add.title': 'Add Security',
+          'add.title': 'Add Bonds',
           'add.desc': 'Enter ticker, quantity and purchase price. AI validation will verify the instrument before adding to portfolio.',
           'add.params': 'Position Parameters',
           'add.ticker': 'Ticker / ISIN / Name',
+          'add.tickerPlaceholder': 'e.g. SBER, RU000A106SK2',
           'add.qty': 'Quantity',
           'add.price': 'Purchase Price',
           'add.btn': 'Add to Portfolio',
           'add.hints': 'Tips',
+          'add.hint1title': 'Corporate Bonds',
+          'add.hint1body': 'Enter ticker or ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> etc.',
+          'add.hint1link': 'Bond list on MOEX →',
+          'add.hint2title': 'Federal Loan Bonds (OFZ)',
+          'add.hint2body': 'Enter ticker: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> etc.',
+          'add.hint2link': 'OFZ list on MOEX →',
+          'add.hint3title': 'Purchase Price',
+          'add.hint3body': 'Full price in rubles: clean price + accrued coupon (NKD) on trade date.',
+          'add.aiTitle': 'AI Validation',
+          'add.aiDesc': 'Before adding, the system verifies the ticker via MOEX and automatically fetches the current price, coupon and maturity date.',
+          'add.suggestTitle': 'Recommended Bonds',
+          'add.suggestLoading': 'Finding similar bonds...',
           'adm.title': 'Admin Panel',
           'adm.desc': 'Manage users, portfolios and shared links.',
           'adm.statUsers': 'Users',
@@ -3925,6 +4675,8 @@
           'settings.portfolios.col.name': 'Name',
           'settings.portfolios.col.count': 'Securities',
           'settings.portfolios.col.actions': 'Actions',
+          'settings.portfolios.new': '+ New Portfolio',
+          'settings.portfolios.delete': 'Delete Current',
           'settings.notif.botTitle': 'Bot Settings',
           'settings.notif.threshold': 'Drop threshold (%)',
           'settings.notif.test': 'Test notification',
@@ -3935,6 +4687,14 @@
           'settings.notif.priceDropDesc': 'Alert when price falls below purchase price by the threshold.',
           'settings.notif.chatIdTitle': 'How to get Chat ID',
           'settings.notif.chatIdDesc': 'Forward any message to @userinfobot — it will reply with your ID.',
+          'settings.notif.botToken': 'Bot Token',
+          'settings.notif.chatId': 'Chat ID',
+          'settings.notif.saving': 'Saving...',
+          'settings.notif.saved': 'Settings saved.',
+          'settings.notif.saveError': 'Failed to save settings.',
+          'settings.notif.sending': 'Sending test message...',
+          'settings.notif.sent': 'Test message sent!',
+          'settings.notif.sendError': 'Failed to send. Check token and chat_id.',
           'io.exportTitle': 'Export',
           'io.exportBtn': '⬇ Download CSV',
           'io.importTitle': 'Import',
@@ -3947,10 +4707,150 @@
           'mobile.version': 'Version:',
           'mobile.desktop': 'Full',
           'mobile.mobile': 'Mobile',
+          'action.delete': 'Delete',
+          'action.confirmDelete': 'Remove this item from portfolio?',
+          'action.deleted': 'Item deleted.',
+          'action.deleteError': 'Delete failed.',
+          'action.move': 'Move',
+          'action.moveTitle': 'Move to portfolio',
+          'action.moveConfirm': 'Move →',
+          'action.moveCancel': 'Cancel',
+          'login.hero': 'Smart bond<br><span class="grad">selection</span><br>powered by AI',
+          'login.sub': 'Track stocks and bonds in one place. AI will select bonds matching your risk profile and target yield.',
+          'login.feat1': 'AI bond selection by yield and risk level',
+          'login.feat2': 'Live prices and yields from MOEX data',
+          'login.feat3': 'Coupon income with holiday and put-date accounting',
+          'login.feat4': 'Issuer credit ratings for all bonds',
+          'login.feat5': 'Public links for shared portfolio viewing',
+          'login.welcome': 'Welcome',
+          'login.desc': 'Sign in or create an account',
+          'login.password': 'Password',
+          'login.loginBtn': 'Sign In',
+          'login.or': 'or',
+          'login.registerBtn': 'Create Account',
+          'login.forgotBtn': 'Forgot password?',
+          'settings.account.emailRequired': 'Enter email address',
+          'settings.account.emailSavedSmtp': 'Email saved. Confirmation email sent.',
+          'settings.account.emailSavedNoSmtp': 'Email saved. SMTP not configured — confirmation not sent, but email will be used for recovery once SMTP is configured.',
+          'settings.account.emailError': 'Save failed',
+          'settings.account.emailConnError': 'Connection error',
+          'settings.account.recoveryTitle': 'Password Recovery',
+          'settings.account.recoveryHint': 'Password can only be recovered via Telegram bot or Email if they are set. The code is valid for 15 minutes.',
+          'settings.account.tgLabel': 'Telegram Chat ID (for recovery)',
+          'settings.account.tgPlaceholder': '-100123456789 or your ID',
+          'settings.account.tgHint': 'How to get it: message @userinfobot in Telegram. The global Bot Token from the Notifications section is used.',
+          'settings.account.tgSave': 'Save Telegram Chat ID',
+          'settings.account.usernameNewPlaceholder': 'Minimum 3 characters',
+          'settings.account.oldPwPlaceholder': 'Current password',
+          'settings.account.newPwPlaceholder': 'Minimum 6 characters',
+          'settings.account.newPw2Placeholder': 'Repeat new password',
+          'io.exportDesc': 'Download all positions of the current portfolio as CSV.<br>File contains: ticker, type, quantity, purchase price.',
+          'io.importDesc': 'CSV format — columns: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>',
+          'footer.disclaimer': 'Not investment advice',
+          'footer.broker': 'Open a brokerage account and get stocks worth 2000 ₽ →',
+          'auth.forgotTitle': 'Password Recovery',
+          'auth.username': 'Username',
+          'auth.sendCode': 'Send code',
+          'auth.codeLabel': 'Code from message',
+          'auth.newPassword': 'New password',
+          'auth.doReset': 'Reset password',
+          'auth.backToLogin': '← Back to login',
+          'share.title': 'Share Portfolio',
+          'share.linkLabel': 'Public link',
+          'share.copyBtn': 'Copy link',
+          'share.pwLabel': 'Password protection (optional)',
+          'share.pwPlaceholder': 'Leave empty — access without password',
+          'share.pwHint': 'If set, visitors enter the password once to view the portfolio.',
+          'share.closeBtn': 'Close',
+          'share.applyBtn': 'Share',
+          'share.revokeBtn': 'Revoke link',
+          'share.notPublished': 'Portfolio not published yet. Set a password (or leave empty) and click "Share".',
+          'portfolio.rename': 'Rename',
+          'portfolio.save': 'Save',
+          'shareView.pwTitle': 'Protected Portfolio',
+          'shareView.pwDesc': 'A password is required to view this portfolio:',
+          'shareView.pwInput': 'Enter password',
+          'shareView.continueBtn': 'Continue',
+          'btn.cancel': 'Cancel',
+          'error.prefix': 'Error: ',
+          'nav.portfolio': 'Portfolio',
+          'modal.createPortfolio.title': 'New Portfolio',
+          'modal.createPortfolio.nameLabel': 'Name',
+          'modal.createPortfolio.namePlaceholder': 'E.g. My Bonds',
+          'modal.createPortfolio.create': 'Create',
+          'modal.createPortfolio.nameRequired': 'Enter portfolio name',
+          'modal.createPortfolio.creating': 'Creating...',
+          'modal.createPortfolio.createError': 'Failed to create',
+          'modal.deletePortfolio.title': 'Delete Portfolio',
+          'modal.deletePortfolio.confirmText': 'Are you sure you want to delete',
+          'modal.deletePortfolio.warning': '⚠️ This action cannot be undone. All positions and sharing links will be deleted.',
+          'modal.deletePortfolio.confirm': 'Delete',
+          'modal.deletePortfolio.noPortfolio': 'No portfolio selected',
+          'modal.deletePortfolio.deleting': 'Deleting...',
+          'modal.deletePortfolio.deleteError': 'Delete error',
+          'settings.account.usernameTitle': 'Username',
+          'settings.account.usernameCurrent': 'Current login',
+          'settings.account.usernameNew': 'New login',
+          'settings.account.usernameSave': 'Change login',
+          'settings.account.usernameMinLength': 'Username must be at least 3 characters',
+          'settings.account.usernameChanged': 'Username changed',
+          'settings.account.usernameTaken': 'Username already taken',
+          'settings.account.pwMismatch': 'Passwords do not match',
+          'settings.account.pwMinLength': 'Minimum 6 characters',
+          'settings.account.pwChanged': 'Password changed',
+          'settings.account.pwError': 'Error',
+          'settings.account.pwConnError': 'Connection error',
+          'settings.account.tgRequired': 'Enter Chat ID',
+          'settings.account.tgSaved': 'Telegram Chat ID saved',
+          'settings.account.tgError': 'Error',
+          'settings.account.tgConnError': 'Connection error',
+          'io.exportDone': 'Export complete.',
+          'io.chooseFilePlaceholder': 'Choose a CSV file.',
+          'io.importing': 'Importing...',
+          'io.importError': 'Import error.',
+          'io.importedN': 'Imported: {n} positions.',
+          'io.importErrors': 'Errors: {n}.',
+          'wizard.title': 'Find your portfolio',
+          'wizard.desc': 'Enter the amount, desired yield and risk level — the system will select up to 10 bonds from MOEX.',
+          'wizard.amount': 'Portfolio amount',
+          'wizard.yield': 'Expected yield',
+          'wizard.risk': 'Risk level',
+          'wizard.riskMin': 'Min.',
+          'wizard.riskHigh': 'High',
+          'wizard.submit': 'Find portfolio',
+          'wizard.addManual': 'Add bond manually',
+          'wizard.selecting': 'Searching...',
+          'wizard.selectError': 'Search error',
+          'wizard.yieldNote': 'Recommended for {label}: {min}–{max}%',
+          'wizard.amountM': 'M ₽',
+          'wizard.amountK': 'K ₽',
+          'wizard.amountMin': '10K',
+          'wizard.amountMax': '100M',
+          'wizard.freqYear': '×/yr',
+          'wizard.offer': 'offer',
+          'wizard.maturity': 'maturity',
+          'wizard.lotX': 'lots ×',
+          'wizard.result.title': 'Selected Portfolio',
+          'wizard.result.bondsRisk': 'bonds · risk:',
+          'wizard.result.total': 'total',
+          'wizard.result.avgCoupon': 'avg. coupon',
+          'wizard.result.leftover': 'leftover',
+          'wizard.result.addAll': 'Add all to portfolio',
+          'wizard.result.changeParams': 'Change parameters',
         },
       };
 
-      window._lang = localStorage.getItem('mvp_lang') || 'ru';
+      // Auto-detect language from browser if user hasn't set preference
+      (function() {
+        const saved = localStorage.getItem('mvp_lang');
+        if (saved) { window._lang = saved; return; }
+        const browserLang = (navigator.language || navigator.userLanguage || 'ru').toLowerCase();
+        window._lang = browserLang.startsWith('ru') ? 'ru' : 'en';
+      })();
+
+      function t(key) {
+        return TRANSLATIONS[window._lang]?.[key] ?? TRANSLATIONS['ru']?.[key] ?? key;
+      }
 
       function applyLang(lang) {
         window._lang = lang;
@@ -3958,11 +4858,45 @@
         document.querySelectorAll('[data-i18n]').forEach(el => {
           const key = el.dataset.i18n;
           const val = TRANSLATIONS[lang]?.[key];
-          if (val !== undefined) el.textContent = val;
+          if (val === undefined) return;
+          // Preserve sort arrow for sortable table headers
+          if (el.tagName === 'TH' && el.dataset.sortKey) {
+            const arrow = el.textContent.match(/\s[↑↓]$/) ? el.textContent.match(/\s[↑↓]$/)[0] : '';
+            el.textContent = val + arrow;
+          } else {
+            el.textContent = val;
+          }
         });
+        document.querySelectorAll('[data-i18n-html]').forEach(el => {
+          const key = el.dataset.i18nHtml;
+          const val = TRANSLATIONS[lang]?.[key];
+          if (val !== undefined) el.innerHTML = val;
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+          const key = el.dataset.i18nPlaceholder;
+          const val = TRANSLATIONS[lang]?.[key];
+          if (val !== undefined) el.placeholder = val;
+        });
+        document.documentElement.dataset.lang = lang;
         document.querySelectorAll('.lang-btn').forEach(b => {
           b.classList.toggle('active', b.textContent.toLowerCase() === lang);
         });
+        // Update subtle login page lang buttons
+        document.querySelectorAll('.login-lang-btn').forEach(b => {
+          const isActive = b.dataset.lang === lang;
+          b.style.color = isActive ? '#f1f5f9' : 'rgba(241,245,249,.45)';
+          b.style.borderColor = isActive ? 'rgba(148,163,184,.5)' : 'rgba(148,163,184,.2)';
+        });
+        // Refresh stat card sub-labels and chart (set dynamically, not via data-i18n)
+        try {
+          if (typeof updateStatCards === 'function' && typeof tableRows !== 'undefined') {
+            const summary = calculateSummary(tableRows);
+            updateStatCards(summary);
+          }
+          if (typeof drawMonthlyChart === 'function' && typeof tableRows !== 'undefined') {
+            drawMonthlyChart(tableRows);
+          }
+        } catch(e) {}
       }
 
       function setLang(lang) { applyLang(lang); }

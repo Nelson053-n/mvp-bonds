@@ -6,6 +6,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_portfolio_or_403
@@ -185,6 +186,27 @@ async def update_coupon_rate(
         "coupon_rate": row.coupon_rate,
         "manual_coupon_rate_set": row.manual_coupon_rate_set,
     }
+
+
+class MoveInstrumentInput(BaseModel):
+    target_portfolio_id: int
+
+
+@router.post("/portfolios/{portfolio_id}/instruments/{item_id}/move")
+async def move_instrument(
+    portfolio_id: int,
+    item_id: int,
+    payload: MoveInstrumentInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, bool]:
+    """Move instrument to another portfolio owned by the same user."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    await get_portfolio_or_403(payload.target_portfolio_id, current_user)
+
+    moved = storage_service.move_instrument(item_id, portfolio_id, payload.target_portfolio_id)
+    if not moved:
+        raise HTTPException(status_code=404, detail="Инструмент не найден")
+    return {"moved": True}
 
 
 @router.delete("/portfolios/{portfolio_id}/instruments/cleanup/not-found")
