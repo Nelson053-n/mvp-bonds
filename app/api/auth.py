@@ -157,6 +157,7 @@ async def update_telegram(
 
 class ForgotPasswordInput(BaseModel):
     username: str = Field(..., min_length=1)
+    lang: str = "ru"
 
 
 class ResetPasswordInput(BaseModel):
@@ -167,7 +168,7 @@ class ResetPasswordInput(BaseModel):
 @router.post("/forgot-password")
 async def forgot_password(payload: ForgotPasswordInput) -> dict:
     """Request password reset. Sends 6-digit code via Telegram and/or email."""
-    method = await auth_service.request_password_reset(payload.username)
+    method = await auth_service.request_password_reset(payload.username, lang=payload.lang)
     return {"method": method}
 
 

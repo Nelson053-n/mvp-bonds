@@ -193,7 +193,7 @@
         line-height: 1.2;
       }
       .stat-value.positive { color: var(--green-600); }
-      .stat-value.negative { color: var(--red-600); }
+      .stat-value.negative { color: #f87171; }
       .stat-sub {
         font-size: 11px;
         color: var(--slate-400);
@@ -700,7 +700,18 @@
         border-top: 1px solid var(--slate-700);
       }
       .mobile-nav { display: none; }
-      .mobile-nav .nav-btn { flex: 1; min-width: 120px; text-align: center; }
+      .mobile-nav .nav-btn {
+        flex: 1; min-width: 100px; text-align: center;
+        height: 44px;
+        border: 1px solid var(--slate-600) !important;
+        border-radius: 8px;
+        border-bottom: 1px solid var(--slate-600) !important;
+      }
+      .mobile-nav .nav-btn.active {
+        border-color: var(--blue-500) !important;
+        color: #fff;
+      }
+      body.mobile-mode #chart-wrap { min-width: 560px; }
 
       /* ── RESPONSIVE ──────────────────────────────────────────── */
       @media (max-width: 1024px) {
@@ -773,9 +784,9 @@
             <div class="stat-sub" id="stat-coupon-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label" data-i18n="stat.ytm">Доходность к погашению</div>
-            <div class="stat-value" id="stat-ytm">—</div>
-            <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
+            <div class="stat-label" data-i18n="stat.riskProfile">Инвестиционный профиль</div>
+            <div class="stat-value" id="stat-risk" style="font-size:16px;">—</div>
+            <div class="stat-sub" id="stat-risk-sub">&nbsp;</div>
           </div>
         </div>
 
@@ -793,7 +804,7 @@
                   <th data-sort-key="company_rating" data-i18n="tbl.rating">Рейтинг</th>
                   <th data-sort-key="current_price" data-i18n="tbl.curPrice">Тек.&nbsp;цена</th>
                   <th data-sort-key="quantity" data-i18n="tbl.qty">Кол-во</th>
-                  <th data-sort-key="purchase_price" data-i18n="tbl.buyPrice">Цена&nbsp;покупки</th>
+                  <th data-sort-key="purchase_price" class="wrap" style="min-width:52px;" data-i18n-html="tbl.buyPrice">Цена<br>покупки</th>
                   <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость</th>
                   <th data-sort-key="profit" data-i18n="tbl.profit">Прибыль</th>
                   <th data-sort-key="weight" data-i18n="tbl.weight">Доля</th>
@@ -817,9 +828,11 @@
           <div class="card-header">
             <h2 class="card-title" data-i18n="chart.title">Купонный доход по месяцам</h2>
           </div>
-          <div style="padding: 12px 16px;">
+          <div style="padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
             <div id="chart-empty" class="chart-empty" style="display:none;" data-i18n="chart.noData">Нет данных по купонным выплатам</div>
-            <canvas id="monthly-chart" height="190"></canvas>
+            <div id="chart-wrap">
+              <canvas id="monthly-chart" height="190"></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -970,6 +983,9 @@
                   <p style="font-size:11px;color:var(--slate-500);margin:4px 0 0;" data-i18n="settings.account.tgHint">
                     Как узнать: напишите @userinfobot в Telegram. Используется глобальный Bot Token из раздела «Уведомления».
                   </p>
+                  <div class="info-box" style="margin-top:8px;font-size:12px;background:#fefce8;border-color:#fde047;color:#854d0e;" data-i18n="settings.account.tgTokenWarning">
+                    ⚠️ Для работы восстановления пароля не забудьте указать токен бота в разделе «Уведомления».
+                  </div>
                 </div>
                 <button class="btn" id="acc-tg-btn" data-i18n="settings.account.tgSave">Сохранить Telegram Chat ID</button>
                 <div id="acc-tg-status" class="status"></div>
@@ -985,7 +1001,6 @@
               <h2 class="card-title" data-i18n="settings.portfolios.title">Мои портфели</h2>
               <div style="display:flex;gap:6px;margin-left:auto;">
                 <button class="btn" style="height:28px;font-size:12px;padding:0 12px;background:var(--blue-600);color:#fff;" onclick="openCreatePortfolioModal()" data-i18n="settings.portfolios.new">+ Новый портфель</button>
-                <button class="btn btn-danger" style="height:28px;font-size:12px;padding:0 12px;" onclick="openDeletePortfolioModal()" data-i18n="settings.portfolios.delete">Удалить текущий</button>
                 <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="settingsLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
               </div>
             </div>
@@ -996,7 +1011,9 @@
                     <tr>
                       <th data-i18n="settings.portfolios.col.name">Название</th>
                       <th data-i18n="settings.portfolios.col.count">Инструментов</th>
-                      <th class="no-sort" data-i18n="settings.portfolios.col.actions">Действия</th>
+                      <th data-i18n="settings.portfolios.col.sum">Сумма</th>
+                      <th data-i18n="settings.portfolios.col.risk">Риск</th>
+                      <th class="no-sort" style="width:1%;white-space:nowrap;" data-i18n="settings.portfolios.col.actions">Действия</th>
                     </tr>
                   </thead>
                   <tbody id="settings-portfolios-body"></tbody>
@@ -1025,6 +1042,13 @@
                 <div class="field">
                   <label for="tg-threshold" data-i18n="settings.notif.threshold">Порог просадки (%)</label>
                   <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
+                </div>
+                <div class="field">
+                  <label for="tg-lang" data-i18n="settings.notif.lang">Язык уведомлений</label>
+                  <select id="tg-lang" class="select-input">
+                    <option value="ru" data-i18n="settings.notif.langRu">Русский</option>
+                    <option value="en" data-i18n="settings.notif.langEn">English</option>
+                  </select>
                 </div>
                 <div class="notif-actions">
                   <button class="btn" id="notif-save-btn" data-i18n="btn.save">Сохранить</button>
@@ -1057,7 +1081,7 @@
 
         <!-- ── TAB: Import/Export ── -->
         <div id="stab-io" class="stab-content" style="display:none;">
-          <div class="panel-cols panel-cols-2">
+          <div class="panel-cols panel-cols-2" style="margin-bottom:16px;">
             <div class="card">
               <div class="card-header">
                 <h2 class="card-title" data-i18n="io.exportTitle">Экспорт</h2>
@@ -1093,6 +1117,39 @@
                   <button class="btn" id="import-btn" data-i18n="io.importBtn">⬆ Импортировать</button>
                 </div>
                 <div id="io-import-status" class="status"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel-cols panel-cols-2">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="io.exportAllTitle">Экспорт всех портфелей</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="info-box" data-i18n-html="io.exportAllDesc">
+                  Скачайте все портфели в один CSV-файл.<br>
+                  Дополнительная колонка <code>portfolio_name</code> определяет принадлежность.
+                </div>
+                <div>
+                  <button class="btn" id="export-all-btn" data-i18n="io.exportAllBtn">⬇ Скачать все портфели</button>
+                </div>
+                <div id="io-export-all-status" class="status"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="io.importAllTitle">Импорт всех портфелей</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="info-box">
+                  <span data-i18n-html="io.importAllDesc">CSV с колонками: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  <label class="file-label" for="import-all-file" style="justify-content:center;" data-i18n="io.chooseFile">📂 Выбрать файл CSV</label>
+                  <input type="file" id="import-all-file" accept=".csv,text/csv" />
+                  <button class="btn" id="import-all-btn" data-i18n="io.importAllBtn">⬆ Импортировать все</button>
+                </div>
+                <div id="io-import-all-status" class="status"></div>
               </div>
             </div>
           </div>
@@ -1244,6 +1301,22 @@
       </div>
     </div>
 
+    <!-- Universal Confirm Modal -->
+    <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;">
+      <div class="modal" style="max-width:360px;">
+        <div class="modal-header">
+          <h2 class="modal-title" id="confirm-modal-title"></h2>
+        </div>
+        <div class="modal-body">
+          <p id="confirm-modal-message" style="margin:0;color:var(--slate-700);font-size:14px;line-height:1.5;"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="confirm-modal-cancel" data-i18n="confirm.cancel">Отмена</button>
+          <button class="btn-primary" id="confirm-modal-ok" data-i18n="confirm.ok">OK</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Password Entry Modal for Shared View -->
     <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
       <div class="modal" style="max-width: 320px;">
@@ -1312,6 +1385,7 @@
       </div>
     </div>
 
+    <!-- __SHARE_INJECT__ -->
     <script>
       // ── NAV ─────────────────────────────────────────────────────
       const navBtns = document.querySelectorAll('.nav-btn');
@@ -1340,6 +1414,16 @@
       const MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       function getMonthNames() { return window._lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_RU; }
 
+      // ── LANG INIT (early, before IIFE) ───────────────────────────
+      // Must run before any showDashboard/applyLang call in the async IIFE
+      (function() {
+        const saved = localStorage.getItem('mvp_lang');
+        if (saved && saved !== 'undefined') { window._lang = saved; return; }
+        const browserLang = (navigator.language || navigator.userLanguage || 'ru').toLowerCase();
+        window._lang = browserLang.startsWith('ru') ? 'ru' : 'en';
+        localStorage.setItem('mvp_lang', window._lang);
+      })();
+
       // ── STATE ────────────────────────────────────────────────────
       let tableRows = [];
       let sortState = { key: null, direction: 'asc' };
@@ -1354,11 +1438,16 @@
         // Check if share token was injected by the backend
         if (window.shareToken && window.isSharedView) {
           shareToken = window.shareToken;
-          // Try to load cached password from sessionStorage
           const cachedPassword = sessionStorage.getItem(`mvp_share_password_${shareToken}`);
-          if (cachedPassword) {
-            sharePassword = cachedPassword;
-          }
+          if (cachedPassword) sharePassword = cachedPassword;
+          return true;
+        }
+        // Fallback: detect share token directly from URL path /share/{token}
+        const pathMatch = window.location.pathname.match(/^\/share\/([0-9a-f-]{36})\/?$/i);
+        if (pathMatch) {
+          shareToken = pathMatch[1];
+          const cachedPassword = sessionStorage.getItem(`mvp_share_password_${shareToken}`);
+          if (cachedPassword) sharePassword = cachedPassword;
           return true;
         }
         // Fallback to URL query parameters or hash (for backward compatibility)
@@ -1366,11 +1455,8 @@
         const hash = window.location.hash.slice(1);
         shareToken = params.get('share') || (hash.startsWith('share=') ? hash.substring(6) : null);
         if (shareToken) {
-          // Try to load cached password from sessionStorage
           const cachedPassword = sessionStorage.getItem(`mvp_share_password_${shareToken}`);
-          if (cachedPassword) {
-            sharePassword = cachedPassword;
-          }
+          if (cachedPassword) sharePassword = cachedPassword;
         }
         return !!shareToken;
       }
@@ -1400,7 +1486,7 @@
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
         console.log(`apiFetch ${url}:`, response.status);
-        if (response.status === 401) {
+        if (response.status === 401 && !isReadOnly) {
           console.log('Got 401, clearing auth');
           localStorage.removeItem('mvp_auth_token');
           localStorage.removeItem('mvp_username');
@@ -1585,11 +1671,9 @@
         const sv  = document.getElementById('stat-value');
         const sp  = document.getElementById('stat-profit');
         const sc  = document.getElementById('stat-coupon');
-        const sy  = document.getElementById('stat-ytm');
         const svs = document.getElementById('stat-value-sub');
         const sps = document.getElementById('stat-profit-sub');
         const scs = document.getElementById('stat-coupon-sub');
-        const sys = document.getElementById('stat-ytm-sub');
 
         const isEmpty = tableRows.length === 0;
 
@@ -1610,9 +1694,19 @@
         animateCounter(sc, isEmpty ? 0 : roundTo2(summary.annualIncome), v => fmt(roundTo2(v)) + ' ₽');
         scs.textContent = isEmpty ? t('stat.sub.noCoupons') : fmt(roundTo2(summary.annualYield)) + t('stat.sub.ofValue');
 
-        sy.className = 'stat-value';
-        animateCounter(sy, isEmpty ? 0 : roundTo2(summary.totalBondYield), v => fmt(roundTo2(v)) + '%');
-        sys.textContent = isEmpty ? t('stat.sub.noYtm') : t('stat.sub.avgYtm');
+        const sr  = document.getElementById('stat-risk');
+        const srs = document.getElementById('stat-risk-sub');
+        if (sr && srs) {
+          if (isEmpty) {
+            sr.textContent = '—'; sr.style.color = ''; srs.textContent = '\u00a0';
+          } else {
+            const riskKey = yieldToRiskKey(summary.totalBondYield);
+            const rInfo = getRiskInfo(riskKey);
+            sr.textContent = rInfo.label;
+            sr.style.color = rInfo.color;
+            srs.textContent = (summary.totalBondYield > 0 ? summary.totalBondYield.toFixed(1) + '% ' : '') + t('stat.sub.avgYtm');
+          }
+        }
       }
 
       // ── MONTHLY CHART ─────────────────────────────────────────────
@@ -1707,7 +1801,7 @@
         // PAD_T increased to fit "оферта" label above bars; PAD_B for month + income labels
         const approxSlotW = (W - 64 - 12) / data.length;
         const rotateLabels = approxSlotW < 42;
-        const PAD_L = 64, PAD_R = 12, PAD_T = 44, PAD_B = rotateLabels ? 68 : 44;
+        const PAD_L = 64, PAD_R = 12, PAD_T = 44, PAD_B = rotateLabels ? 60 : 28;
         const chartW = W - PAD_L - PAD_R;
         const chartH = H - PAD_T - PAD_B;
         const slotW  = chartW / data.length;
@@ -1732,12 +1826,20 @@
           ctx.fillText(fmt(roundTo2(val)), PAD_L - 6, y + 3);
         }
 
+        // Abbreviated income formatter for bar labels
+        const fmtBarVal = v => {
+          if (v >= 1000000) return (v / 1000000).toFixed(1).replace('.0', '') + ' М';
+          if (v >= 1000)    return Math.round(v / 1000) + ' к';
+          return Math.round(v) + ' ₽';
+        };
+
         // Bars
         const bottomBase = H - PAD_B; // baseline for text rows at bottom
         data.forEach((d, i) => {
           const x    = PAD_L + i * slotW + (slotW - barW) / 2;
           const barH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
           const y    = PAD_T + chartH - barH;
+          const cx   = x + barW / 2;
 
           if (barH > 0) {
             ctx.fillStyle = d.hasOffer ? '#f59e0b' : '#60a5fa';
@@ -1752,23 +1854,48 @@
             ctx.quadraticCurveTo(x, y, x + radius, y);
             ctx.closePath();
             ctx.fill();
+
+            // Income label: inside bar if tall enough, else above bar
+            const incLabel = fmtBarVal(d.income);
+            if (barH >= 18) {
+              // Inside bar — white text
+              ctx.fillStyle = 'rgba(255,255,255,0.92)';
+              ctx.font      = 'bold 9px Inter, system-ui, sans-serif';
+              if (rotateLabels && barH >= 36) {
+                // Rotated 90° inside bar for narrow slots
+                ctx.save();
+                ctx.translate(cx, y + barH / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.textAlign = 'center';
+                ctx.fillText(incLabel, 0, 3);
+                ctx.restore();
+              } else {
+                ctx.textAlign = 'center';
+                ctx.fillText(incLabel, cx, y + Math.min(barH / 2 + 4, barH - 4));
+              }
+            } else {
+              // Above bar — colored text
+              ctx.fillStyle = d.hasOffer ? '#b45309' : '#2563eb';
+              ctx.font      = 'bold 8.5px Inter, system-ui, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText(incLabel, cx, y - 4);
+            }
           }
 
           // "Оферта/Offer" label above bar
           if (d.hasOffer) {
-            const labelY = barH > 0 ? y - 5 : PAD_T - 5;
+            const labelY = barH > 0 ? y - (barH >= 18 ? 18 : 16) : PAD_T - 5;
             ctx.fillStyle  = '#d97706';
             ctx.font       = 'bold 8px Inter, system-ui, sans-serif';
             ctx.textAlign  = 'center';
-            ctx.fillText(t('chart.offer'), x + barW / 2, labelY);
+            ctx.fillText(t('chart.offer'), cx, labelY);
           }
 
-          // Row 1 at bottom: month name
-          ctx.fillStyle  = '#64748b';
-          ctx.font       = '9px Inter, system-ui, sans-serif';
+          // Month name at bottom
+          ctx.fillStyle = '#64748b';
+          ctx.font      = '9px Inter, system-ui, sans-serif';
           const now = new Date();
           const lbl = getMonthNames()[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
-          const cx = x + barW / 2;
           if (rotateLabels) {
             ctx.save();
             ctx.translate(cx, bottomBase + 8);
@@ -1779,22 +1906,6 @@
           } else {
             ctx.textAlign = 'center';
             ctx.fillText(lbl, cx, bottomBase + 13);
-          }
-
-          // Row 2 at bottom: income amount
-          ctx.fillStyle = d.income > 0 ? '#475569' : '#cbd5e1';
-          ctx.font      = d.income > 0 ? 'bold 8.5px Inter, system-ui, sans-serif' : '8px Inter, system-ui, sans-serif';
-          if (rotateLabels) {
-            ctx.save();
-            ctx.translate(cx, bottomBase + 8);
-            ctx.rotate(-Math.PI / 2);
-            ctx.textAlign = 'right';
-            const incLabel = d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—';
-            ctx.fillText(incLabel, -38, 0);
-            ctx.restore();
-          } else {
-            ctx.textAlign = 'center';
-            ctx.fillText(d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—', cx, bottomBase + 27);
           }
         });
 
@@ -1950,7 +2061,7 @@
         low:       { label: 'Низкий',      desc: 'Рейтинг AAA–AA, крупнейшие эмитенты', color: '#84cc16', yieldMin: 5, yieldMax: 13 },
         moderate:  { label: 'Умеренный',   desc: 'Рейтинг A–BBB, надёжный корпоратив', color: '#eab308', yieldMin: 8, yieldMax: 18 },
         elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 22 },
-        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#ef4444', yieldMin: 23, yieldMax: 27 },
+        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#f87171', yieldMin: 23, yieldMax: 27 },
       };
       const RISK_LABELS_EN = {
         ultra_low: { label: 'Minimal',  desc: 'OFZ — government bonds' },
@@ -1961,7 +2072,7 @@
       };
       function getRiskInfo(key) {
         const base = RISK_LABELS[key];
-        if (!base) return { label: key, desc: '', color: '#94a3b8', yieldMin: 5, yieldMax: 30 };
+        if (!base) return { label: window._lang === 'en' ? 'Undefined' : 'Не определён', desc: '', color: '#94a3b8', yieldMin: 5, yieldMax: 30 };
         if (window._lang === 'en') {
           const en = RISK_LABELS_EN[key] || {};
           return { ...base, label: en.label || base.label, desc: en.desc || base.desc };
@@ -2174,7 +2285,7 @@
               background: var(--slate-800,#1e293b);
               border: 1px solid var(--slate-700,#334155);
               border-radius: 10px; padding: 14px 16px;
-              display: flex; align-items: center; gap: 14px;
+              display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
               transition: border-color .15s;
             }
             .pw-bond-card:hover { border-color: #3b82f6; }
@@ -2377,7 +2488,7 @@
               </div>` : ''}
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-bottom:24px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:10px;margin-bottom:24px;">
             ${cardsHtml}
           </div>
           <div style="text-align:center;">
@@ -2593,13 +2704,8 @@
             if (portfolios.length > 1) {
               const moveBtn = document.createElement('button');
               moveBtn.className = 'btn-sm-move';
-              moveBtn.title = t('action.move');
-              // Split icon + translatable label so applyLang() can update the span
-              moveBtn.appendChild(document.createTextNode('⇄ '));
-              const moveLbl = document.createElement('span');
-              moveLbl.dataset.i18n = 'action.move';
-              moveLbl.textContent = t('action.move');
-              moveBtn.appendChild(moveLbl);
+              moveBtn.title = t('action.moveTooltip');
+              moveBtn.textContent = '⇄';
               moveBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const pop = document.getElementById('move-popover');
@@ -2617,8 +2723,8 @@
             const delBtn = document.createElement('button');
             delBtn.className = 'btn-sm';
             delBtn.style.marginLeft = portfolios.length > 1 ? '4px' : '0';
-            delBtn.dataset.i18n = 'action.delete';
-            delBtn.textContent = t('action.delete');
+            delBtn.title = t('action.deleteTooltip');
+            delBtn.textContent = '✕';
             delBtn.addEventListener('click', async () => {
               if (!confirm(t('action.confirmDelete'))) return;
               try {
@@ -2681,10 +2787,17 @@
           document.querySelectorAll('th[data-sort-key]').forEach(h => {
             const arrow = h.dataset.sortKey === key ? (sortState.direction === 'asc' ? ' ↑' : ' ↓') : '';
             // Always use current-language label for translated headers
-            const base = h.dataset.i18n
-              ? (TRANSLATIONS[window._lang]?.[h.dataset.i18n] || h.textContent.replace(/\s[↑↓]$/, '').trim())
-              : (h.dataset.origLabel || (() => { h.dataset.origLabel = h.textContent.replace(/\s[↑↓]$/, '').trim(); return h.dataset.origLabel; })());
-            h.textContent = base + arrow;
+            const i18nHtmlKey = h.dataset.i18nHtml;
+            if (i18nHtmlKey) {
+              const base = TRANSLATIONS[window._lang]?.[i18nHtmlKey] || h.dataset.origLabel || '';
+              if (!h.dataset.origLabel) h.dataset.origLabel = base;
+              h.innerHTML = base + (arrow ? `<span style="font-style:normal">${arrow}</span>` : '');
+            } else {
+              const base = h.dataset.i18n
+                ? (TRANSLATIONS[window._lang]?.[h.dataset.i18n] || h.textContent.replace(/\s[↑↓]$/, '').trim())
+                : (h.dataset.origLabel || (() => { h.dataset.origLabel = h.textContent.replace(/\s[↑↓]$/, '').trim(); return h.dataset.origLabel; })());
+              h.textContent = base + arrow;
+            }
           });
           renderTable();
         });
@@ -2734,7 +2847,8 @@
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
         tableRows = payload.items || [];
-        persistTableCache(); renderTable();
+        if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
+        renderTable();
       }
 
       // ── ADD FORM ─────────────────────────────────────────────────
@@ -2779,6 +2893,7 @@
       const tgTokenInput  = document.getElementById('tg-token');
       const tgChatInput   = document.getElementById('tg-chat');
       const tgThreshInput = document.getElementById('tg-threshold');
+      const tgLangSelect  = document.getElementById('tg-lang');
       async function loadNotifSettings() {
         try {
           const r = await apiFetch('/settings/notifications');
@@ -2787,6 +2902,7 @@
           tgTokenInput.value  = s.tg_bot_token || '';
           tgChatInput.value   = s.tg_chat_id   || '';
           tgThreshInput.value = s.price_drop_threshold ?? 5;
+          if (tgLangSelect && s.tg_lang) tgLangSelect.value = s.tg_lang;
         } catch {}
       }
       document.getElementById('notif-save-btn').addEventListener('click', async () => {
@@ -2794,7 +2910,7 @@
         try {
           const r = await apiFetch('/settings/notifications', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
           });
           if (!r.ok) throw new Error(t('settings.notif.saveError'));
           setStatus(notifStatusEl, t('settings.notif.saved'));
@@ -2805,7 +2921,7 @@
         try {
           const r = await apiFetch('/settings/notifications/test', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5 }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
           });
           const res = await r.json();
           if (!r.ok || !res.success) throw new Error(t('settings.notif.sendError'));
@@ -2859,6 +2975,45 @@
           }
           importFileInp.value = '';
         } catch (err) { setStatus(ioImportStatusEl, err.message, true); }
+      });
+
+      // ── EXPORT / IMPORT ALL PORTFOLIOS ─────────────────────────────
+      const ioExportAllStatusEl = document.getElementById('io-export-all-status');
+      const ioImportAllStatusEl = document.getElementById('io-import-all-status');
+
+      document.getElementById('export-all-btn').addEventListener('click', async () => {
+        setStatus(ioExportAllStatusEl, t('io.exporting') || 'Экспорт...');
+        try {
+          const r = await apiFetch('/portfolios/export-all');
+          if (!r.ok) throw new Error(t('io.exportError') || 'Ошибка экспорта');
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'all_portfolios.csv'; a.click();
+          URL.revokeObjectURL(url);
+          setStatus(ioExportAllStatusEl, t('io.exportDone'));
+        } catch (err) { setStatus(ioExportAllStatusEl, err.message, true); }
+      });
+
+      document.getElementById('import-all-btn').addEventListener('click', async () => {
+        const file = document.getElementById('import-all-file').files[0];
+        if (!file) { setStatus(ioImportAllStatusEl, t('io.chooseFilePlaceholder'), true); return; }
+        setStatus(ioImportAllStatusEl, t('io.importing'));
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          const r = await apiFetch('/portfolios/import-all', { method: 'POST', body: fd });
+          const res = await r.json();
+          if (!r.ok) throw new Error(res.detail || t('io.importError'));
+          let msg = t('io.importedN').replace('{n}', res.added);
+          if (res.errors > 0) msg += ' ' + t('io.importErrors').replace('{n}', res.errors);
+          setStatus(ioImportAllStatusEl, msg, res.errors > 0);
+          if (res.added > 0) {
+            await loadPortfolios();
+            updatePortfolioSelector();
+            syncTableFromServer().catch(() => {});
+          }
+          document.getElementById('import-all-file').value = '';
+        } catch (err) { setStatus(ioImportAllStatusEl, err.message, true); }
       });
 
       // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
@@ -3326,7 +3481,7 @@
               try {
                 const r = await fetch('/auth/forgot-password', {
                   method: 'POST', headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({ username })
+                  body: JSON.stringify({ username, lang: window._lang || 'ru' })
                 });
                 const d = await r.json();
                 if (d.method === 'email_no_smtp') {
@@ -3448,7 +3603,8 @@
         // Init mobile mode
         initMobileMode();
         // Re-apply current language (in case DOM was updated)
-        applyLang(window._lang);
+        // Guard: TRANSLATIONS may not be defined yet if called from share IIFE before line 4534
+        try { applyLang(window._lang); } catch(e) { /* TRANSLATIONS not yet initialized */ }
       }
 
       async function loadPortfolios() {
@@ -3492,7 +3648,7 @@
         const importSelector = document.getElementById('import-portfolio');
         if (importSelector) {
           const currentValue = importSelector.value;
-          importSelector.innerHTML = `<option value="">${t('io.importPortfolioPlaceholder')}</option>`;
+          importSelector.innerHTML = `<option value="" data-i18n="io.importPortfolioPlaceholder">${t('io.importPortfolioPlaceholder')}</option>`;
           for (const p of portfolios) {
             const option = document.createElement('option');
             option.value = String(p.id);
@@ -3558,11 +3714,35 @@
         updatePortfolioSelector();
       }
 
+      // ── CONFIRM MODAL ────────────────────────────────────────────
+      let _confirmCallback = null;
+      (function initConfirmModal() {
+        const overlay = document.getElementById('confirm-modal-overlay');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        function closeConfirm() { overlay.style.display = 'none'; _confirmCallback = null; }
+        okBtn.addEventListener('click', () => { closeConfirm(); if (_confirmCallback) _confirmCallback(); });
+        cancelBtn.addEventListener('click', closeConfirm);
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeConfirm(); });
+      })();
+
+      function showConfirm(title, message, onConfirm) {
+        document.getElementById('confirm-modal-title').textContent = title;
+        document.getElementById('confirm-modal-message').textContent = message;
+        _confirmCallback = onConfirm;
+        document.getElementById('confirm-modal-overlay').style.display = 'flex';
+      }
+
       // ── SHARE PORTFOLIO ──────────────────────────────────────────
       function openShareModal() {
         const overlay = document.getElementById('share-modal-overlay');
         if (overlay) overlay.classList.add('show');
         loadShareStatus();
+      }
+
+      function openShareModalFor(id) {
+        portfolioId = id;
+        openShareModal();
       }
 
       function closeShareModal() {
@@ -3856,7 +4036,11 @@
           // Read-only shared view
           isReadOnly = true;
           document.body.classList.add('read-only-mode');
-          showDashboard();
+          try { showDashboard(); } catch(e) {
+            // showDashboard may throw if called before TRANSLATIONS is initialized
+            // Still ensure container is visible
+            document.querySelector('.container').style.display = 'block';
+          }
           document.querySelector('.topbar-nav').style.display = 'none';
           const shareBtn = document.getElementById('btn-share-portfolio');
           if (shareBtn) shareBtn.style.display = 'none';
@@ -3864,6 +4048,12 @@
           if (logoutBtn) logoutBtn.style.display = 'none';
           const navBtns = document.querySelectorAll('.nav-btn:not([data-panel="panel-table"])');
           navBtns.forEach(btn => btn.style.display = 'none');
+
+          // Make brand logo link to bondai.ru in share view
+          const brand = document.querySelector('.topbar-brand');
+          if (brand) {
+            brand.onclick = () => { window.open('https://bondai.ru', '_blank', 'noopener'); };
+          }
 
           // Add "Create your own portfolio" button in topbar
           const topbarInner = document.querySelector('.topbar-inner');
@@ -4153,34 +4343,80 @@
       async function settingsLoadPortfolios() {
         const tbody = document.getElementById('settings-portfolios-body');
         if (!tbody) return;
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/auth/me/portfolios-stats');
           const d = await r.json();
           tbody.innerHTML = '';
-          (d.portfolios || []).forEach(p => {
+          const allPortfolios = d.portfolios || [];
+          allPortfolios.forEach(p => {
             const tr = document.createElement('tr');
+            tr.id = `sp-row-${p.id}`;
+            const riskKey = p.risk || 'unknown';
+            const riskInfo = getRiskInfo(riskKey);
+            const riskLabel = riskInfo ? riskInfo.label : riskKey;
+            const riskColor = riskInfo ? riskInfo.color : '#94a3b8';
+            const sumFormatted = p.total_cost > 0 ? fmtAmount(p.total_cost) : '—';
+            // Build merge options (other portfolios)
+            const otherOpts = allPortfolios.filter(x => x.id !== p.id)
+              .map(x => `<option value="${x.id}">${x.name.replace(/"/g, '&quot;')}</option>`).join('');
+            const mergeSelect = otherOpts
+              ? `<select id="sp-merge-sel-${p.id}" class="select-input" style="height:22px;font-size:10px;padding:0 4px;width:auto;">${otherOpts}</select>
+                 <button class="btn-sm-move"
+                   onclick="settingsMergePortfolio(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                   title="${t('settings.portfolios.mergeTitle')}">⇄</button>`
+              : '';
             tr.innerHTML = `
               <td>
                 <span id="sp-name-${p.id}">${p.name}</span>
                 <input id="sp-input-${p.id}" class="input" style="display:none;max-width:180px;padding:4px 8px;font-size:12px;" value="${p.name}" />
               </td>
               <td>${p.item_count}</td>
-              <td>
-                <div style="display:flex;gap:6px;">
-                  <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;"
+              <td style="white-space:nowrap;">${sumFormatted}</td>
+              <td><span style="color:${riskColor};font-weight:500;font-size:12px;">${riskLabel}</span></td>
+              <td style="white-space:nowrap;">
+                <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;">
+                  ${mergeSelect}
+                  <button class="btn-sm" style="color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);"
                     onclick="settingsEditPortfolio(${p.id})"
                     id="sp-edit-${p.id}">${t('portfolio.rename')}</button>
-                  <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;display:none;background:var(--blue-600);color:#fff;"
+                  <button class="btn-sm" style="display:none;background:var(--blue-600);color:#fff;border-color:var(--blue-600);"
                     onclick="settingsSavePortfolio(${p.id})"
                     id="sp-save-${p.id}">${t('portfolio.save')}</button>
+                  <button class="btn-sm" style="color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);"
+                    onclick="openShareModalFor(${p.id})"
+                    title="${t('nav.share')}">${t('settings.portfolios.shareBtn')}</button>
+                  <button class="btn-sm" style="color:var(--red-600);background:#fee2e2;border-color:#fecaca;"
+                    onclick="settingsDeletePortfolio(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                    title="${t('settings.portfolios.deleteTitle')}">${t('settings.portfolios.deleteBtn')}</button>
                 </div>
               </td>`;
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="3" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
         }
+      }
+
+      async function settingsMergePortfolio(sourceId, sourceName) {
+        const sel = document.getElementById(`sp-merge-sel-${sourceId}`);
+        if (!sel) return;
+        const targetId = parseInt(sel.value);
+        if (!targetId) return;
+        const targetName = sel.options[sel.selectedIndex].text;
+        const msg = t('settings.portfolios.mergeConfirm').replace('{source}', sourceName).replace('{target}', targetName);
+        showConfirm(t('settings.portfolios.mergeTitle'), msg, async () => {
+          try {
+            const r = await apiFetch(`/portfolios/${sourceId}/merge-into/${targetId}`, { method: 'POST' });
+            if (!r.ok) { alert(t('settings.portfolios.mergeError')); return; }
+            await r.json();
+            document.getElementById(`sp-row-${sourceId}`)?.remove();
+            await loadPortfolios();
+            updatePortfolioSelector();
+            settingsLoadPortfolios();
+            if (portfolioId === sourceId) { portfolioId = targetId; renderTable(); }
+          } catch(e) { alert(t('settings.portfolios.mergeError')); }
+        });
       }
 
       function settingsEditPortfolio(id) {
@@ -4206,6 +4442,20 @@
           await loadPortfolios();
           updatePortfolioSelector();
         } catch(e) { alert('Ошибка сохранения'); }
+      }
+
+      async function settingsDeletePortfolio(id, name) {
+        const msg = t('settings.portfolios.deleteConfirm').replace('{name}', name);
+        showConfirm(t('settings.portfolios.deleteTitle'), msg, async () => {
+          try {
+            const r = await apiFetch(`/portfolios/${id}`, { method: 'DELETE' });
+            if (!r.ok) { alert(t('settings.portfolios.deleteError')); return; }
+            document.getElementById(`sp-row-${id}`)?.remove();
+            await loadPortfolios();
+            updatePortfolioSelector();
+            if (portfolioId === id) { portfolioId = portfolios[0]?.id || null; renderTable(); }
+          } catch(e) { alert(t('settings.portfolios.deleteError')); }
+        });
       }
 
       // Change username
@@ -4337,7 +4587,7 @@
           'tbl.rating': 'Рейтинг',
           'tbl.curPrice': 'Тек. цена',
           'tbl.qty': 'Кол-во',
-          'tbl.buyPrice': 'Цена покупки',
+          'tbl.buyPrice': 'Цена<br>покупки',
           'tbl.value': 'Стоимость',
           'tbl.profit': 'Прибыль',
           'tbl.weight': 'Доля',
@@ -4424,25 +4674,49 @@
           'settings.notif.sent': 'Тестовое сообщение отправлено!',
           'settings.notif.sendError': 'Не удалось отправить. Проверьте токен и chat_id.',
           'io.exportTitle': 'Экспорт',
-          'io.exportBtn': '⬇ Скачать CSV',
+          'io.exportBtn': 'Скачать CSV',
           'io.importTitle': 'Импорт',
           'io.importPortfolio': 'Портфель для импорта',
           'io.importPortfolioPlaceholder': 'Выберите портфель',
           'io.chooseFile': '📂 Выбрать файл CSV',
-          'io.importBtn': '⬆ Импортировать',
+          'io.importBtn': 'Импортировать',
           'btn.save': 'Сохранить',
           'btn.refresh': '↺ Обновить',
           'mobile.version': 'Версия:',
           'mobile.desktop': 'Полная',
           'mobile.mobile': 'Мобильная',
           'action.delete': 'Удалить',
+          'action.deleteTooltip': 'Удалить из портфеля',
           'action.confirmDelete': 'Удалить эту строку из портфеля?',
           'action.deleted': 'Строка удалена.',
           'action.deleteError': 'Ошибка удаления.',
           'action.move': 'Перенести',
+          'action.moveTooltip': 'Переместить в другой портфель',
           'action.moveTitle': 'Перенести в портфель',
           'action.moveConfirm': 'Перенести →',
           'action.moveCancel': 'Отмена',
+          'stat.riskProfile': 'Инвестиционный риск профиль',
+          'settings.notif.lang': 'Язык уведомлений',
+          'settings.notif.langRu': 'Русский',
+          'settings.notif.langEn': 'English',
+          'settings.portfolios.shareBtn': 'Поделиться',
+          'settings.portfolios.deleteBtn': 'Удалить',
+          'settings.portfolios.deleteTitle': 'Удалить портфель',
+          'settings.portfolios.deleteConfirm': 'Удалить портфель «{name}» и все его позиции?',
+          'settings.portfolios.deleteError': 'Ошибка удаления портфеля',
+          'settings.portfolios.col.sum': 'Сумма',
+          'settings.portfolios.col.risk': 'Риск',
+          'settings.portfolios.mergeTitle': 'Объединить с выбранным портфелем',
+          'settings.portfolios.mergeConfirm': 'Переместить все позиции из «{source}» в «{target}»? Портфель «{source}» не будет удалён.',
+          'settings.portfolios.mergeError': 'Ошибка объединения портфелей',
+          'confirm.cancel': 'Отмена',
+          'confirm.ok': 'OK',
+          'io.exportAllTitle': 'Экспорт всех портфелей',
+          'io.exportAllDesc': 'Скачайте все портфели в один CSV-файл.<br>Дополнительная колонка <code>portfolio_name</code> определяет принадлежность.',
+          'io.exportAllBtn': '⬇ Скачать все портфели',
+          'io.importAllTitle': 'Импорт всех портфелей',
+          'io.importAllDesc': 'CSV с колонками: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.',
+          'io.importAllBtn': '⬆ Импортировать все',
           'login.hero': 'Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ',
           'login.sub': 'Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.',
           'login.feat1': 'ИИ-подбор облигаций по доходности и уровню риска',
@@ -4468,6 +4742,7 @@
           'settings.account.tgPlaceholder': '-100123456789 или ваш ID',
           'settings.account.tgHint': 'Как узнать: напишите @userinfobot в Telegram. Используется глобальный Bot Token из раздела «Уведомления».',
           'settings.account.tgSave': 'Сохранить Telegram Chat ID',
+          'settings.account.tgTokenWarning': '⚠️ Для работы восстановления пароля не забудьте указать токен бота в разделе «Уведомления».',
           'settings.account.usernameNewPlaceholder': 'Минимум 3 символа',
           'settings.account.oldPwPlaceholder': 'Текущий пароль',
           'settings.account.newPwPlaceholder': 'Минимум 6 символов',
@@ -4609,7 +4884,7 @@
           'tbl.rating': 'Rating',
           'tbl.curPrice': 'Cur. Price',
           'tbl.qty': 'Qty',
-          'tbl.buyPrice': 'Buy Price',
+          'tbl.buyPrice': 'Buy<br>Price',
           'tbl.value': 'Value',
           'tbl.profit': 'Profit',
           'tbl.weight': 'Weight',
@@ -4696,25 +4971,49 @@
           'settings.notif.sent': 'Test message sent!',
           'settings.notif.sendError': 'Failed to send. Check token and chat_id.',
           'io.exportTitle': 'Export',
-          'io.exportBtn': '⬇ Download CSV',
+          'io.exportBtn': 'Download CSV',
           'io.importTitle': 'Import',
           'io.importPortfolio': 'Target portfolio',
           'io.importPortfolioPlaceholder': 'Select portfolio',
           'io.chooseFile': '📂 Choose CSV file',
-          'io.importBtn': '⬆ Import',
+          'io.importBtn': 'Import',
           'btn.save': 'Save',
           'btn.refresh': '↺ Refresh',
           'mobile.version': 'Version:',
           'mobile.desktop': 'Full',
           'mobile.mobile': 'Mobile',
           'action.delete': 'Delete',
+          'action.deleteTooltip': 'Remove from portfolio',
           'action.confirmDelete': 'Remove this item from portfolio?',
           'action.deleted': 'Item deleted.',
           'action.deleteError': 'Delete failed.',
           'action.move': 'Move',
+          'action.moveTooltip': 'Move to another portfolio',
           'action.moveTitle': 'Move to portfolio',
           'action.moveConfirm': 'Move →',
           'action.moveCancel': 'Cancel',
+          'stat.riskProfile': 'Investment Risk Profile',
+          'settings.notif.lang': 'Notification language',
+          'settings.notif.langRu': 'Russian',
+          'settings.notif.langEn': 'English',
+          'settings.portfolios.shareBtn': 'Share',
+          'settings.portfolios.deleteBtn': 'Delete',
+          'settings.portfolios.deleteTitle': 'Delete portfolio',
+          'settings.portfolios.deleteConfirm': 'Delete portfolio «{name}» and all its positions?',
+          'settings.portfolios.deleteError': 'Failed to delete portfolio',
+          'settings.portfolios.col.sum': 'Total',
+          'settings.portfolios.col.risk': 'Risk',
+          'settings.portfolios.mergeTitle': 'Merge into selected portfolio',
+          'settings.portfolios.mergeConfirm': 'Move all positions from «{source}» into «{target}»? Portfolio «{source}» will not be deleted.',
+          'settings.portfolios.mergeError': 'Failed to merge portfolios',
+          'confirm.cancel': 'Cancel',
+          'confirm.ok': 'OK',
+          'io.exportAllTitle': 'Export All Portfolios',
+          'io.exportAllDesc': 'Download all portfolios as a single CSV file.<br>Column <code>portfolio_name</code> identifies each portfolio.',
+          'io.exportAllBtn': '⬇ Download all portfolios',
+          'io.importAllTitle': 'Import All Portfolios',
+          'io.importAllDesc': 'CSV columns: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Missing portfolios are created automatically.',
+          'io.importAllBtn': '⬆ Import all',
           'login.hero': 'Smart bond<br><span class="grad">selection</span><br>powered by AI',
           'login.sub': 'Track stocks and bonds in one place. AI will select bonds matching your risk profile and target yield.',
           'login.feat1': 'AI bond selection by yield and risk level',
@@ -4740,6 +5039,7 @@
           'settings.account.tgPlaceholder': '-100123456789 or your ID',
           'settings.account.tgHint': 'How to get it: message @userinfobot in Telegram. The global Bot Token from the Notifications section is used.',
           'settings.account.tgSave': 'Save Telegram Chat ID',
+          'settings.account.tgTokenWarning': '⚠️ For password recovery to work, make sure to set the bot token in the Notifications section.',
           'settings.account.usernameNewPlaceholder': 'Minimum 3 characters',
           'settings.account.oldPwPlaceholder': 'Current password',
           'settings.account.newPwPlaceholder': 'Minimum 6 characters',
@@ -4840,13 +5140,9 @@
         },
       };
 
-      // Auto-detect language from browser if user hasn't set preference
-      (function() {
-        const saved = localStorage.getItem('mvp_lang');
-        if (saved) { window._lang = saved; return; }
-        const browserLang = (navigator.language || navigator.userLanguage || 'ru').toLowerCase();
-        window._lang = browserLang.startsWith('ru') ? 'ru' : 'en';
-      })();
+      // TRANSLATIONS are now loaded; re-apply lang so all elements get correct text
+      // (window._lang was set early above, before IIFE; just re-apply to cover new DOM)
+      // No re-init needed — applyLang call below handles it.
 
       function t(key) {
         return TRANSLATIONS[window._lang]?.[key] ?? TRANSLATIONS['ru']?.[key] ?? key;
@@ -4870,7 +5166,14 @@
         document.querySelectorAll('[data-i18n-html]').forEach(el => {
           const key = el.dataset.i18nHtml;
           const val = TRANSLATIONS[lang]?.[key];
-          if (val !== undefined) el.innerHTML = val;
+          if (val === undefined) return;
+          if (el.tagName === 'TH' && el.dataset.sortKey) {
+            const arrowSpan = el.querySelector('span');
+            const arrow = arrowSpan ? arrowSpan.outerHTML : '';
+            el.innerHTML = val + arrow;
+          } else {
+            el.innerHTML = val;
+          }
         });
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
           const key = el.dataset.i18nPlaceholder;
@@ -4897,6 +5200,15 @@
             drawMonthlyChart(tableRows);
           }
         } catch(e) {}
+        // Re-render settings portfolios table (risk labels are dynamic, only in authenticated view)
+        if (!isReadOnly) {
+          try {
+            const portfoliosSection = document.getElementById('settings-portfolios-body');
+            if (portfoliosSection && typeof settingsLoadPortfolios === 'function') {
+              settingsLoadPortfolios();
+            }
+          } catch(e) {}
+        }
       }
 
       function setLang(lang) { applyLang(lang); }

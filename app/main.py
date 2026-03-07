@@ -191,8 +191,8 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
     html = dashboard_path.read_text(encoding="utf-8")
     # Inject the share token into the HTML so JS knows to load this shared portfolio
     html = html.replace(
-        "<script>",
-        f"<script>window.shareToken='{share_token}';window.isSharedView=true;</script><script>",
+        "<!-- __SHARE_INJECT__ -->",
+        f"<script>window.shareToken='{share_token}';window.isSharedView=true;</script>",
         1
     )
     return HTMLResponse(

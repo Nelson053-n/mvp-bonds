@@ -697,7 +697,9 @@ class StorageService:
             rows = conn.execute(
                 """
                 SELECT p.id, p.name, p.created_at,
-                       COUNT(pi.id) as item_count
+                       COUNT(pi.id) as item_count,
+                       COALESCE(SUM(pi.quantity * pi.purchase_price), 0) as total_cost,
+                       GROUP_CONCAT(pi.company_rating) as ratings
                 FROM portfolios p
                 LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
                 WHERE p.user_id = ?
@@ -706,15 +708,59 @@ class StorageService:
                 """,
                 (user_id,),
             ).fetchall()
-        return [
-            {
+        result = []
+        for row in rows:
+            ratings_raw = row[5] or ""
+            ratings = [r.strip() for r in ratings_raw.split(",") if r.strip()]
+            risk = self._calc_risk_from_ratings(ratings)
+            result.append({
                 "id": int(row[0]),
                 "name": row[1],
                 "created_at": row[2],
                 "item_count": int(row[3]),
-            }
-            for row in rows
-        ]
+                "total_cost": round(float(row[4]), 2),
+                "risk": risk,
+            })
+        return result
+
+    @staticmethod
+    def _calc_risk_from_ratings(ratings: list[str]) -> str:
+        """Determine portfolio risk level from instrument ratings."""
+        if not ratings:
+            return "unknown"
+        _map = {
+            "AAA": 0, "AA+": 1, "AA": 1, "AA-": 1,
+            "A+": 2, "A": 2, "A-": 2,
+            "BBB+": 3, "BBB": 3, "BBB-": 3,
+            "BB+": 4, "BB": 4, "BB-": 4,
+            "B+": 5, "B": 5, "B-": 5,
+        }
+        scores = [_map.get(r.upper(), 3) for r in ratings]
+        avg = sum(scores) / len(scores)
+        if avg <= 1.5:
+            return "conservative"
+        if avg <= 2.5:
+            return "low"
+        if avg <= 3.5:
+            return "moderate"
+        if avg <= 4.5:
+            return "high"
+        return "aggressive"
+
+    def merge_portfolios(self, source_id: int, target_id: int) -> int:
+        """Move all items from source portfolio into target. Returns count moved."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET portfolio_id = ? WHERE portfolio_id = ?",
+                (target_id, source_id),
+            )
+            moved = int(cursor.rowcount)
+            conn.commit()
+        return moved
+
+    def get_all_items(self, portfolio_id: int) -> list[dict]:
+        """Get all items for a portfolio (minimal fields for export)."""
+        return self.get_items(portfolio_id)
 
     def get_all_portfolios_with_users(self) -> list[dict]:
         with self._connect() as conn:
