@@ -679,22 +679,22 @@
         <!-- Stat cards -->
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-label">Стоимость портфеля</div>
+            <div class="stat-label" data-i18n="stat.value">Стоимость портфеля</div>
             <div class="stat-value" id="stat-value">—</div>
             <div class="stat-sub" id="stat-value-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Прибыль / Убыток</div>
+            <div class="stat-label" data-i18n="stat.profit">Прибыль / Убыток</div>
             <div class="stat-value" id="stat-profit">—</div>
             <div class="stat-sub" id="stat-profit-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Годовой купонный доход</div>
+            <div class="stat-label" data-i18n="stat.coupon">Годовой купонный доход</div>
             <div class="stat-value" id="stat-coupon">—</div>
             <div class="stat-sub" id="stat-coupon-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Доходность к погашению</div>
+            <div class="stat-label" data-i18n="stat.ytm">Доходность к погашению</div>
             <div class="stat-value" id="stat-ytm">—</div>
             <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
           </div>
@@ -710,22 +710,22 @@
               <thead>
                 <tr>
                   <th data-sort-key="id" style="min-width:32px;">&#8470;</th>
-                  <th data-sort-key="name">Название</th>
-                  <th data-sort-key="company_rating">Рейтинг</th>
-                  <th data-sort-key="current_price">Тек.&nbsp;цена</th>
-                  <th data-sort-key="quantity">Кол-во</th>
-                  <th data-sort-key="purchase_price">Цена&nbsp;покупки</th>
-                  <th data-sort-key="current_value">Стоимость</th>
-                  <th data-sort-key="profit">Прибыль</th>
-                  <th data-sort-key="weight">Доля</th>
-                  <th data-sort-key="coupon" style="max-width:48px;">Купон</th>
-                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;">Купон<br>%</th>
-                  <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;">Частота<br>выплат</th>
-                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;">Годовой<br>купон</th>
-                  <th data-sort-key="market_yield" class="wrap" style="min-width:52px;">Рын.<br>доход.</th>
-                  <th data-sort-key="maturity_date">Погашение</th>
-                  <th data-sort-key="offer_date">Оферта</th>
-                  <th class="no-sort actions-column">Действия</th>
+                  <th data-sort-key="name" data-i18n="tbl.name">Название</th>
+                  <th data-sort-key="company_rating" data-i18n="tbl.rating">Рейтинг</th>
+                  <th data-sort-key="current_price" data-i18n="tbl.curPrice">Тек.&nbsp;цена</th>
+                  <th data-sort-key="quantity" data-i18n="tbl.qty">Кол-во</th>
+                  <th data-sort-key="purchase_price" data-i18n="tbl.buyPrice">Цена&nbsp;покупки</th>
+                  <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость</th>
+                  <th data-sort-key="profit" data-i18n="tbl.profit">Прибыль</th>
+                  <th data-sort-key="weight" data-i18n="tbl.weight">Доля</th>
+                  <th data-sort-key="coupon" style="max-width:48px;" data-i18n="tbl.coupon">Купон</th>
+                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.couponPct">Купон<br>%</th>
+                  <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;" data-i18n="tbl.freq">Частота<br>выплат</th>
+                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;" data-i18n="tbl.annualCoupon">Годовой<br>купон</th>
+                  <th data-sort-key="market_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.yield">Рын.<br>доход.</th>
+                  <th data-sort-key="maturity_date" data-i18n="tbl.maturity">Погашение</th>
+                  <th data-sort-key="offer_date" data-i18n="tbl.offer">Оферта</th>
+                  <th class="no-sort actions-column" data-i18n="tbl.actions">Действия</th>
                 </tr>
               </thead>
               <tbody id="table-body"></tbody>
@@ -736,7 +736,7 @@
         <!-- Monthly income chart -->
         <div class="card" id="chart-card" style="padding: 0;">
           <div class="card-header">
-            <h2 class="card-title">Купонный доход по месяцам</h2>
+            <h2 class="card-title" data-i18n="chart.title">Купонный доход по месяцам</h2>
           </div>
           <div style="padding: 12px 16px;">
             <div id="chart-empty" class="chart-empty" style="display:none;">Нет данных по купонным выплатам</div>
@@ -748,33 +748,33 @@
       <!-- ── PANEL: ADD INSTRUMENT ──────────────────────────────── -->
       <div id="panel-add" class="panel">
         <div class="section-header">
-          <h1 class="section-title">Добавить инструмент</h1>
-          <p class="section-desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
+          <h1 class="section-title" data-i18n="add.title">Добавить инструмент</h1>
+          <p class="section-desc" data-i18n="add.desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
         </div>
         <div class="panel-cols panel-cols-auto">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Параметры позиции</h2>
+              <h2 class="card-title" data-i18n="add.params">Параметры позиции</h2>
             </div>
             <div class="card-body">
               <form id="add-form">
                 <div style="display:flex;flex-direction:column;gap:14px;">
                   <div class="field">
-                    <label for="ticker">Тикер / ISIN / название</label>
+                    <label for="ticker" data-i18n="add.ticker">Тикер / ISIN / название</label>
                     <input id="ticker" name="ticker" type="text" class="input" placeholder="Например: SBER, RU000A106SK2" required />
                   </div>
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div class="field">
-                      <label for="quantity">Количество</label>
+                      <label for="quantity" data-i18n="add.qty">Количество</label>
                       <input id="quantity" name="quantity" type="number" class="input" step="0.01" min="0.01" placeholder="0" required />
                     </div>
                     <div class="field">
-                      <label for="purchase_price">Цена покупки</label>
+                      <label for="purchase_price" data-i18n="add.price">Цена покупки</label>
                       <input id="purchase_price" name="purchase_price" type="number" class="input" step="0.01" min="0.01" placeholder="0.00" required />
                     </div>
                   </div>
                   <div>
-                    <button class="btn" id="submit-btn" type="submit" style="width:100%;">Добавить в портфель</button>
+                    <button class="btn" id="submit-btn" type="submit" style="width:100%;" data-i18n="add.btn">Добавить в портфель</button>
                   </div>
                 </div>
               </form>
@@ -783,7 +783,7 @@
           </div>
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Подсказки</h2>
+              <h2 class="card-title" data-i18n="add.hints">Подсказки</h2>
             </div>
             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
               <div class="info-box">
@@ -982,26 +982,26 @@
       <div id="panel-admin" class="panel">
 
         <div class="section-header">
-          <h1 class="section-title">Панель администратора</h1>
-          <p class="section-desc">Управление пользователями, портфелями и общими ссылками.</p>
+          <h1 class="section-title" data-i18n="adm.title">Панель администратора</h1>
+          <p class="section-desc" data-i18n="adm.desc">Управление пользователями, портфелями и общими ссылками.</p>
         </div>
 
         <!-- Stat cards -->
         <div class="stat-grid" style="margin-bottom:20px;">
           <div class="stat-card">
-            <div class="stat-label">Пользователей</div>
+            <div class="stat-label" data-i18n="adm.statUsers">Пользователей</div>
             <div class="stat-value" id="adm-stat-users">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Портфелей</div>
+            <div class="stat-label" data-i18n="adm.statPortfolios">Портфелей</div>
             <div class="stat-value" id="adm-stat-portfolios">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Расшаренных ссылок</div>
+            <div class="stat-label" data-i18n="adm.statShared">Расшаренных ссылок</div>
             <div class="stat-value" id="adm-stat-shared">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Инструментов всего</div>
+            <div class="stat-label" data-i18n="adm.statInstruments">Инструментов всего</div>
             <div class="stat-value" id="adm-stat-instruments">—</div>
           </div>
         </div>
@@ -1009,8 +1009,8 @@
         <!-- Users table -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-header">
-            <h2 class="card-title">Пользователи</h2>
-            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadUsers()">↺ Обновить</button>
+            <h2 class="card-title" data-i18n="adm.usersTitle">Пользователи</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadUsers()" data-i18n="btn.refresh">↺ Обновить</button>
           </div>
           <div class="card-body" style="padding:0;">
             <div class="table-wrap">
@@ -1018,11 +1018,11 @@
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>Имя пользователя</th>
-                    <th>Портфелей</th>
-                    <th>Дата регистрации</th>
-                    <th>Роль</th>
-                    <th class="no-sort">Действия</th>
+                    <th data-i18n="adm.colUsername">Имя пользователя</th>
+                    <th data-i18n="adm.colPortfolios">Портфелей</th>
+                    <th data-i18n="adm.colCreated">Дата регистрации</th>
+                    <th data-i18n="adm.colRole">Роль</th>
+                    <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
                 <tbody id="adm-users-body"></tbody>
@@ -1034,8 +1034,8 @@
         <!-- Portfolios table -->
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Все портфели</h2>
-            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadPortfolios()">↺ Обновить</button>
+            <h2 class="card-title" data-i18n="adm.portfoliosTitle">Все портфели</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
           </div>
           <div class="card-body" style="padding:0;">
             <div class="table-wrap">
@@ -1043,12 +1043,12 @@
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>Название</th>
-                    <th>Владелец</th>
-                    <th>Инструментов</th>
-                    <th>Шеринг</th>
-                    <th>Создан</th>
-                    <th class="no-sort">Действия</th>
+                    <th data-i18n="tbl.name">Название</th>
+                    <th data-i18n="adm.colOwner">Владелец</th>
+                    <th data-i18n="adm.colCount">Инструментов</th>
+                    <th data-i18n="adm.colSharing">Шеринг</th>
+                    <th data-i18n="adm.colCreated">Создан</th>
+                    <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
                 <tbody id="adm-portfolios-body"></tbody>
@@ -1566,7 +1566,9 @@
         ctx.scale(dpr, dpr);
 
         // PAD_T increased to fit "оферта" label above bars; PAD_B for month + income labels
-        const PAD_L = 64, PAD_R = 12, PAD_T = 44, PAD_B = 44;
+        const approxSlotW = (W - 64 - 12) / data.length;
+        const rotateLabels = approxSlotW < 42;
+        const PAD_L = 64, PAD_R = 12, PAD_T = 44, PAD_B = rotateLabels ? 68 : 44;
         const chartW = W - PAD_L - PAD_R;
         const chartH = H - PAD_T - PAD_B;
         const slotW  = chartW / data.length;
@@ -1625,16 +1627,36 @@
           // Row 1 at bottom: month name
           ctx.fillStyle  = '#64748b';
           ctx.font       = '9px Inter, system-ui, sans-serif';
-          ctx.textAlign  = 'center';
           const now = new Date();
           const lbl = MONTH_NAMES[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
-          ctx.fillText(lbl, x + barW / 2, bottomBase + 13);
+          const cx = x + barW / 2;
+          if (rotateLabels) {
+            ctx.save();
+            ctx.translate(cx, bottomBase + 8);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'right';
+            ctx.fillText(lbl, 0, 0);
+            ctx.restore();
+          } else {
+            ctx.textAlign = 'center';
+            ctx.fillText(lbl, cx, bottomBase + 13);
+          }
 
           // Row 2 at bottom: income amount
           ctx.fillStyle = d.income > 0 ? '#475569' : '#cbd5e1';
           ctx.font      = d.income > 0 ? 'bold 8.5px Inter, system-ui, sans-serif' : '8px Inter, system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—', x + barW / 2, bottomBase + 27);
+          if (rotateLabels) {
+            ctx.save();
+            ctx.translate(cx, bottomBase + 8);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'right';
+            const incLabel = d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—';
+            ctx.fillText(incLabel, -38, 0);
+            ctx.restore();
+          } else {
+            ctx.textAlign = 'center';
+            ctx.fillText(d.income > 0 ? fmt(roundTo2(d.income)) + ' ₽' : '—', cx, bottomBase + 27);
+          }
         });
 
         // Y-axis label
@@ -3751,6 +3773,50 @@
           'nav.settings': 'Настройки',
           'nav.share': 'Поделиться',
           'nav.logout': 'Выйти',
+          'stat.value': 'Стоимость портфеля',
+          'stat.profit': 'Прибыль / Убыток',
+          'stat.coupon': 'Годовой купонный доход',
+          'stat.ytm': 'Доходность к погашению',
+          'chart.title': 'Купонный доход по месяцам',
+          'tbl.name': 'Название',
+          'tbl.rating': 'Рейтинг',
+          'tbl.curPrice': 'Тек. цена',
+          'tbl.qty': 'Кол-во',
+          'tbl.buyPrice': 'Цена покупки',
+          'tbl.value': 'Стоимость',
+          'tbl.profit': 'Прибыль',
+          'tbl.weight': 'Доля',
+          'tbl.coupon': 'Купон',
+          'tbl.couponPct': 'Купон %',
+          'tbl.freq': 'Частота выплат',
+          'tbl.annualCoupon': 'Годовой купон',
+          'tbl.yield': 'Рын. доход.',
+          'tbl.maturity': 'Погашение',
+          'tbl.offer': 'Оферта',
+          'tbl.actions': 'Действия',
+          'add.title': 'Добавить инструмент',
+          'add.desc': 'Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.',
+          'add.params': 'Параметры позиции',
+          'add.ticker': 'Тикер / ISIN / название',
+          'add.qty': 'Количество',
+          'add.price': 'Цена покупки',
+          'add.btn': 'Добавить в портфель',
+          'add.hints': 'Подсказки',
+          'adm.title': 'Панель администратора',
+          'adm.desc': 'Управление пользователями, портфелями и общими ссылками.',
+          'adm.statUsers': 'Пользователей',
+          'adm.statPortfolios': 'Портфелей',
+          'adm.statShared': 'Расшаренных ссылок',
+          'adm.statInstruments': 'Инструментов всего',
+          'adm.usersTitle': 'Пользователи',
+          'adm.portfoliosTitle': 'Все портфели',
+          'adm.colUsername': 'Имя пользователя',
+          'adm.colPortfolios': 'Портфелей',
+          'adm.colCreated': 'Дата регистрации',
+          'adm.colRole': 'Роль',
+          'adm.colOwner': 'Владелец',
+          'adm.colCount': 'Инструментов',
+          'adm.colSharing': 'Шеринг',
           'settings.title': 'Настройки',
           'settings.desc': 'Управление аккаунтом, портфелями и уведомлениями.',
           'settings.tab.account': 'Аккаунт',
@@ -3797,6 +3863,50 @@
           'nav.settings': 'Settings',
           'nav.share': 'Share',
           'nav.logout': 'Logout',
+          'stat.value': 'Portfolio Value',
+          'stat.profit': 'Profit / Loss',
+          'stat.coupon': 'Annual Coupon Income',
+          'stat.ytm': 'Yield to Maturity',
+          'chart.title': 'Coupon Income by Month',
+          'tbl.name': 'Name',
+          'tbl.rating': 'Rating',
+          'tbl.curPrice': 'Cur. Price',
+          'tbl.qty': 'Qty',
+          'tbl.buyPrice': 'Buy Price',
+          'tbl.value': 'Value',
+          'tbl.profit': 'Profit',
+          'tbl.weight': 'Weight',
+          'tbl.coupon': 'Coupon',
+          'tbl.couponPct': 'Coupon %',
+          'tbl.freq': 'Pay Freq.',
+          'tbl.annualCoupon': 'Annual Coupon',
+          'tbl.yield': 'Mkt Yield',
+          'tbl.maturity': 'Maturity',
+          'tbl.offer': 'Put Date',
+          'tbl.actions': 'Actions',
+          'add.title': 'Add Security',
+          'add.desc': 'Enter ticker, quantity and purchase price. AI validation will verify the instrument before adding to portfolio.',
+          'add.params': 'Position Parameters',
+          'add.ticker': 'Ticker / ISIN / Name',
+          'add.qty': 'Quantity',
+          'add.price': 'Purchase Price',
+          'add.btn': 'Add to Portfolio',
+          'add.hints': 'Tips',
+          'adm.title': 'Admin Panel',
+          'adm.desc': 'Manage users, portfolios and shared links.',
+          'adm.statUsers': 'Users',
+          'adm.statPortfolios': 'Portfolios',
+          'adm.statShared': 'Shared links',
+          'adm.statInstruments': 'Total securities',
+          'adm.usersTitle': 'Users',
+          'adm.portfoliosTitle': 'All Portfolios',
+          'adm.colUsername': 'Username',
+          'adm.colPortfolios': 'Portfolios',
+          'adm.colCreated': 'Registered',
+          'adm.colRole': 'Role',
+          'adm.colOwner': 'Owner',
+          'adm.colCount': 'Securities',
+          'adm.colSharing': 'Sharing',
           'settings.title': 'Settings',
           'settings.desc': 'Manage your account, portfolios and notifications.',
           'settings.tab.account': 'Account',
