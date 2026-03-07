@@ -97,6 +97,49 @@ class PortfolioService:
             "Не удалось сформировать строку для добавленной бумаги"
         )
 
+    async def add_instruments_bulk(
+        self, portfolio_id: int, payloads: list[AddInstrumentInput]
+    ) -> list[InstrumentMetrics]:
+        """Add multiple instruments in parallel, refresh cache once at the end."""
+
+        async def _prepare(payload: AddInstrumentInput):
+            validation = await self.validate(payload)
+            if not validation.validated:
+                raise ValidationError("Ошибка валидации", "; ".join(validation.warnings))
+            ticker = payload.ticker.upper().strip()
+            if validation.instrument_type == "bond":
+                snapshot = await moex_service.get_bond_snapshot(ticker)
+                if payload.purchase_price is None:
+                    nominal = snapshot.nominal or 1000.0
+                    price = round((snapshot.clean_price_percent / 100.0) * nominal + (snapshot.aci or 0.0), 2)
+                else:
+                    price = payload.purchase_price
+            else:
+                snapshot = await moex_service.get_stock_snapshot(ticker)
+                price = payload.purchase_price if payload.purchase_price is not None else snapshot.current_price
+            return ticker, validation.instrument_type, payload.quantity, price
+
+        results = await asyncio.gather(*[_prepare(p) for p in payloads], return_exceptions=True)
+
+        added_ids = []
+        for res in results:
+            if isinstance(res, Exception):
+                logger.warning("Bulk add: skipping item due to error: %s", res)
+                continue
+            ticker, itype, quantity, price = res
+            new_id = storage_service.add_item(
+                ticker=ticker,
+                instrument_type=itype,
+                quantity=quantity,
+                purchase_price=price,
+                portfolio_id=portfolio_id,
+            )
+            added_ids.append(new_id)
+
+        from app.services.cache_service import cache_service
+        rows = await cache_service.refresh(portfolio_id)
+        return [r for r in rows if r.id in added_ids]
+
     def delete_instrument(self, portfolio_id: int, item_id: int) -> bool:
         deleted = storage_service.delete_item(item_id, portfolio_id)
         if deleted > 0:

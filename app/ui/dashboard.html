@@ -57,7 +57,9 @@
 
       /* ── TOPBAR ───────────────────────────────────────────────── */
       .topbar {
-        background: var(--slate-900);
+        background-color: var(--slate-900);
+        background-image: linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);
+        background-size: 44px 44px;
         position: sticky;
         top: 0;
         z-index: 100;
@@ -1618,8 +1620,8 @@
         ultra_low: { label: 'Минимальный', desc: 'ОФЗ — государственные облигации', color: '#22c55e', yieldMin: 5, yieldMax: 10 },
         low:       { label: 'Низкий',      desc: 'Рейтинг AAA–AA, крупнейшие эмитенты', color: '#84cc16', yieldMin: 5, yieldMax: 13 },
         moderate:  { label: 'Умеренный',   desc: 'Рейтинг A–BBB, надёжный корпоратив', color: '#eab308', yieldMin: 8, yieldMax: 18 },
-        elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 23 },
-        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#ef4444', yieldMin: 15, yieldMax: 27 },
+        elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 22 },
+        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#ef4444', yieldMin: 23, yieldMax: 27 },
       };
       const RISK_KEYS = Object.keys(RISK_LABELS);
 
@@ -1641,7 +1643,7 @@
 
       function buildWizardHTML() {
         return `
-        <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background:var(--slate-900,#0f172a);border-radius:0 0 var(--radius,8px) var(--radius,8px);">
+        <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background-color:#0f172a;background-image:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);background-size:44px 44px;border-radius:var(--radius,8px);width:100%;box-sizing:border-box;text-align:left;">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:32px;">
             <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;">
               Подберём портфель за вас
@@ -1740,6 +1742,14 @@
               transition: border-color .15s;
             }
             .pw-bond-card:hover { border-color: #3b82f6; }
+            .pw-dismiss-btn {
+              position: absolute; top: 3px; right: 6px;
+              background: none; border: none; cursor: pointer;
+              color: var(--slate-500); font-size: 15px; line-height: 1;
+              padding: 2px 5px; border-radius: 4px; font-family: inherit;
+              transition: color .15s, background .15s;
+            }
+            .pw-dismiss-btn:hover { color: #f87171; background: rgba(248,113,113,.1); }
             .pw-rating-badge {
               flex-shrink: 0; min-width: 38px; padding: 3px 7px;
               border-radius: 5px; font-size: 11px; font-weight: 700;
@@ -1763,96 +1773,88 @@
 
         if (!amountSlider) return;
 
-        const updateAmount = () => {
-          const a = sliderToAmount(+amountSlider.value);
-          amountVal.textContent = fmtAmount(a);
-        };
-        const yieldMinEl  = document.getElementById('pw-yield-min');
-        const yieldMaxEl  = document.getElementById('pw-yield-max');
         const yieldRangeNote = document.getElementById('pw-yield-range-note');
 
-        // Flag to prevent mutual recursion between yield↔risk updates
-        let _updatingFromYield = false;
-        let _updatingFromRisk  = false;
+        const updateAmount = () => {
+          amountVal.textContent = fmtAmount(sliderToAmount(+amountSlider.value));
+        };
 
-        // Find best-matching risk index for a given yield value
-        // Picks the risk level whose midpoint is closest to the yield
+        const updateYieldDisplay = (v = +yieldSlider.value) => {
+          yieldVal.textContent = v.toFixed(1).replace('.0', '') + '%';
+        };
+
+        // Closest risk level by midpoint distance
         const yieldToRiskIndex = (yv) => {
           let bestIdx = 0, bestDist = Infinity;
           RISK_KEYS.forEach((key, idx) => {
-            const info = RISK_LABELS[key];
-            const mid = (info.yieldMin + info.yieldMax) / 2;
-            const dist = Math.abs(mid - yv);
+            const { yieldMin, yieldMax } = RISK_LABELS[key];
+            const dist = Math.abs((yieldMin + yieldMax) / 2 - yv);
             if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
           });
           return bestIdx;
         };
 
-        const applyRiskYieldBounds = (info, animate) => {
-          const cur = +yieldSlider.value;
-          yieldSlider.min = info.yieldMin;
-          yieldSlider.max = info.yieldMax;
-          yieldMinEl.textContent = info.yieldMin + '%';
-          yieldMaxEl.textContent = info.yieldMax + '%';
-
-          const clamped = Math.min(info.yieldMax, Math.max(info.yieldMin, cur));
-          if (clamped !== cur) {
-            yieldSlider.value = clamped;
-            updateYieldDisplay();
-            if (animate) {
-              yieldVal.style.transition = 'color .3s';
-              yieldVal.style.color = info.color;
-              setTimeout(() => { yieldVal.style.color = ''; yieldVal.style.transition = ''; }, 600);
-            }
-            yieldRangeNote.textContent = `Для этого уровня риска: ${info.yieldMin}–${info.yieldMax}%`;
-          } else {
-            yieldRangeNote.textContent = `Диапазон для этого уровня: ${info.yieldMin}–${info.yieldMax}%`;
+        // Update risk label/desc/note to match current yield (no slider animation)
+        let _syncingRisk = false;
+        const syncRiskFromYield = () => {
+          const idx  = yieldToRiskIndex(+yieldSlider.value);
+          const key  = RISK_KEYS[idx];
+          const info = RISK_LABELS[key];
+          riskVal.textContent = info.label;
+          riskVal.style.color  = info.color;
+          riskDesc.textContent = info.desc;
+          yieldRangeNote.textContent = `Рекомендуем для ${info.label.toLowerCase()}: ${info.yieldMin}–${info.yieldMax}%`;
+          if (+riskSlider.value !== idx) {
+            _syncingRisk = true;
+            riskSlider.value = idx;
+            _syncingRisk = false;
           }
         };
 
-        const updateYieldDisplay = () => {
-          yieldVal.textContent = (+yieldSlider.value).toFixed(1).replace('.0','') + '%';
+        // Smoothly animate yield slider to target value
+        let _yieldAnimId = null;
+        const animateYieldTo = (target) => {
+          if (_yieldAnimId) cancelAnimationFrame(_yieldAnimId);
+          const start = +yieldSlider.value;
+          if (Math.abs(start - target) < 0.05) return;
+          const duration = 380;
+          const t0 = performance.now();
+          const step = (now) => {
+            const p    = Math.min(1, (now - t0) / duration);
+            const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+            const v    = start + (target - start) * ease;
+            yieldSlider.value = v;
+            updateYieldDisplay(v);
+            syncRiskFromYield();
+            if (p < 1) _yieldAnimId = requestAnimationFrame(step);
+          };
+          _yieldAnimId = requestAnimationFrame(step);
         };
 
+        // Yield drag → risk label follows in real-time
         const updateYield = () => {
+          if (_yieldAnimId) { cancelAnimationFrame(_yieldAnimId); _yieldAnimId = null; }
           updateYieldDisplay();
-          if (_updatingFromRisk) return;
-          // Adjust risk to match the new yield
-          _updatingFromYield = true;
-          const newIdx = yieldToRiskIndex(+yieldSlider.value);
-          if (+riskSlider.value !== newIdx) {
-            riskSlider.value = newIdx;
-            const info = RISK_LABELS[RISK_KEYS[newIdx]];
-            riskVal.textContent = info.label;
-            riskVal.style.color  = info.color;
-            riskDesc.textContent = info.desc;
-            // Update yield bounds silently (no clamp expected since we just set from yield)
-            yieldSlider.min = info.yieldMin;
-            yieldSlider.max = info.yieldMax;
-            yieldMinEl.textContent = info.yieldMin + '%';
-            yieldMaxEl.textContent = info.yieldMax + '%';
-            yieldRangeNote.textContent = `Диапазон для этого уровня: ${info.yieldMin}–${info.yieldMax}%`;
-          }
-          _updatingFromYield = false;
+          syncRiskFromYield();
         };
 
-        const updateRisk = (animate = true) => {
+        // Risk click → yield animates to midpoint of selected range
+        const updateRisk = () => {
+          if (_syncingRisk) return;
           const key  = RISK_KEYS[+riskSlider.value];
           const info = RISK_LABELS[key];
           riskVal.textContent = info.label;
           riskVal.style.color  = info.color;
           riskDesc.textContent = info.desc;
-          if (_updatingFromYield) return;
-          _updatingFromRisk = true;
-          applyRiskYieldBounds(info, animate);
-          _updatingFromRisk = false;
+          const mid = (info.yieldMin + info.yieldMax) / 2;
+          animateYieldTo(mid);
         };
 
         amountSlider.addEventListener('input', updateAmount);
         yieldSlider.addEventListener('input', updateYield);
-        riskSlider.addEventListener('input', () => updateRisk(true));
+        riskSlider.addEventListener('input', updateRisk);
 
-        updateAmount(); updateYieldDisplay(); updateRisk(false);
+        updateAmount(); updateYieldDisplay(); syncRiskFromYield();
 
         submitBtn.addEventListener('click', async () => {
           const amount = sliderToAmount(+amountSlider.value);
@@ -1885,7 +1887,9 @@
 
         const freqLabel = f => f === 12 ? '12×/год' : f === 4 ? '4×/год' : f === 2 ? '2×/год' : f === 1 ? '1×/год' : `${f}×/год`;
 
-        let cardsHtml = bonds.map(b => {
+        const skipped = new Set();
+
+        let cardsHtml = bonds.map((b, i) => {
           const ratingValue = b.rating || b.company_rating || null;
           const ratingHtml = ratingValue
             ? `<span class="pw-rating-badge">${ratingValue}</span>`
@@ -1894,7 +1898,8 @@
           const offerNote = b.offer_date ? ` · оферта ${b.offer_date.substring(0,7)}` : '';
           const freq = freqLabel(b.coupon_frequency || 2);
           return `
-          <div class="pw-bond-card">
+          <div class="pw-bond-card" data-bond-idx="${i}" style="position:relative;">
+            <button class="pw-dismiss-btn" data-idx="${i}" title="Пропустить">×</button>
             ${ratingHtml}
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:13px;color:var(--slate-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
@@ -1947,27 +1952,40 @@
           </div>
         `;
 
+        // Dismiss buttons
+        container.querySelectorAll('.pw-dismiss-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.idx);
+            skipped.add(idx);
+            const card = container.querySelector(`.pw-bond-card[data-bond-idx="${idx}"]`);
+            if (card) {
+              card.style.transition = 'opacity .2s,transform .2s';
+              card.style.opacity = '0';
+              card.style.transform = 'scale(.95)';
+              setTimeout(() => card.remove(), 200);
+            }
+          });
+        });
+
         document.getElementById('pw-add-all').addEventListener('click', async () => {
           const addBtn = document.getElementById('pw-add-all');
           addBtn.disabled = true;
           addBtn.textContent = 'Добавляем...';
+
+          const toAdd = bonds.filter((_, i) => !skipped.has(i));
+          const payload = toAdd.map(b => ({ ticker: b.ticker, quantity: b.lots * b.lot_size }));
           let added = 0;
-          for (const b of bonds) {
-            try {
-              await apiFetch(`/portfolios/${portfolioId}/instruments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  ticker: b.ticker,
-                  quantity: b.lots * b.lot_size,
-                  // purchase_price omitted → backend auto-fetches current MOEX price
-                }),
-              });
-              added++;
-            } catch(e) {
-              console.warn('Failed to add', b.ticker, e);
-            }
+          try {
+            const res = await apiFetch(`/portfolios/${portfolioId}/instruments/bulk`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            added = res.added ?? toAdd.length;
+          } catch(e) {
+            console.warn('Bulk add failed', e);
           }
+
           addBtn.textContent = `✓ Добавлено ${added} бумаг`;
           addBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
           await syncTableFromServer();
@@ -2014,9 +2032,9 @@
         if (thead) thead.style.display = isEmpty ? 'none' : '';
         // Убираем белый фон и бордер карточки таблицы когда показывается wizard
         if (tableCard) {
-          tableCard.style.background  = isEmpty ? 'transparent' : '';
-          tableCard.style.border      = isEmpty ? 'none' : '';
-          tableCard.style.borderRadius = isEmpty ? '0' : '';
+          tableCard.style.background = isEmpty ? 'transparent' : '';
+          tableCard.style.border     = isEmpty ? 'none' : '';
+          tableCard.style.overflow   = isEmpty ? 'visible' : '';
         }
       }
 
@@ -2031,7 +2049,7 @@
           const tr = document.createElement('tr');
           const td = document.createElement('td');
           td.colSpan = 20;
-          td.style.cssText = 'padding: 0; border: none;';
+          td.style.cssText = 'padding: 0; border: none; white-space: normal; text-align: center;';
           td.innerHTML = buildWizardHTML();
           tr.appendChild(td);
           tableBody.appendChild(tr);
