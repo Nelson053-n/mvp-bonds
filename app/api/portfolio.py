@@ -82,13 +82,13 @@ async def add_instruments_bulk(
     """Add multiple instruments at once, with a single cache refresh."""
     await get_portfolio_or_403(portfolio_id, current_user)
     try:
-        rows = await portfolio_service.add_instruments_bulk(portfolio_id, payloads)
+        result = await portfolio_service.add_instruments_bulk(portfolio_id, payloads)
     except AppError as exc:
         raise HTTPException(status_code=400, detail=exc.detail) from exc
     except Exception:
         logger.exception("Unexpected error in bulk add for portfolio_id=%s", portfolio_id)
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
-    return {"added": len(rows)}
+    return result  # {"added": [...], "failed": [...]}
 
 
 @router.delete("/portfolios/{portfolio_id}/instruments/{item_id}")

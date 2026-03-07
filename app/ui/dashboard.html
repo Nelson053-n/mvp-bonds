@@ -1969,29 +1969,63 @@
           });
         });
 
-        document.getElementById('pw-add-all').addEventListener('click', async () => {
+        const doBulkAdd = async (bondsToAdd) => {
           const addBtn = document.getElementById('pw-add-all');
           addBtn.disabled = true;
           addBtn.textContent = 'Добавляем...';
 
-          const toAdd = bonds.filter((_, i) => !skipped.has(i));
-          const payload = toAdd.map(b => ({ ticker: b.ticker, quantity: b.lots * b.lot_size }));
-          let added = 0;
+          const payload = bondsToAdd.map(b => ({ ticker: b.ticker, quantity: b.lots * b.lot_size }));
+          let addedTickers = [], failedTickers = [];
           try {
             const res = await apiFetch(`/portfolios/${portfolioId}/instruments/bulk`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
-            added = res.added ?? toAdd.length;
+            addedTickers = Array.isArray(res.added) ? res.added : bondsToAdd.map(b => b.ticker);
+            failedTickers = Array.isArray(res.failed) ? res.failed : [];
           } catch(e) {
             console.warn('Bulk add failed', e);
+            failedTickers = bondsToAdd.map(b => b.ticker);
           }
 
           window._wizardBusy = false;
-          addBtn.textContent = `✓ Добавлено ${added} бумаг`;
-          addBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+
+          if (failedTickers.length === 0) {
+            addBtn.textContent = `✓ Добавлено ${addedTickers.length} бумаг`;
+            addBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+          } else {
+            addBtn.textContent = addedTickers.length > 0
+              ? `✓ ${addedTickers.length} добавлено, ${failedTickers.length} не удалось`
+              : `✗ Не удалось добавить ${failedTickers.length} бумаг`;
+            addBtn.style.background = addedTickers.length > 0
+              ? 'linear-gradient(135deg,#d97706,#b45309)'
+              : 'linear-gradient(135deg,#dc2626,#b91c1c)';
+
+            // Показываем кнопку повтора для упавших
+            const retryBonds = bondsToAdd.filter(b => failedTickers.includes(b.ticker));
+            let retryBtn = document.getElementById('pw-retry-btn');
+            if (!retryBtn) {
+              retryBtn = document.createElement('button');
+              retryBtn.id = 'pw-retry-btn';
+              retryBtn.style.cssText = 'background:none;border:1px solid #f87171;color:#f87171;font-size:12px;cursor:pointer;font-family:inherit;margin-left:12px;padding:6px 14px;border-radius:6px;transition:background .15s';
+              retryBtn.onmouseenter = () => retryBtn.style.background = 'rgba(248,113,113,.1)';
+              retryBtn.onmouseleave = () => retryBtn.style.background = 'none';
+              addBtn.parentNode.appendChild(retryBtn);
+            }
+            retryBtn.textContent = `Повторить (${failedTickers.length})`;
+            retryBtn.onclick = () => {
+              retryBtn.remove();
+              doBulkAdd(retryBonds);
+            };
+          }
+
           await syncTableFromServer();
+        };
+
+        document.getElementById('pw-add-all').addEventListener('click', () => {
+          const toAdd = bonds.filter((_, i) => !skipped.has(i));
+          doBulkAdd(toAdd);
         });
 
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
