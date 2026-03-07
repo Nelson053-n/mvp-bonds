@@ -253,7 +253,9 @@ async def suggest_portfolio(
 
     async def _fetch_rating(bond: dict) -> dict:
         try:
-            rating = await moex_service._get_credit_rating(bond["ticker"])
+            rating = await moex_service._get_smartlab_credit_rating(bond["ticker"])
+            if rating is None:
+                rating = await moex_service._get_credit_rating(bond["ticker"])
         except Exception:
             rating = None
         return {**bond, "rating": rating}
