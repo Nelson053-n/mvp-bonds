@@ -99,46 +99,73 @@ class PortfolioService:
 
     async def add_instruments_bulk(
         self, portfolio_id: int, payloads: list[AddInstrumentInput]
-    ) -> list[InstrumentMetrics]:
-        """Add multiple instruments in parallel, refresh cache once at the end."""
+    ) -> dict:
+        """Add multiple instruments in parallel with retries, refresh cache once.
 
-        async def _prepare(payload: AddInstrumentInput):
-            validation = await self.validate(payload)
-            if not validation.validated:
-                raise ValidationError("Ошибка валидации", "; ".join(validation.warnings))
+        Returns {"added": [...tickers], "failed": [...tickers]}.
+        """
+        MAX_RETRIES = 3
+        RETRY_DELAYS = [1.0, 2.0]  # seconds before each retry
+
+        async def _prepare_with_retry(payload: AddInstrumentInput) -> tuple:
             ticker = payload.ticker.upper().strip()
-            if validation.instrument_type == "bond":
-                snapshot = await moex_service.get_bond_snapshot(ticker)
-                if payload.purchase_price is None:
-                    nominal = snapshot.nominal or 1000.0
-                    price = round((snapshot.clean_price_percent / 100.0) * nominal + (snapshot.aci or 0.0), 2)
-                else:
-                    price = payload.purchase_price
-            else:
-                snapshot = await moex_service.get_stock_snapshot(ticker)
-                price = payload.purchase_price if payload.purchase_price is not None else snapshot.current_price
-            return ticker, validation.instrument_type, payload.quantity, price
+            last_exc: Exception | None = None
+            for attempt in range(MAX_RETRIES):
+                try:
+                    validation = await self.validate(payload)
+                    if not validation.validated:
+                        raise ValidationError("Ошибка валидации", "; ".join(validation.warnings))
+                    if validation.instrument_type == "bond":
+                        snapshot = await moex_service.get_bond_snapshot(ticker)
+                        if payload.purchase_price is None:
+                            nominal = snapshot.nominal or 1000.0
+                            price = round(
+                                (snapshot.clean_price_percent / 100.0) * nominal + (snapshot.aci or 0.0), 2
+                            )
+                        else:
+                            price = payload.purchase_price
+                    else:
+                        snapshot = await moex_service.get_stock_snapshot(ticker)
+                        price = payload.purchase_price if payload.purchase_price is not None else snapshot.current_price
+                    return ticker, validation.instrument_type, payload.quantity, price
+                except ValidationError:
+                    raise  # не ретраим ошибки валидации
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt < len(RETRY_DELAYS):
+                        logger.warning("Bulk add attempt %d failed for %s: %s — retrying", attempt + 1, ticker, exc)
+                        await asyncio.sleep(RETRY_DELAYS[attempt])
+                    else:
+                        logger.error("Bulk add failed after %d attempts for %s: %s", MAX_RETRIES, ticker, exc)
+            raise last_exc  # type: ignore[misc]
 
-        results = await asyncio.gather(*[_prepare(p) for p in payloads], return_exceptions=True)
+        results = await asyncio.gather(
+            *[_prepare_with_retry(p) for p in payloads], return_exceptions=True
+        )
 
-        added_ids = []
-        for res in results:
+        added_tickers: list[str] = []
+        failed_tickers: list[str] = []
+        added_ids: list[int] = []
+
+        for payload, res in zip(payloads, results):
+            ticker = payload.ticker.upper().strip()
             if isinstance(res, Exception):
-                logger.warning("Bulk add: skipping item due to error: %s", res)
+                failed_tickers.append(ticker)
                 continue
-            ticker, itype, quantity, price = res
+            t, itype, quantity, price = res
             new_id = storage_service.add_item(
-                ticker=ticker,
+                ticker=t,
                 instrument_type=itype,
                 quantity=quantity,
                 purchase_price=price,
                 portfolio_id=portfolio_id,
             )
             added_ids.append(new_id)
+            added_tickers.append(t)
 
         from app.services.cache_service import cache_service
-        rows = await cache_service.refresh(portfolio_id)
-        return [r for r in rows if r.id in added_ids]
+        await cache_service.refresh(portfolio_id)
+        return {"added": added_tickers, "failed": failed_tickers}
 
     def delete_instrument(self, portfolio_id: int, item_id: int) -> bool:
         deleted = storage_service.delete_item(item_id, portfolio_id)
