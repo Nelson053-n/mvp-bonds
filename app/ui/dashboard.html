@@ -2200,7 +2200,7 @@
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:900px;margin:0 auto 28px;">
+          <div class="pw-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:900px;margin:0 auto 28px;">
 
             <!-- Slider 1: Amount -->
             <div class="pw-card">
@@ -2280,6 +2280,18 @@
             .pw-slider-hints {
               display: flex; justify-content: space-between;
               font-size: 10px; color: var(--slate-500,#64748b); margin-top: 6px;
+            }
+            body.mobile-mode .pw-grid {
+              grid-template-columns: 1fr !important;
+            }
+            body.mobile-mode .pw-results-grid {
+              grid-template-columns: 1fr !important;
+            }
+            body.mobile-mode .pw-result-stats {
+              flex-direction: column; align-items: flex-start; gap: 8px;
+            }
+            body.mobile-mode .pw-result-stats-nums {
+              flex-wrap: wrap; gap: 16px;
             }
             .pw-bond-card {
               background: var(--slate-800,#1e293b);
@@ -2466,14 +2478,14 @@
 
         container.style.display = 'block';
         container.innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <div class="pw-result-stats" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
             <div>
               <div style="font-size:17px;font-weight:700;color:var(--slate-100);">${t('wizard.result.title')}</div>
               <div style="font-size:12px;color:var(--slate-400);margin-top:3px;">
                 ${summary.bonds_count} ${t('wizard.result.bondsRisk')} <span style="color:${riskInfo.color};">${riskInfo.label}</span>
               </div>
             </div>
-            <div style="display:flex;gap:24px;">
+            <div class="pw-result-stats-nums" style="display:flex;gap:24px;">
               <div style="text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:var(--slate-100);">${fmt(summary.total_cost)} ₽</div>
                 <div style="font-size:11px;color:var(--slate-400);">${t('wizard.result.total')}</div>
@@ -2488,7 +2500,7 @@
               </div>` : ''}
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:10px;margin-bottom:24px;">
+          <div class="pw-results-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:10px;margin-bottom:24px;">
             ${cardsHtml}
           </div>
           <div style="text-align:center;">
@@ -3627,6 +3639,15 @@
           option.textContent = p.name;
           option.selected = p.id === portfolioId;
           selector.appendChild(option);
+        }
+        // Size to longest name
+        if (portfolios.length) {
+          const longest = portfolios.reduce((a, b) => a.name.length > b.name.length ? a : b).name;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const cs = window.getComputedStyle(selector);
+          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          selector.style.width = Math.ceil(ctx.measureText(longest).width + 40) + 'px';
         }
 
         // Also update mobile selector
