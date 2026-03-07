@@ -1861,6 +1861,7 @@
           const yieldT = +yieldSlider.value;
           const riskKey = RISK_KEYS[+riskSlider.value];
 
+          window._wizardBusy = true;
           submitBtn.disabled = true;
           submitBtn.innerHTML = '<span style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spinBtn .6s linear infinite;display:inline-block;margin-right:6px;vertical-align:middle;"></span>Подбираем...';
           resultEl.style.display = 'none';
@@ -1876,6 +1877,7 @@
           } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = 'Подобрать портфель';
+            // _wizardBusy остаётся true пока результаты видны (сбрасывается при добавлении или "Изменить параметры")
           }
         });
       }
@@ -1946,7 +1948,7 @@
             <button id="pw-add-all" class="btn" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;padding:11px 32px;font-size:14px;font-weight:600;border-radius:8px;">
               Добавить всё в портфель
             </button>
-            <button onclick="document.getElementById('pw-result').style.display='none'" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;margin-left:16px;">
+            <button onclick="document.getElementById('pw-result').style.display='none';window._wizardBusy=false;" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;margin-left:16px;">
               Изменить параметры
             </button>
           </div>
@@ -1986,6 +1988,7 @@
             console.warn('Bulk add failed', e);
           }
 
+          window._wizardBusy = false;
           addBtn.textContent = `✓ Добавлено ${added} бумаг`;
           addBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
           await syncTableFromServer();
@@ -3187,6 +3190,7 @@
             setStatus(tableStatusEl, err.message || 'Ошибка загрузки портфеля.', true);
           }
           setInterval(() => {
+            if (window._wizardBusy) return;
             syncTableFromServer().catch(() => {});
           }, SYNC_INTERVAL_MS);
         } else {
@@ -3195,7 +3199,9 @@
             loadNotifSettings();
             if (loadTableCache()) renderTable();
             setInterval(() => {
-              if (portfolioId) syncTableFromServer().catch(() => {});
+              if (!portfolioId) return;
+              if (window._wizardBusy) return;
+              syncTableFromServer().catch(() => {});
             }, SYNC_INTERVAL_MS);
           });
         }
