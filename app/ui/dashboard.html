@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MVP Portfolio</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>P</text></svg>" />
+    <title>Bond AI</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -542,6 +542,90 @@
         vertical-align: middle;
       }
 
+      /* ── SETTINGS TABS ───────────────────────────────────────── */
+      .stab-btn {
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--slate-500);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 8px 14px 10px;
+        margin-bottom: -1px;
+        transition: color .15s, border-color .15s;
+      }
+      .stab-btn:hover { color: var(--slate-800); }
+      .stab-btn.stab-active { color: var(--blue-600); border-bottom-color: var(--blue-600); font-weight: 600; }
+
+      /* ── LANGUAGE SWITCHER ────────────────────────────────────── */
+      .lang-btn {
+        background: none;
+        border: 1px solid var(--slate-700);
+        border-radius: var(--radius-sm);
+        color: var(--slate-400);
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .3px;
+        padding: 3px 8px;
+        transition: background .15s, color .15s;
+      }
+      .lang-btn:hover, .lang-btn.active { background: var(--slate-700); color: #fff; }
+
+      /* ── MOBILE VERSION ───────────────────────────────────────── */
+      .mobile-toggle-bar {
+        display: none;
+        text-align: center;
+        padding: 12px;
+        border-top: 1px solid var(--slate-200);
+        background: var(--slate-50);
+        font-size: 12px;
+        color: var(--slate-500);
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .mobile-toggle-btn {
+        background: none;
+        border: 1px solid var(--slate-300);
+        border-radius: 16px;
+        color: var(--slate-600);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 4px 14px;
+        transition: background .15s, color .15s;
+      }
+      .mobile-toggle-btn.active { background: var(--slate-800); color: #fff; border-color: var(--slate-800); }
+
+      @media (max-width: 640px) {
+        .mobile-toggle-bar { display: flex; }
+      }
+
+      /* Mobile layout */
+      body.mobile-mode .topbar-nav { display: none !important; }
+      body.mobile-mode .topbar-inner { flex-wrap: wrap; }
+      body.mobile-mode .container { padding: 8px; }
+      body.mobile-mode .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      body.mobile-mode .stat-card { padding: 10px 12px; }
+      body.mobile-mode .panel-cols { grid-template-columns: 1fr !important; }
+      body.mobile-mode table { font-size: 10px; }
+      body.mobile-mode th, body.mobile-mode td { padding: 5px 6px; }
+      body.mobile-mode .mobile-toggle-bar { display: flex; }
+      body.mobile-mode .brand-badge { display: none; }
+
+      /* Mobile nav drawer */
+      body.mobile-mode .mobile-nav {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px 12px;
+        background: var(--slate-900);
+        border-top: 1px solid var(--slate-700);
+      }
+      .mobile-nav { display: none; }
+      .mobile-nav .nav-btn { flex: 1; min-width: 120px; text-align: center; }
+
       /* ── RESPONSIVE ──────────────────────────────────────────── */
       @media (max-width: 1024px) {
         .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -568,18 +652,24 @@
     <nav class="topbar">
       <div class="topbar-inner">
         <div class="topbar-brand" data-panel="panel-table" style="cursor:pointer;">
-          <div class="brand-mark">P</div>
-          <span class="brand-name">Портфель</span>
-          <span class="brand-badge">MVP</span>
+          <div class="brand-mark">B</div>
+          <span class="brand-name">Bond AI</span>
         </div>
         <div class="topbar-nav">
-          <button class="nav-btn" data-panel="panel-add">Добавить бумагу</button>
-          <button class="nav-btn" data-panel="panel-notifications">Уведомления</button>
-          <button class="nav-btn" data-panel="panel-io">Импорт / Экспорт</button>
+          <button class="nav-btn" data-panel="panel-add" data-i18n="nav.add">Добавить бумагу</button>
+          <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
           <button class="nav-btn" id="nav-admin" data-panel="panel-admin" style="display:none; color:#f59e0b;">Администратор</button>
         </div>
+        <div id="topbar-right" style="display:flex;align-items:center;gap:8px;margin-left:auto;"></div>
       </div>
     </nav>
+
+    <!-- Mobile nav (visible only in mobile-mode) -->
+    <div class="mobile-nav" id="mobile-nav">
+      <button class="nav-btn" data-panel="panel-table">Портфель</button>
+      <button class="nav-btn" data-panel="panel-add" data-i18n="nav.add">Добавить бумагу</button>
+      <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
+    </div>
 
     <div class="container">
 
@@ -715,105 +805,176 @@
         </div>
       </div>
 
-      <!-- ── PANEL: NOTIFICATIONS ───────────────────────────────── -->
-      <div id="panel-notifications" class="panel">
+      <!-- ── PANEL: SETTINGS ───────────────────────────────────── -->
+      <div id="panel-settings" class="panel">
         <div class="section-header">
-          <h1 class="section-title">Telegram-уведомления</h1>
-          <p class="section-desc">Получайте оповещения об изменениях рейтинга и просадке позиций прямо в Telegram.</p>
+          <h1 class="section-title" data-i18n="settings.title">Настройки</h1>
+          <p class="section-desc" data-i18n="settings.desc">Управление аккаунтом, портфелями и уведомлениями.</p>
         </div>
-        <div class="panel-cols panel-cols-auto">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Настройки бота</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <div class="field">
-                <label for="tg-token">Bot Token</label>
-                <input id="tg-token" type="password" class="input" placeholder="123456:ABC-DEF..." />
-              </div>
-              <div class="field">
-                <label for="tg-chat">Chat ID</label>
-                <input id="tg-chat" type="text" class="input" placeholder="-100123456789" />
-              </div>
-              <div class="field">
-                <label for="tg-threshold">Порог просадки (%)</label>
-                <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
-              </div>
-              <div class="notif-actions">
-                <button class="btn" id="notif-save-btn">Сохранить</button>
-                <button class="btn btn-secondary" id="notif-test-btn">Тест уведомления</button>
-              </div>
-              <div id="notif-status" class="status"></div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Когда приходят уведомления</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-              <div class="info-box">
-                <b>Изменение кредитного рейтинга</b><br>
-                Бот пришлёт сообщение, если рейтинг эмитента повысился или понизился с момента последней проверки.
-              </div>
-              <div class="info-box">
-                <b>Просадка рыночной цены</b><br>
-                Если текущая цена упала ниже цены покупки на установленный порог (%), придёт предупреждение.
-              </div>
-              <div class="info-box">
-                <b>Как получить Chat ID</b><br>
-                Перешлите любое сообщение боту <b>@userinfobot</b> — он ответит вашим ID.<br>
-                Для группы/канала добавьте бота и используйте ID группы.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- ── PANEL: IMPORT / EXPORT ─────────────────────────────── -->
-      <div id="panel-io" class="panel">
-        <div class="section-header">
-          <h1 class="section-title">Импорт и экспорт</h1>
-          <p class="section-desc">Выгружайте портфель в CSV или загружайте позиции из файла.</p>
+        <!-- Settings tabs -->
+        <div class="settings-tabs" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--slate-200);padding-bottom:0;">
+          <button class="stab-btn stab-active" data-stab="stab-account" data-i18n="settings.tab.account">Аккаунт</button>
+          <button class="stab-btn" data-stab="stab-portfolios" data-i18n="settings.tab.portfolios">Портфели</button>
+          <button class="stab-btn" data-stab="stab-notifications" data-i18n="settings.tab.notifications">Уведомления</button>
+          <button class="stab-btn" data-stab="stab-io" data-i18n="settings.tab.io">Импорт / Экспорт</button>
         </div>
-        <div class="panel-cols panel-cols-2">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Экспорт</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <div class="info-box">
-                Скачайте все позиции текущего портфеля в формате CSV.<br>
-                Файл содержит: тикер, тип, количество, цену покупки.
+
+        <!-- ── TAB: Account ── -->
+        <div id="stab-account" class="stab-content">
+          <div class="panel-cols panel-cols-auto">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="settings.account.pwTitle">Смена пароля</h2>
               </div>
-              <div>
-                <button class="btn" id="export-btn">⬇ Скачать CSV</button>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="field">
+                  <label for="acc-old-pw" data-i18n="settings.account.oldPw">Текущий пароль</label>
+                  <input id="acc-old-pw" type="password" class="input" />
+                </div>
+                <div class="field">
+                  <label for="acc-new-pw" data-i18n="settings.account.newPw">Новый пароль</label>
+                  <input id="acc-new-pw" type="password" class="input" />
+                </div>
+                <div class="field">
+                  <label for="acc-new-pw2" data-i18n="settings.account.newPw2">Повторите пароль</label>
+                  <input id="acc-new-pw2" type="password" class="input" />
+                </div>
+                <button class="btn" id="acc-pw-btn" data-i18n="settings.account.pwSave">Сменить пароль</button>
+                <div id="acc-pw-status" class="status"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="settings.account.emailTitle">Email</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="field">
+                  <label for="acc-email" data-i18n="settings.account.emailLabel">Email адрес</label>
+                  <input id="acc-email" type="email" class="input" placeholder="you@example.com" />
+                </div>
+                <button class="btn" id="acc-email-btn" data-i18n="settings.account.emailSave">Сохранить email</button>
+                <div id="acc-email-status" class="status"></div>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- ── TAB: Portfolios ── -->
+        <div id="stab-portfolios" class="stab-content" style="display:none;">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Импорт</h2>
+              <h2 class="card-title" data-i18n="settings.portfolios.title">Мои портфели</h2>
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="settingsLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
             </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <div class="info-box">
-                Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code><br>
-                Значения instrument_type: <code>bond</code> или <code>stock</code>
+            <div class="card-body" style="padding:0;">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th data-i18n="settings.portfolios.col.name">Название</th>
+                      <th data-i18n="settings.portfolios.col.count">Инструментов</th>
+                      <th class="no-sort" data-i18n="settings.portfolios.col.actions">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settings-portfolios-body"></tbody>
+                </table>
               </div>
-              <div class="field">
-                <label for="import-portfolio">Портфель для импорта</label>
-                <select id="import-portfolio" class="select-input">
-                  <option value="">Выберите портфель</option>
-                </select>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:10px;">
-                <label class="file-label" for="import-file" style="justify-content:center;">📂 Выбрать файл CSV</label>
-                <input type="file" id="import-file" accept=".csv,text/csv" />
-                <button class="btn" id="import-btn">⬆ Импортировать</button>
-              </div>
-              <div id="io-status" class="status"></div>
             </div>
           </div>
         </div>
+
+        <!-- ── TAB: Notifications ── -->
+        <div id="stab-notifications" class="stab-content" style="display:none;">
+          <div class="panel-cols panel-cols-auto">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="settings.notif.botTitle">Настройки бота</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="field">
+                  <label for="tg-token">Bot Token</label>
+                  <input id="tg-token" type="password" class="input" placeholder="123456:ABC-DEF..." />
+                </div>
+                <div class="field">
+                  <label for="tg-chat">Chat ID</label>
+                  <input id="tg-chat" type="text" class="input" placeholder="-100123456789" />
+                </div>
+                <div class="field">
+                  <label for="tg-threshold" data-i18n="settings.notif.threshold">Порог просадки (%)</label>
+                  <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
+                </div>
+                <div class="notif-actions">
+                  <button class="btn" id="notif-save-btn" data-i18n="btn.save">Сохранить</button>
+                  <button class="btn btn-secondary" id="notif-test-btn" data-i18n="settings.notif.test">Тест уведомления</button>
+                </div>
+                <div id="notif-status" class="status"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="settings.notif.whenTitle">Когда приходят уведомления</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                <div class="info-box">
+                  <b data-i18n="settings.notif.ratingChange">Изменение кредитного рейтинга</b><br>
+                  <span data-i18n="settings.notif.ratingDesc">Бот пришлёт сообщение, если рейтинг эмитента повысился или понизился с момента последней проверки.</span>
+                </div>
+                <div class="info-box">
+                  <b data-i18n="settings.notif.priceDropTitle">Просадка рыночной цены</b><br>
+                  <span data-i18n="settings.notif.priceDropDesc">Если текущая цена упала ниже цены покупки на установленный порог (%), придёт предупреждение.</span>
+                </div>
+                <div class="info-box">
+                  <b data-i18n="settings.notif.chatIdTitle">Как получить Chat ID</b><br>
+                  <span data-i18n="settings.notif.chatIdDesc">Перешлите любое сообщение боту <b>@userinfobot</b> — он ответит вашим ID. Для группы/канала добавьте бота и используйте ID группы.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Import/Export ── -->
+        <div id="stab-io" class="stab-content" style="display:none;">
+          <div class="panel-cols panel-cols-2">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="io.exportTitle">Экспорт</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="info-box" data-i18n="io.exportDesc">
+                  Скачайте все позиции текущего портфеля в формате CSV.<br>
+                  Файл содержит: тикер, тип, количество, цену покупки.
+                </div>
+                <div>
+                  <button class="btn" id="export-btn" data-i18n="io.exportBtn">⬇ Скачать CSV</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="io.importTitle">Импорт</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <div class="info-box">
+                  <span data-i18n="io.importDesc">Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code></span>
+                </div>
+                <div class="field">
+                  <label for="import-portfolio" data-i18n="io.importPortfolio">Портфель для импорта</label>
+                  <select id="import-portfolio" class="select-input">
+                    <option value="" data-i18n="io.importPortfolioPlaceholder">Выберите портфель</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  <label class="file-label" for="import-file" style="justify-content:center;" data-i18n="io.chooseFile">📂 Выбрать файл CSV</label>
+                  <input type="file" id="import-file" accept=".csv,text/csv" />
+                  <button class="btn" id="import-btn" data-i18n="io.importBtn">⬆ Импортировать</button>
+                </div>
+                <div id="io-status" class="status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
 
@@ -919,9 +1080,16 @@
 
     </div><!-- /container -->
 
+    <!-- Mobile bottom toggle bar -->
+    <div class="mobile-toggle-bar" id="mobile-toggle-bar">
+      <span style="color:var(--slate-400);font-size:11px;" data-i18n="mobile.version">Версия:</span>
+      <button class="mobile-toggle-btn" id="mobile-btn-desktop" onclick="setMobileMode(false)" data-i18n="mobile.desktop">Полная</button>
+      <button class="mobile-toggle-btn active" id="mobile-btn-mobile" onclick="setMobileMode(true)" data-i18n="mobile.mobile">Мобильная</button>
+    </div>
+
     <!-- Site Footer -->
     <footer style="border-top: 1px solid #1e293b; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px;">
-      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Портфель MVP &nbsp;·&nbsp; Не является инвестиционной рекомендацией</span>
+      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Bond AI &nbsp;·&nbsp; Не является инвестиционной рекомендацией</span>
       <span style="font-size: 11px; color: #475569;"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: #3b82f6; text-decoration: none;">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
     </footer>
 
@@ -2723,17 +2891,16 @@
               <div class="l-hero">
                 <div class="l-left">
                   <div class="l-brand">
-                    <div class="l-brand-mark">P</div>
-                    <span class="l-brand-name">Портфель</span>
-                    <span class="l-brand-badge">MVP</span>
+                    <div class="l-brand-mark">B</div>
+                    <span class="l-brand-name">Bond AI</span>
                   </div>
-                  <h1 class="l-h1">Контроль над<br><span class="grad">инвестиционным</span><br>портфелем</h1>
-                  <p class="l-sub">Отслеживайте акции и облигации в одном месте.<br>Рыночные данные MOEX, купонный доход, рейтинги эмитентов и AI-комментарии.</p>
+                  <h1 class="l-h1">Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ</h1>
+                  <p class="l-sub">Отслеживайте акции и облигации в одном месте.<br>ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.</p>
                   <ul class="l-feats">
+                    <li><span class="l-feat-icon">🤖</span><span>ИИ-подбор облигаций по доходности и уровню риска</span></li>
                     <li><span class="l-feat-icon">📊</span><span>Актуальные цены и доходность по данным MOEX</span></li>
                     <li><span class="l-feat-icon">💰</span><span>Расчёт купонного дохода с учётом праздников и оферт</span></li>
                     <li><span class="l-feat-icon">🏅</span><span>Кредитные рейтинги эмитентов облигаций</span></li>
-                    <li><span class="l-feat-icon">🤖</span><span>AI-комментарии по каждой позиции от Claude</span></li>
                     <li><span class="l-feat-icon">🔗</span><span>Публичные ссылки для совместного просмотра портфеля</span></li>
                   </ul>
                 </div>
@@ -2761,7 +2928,7 @@
                 </div>
               </div>
               <div class="l-footer">
-                <p>© ${new Date().getFullYear()} Портфель MVP · Не является инвестиционной рекомендацией</p>
+                <p>© ${new Date().getFullYear()} Bond AI · Не является инвестиционной рекомендацией</p>
                 <p><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener">Откройте счёт и получите акции на 2000 ₽ →</a></p>
               </div>
             </div>
@@ -2803,45 +2970,50 @@
         // Setup portfolio selector
         setupPortfolioSelector();
 
-        // Add share and logout buttons if not in shared view
+        // Add share, lang switcher and logout buttons if not in shared view
         if (!isReadOnly && !document.getElementById('btn-logout')) {
           const topbarNav = document.querySelector('.topbar-nav');
-          if (topbarNav) {
-            // Add share button
-            if (!document.getElementById('btn-share-portfolio')) {
-              const shareBtn = document.createElement('button');
-              shareBtn.id = 'btn-share-portfolio';
-              shareBtn.className = 'nav-btn';
-              shareBtn.textContent = '📤 Поделиться';
-              shareBtn.style.marginLeft = 'auto';
-              shareBtn.onclick = openShareModal;
-              topbarNav.appendChild(shareBtn);
-            }
+          const topbarRight = document.getElementById('topbar-right');
 
-            // Add logout button to topbar-inner
-            const topbarInner = document.querySelector('.topbar-inner');
-            if (topbarInner) {
-              const btn = document.createElement('button');
-              btn.id = 'btn-logout';
-              btn.textContent = 'Выйти';
-              btn.style.marginLeft = '12px';
-              btn.style.padding = '4px 12px';
-              btn.style.background = '#dc2626';
-              btn.style.color = '#fff';
-              btn.style.border = 'none';
-              btn.style.borderRadius = '4px';
-              btn.style.cursor = 'pointer';
-              btn.style.fontSize = '12px';
-              btn.style.alignSelf = 'center';
-              btn.onclick = () => {
-                localStorage.removeItem('mvp_auth_token');
-                localStorage.removeItem('mvp_username');
-                location.reload();
-              };
-              topbarInner.appendChild(btn);
-            }
+          // Share button (in nav)
+          if (topbarNav && !document.getElementById('btn-share-portfolio')) {
+            const shareBtn = document.createElement('button');
+            shareBtn.id = 'btn-share-portfolio';
+            shareBtn.className = 'nav-btn';
+            shareBtn.setAttribute('data-i18n', 'nav.share');
+            shareBtn.textContent = 'Поделиться';
+            shareBtn.onclick = openShareModal;
+            topbarNav.appendChild(shareBtn);
+          }
+
+          if (topbarRight) {
+            // Language switcher
+            const langWrap = document.createElement('div');
+            langWrap.style.display = 'flex';
+            langWrap.style.gap = '4px';
+            langWrap.innerHTML = `
+              <button class="lang-btn${window._lang==='ru'?' active':''}" onclick="setLang('ru')">RU</button>
+              <button class="lang-btn${window._lang==='en'?' active':''}" onclick="setLang('en')">EN</button>
+            `;
+            topbarRight.appendChild(langWrap);
+
+            // Logout button
+            const btn = document.createElement('button');
+            btn.id = 'btn-logout';
+            btn.setAttribute('data-i18n', 'nav.logout');
+            btn.textContent = 'Выйти';
+            btn.style.cssText = 'padding:4px 12px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;';
+            btn.onclick = () => {
+              localStorage.removeItem('mvp_auth_token');
+              localStorage.removeItem('mvp_username');
+              location.reload();
+            };
+            topbarRight.appendChild(btn);
           }
         }
+
+        // Init mobile mode
+        initMobileMode();
       }
 
       async function loadPortfolios() {
@@ -3447,6 +3619,267 @@
         btn.appendChild(wave);
         wave.addEventListener('animationend', () => wave.remove(), { once: true });
       });
+
+      // ── SETTINGS TABS ─────────────────────────────────────────────
+      document.querySelectorAll('.stab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.stab-btn').forEach(b => b.classList.remove('stab-active'));
+          document.querySelectorAll('.stab-content').forEach(c => c.style.display = 'none');
+          btn.classList.add('stab-active');
+          const target = document.getElementById(btn.dataset.stab);
+          if (target) target.style.display = 'block';
+          if (btn.dataset.stab === 'stab-portfolios') settingsLoadPortfolios();
+          if (btn.dataset.stab === 'stab-account') settingsLoadAccount();
+        });
+      });
+
+      // Load account info
+      async function settingsLoadAccount() {
+        try {
+          const r = await apiFetch('/auth/me/portfolios-stats');
+          if (!r.ok) return;
+          const d = await r.json();
+          const emailInput = document.getElementById('acc-email');
+          if (emailInput && d.email) emailInput.value = d.email;
+        } catch(e) {}
+      }
+
+      // Load portfolio stats
+      async function settingsLoadPortfolios() {
+        const tbody = document.getElementById('settings-portfolios-body');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        try {
+          const r = await apiFetch('/auth/me/portfolios-stats');
+          const d = await r.json();
+          tbody.innerHTML = '';
+          (d.portfolios || []).forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>
+                <span id="sp-name-${p.id}">${p.name}</span>
+                <input id="sp-input-${p.id}" class="input" style="display:none;max-width:180px;padding:4px 8px;font-size:12px;" value="${p.name}" />
+              </td>
+              <td>${p.item_count}</td>
+              <td>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;"
+                    onclick="settingsEditPortfolio(${p.id})"
+                    id="sp-edit-${p.id}">Переименовать</button>
+                  <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;display:none;background:var(--blue-600);color:#fff;"
+                    onclick="settingsSavePortfolio(${p.id})"
+                    id="sp-save-${p.id}">Сохранить</button>
+                </div>
+              </td>`;
+            tbody.appendChild(tr);
+          });
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="3" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+        }
+      }
+
+      function settingsEditPortfolio(id) {
+        document.getElementById(`sp-name-${id}`).style.display = 'none';
+        document.getElementById(`sp-input-${id}`).style.display = '';
+        document.getElementById(`sp-edit-${id}`).style.display = 'none';
+        document.getElementById(`sp-save-${id}`).style.display = '';
+        document.getElementById(`sp-input-${id}`).focus();
+      }
+
+      async function settingsSavePortfolio(id) {
+        const newName = document.getElementById(`sp-input-${id}`).value.trim();
+        if (!newName) return;
+        try {
+          const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', body: JSON.stringify({ name: newName }) });
+          if (!r.ok) { alert('Ошибка сохранения'); return; }
+          document.getElementById(`sp-name-${id}`).textContent = newName;
+          document.getElementById(`sp-name-${id}`).style.display = '';
+          document.getElementById(`sp-input-${id}`).style.display = 'none';
+          document.getElementById(`sp-edit-${id}`).style.display = '';
+          document.getElementById(`sp-save-${id}`).style.display = 'none';
+          // Update portfolio selector
+          await loadPortfolios();
+          updatePortfolioSelector();
+        } catch(e) { alert('Ошибка сохранения'); }
+      }
+
+      // Change password
+      document.getElementById('acc-pw-btn').addEventListener('click', async () => {
+        const oldPw = document.getElementById('acc-old-pw').value;
+        const newPw = document.getElementById('acc-new-pw').value;
+        const newPw2 = document.getElementById('acc-new-pw2').value;
+        const status = document.getElementById('acc-pw-status');
+        if (newPw !== newPw2) { status.textContent = 'Новые пароли не совпадают'; status.className = 'status error'; return; }
+        if (newPw.length < 6) { status.textContent = 'Минимум 6 символов'; status.className = 'status error'; return; }
+        try {
+          const r = await apiFetch('/auth/change-password', { method: 'POST', body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
+          if (r.status === 204) {
+            status.textContent = 'Пароль изменён';
+            status.className = 'status ok';
+            document.getElementById('acc-old-pw').value = '';
+            document.getElementById('acc-new-pw').value = '';
+            document.getElementById('acc-new-pw2').value = '';
+          } else {
+            const d = await r.json().catch(() => ({}));
+            status.textContent = d.detail || 'Ошибка';
+            status.className = 'status error';
+          }
+        } catch(e) { status.textContent = 'Ошибка соединения'; status.className = 'status error'; }
+      });
+
+      // Change email
+      document.getElementById('acc-email-btn').addEventListener('click', async () => {
+        const email = document.getElementById('acc-email').value.trim();
+        const status = document.getElementById('acc-email-status');
+        if (!email) { status.textContent = 'Введите email'; status.className = 'status error'; return; }
+        try {
+          const r = await apiFetch('/auth/change-email', { method: 'POST', body: JSON.stringify({ email }) });
+          if (r.status === 204) { status.textContent = 'Email сохранён'; status.className = 'status ok'; }
+          else { status.textContent = 'Ошибка'; status.className = 'status error'; }
+        } catch(e) { status.textContent = 'Ошибка соединения'; status.className = 'status error'; }
+      });
+
+      // Load account on settings tab open
+      document.querySelector('[data-panel="panel-settings"]')?.addEventListener('click', () => {
+        setTimeout(settingsLoadAccount, 100);
+      });
+
+      // ── LANGUAGE SWITCHER ─────────────────────────────────────────
+      const TRANSLATIONS = {
+        ru: {
+          'nav.add': 'Добавить бумагу',
+          'nav.settings': 'Настройки',
+          'nav.share': 'Поделиться',
+          'nav.logout': 'Выйти',
+          'settings.title': 'Настройки',
+          'settings.desc': 'Управление аккаунтом, портфелями и уведомлениями.',
+          'settings.tab.account': 'Аккаунт',
+          'settings.tab.portfolios': 'Портфели',
+          'settings.tab.notifications': 'Уведомления',
+          'settings.tab.io': 'Импорт / Экспорт',
+          'settings.account.pwTitle': 'Смена пароля',
+          'settings.account.oldPw': 'Текущий пароль',
+          'settings.account.newPw': 'Новый пароль',
+          'settings.account.newPw2': 'Повторите пароль',
+          'settings.account.pwSave': 'Сменить пароль',
+          'settings.account.emailTitle': 'Email',
+          'settings.account.emailLabel': 'Email адрес',
+          'settings.account.emailSave': 'Сохранить email',
+          'settings.portfolios.title': 'Мои портфели',
+          'settings.portfolios.col.name': 'Название',
+          'settings.portfolios.col.count': 'Инструментов',
+          'settings.portfolios.col.actions': 'Действия',
+          'settings.notif.botTitle': 'Настройки бота',
+          'settings.notif.threshold': 'Порог просадки (%)',
+          'settings.notif.test': 'Тест уведомления',
+          'settings.notif.whenTitle': 'Когда приходят уведомления',
+          'settings.notif.ratingChange': 'Изменение кредитного рейтинга',
+          'settings.notif.ratingDesc': 'Бот пришлёт сообщение, если рейтинг эмитента повысился или понизился с момента последней проверки.',
+          'settings.notif.priceDropTitle': 'Просадка рыночной цены',
+          'settings.notif.priceDropDesc': 'Если текущая цена упала ниже цены покупки на установленный порог (%), придёт предупреждение.',
+          'settings.notif.chatIdTitle': 'Как получить Chat ID',
+          'settings.notif.chatIdDesc': 'Перешлите любое сообщение боту @userinfobot — он ответит вашим ID. Для группы/канала добавьте бота и используйте ID группы.',
+          'io.exportTitle': 'Экспорт',
+          'io.exportBtn': '⬇ Скачать CSV',
+          'io.importTitle': 'Импорт',
+          'io.importPortfolio': 'Портфель для импорта',
+          'io.importPortfolioPlaceholder': 'Выберите портфель',
+          'io.chooseFile': '📂 Выбрать файл CSV',
+          'io.importBtn': '⬆ Импортировать',
+          'btn.save': 'Сохранить',
+          'btn.refresh': '↺ Обновить',
+          'mobile.version': 'Версия:',
+          'mobile.desktop': 'Полная',
+          'mobile.mobile': 'Мобильная',
+        },
+        en: {
+          'nav.add': 'Add Security',
+          'nav.settings': 'Settings',
+          'nav.share': 'Share',
+          'nav.logout': 'Logout',
+          'settings.title': 'Settings',
+          'settings.desc': 'Manage your account, portfolios and notifications.',
+          'settings.tab.account': 'Account',
+          'settings.tab.portfolios': 'Portfolios',
+          'settings.tab.notifications': 'Notifications',
+          'settings.tab.io': 'Import / Export',
+          'settings.account.pwTitle': 'Change Password',
+          'settings.account.oldPw': 'Current password',
+          'settings.account.newPw': 'New password',
+          'settings.account.newPw2': 'Confirm new password',
+          'settings.account.pwSave': 'Change password',
+          'settings.account.emailTitle': 'Email',
+          'settings.account.emailLabel': 'Email address',
+          'settings.account.emailSave': 'Save email',
+          'settings.portfolios.title': 'My Portfolios',
+          'settings.portfolios.col.name': 'Name',
+          'settings.portfolios.col.count': 'Securities',
+          'settings.portfolios.col.actions': 'Actions',
+          'settings.notif.botTitle': 'Bot Settings',
+          'settings.notif.threshold': 'Drop threshold (%)',
+          'settings.notif.test': 'Test notification',
+          'settings.notif.whenTitle': 'When notifications arrive',
+          'settings.notif.ratingChange': 'Credit rating change',
+          'settings.notif.ratingDesc': 'The bot will notify you if an issuer rating changes.',
+          'settings.notif.priceDropTitle': 'Price drawdown',
+          'settings.notif.priceDropDesc': 'Alert when price falls below purchase price by the threshold.',
+          'settings.notif.chatIdTitle': 'How to get Chat ID',
+          'settings.notif.chatIdDesc': 'Forward any message to @userinfobot — it will reply with your ID.',
+          'io.exportTitle': 'Export',
+          'io.exportBtn': '⬇ Download CSV',
+          'io.importTitle': 'Import',
+          'io.importPortfolio': 'Target portfolio',
+          'io.importPortfolioPlaceholder': 'Select portfolio',
+          'io.chooseFile': '📂 Choose CSV file',
+          'io.importBtn': '⬆ Import',
+          'btn.save': 'Save',
+          'btn.refresh': '↺ Refresh',
+          'mobile.version': 'Version:',
+          'mobile.desktop': 'Full',
+          'mobile.mobile': 'Mobile',
+        },
+      };
+
+      window._lang = localStorage.getItem('mvp_lang') || 'ru';
+
+      function applyLang(lang) {
+        window._lang = lang;
+        localStorage.setItem('mvp_lang', lang);
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.dataset.i18n;
+          const val = TRANSLATIONS[lang]?.[key];
+          if (val !== undefined) el.textContent = val;
+        });
+        document.querySelectorAll('.lang-btn').forEach(b => {
+          b.classList.toggle('active', b.textContent.toLowerCase() === lang);
+        });
+      }
+
+      function setLang(lang) { applyLang(lang); }
+
+      // ── MOBILE MODE ───────────────────────────────────────────────
+      function initMobileMode() {
+        const isMobileDevice = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        const saved = localStorage.getItem('mvp_mobile_mode');
+        const mobile = saved !== null ? saved === '1' : isMobileDevice;
+        applyMobileMode(mobile);
+      }
+
+      function setMobileMode(on) {
+        localStorage.setItem('mvp_mobile_mode', on ? '1' : '0');
+        applyMobileMode(on);
+      }
+
+      function applyMobileMode(on) {
+        document.body.classList.toggle('mobile-mode', on);
+        const db = document.getElementById('mobile-btn-desktop');
+        const mb = document.getElementById('mobile-btn-mobile');
+        if (db) db.classList.toggle('active', !on);
+        if (mb) mb.classList.toggle('active', on);
+      }
+
+      // Apply saved language on load (before login so translations are ready)
+      applyLang(window._lang);
 
 
     </script>

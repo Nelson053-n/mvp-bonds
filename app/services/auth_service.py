@@ -94,6 +94,27 @@ class AuthService:
         )
         return token
 
+    def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
+        """Change user password. Returns False if old password is wrong."""
+        user = storage_service.get_user_by_id(user_id)
+        if not user:
+            return False
+        if not bcrypt.checkpw(old_password.encode(), user["password_hash"].encode()):
+            return False
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        storage_service.update_user_password(user_id, new_hash)
+        logger.info("Password changed for user_id=%d", user_id)
+        return True
+
+    def change_email(self, user_id: int, email: str) -> bool:
+        """Update user email. Returns True on success."""
+        user = storage_service.get_user_by_id(user_id)
+        if not user:
+            return False
+        storage_service.update_user_email(user_id, email.strip() or None)
+        logger.info("Email updated for user_id=%d", user_id)
+        return True
+
     def verify_token(self, token: str) -> dict | None:
         """
         Verify a JWT token and return its payload.

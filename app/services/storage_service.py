@@ -88,6 +88,11 @@ class StorageService:
             except sqlite3.OperationalError:
                 pass
 
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_snapshots (
@@ -624,6 +629,39 @@ class StorageService:
             )
             conn.commit()
             return int(cursor.rowcount)
+
+    def update_user_email(self, user_id: int, email: str | None) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET email = ? WHERE id = ?",
+                (email, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def get_portfolios_with_item_counts(self, user_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT p.id, p.name, p.created_at,
+                       COUNT(pi.id) as item_count
+                FROM portfolios p
+                LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
+                WHERE p.user_id = ?
+                GROUP BY p.id
+                ORDER BY p.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "name": row[1],
+                "created_at": row[2],
+                "item_count": int(row[3]),
+            }
+            for row in rows
+        ]
 
     def get_all_portfolios_with_users(self) -> list[dict]:
         with self._connect() as conn:
