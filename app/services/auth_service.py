@@ -130,7 +130,7 @@ class AuthService:
         for k in expired:
             del self._reset_codes[k]
 
-    async def request_password_reset(self, username: str) -> str:
+    async def request_password_reset(self, username: str, lang: str = "ru") -> str:
         """
         Generate a 6-digit reset code for user and send it via Telegram and/or email.
         Returns one of: 'telegram', 'email', 'both', 'none'.
@@ -151,7 +151,7 @@ class AuthService:
         if user["tg_chat_id"]:
             tg_token = storage_service.get_setting("tg_bot_token", "")
             if tg_token:
-                ok = await self._send_telegram_reset(tg_token, user["tg_chat_id"], code, username)
+                ok = await self._send_telegram_reset(tg_token, user["tg_chat_id"], code, username, lang=lang)
                 if ok:
                     sent_via.append("telegram")
 
@@ -161,7 +161,7 @@ class AuthService:
                 has_email_but_no_smtp = True
                 logger.warning("Email set for user %s but SMTP not configured", username)
             else:
-                ok = self._send_email_reset(user["email"], code, username)
+                ok = self._send_email_reset(user["email"], code, username, lang=lang)
                 if ok:
                     sent_via.append("email")
 
@@ -173,13 +173,21 @@ class AuthService:
 
         return "+".join(sent_via)
 
-    async def _send_telegram_reset(self, bot_token: str, chat_id: str, code: str, username: str) -> bool:
-        text = (
-            f"🔐 Bond AI — восстановление пароля\n\n"
-            f"Аккаунт: {username}\n"
-            f"Код подтверждения: <b>{code}</b>\n\n"
-            f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
-        )
+    async def _send_telegram_reset(self, bot_token: str, chat_id: str, code: str, username: str, lang: str = "ru") -> bool:
+        if lang == "en":
+            text = (
+                f"🔐 Bond AI — password recovery\n\n"
+                f"Account: {username}\n"
+                f"Verification code: <b>{code}</b>\n\n"
+                f"Valid for 15 minutes. If you did not request a reset — ignore this message."
+            )
+        else:
+            text = (
+                f"🔐 Bond AI — восстановление пароля\n\n"
+                f"Аккаунт: {username}\n"
+                f"Код подтверждения: <b>{code}</b>\n\n"
+                f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
+            )
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 r = await client.post(
@@ -191,19 +199,28 @@ class AuthService:
             logger.warning("Telegram reset send failed: %s", e)
             return False
 
-    def _send_email_reset(self, email: str, code: str, username: str) -> bool:
+    def _send_email_reset(self, email: str, code: str, username: str, lang: str = "ru") -> bool:
         if not settings.smtp_host or not settings.smtp_from:
             logger.warning("SMTP not configured — cannot send email reset code")
             return False
-        msg = MIMEText(
-            f"Восстановление пароля Bond AI\n\n"
-            f"Аккаунт: {username}\n"
-            f"Код подтверждения: {code}\n\n"
-            f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте.",
-            "plain",
-            "utf-8",
-        )
-        msg["Subject"] = "Bond AI — код восстановления пароля"
+        if lang == "en":
+            body = (
+                f"Bond AI — Password Recovery\n\n"
+                f"Account: {username}\n"
+                f"Verification code: {code}\n\n"
+                f"Valid for 15 minutes. If you did not request a reset — ignore this message."
+            )
+            subject = "Bond AI — password reset code"
+        else:
+            body = (
+                f"Восстановление пароля Bond AI\n\n"
+                f"Аккаунт: {username}\n"
+                f"Код подтверждения: {code}\n\n"
+                f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
+            )
+            subject = "Bond AI — код восстановления пароля"
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = subject
         msg["From"] = settings.smtp_from
         msg["To"] = email
         try:

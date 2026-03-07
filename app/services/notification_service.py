@@ -63,6 +63,8 @@ class NotificationService:
         except ValueError:
             threshold = 5.0
 
+        lang = s.get("tg_lang", "ru")
+
         old_by_id: dict[int, "InstrumentMetrics"] = {r.id: r for r in old_rows}
         messages: list[str] = []
 
@@ -77,11 +79,18 @@ class NotificationService:
                 and new_row.company_rating
                 and old_row.company_rating != new_row.company_rating
             ):
-                messages.append(
-                    f"\u26a0\ufe0f <b>Изменение рейтинга</b>\n"
-                    f"{new_row.name} ({new_row.ticker})\n"
-                    f"{old_row.company_rating} \u2192 {new_row.company_rating}"
-                )
+                if lang == "en":
+                    messages.append(
+                        f"\u26a0\ufe0f <b>Rating change</b>\n"
+                        f"{new_row.name} ({new_row.ticker})\n"
+                        f"{old_row.company_rating} \u2192 {new_row.company_rating}"
+                    )
+                else:
+                    messages.append(
+                        f"\u26a0\ufe0f <b>Изменение рейтинга</b>\n"
+                        f"{new_row.name} ({new_row.ticker})\n"
+                        f"{old_row.company_rating} \u2192 {new_row.company_rating}"
+                    )
 
             # Price drop
             if old_row.current_price > 0 and new_row.current_price > 0:
@@ -91,13 +100,22 @@ class NotificationService:
                     * 100
                 )
                 if drop_pct >= threshold:
-                    messages.append(
-                        f"\U0001f4c9 <b>Просадка цены</b>\n"
-                        f"{new_row.name} ({new_row.ticker})\n"
-                        f"Было: {old_row.current_price:.2f} \u2192 "
-                        f"Стало: {new_row.current_price:.2f} "
-                        f"(-{drop_pct:.1f}%)"
-                    )
+                    if lang == "en":
+                        messages.append(
+                            f"\U0001f4c9 <b>Price drop</b>\n"
+                            f"{new_row.name} ({new_row.ticker})\n"
+                            f"Was: {old_row.current_price:.2f} \u2192 "
+                            f"Now: {new_row.current_price:.2f} "
+                            f"(-{drop_pct:.1f}%)"
+                        )
+                    else:
+                        messages.append(
+                            f"\U0001f4c9 <b>Просадка цены</b>\n"
+                            f"{new_row.name} ({new_row.ticker})\n"
+                            f"Было: {old_row.current_price:.2f} \u2192 "
+                            f"Стало: {new_row.current_price:.2f} "
+                            f"(-{drop_pct:.1f}%)"
+                        )
 
         for msg in messages:
             await self.send_telegram(token, chat_id, msg)
