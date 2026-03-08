@@ -70,6 +70,17 @@ class StorageService:
                 )
                 """
             )
+            # Migrations for portfolios table
+            for col, col_def in [
+                ("share_expires_at", "INTEGER"),  # UNIX timestamp, NULL = never expires
+            ]:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE portfolios ADD COLUMN {col} {col_def}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
+
             # Migrations for existing databases
             for col, col_def in [
                 ("manual_coupon", "REAL"),
@@ -103,6 +114,29 @@ class StorageService:
             except sqlite3.OperationalError:
                 pass
 
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_enabled INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_days INTEGER NOT NULL DEFAULT 3")
+            except sqlite3.OperationalError:
+                pass
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS coupon_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                    item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
+                    coupon_date TEXT NOT NULL,
+                    sent_at TEXT NOT NULL,
+                    UNIQUE(item_id, coupon_date)
+                )
+                """
+            )
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS price_snapshots (
@@ -121,6 +155,59 @@ class StorageService:
                 )
                 """
             )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rate_limits (
+                    key TEXT NOT NULL,
+                    window_start INTEGER NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 1,
+                    PRIMARY KEY (key, window_start)
+                )
+                """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS price_alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                    item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
+                    ticker TEXT NOT NULL,
+                    alert_type TEXT NOT NULL CHECK(alert_type IN ('above', 'below')),
+                    target_price REAL NOT NULL,
+                    triggered INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    triggered_at TEXT
+                )
+                """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                    snapshot_date TEXT NOT NULL,
+                    total_value REAL NOT NULL DEFAULT 0,
+                    total_cost REAL NOT NULL DEFAULT 0,
+                    UNIQUE(portfolio_id, snapshot_date)
+                )
+                """
+            )
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS watchlist (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    ticker TEXT NOT NULL,
+                    instrument_type TEXT NOT NULL DEFAULT 'bond',
+                    note TEXT,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(user_id, ticker, instrument_type)
+                )
+            """)
 
             # Create indices
             try:
@@ -143,6 +230,14 @@ class StorageService:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_portfolios_share_token "
                     "ON portfolios(share_token)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio_date "
+                    "ON portfolio_snapshots(portfolio_id, snapshot_date)"
                 )
             except sqlite3.OperationalError:
                 pass
@@ -487,7 +582,7 @@ class StorageService:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, user_id, name, share_token, share_password_hash, created_at
+                SELECT id, user_id, name, share_token, share_password_hash, created_at, share_expires_at
                 FROM portfolios
                 WHERE user_id = ?
                 ORDER BY id ASC
@@ -503,6 +598,7 @@ class StorageService:
                 "share_token": row[3],
                 "share_password_hash": row[4],
                 "created_at": row[5],
+                "share_expires_at": row[6],
             }
             for row in rows
         ]
@@ -511,7 +607,7 @@ class StorageService:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, user_id, name, share_token, share_password_hash, created_at
+                SELECT id, user_id, name, share_token, share_password_hash, created_at, share_expires_at
                 FROM portfolios
                 WHERE id = ?
                 """,
@@ -527,13 +623,14 @@ class StorageService:
             "share_token": row[3],
             "share_password_hash": row[4],
             "created_at": row[5],
+            "share_expires_at": row[6],
         }
 
     def get_portfolio_by_share_token(self, share_token: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, user_id, name, share_token, share_password_hash, created_at
+                SELECT id, user_id, name, share_token, share_password_hash, created_at, share_expires_at
                 FROM portfolios
                 WHERE share_token = ?
                 """,
@@ -549,6 +646,7 @@ class StorageService:
             "share_token": row[3],
             "share_password_hash": row[4],
             "created_at": row[5],
+            "share_expires_at": row[6],
         }
 
     def update_portfolio(
@@ -557,6 +655,7 @@ class StorageService:
         name: str | None = None,
         share_token: str | None = _UNSET,
         share_password_hash: str | None = _UNSET,
+        share_expires_at: int | None = _UNSET,
     ) -> int:
         updates = []
         values = []
@@ -570,6 +669,9 @@ class StorageService:
         if share_password_hash is not _UNSET:
             updates.append("share_password_hash = ?")
             values.append(share_password_hash)
+        if share_expires_at is not _UNSET:
+            updates.append("share_expires_at = ?")
+            values.append(share_expires_at)
 
         if not updates:
             return 0
@@ -591,7 +693,57 @@ class StorageService:
             conn.commit()
             return int(cursor.rowcount)
 
+    def count_portfolios(self, user_id: int) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM portfolios WHERE user_id = ?", (user_id,)).fetchone()
+            return int(row[0]) if row else 0
 
+    def count_items(self, portfolio_id: int) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM portfolio_items WHERE portfolio_id = ?", (portfolio_id,)).fetchone()
+            return int(row[0]) if row else 0
+
+    def cleanup_expired_shares(self) -> int:
+        """Remove expired share tokens. Returns count of cleaned up records."""
+        import time
+        now = int(time.time())
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolios SET share_token = NULL, share_password_hash = NULL, share_expires_at = NULL "
+                "WHERE share_expires_at IS NOT NULL AND share_expires_at < ?",
+                (now,)
+            )
+            conn.commit()
+            return cursor.rowcount
+
+    def check_rate_limit(self, key: str, window_seconds: int, max_count: int) -> bool:
+        """Returns True if request is allowed, False if rate-limited. Atomically increments counter."""
+        import time
+        now = int(time.time())
+        window_start = now - (now % window_seconds)
+        with self._connect() as conn:
+            # Clean old windows
+            conn.execute("DELETE FROM rate_limits WHERE window_start < ?", (window_start - window_seconds,))
+            row = conn.execute(
+                "SELECT count FROM rate_limits WHERE key = ? AND window_start = ?",
+                (key, window_start)
+            ).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)",
+                    (key, window_start)
+                )
+                conn.commit()
+                return True
+            if row[0] >= max_count:
+                conn.commit()
+                return False
+            conn.execute(
+                "UPDATE rate_limits SET count = count + 1 WHERE key = ? AND window_start = ?",
+                (key, window_start)
+            )
+            conn.commit()
+            return True
 
     # ── Admin ───────────────────────────────────────────────────────────────
 
@@ -804,5 +956,243 @@ class StorageService:
             "shared_links": int(shared),
             "total_instruments": int(items),
         }
+
+    def get_all_portfolios_raw(self) -> list[dict]:
+        """Get all portfolios (id, user_id, name) for background jobs."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT id, user_id, name FROM portfolios").fetchall()
+        return [{"id": r[0], "user_id": r[1], "name": r[2]} for r in rows]
+
+    def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float) -> None:
+        """Save daily snapshot. Upsert by date."""
+        from datetime import date
+        today = date.today().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO portfolio_snapshots (portfolio_id, snapshot_date, total_value, total_cost)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(portfolio_id, snapshot_date) DO UPDATE SET
+                   total_value=excluded.total_value, total_cost=excluded.total_cost""",
+                (portfolio_id, today, total_value, total_cost)
+            )
+            conn.commit()
+
+    def get_portfolio_snapshots(self, portfolio_id: int, days: int = 90) -> list[dict]:
+        """Get historical snapshots for last N days."""
+        from datetime import date, timedelta
+        since = (date.today() - timedelta(days=days)).isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT snapshot_date, total_value, total_cost
+                   FROM portfolio_snapshots
+                   WHERE portfolio_id = ? AND snapshot_date >= ?
+                   ORDER BY snapshot_date ASC""",
+                (portfolio_id, since)
+            ).fetchall()
+        return [{"date": r[0], "total_value": r[1], "total_cost": r[2]} for r in rows]
+
+    # ── User notification settings ─────────────────────────────────────────
+
+    def get_user_notification_settings(self, user_id: int) -> dict:
+        """Return coupon notification settings for a user."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT coupon_notif_enabled, coupon_notif_days FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return {"coupon_notif_enabled": False, "coupon_notif_days": 3}
+        return {
+            "coupon_notif_enabled": bool(row[0]),
+            "coupon_notif_days": int(row[1]),
+        }
+
+    def update_user_notification_settings(
+        self, user_id: int, enabled: bool, days_before: int
+    ) -> None:
+        """Update coupon notification settings for a user."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE users SET coupon_notif_enabled = ?, coupon_notif_days = ? WHERE id = ?",
+                (1 if enabled else 0, days_before, user_id),
+            )
+            conn.commit()
+
+    def get_users_with_coupon_notifications(self) -> list[dict]:
+        """Return users who have coupon notifications enabled and a tg_chat_id set."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, username, tg_chat_id, coupon_notif_days
+                FROM users
+                WHERE coupon_notif_enabled = 1 AND tg_chat_id IS NOT NULL
+                """
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "username": row[1],
+                "tg_chat_id": row[2],
+                "coupon_notif_days": int(row[3]),
+            }
+            for row in rows
+        ]
+
+    # ── Coupon notifications log ───────────────────────────────────────────
+
+    def mark_coupon_notification_sent(self, item_id: int, coupon_date: str) -> None:
+        """Record that a coupon notification was sent for item_id + coupon_date."""
+        from datetime import datetime, timezone
+
+        sent_at = datetime.now(timezone.utc).isoformat()
+        # Resolve portfolio_id for the item
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT portfolio_id FROM portfolio_items WHERE id = ?", (item_id,)
+            ).fetchone()
+            if not row:
+                return
+            portfolio_id = row[0]
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO coupon_notifications (portfolio_id, item_id, coupon_date, sent_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (portfolio_id, item_id, coupon_date, sent_at),
+            )
+            conn.commit()
+
+    def is_coupon_notification_sent(self, item_id: int, coupon_date: str) -> bool:
+        """Return True if a notification for this item+coupon_date was already sent."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM coupon_notifications WHERE item_id = ? AND coupon_date = ?",
+                (item_id, coupon_date),
+            ).fetchone()
+        return row is not None
+
+    # ── Price alerts ───────────────────────────────────────────────────────
+
+    def get_price_alerts(self, user_id: int) -> list[dict]:
+        """Get all price alerts for a user."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT pa.id, pa.user_id, pa.portfolio_id, pa.item_id, pa.ticker,
+                          pa.alert_type, pa.target_price, pa.triggered, pa.created_at, pa.triggered_at
+                   FROM price_alerts pa WHERE pa.user_id = ? ORDER BY pa.created_at DESC""",
+                (user_id,)
+            ).fetchall()
+        cols = ["id", "user_id", "portfolio_id", "item_id", "ticker", "alert_type", "target_price", "triggered", "created_at", "triggered_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+    def get_price_alerts_for_item(self, item_id: int) -> list[dict]:
+        """Get active price alerts for a specific portfolio item."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM price_alerts WHERE item_id = ? AND triggered = 0",
+                (item_id,)
+            ).fetchall()
+        cols = ["id", "user_id", "portfolio_id", "item_id", "ticker", "alert_type", "target_price", "triggered", "created_at", "triggered_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+    def create_price_alert(self, user_id: int, portfolio_id: int, item_id: int, ticker: str, alert_type: str, target_price: float) -> int:
+        """Create a new price alert. Returns the new alert id."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """INSERT INTO price_alerts (user_id, portfolio_id, item_id, ticker, alert_type, target_price, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, portfolio_id, item_id, ticker, alert_type, target_price, now)
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+
+    def delete_price_alert(self, alert_id: int, user_id: int) -> bool:
+        """Delete a price alert owned by the user. Returns True if deleted."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM price_alerts WHERE id = ? AND user_id = ?",
+                (alert_id, user_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_all_active_price_alerts(self) -> list[dict]:
+        """Get all non-triggered price alerts with user tg_chat_id."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT pa.id, pa.user_id, pa.item_id, pa.ticker, pa.alert_type, pa.target_price,
+                          u.tg_chat_id
+                   FROM price_alerts pa
+                   JOIN users u ON u.id = pa.user_id
+                   WHERE pa.triggered = 0 AND u.tg_chat_id IS NOT NULL"""
+            ).fetchall()
+        cols = ["id", "user_id", "item_id", "ticker", "alert_type", "target_price", "tg_chat_id"]
+        return [dict(zip(cols, r)) for r in rows]
+
+    def mark_price_alert_triggered(self, alert_id: int) -> None:
+        """Mark a price alert as triggered with current timestamp."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE price_alerts SET triggered = 1, triggered_at = ? WHERE id = ?",
+                (now, alert_id)
+            )
+            conn.commit()
+
+    def get_item(self, item_id: int, portfolio_id: int) -> dict | None:
+        """Get a single portfolio item by id and portfolio_id."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM portfolio_items WHERE id = ? AND portfolio_id = ?",
+                (item_id, portfolio_id)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            cols = [d[0] for d in cursor.description]
+        return dict(zip(cols, row))
+
+    # ── Watchlist ───────────────────────────────────────────────────────────
+
+    def get_watchlist(self, user_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, user_id, ticker, instrument_type, note, created_at FROM watchlist WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,)
+            ).fetchall()
+        cols = ["id", "user_id", "ticker", "instrument_type", "note", "created_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+    def add_to_watchlist(self, user_id: int, ticker: str, instrument_type: str, note: str = None) -> int:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            try:
+                cursor = conn.execute(
+                    "INSERT INTO watchlist (user_id, ticker, instrument_type, note, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, ticker, instrument_type, note, now)
+                )
+                conn.commit()
+                return cursor.lastrowid
+            except Exception:
+                # Already exists — return existing id
+                row = conn.execute(
+                    "SELECT id FROM watchlist WHERE user_id = ? AND ticker = ? AND instrument_type = ?",
+                    (user_id, ticker, instrument_type)
+                ).fetchone()
+                return row[0] if row else -1
+
+    def remove_from_watchlist(self, user_id: int, watchlist_id: int) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM watchlist WHERE id = ? AND user_id = ?",
+                (watchlist_id, user_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
 
 storage_service = StorageService()

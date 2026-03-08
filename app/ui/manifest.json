@@ -1,0 +1,12 @@
+{
+  "name": "Bond AI — Портфель облигаций",
+  "short_name": "Bond AI",
+  "description": "Управление портфелем облигаций с AI-анализом",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "lang": "ru"
+}
