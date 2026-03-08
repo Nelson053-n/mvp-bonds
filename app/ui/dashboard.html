@@ -4373,6 +4373,7 @@
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/auth/me/portfolios-stats');
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = await r.json();
           tbody.innerHTML = '';
           const allPortfolios = d.portfolios || [];
@@ -4384,43 +4385,111 @@
             const riskLabel = riskInfo ? riskInfo.label : riskKey;
             const riskColor = riskInfo ? riskInfo.color : '#94a3b8';
             const sumFormatted = p.total_cost > 0 ? fmtAmount(p.total_cost) : '—';
-            // Build merge options (other portfolios)
-            const otherOpts = allPortfolios.filter(x => x.id !== p.id)
-              .map(x => `<option value="${x.id}">${x.name.replace(/"/g, '&quot;')}</option>`).join('');
-            const mergeSelect = otherOpts
-              ? `<select id="sp-merge-sel-${p.id}" class="select-input" style="height:22px;font-size:10px;padding:0 4px;width:auto;">${otherOpts}</select>
-                 <button class="btn-sm-move"
-                   onclick="settingsMergePortfolio(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
-                   title="${t('settings.portfolios.mergeTitle')}">⇄</button>`
-              : '';
-            tr.innerHTML = `
-              <td>
-                <span id="sp-name-${p.id}">${p.name}</span>
-                <input id="sp-input-${p.id}" class="input" style="display:none;max-width:180px;padding:4px 8px;font-size:12px;" value="${p.name}" />
-              </td>
-              <td>${p.item_count}</td>
-              <td style="white-space:nowrap;">${sumFormatted}</td>
-              <td><span style="color:${riskColor};font-weight:500;font-size:12px;">${riskLabel}</span></td>
-              <td style="white-space:nowrap;">
-                <div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap;">
-                  ${mergeSelect}
-                  <button class="btn-sm" style="color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);"
-                    onclick="settingsEditPortfolio(${p.id})"
-                    id="sp-edit-${p.id}">${t('portfolio.rename')}</button>
-                  <button class="btn-sm" style="display:none;background:var(--blue-600);color:#fff;border-color:var(--blue-600);"
-                    onclick="settingsSavePortfolio(${p.id})"
-                    id="sp-save-${p.id}">${t('portfolio.save')}</button>
-                  <button class="btn-sm" style="color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);"
-                    onclick="openShareModalFor(${p.id})"
-                    title="${t('nav.share')}">${t('settings.portfolios.shareBtn')}</button>
-                  <button class="btn-sm" style="color:var(--red-600);background:#fee2e2;border-color:#fecaca;"
-                    onclick="settingsDeletePortfolio(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
-                    title="${t('settings.portfolios.deleteTitle')}">${t('settings.portfolios.deleteBtn')}</button>
-                </div>
-              </td>`;
+
+            // td: name
+            const tdName = document.createElement('td');
+            const nameSpan = document.createElement('span');
+            nameSpan.id = `sp-name-${p.id}`;
+            nameSpan.textContent = p.name;
+            const nameInput = document.createElement('input');
+            nameInput.id = `sp-input-${p.id}`;
+            nameInput.className = 'input';
+            nameInput.style.cssText = 'display:none;max-width:180px;padding:4px 8px;font-size:12px;';
+            nameInput.value = p.name;
+            tdName.appendChild(nameSpan);
+            tdName.appendChild(nameInput);
+
+            // td: item count
+            const tdCount = document.createElement('td');
+            tdCount.textContent = p.item_count;
+
+            // td: sum
+            const tdSum = document.createElement('td');
+            tdSum.style.whiteSpace = 'nowrap';
+            tdSum.textContent = sumFormatted;
+
+            // td: risk
+            const tdRisk = document.createElement('td');
+            const riskSpan = document.createElement('span');
+            riskSpan.style.cssText = `color:${riskColor};font-weight:500;font-size:12px;`;
+            riskSpan.textContent = riskLabel;
+            tdRisk.appendChild(riskSpan);
+
+            // td: actions
+            const tdActions = document.createElement('td');
+            tdActions.style.whiteSpace = 'nowrap';
+            const actionsDiv = document.createElement('div');
+            actionsDiv.style.cssText = 'display:flex;gap:4px;align-items:center;flex-wrap:nowrap;';
+
+            // merge select + button
+            const others = allPortfolios.filter(x => x.id !== p.id);
+            if (others.length > 0) {
+              const sel = document.createElement('select');
+              sel.id = `sp-merge-sel-${p.id}`;
+              sel.className = 'select-input';
+              sel.style.cssText = 'height:22px;font-size:10px;padding:0 4px;width:auto;';
+              others.forEach(x => {
+                const opt = document.createElement('option');
+                opt.value = x.id;
+                opt.textContent = x.name;
+                sel.appendChild(opt);
+              });
+              const mergeBtn = document.createElement('button');
+              mergeBtn.className = 'btn-sm-move';
+              mergeBtn.title = t('settings.portfolios.mergeTitle');
+              mergeBtn.textContent = '⇄';
+              mergeBtn.addEventListener('click', () => settingsMergePortfolio(p.id, p.name));
+              actionsDiv.appendChild(sel);
+              actionsDiv.appendChild(mergeBtn);
+            }
+
+            // edit btn
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-sm';
+            editBtn.id = `sp-edit-${p.id}`;
+            editBtn.style.cssText = 'color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);';
+            editBtn.textContent = t('portfolio.rename');
+            editBtn.addEventListener('click', () => settingsEditPortfolio(p.id));
+
+            // save btn
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn-sm';
+            saveBtn.id = `sp-save-${p.id}`;
+            saveBtn.style.cssText = 'display:none;background:var(--blue-600);color:#fff;border-color:var(--blue-600);';
+            saveBtn.textContent = t('portfolio.save');
+            saveBtn.addEventListener('click', () => settingsSavePortfolio(p.id));
+
+            // share btn
+            const shareBtn = document.createElement('button');
+            shareBtn.className = 'btn-sm';
+            shareBtn.style.cssText = 'color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);';
+            shareBtn.title = t('nav.share');
+            shareBtn.textContent = t('settings.portfolios.shareBtn');
+            shareBtn.addEventListener('click', () => openShareModalFor(p.id));
+
+            // delete btn
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-sm';
+            delBtn.style.cssText = 'color:var(--red-600);background:#fee2e2;border-color:#fecaca;';
+            delBtn.title = t('settings.portfolios.deleteTitle');
+            delBtn.textContent = t('settings.portfolios.deleteBtn');
+            delBtn.addEventListener('click', () => settingsDeletePortfolio(p.id, p.name));
+
+            actionsDiv.appendChild(editBtn);
+            actionsDiv.appendChild(saveBtn);
+            actionsDiv.appendChild(shareBtn);
+            actionsDiv.appendChild(delBtn);
+            tdActions.appendChild(actionsDiv);
+
+            tr.appendChild(tdName);
+            tr.appendChild(tdCount);
+            tr.appendChild(tdSum);
+            tr.appendChild(tdRisk);
+            tr.appendChild(tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
+          console.error('settingsLoadPortfolios error:', e);
           tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
         }
       }

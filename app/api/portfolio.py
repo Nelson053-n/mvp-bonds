@@ -233,7 +233,11 @@ async def get_table(
     """Get portfolio table."""
     await get_portfolio_or_403(portfolio_id, current_user)
 
-    rows = await portfolio_service.get_table(portfolio_id)
+    try:
+        rows = await portfolio_service.get_table(portfolio_id)
+    except Exception:
+        logger.exception("Error in get_table for portfolio_id=%s user_id=%s", portfolio_id, current_user["sub"])
+        raise
     return PortfolioTableResponse(items=rows)
 
 

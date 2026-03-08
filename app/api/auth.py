@@ -2,6 +2,7 @@
 Authentication API routes: register, login, get current user.
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -10,6 +11,7 @@ from app.exceptions import AuthError
 from app.services.auth_service import auth_service
 from app.services.storage_service import storage_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
