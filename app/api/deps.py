@@ -27,6 +27,13 @@ async def get_current_user(
     return payload  # {"sub": user_id, "username": ...}
 
 
+def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Require authenticated admin user."""
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступ запрещён")
+    return current_user
+
+
 async def get_optional_user(request: Request) -> dict | None:
     """
     Try to extract JWT token from Authorization header.

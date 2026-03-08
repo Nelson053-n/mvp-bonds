@@ -285,7 +285,10 @@ async def import_csv(
     """
     await get_portfolio_or_403(portfolio_id, current_user)
 
-    content = await file.read()
+    _MAX_CSV_SIZE = 1 * 1024 * 1024  # 1 MB
+    content = await file.read(_MAX_CSV_SIZE + 1)
+    if len(content) > _MAX_CSV_SIZE:
+        raise HTTPException(status_code=413, detail="Файл слишком большой (максимум 1 МБ)")
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:

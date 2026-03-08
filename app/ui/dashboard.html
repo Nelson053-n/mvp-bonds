@@ -2432,7 +2432,11 @@
             renderWizardResult(data, resultEl, amount);
           } catch(err) {
             resultEl.style.display = 'block';
-            resultEl.innerHTML = `<div style="text-align:center;color:#f87171;padding:16px;">${err.message}</div>`;
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'text-align:center;color:#f87171;padding:16px;';
+            errDiv.textContent = err.message;
+            resultEl.innerHTML = '';
+            resultEl.appendChild(errDiv);
           } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = t('wizard.submit');
@@ -4151,6 +4155,14 @@
         } catch(e) {}
       }
 
+      function _mkBtn(text, style, onClick) {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.style.cssText = style + ';padding:3px 8px;font-size:11px;border:none;border-radius:4px;cursor:pointer;';
+        btn.addEventListener('click', onClick);
+        return btn;
+      }
+
       async function adminLoadUsers() {
         const tbody = document.getElementById('adm-users-body');
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
@@ -4159,38 +4171,62 @@
           const users = await r.json();
           tbody.innerHTML = '';
           users.forEach(u => {
-            const date = u.created_at ? u.created_at.substring(0, 10) : '—';
-            const role = u.is_admin
-              ? '<span style="color:#f59e0b;font-weight:600;">Администратор</span>'
-              : '<span style="color:var(--slate-400);">Пользователь</span>';
             const isPrimary = u.id === 1;
-            const roleBtn = u.is_admin
-              ? (isPrimary ? '' : `<button onclick="adminSetRole(${u.id}, false, this)"
-                  style="padding:3px 8px;font-size:11px;background:#92400e;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                  Снять администратора</button>`)
-              : `<button onclick="adminSetRole(${u.id}, true, this)"
-                  style="padding:3px 8px;font-size:11px;background:#d97706;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                  Сделать администратором</button>`;
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${u.id}</td>
-              <td style="font-weight:600;">${u.username}${isPrimary ? ' <span style="font-size:10px;color:#f59e0b;">★</span>' : ''}</td>
-              <td>${u.portfolio_count}</td>
-              <td>${date}</td>
-              <td>${role}</td>
-              <td>
-                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
-                  <button onclick="adminOpenPwdModal(${u.id}, '${u.username}')"
-                    style="padding:3px 8px;font-size:11px;background:var(--blue-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    Пароль
-                  </button>
-                  ${roleBtn}
-                  ${!u.is_admin ? `<button onclick="adminDeleteUser(${u.id}, '${u.username}')"
-                    style="padding:3px 8px;font-size:11px;background:var(--red-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    Удалить
-                  </button>` : ''}
-                </div>
-              </td>`;
+
+            const tdId = document.createElement('td');
+            tdId.textContent = u.id;
+
+            const tdName = document.createElement('td');
+            tdName.style.fontWeight = '600';
+            tdName.textContent = u.username;
+            if (isPrimary) {
+              const star = document.createElement('span');
+              star.textContent = ' ★';
+              star.style.cssText = 'font-size:10px;color:#f59e0b;';
+              tdName.appendChild(star);
+            }
+
+            const tdCount = document.createElement('td');
+            tdCount.textContent = u.portfolio_count;
+
+            const tdDate = document.createElement('td');
+            tdDate.textContent = u.created_at ? u.created_at.substring(0, 10) : '—';
+
+            const tdRole = document.createElement('td');
+            const roleSpan = document.createElement('span');
+            if (u.is_admin) {
+              roleSpan.textContent = 'Администратор';
+              roleSpan.style.cssText = 'color:#f59e0b;font-weight:600;';
+            } else {
+              roleSpan.textContent = 'Пользователь';
+              roleSpan.style.color = 'var(--slate-400)';
+            }
+            tdRole.appendChild(roleSpan);
+
+            const tdActions = document.createElement('td');
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
+
+            const pwdBtn = _mkBtn('Пароль', 'background:var(--blue-600);color:#fff',
+              () => adminOpenPwdModal(u.id, u.username));
+            div.appendChild(pwdBtn);
+
+            if (u.is_admin && !isPrimary) {
+              const demoteBtn = _mkBtn('Снять администратора', 'background:#92400e;color:#fff',
+                function() { adminSetRole(u.id, false, this); });
+              div.appendChild(demoteBtn);
+            } else if (!u.is_admin) {
+              const promoteBtn = _mkBtn('Сделать администратором', 'background:#d97706;color:#fff',
+                function() { adminSetRole(u.id, true, this); });
+              div.appendChild(promoteBtn);
+              const delBtn = _mkBtn('Удалить', 'background:var(--red-600);color:#fff',
+                () => adminDeleteUser(u.id, u.username));
+              div.appendChild(delBtn);
+            }
+
+            tdActions.appendChild(div);
+            tr.append(tdId, tdName, tdCount, tdDate, tdRole, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
@@ -4206,24 +4242,49 @@
           const portfolios = await r.json();
           tbody.innerHTML = '';
           portfolios.forEach(p => {
-            const date = p.created_at ? p.created_at.substring(0, 10) : '—';
-            const shared = p.share_token
-              ? `<a href="/share/${p.share_token}" target="_blank" style="color:var(--blue-600);font-size:11px;">Открыть</a>`
-              : '<span style="color:var(--slate-400);">—</span>';
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${p.id}</td>
-              <td style="font-weight:500;">${p.name}</td>
-              <td>${p.username} <span style="color:var(--slate-400);font-size:10px;">#${p.user_id}</span></td>
-              <td>${p.item_count}</td>
-              <td>${shared}</td>
-              <td>${date}</td>
-              <td>
-                <button onclick="adminDeletePortfolio(${p.id}, '${p.name}')"
-                  style="padding:3px 8px;font-size:11px;background:var(--red-600);color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                  Удалить
-                </button>
-              </td>`;
+
+            const tdId = document.createElement('td');
+            tdId.textContent = p.id;
+
+            const tdName = document.createElement('td');
+            tdName.style.fontWeight = '500';
+            tdName.textContent = p.name;
+
+            const tdUser = document.createElement('td');
+            tdUser.textContent = p.username;
+            const userIdSpan = document.createElement('span');
+            userIdSpan.textContent = ` #${p.user_id}`;
+            userIdSpan.style.cssText = 'color:var(--slate-400);font-size:10px;';
+            tdUser.appendChild(userIdSpan);
+
+            const tdCount = document.createElement('td');
+            tdCount.textContent = p.item_count;
+
+            const tdShared = document.createElement('td');
+            if (p.share_token) {
+              const link = document.createElement('a');
+              link.href = `/share/${encodeURIComponent(p.share_token)}`;
+              link.target = '_blank';
+              link.style.cssText = 'color:var(--blue-600);font-size:11px;';
+              link.textContent = 'Открыть';
+              tdShared.appendChild(link);
+            } else {
+              const dash = document.createElement('span');
+              dash.textContent = '—';
+              dash.style.color = 'var(--slate-400)';
+              tdShared.appendChild(dash);
+            }
+
+            const tdDate = document.createElement('td');
+            tdDate.textContent = p.created_at ? p.created_at.substring(0, 10) : '—';
+
+            const tdActions = document.createElement('td');
+            const delBtn = _mkBtn('Удалить', 'background:var(--red-600);color:#fff',
+              () => adminDeletePortfolio(p.id, p.name));
+            tdActions.appendChild(delBtn);
+
+            tr.append(tdId, tdName, tdUser, tdCount, tdShared, tdDate, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {

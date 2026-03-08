@@ -3,7 +3,7 @@ Authentication API routes: register, login, get current user.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user
@@ -52,9 +52,10 @@ async def register(payload: RegisterInput) -> dict:
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(payload: LoginInput) -> dict:
+async def login(payload: LoginInput, request: Request) -> dict:
     """Login with username and password."""
-    result = auth_service.login(payload.username, payload.password)
+    client_ip = request.client.host if request.client else ""
+    result = auth_service.login(payload.username, payload.password, client_ip)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
