@@ -4,7 +4,9 @@ Tests for portfolio API endpoints.
 
 import pytest
 from httpx import AsyncClient
-from pydantic import ValidationError
+
+# Bootstrap creates admin user (id=1) with portfolio (id=1)
+TEST_PORTFOLIO_ID = 1
 
 
 class TestPortfolioAPI:
@@ -34,12 +36,13 @@ class TestPortfolioAPI:
         assert "text/html" in response.headers["content-type"]
 
     async def test_validate_stock_input(
-        self, client: AsyncClient, sample_stock_input: dict
+        self, client: AsyncClient, auth_headers: dict, sample_stock_input: dict
     ) -> None:
         """Test validating stock input."""
         response = await client.post(
-            "/portfolio/validate",
+            f"/portfolios/{TEST_PORTFOLIO_ID}/validate",
             json={"user_input": sample_stock_input},
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -48,12 +51,13 @@ class TestPortfolioAPI:
         assert data["validated"] is True
 
     async def test_validate_bond_input(
-        self, client: AsyncClient, sample_bond_input: dict
+        self, client: AsyncClient, auth_headers: dict, sample_bond_input: dict
     ) -> None:
         """Test validating bond input."""
         response = await client.post(
-            "/portfolio/validate",
+            f"/portfolios/{TEST_PORTFOLIO_ID}/validate",
             json={"user_input": sample_bond_input},
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
@@ -61,11 +65,12 @@ class TestPortfolioAPI:
         assert data["instrument_type"] == "bond"
         assert data["validated"] is True
 
-    async def test_validate_invalid_input(self, client: AsyncClient) -> None:
+    async def test_validate_invalid_input(
+        self, client: AsyncClient, auth_headers: dict
+    ) -> None:
         """Test validating invalid input (pydantic validation)."""
-        # Pydantic validates quantity > 0, so invalid input returns 422
         response = await client.post(
-            "/portfolio/validate",
+            f"/portfolios/{TEST_PORTFOLIO_ID}/validate",
             json={
                 "user_input": {
                     "ticker": "SBER",
@@ -73,39 +78,54 @@ class TestPortfolioAPI:
                     "purchase_price": 250.0,
                 }
             },
+            headers=auth_headers,
         )
 
         assert response.status_code == 422
 
-    async def test_get_empty_table(self, client: AsyncClient) -> None:
-        """Test getting empty portfolio table."""
-        response = await client.get("/portfolio/table")
+    async def test_get_empty_table(
+        self, client: AsyncClient, auth_headers: dict
+    ) -> None:
+        """Test getting portfolio table."""
+        response = await client.get(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/table",
+            headers=auth_headers,
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
-        # Note: table may have data from previous runs
         assert isinstance(data["items"], list)
 
     async def test_delete_nonexistent_instrument(
-        self, client: AsyncClient
+        self, client: AsyncClient, auth_headers: dict
     ) -> None:
         """Test deleting nonexistent instrument."""
-        response = await client.delete("/portfolio/instruments/9999")
+        response = await client.delete(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments/9999",
+            headers=auth_headers,
+        )
 
         assert response.status_code == 404
 
     async def test_cleanup_not_found_empty(
-        self, client: AsyncClient
+        self, client: AsyncClient, auth_headers: dict
     ) -> None:
         """Test cleanup not found with empty portfolio."""
         response = await client.delete(
-            "/portfolio/instruments/cleanup/not-found"
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments/cleanup/not-found",
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
         data = response.json()
         assert "deleted_count" in data
+
+    async def test_unauthorized_access(self, client: AsyncClient) -> None:
+        """Test that endpoints require authentication."""
+        response = await client.get(f"/portfolios/{TEST_PORTFOLIO_ID}/table")
+
+        assert response.status_code == 403  # HTTPBearer returns 403 when no token
 
 
 class TestPortfolioServiceUnit:

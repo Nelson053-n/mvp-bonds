@@ -2,7 +2,6 @@
 Test fixtures for the MVP LLM Portfolio application.
 """
 
-import asyncio
 from pathlib import Path
 import tempfile
 from typing import AsyncGenerator, Generator
@@ -17,6 +16,8 @@ from app.services.cache_service import CacheService
 from app.services.portfolio_service import PortfolioService
 from app.services.moex_service import MOEXService
 from app.services.llm_service import LLMService
+
+TEST_JWT_SECRET = "test_jwt_secret_for_tests"
 
 
 @pytest.fixture(scope="session")
@@ -42,6 +43,7 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
         openai_model="gpt-4o-mini",
         log_level="DEBUG",
         log_format="text",
+        jwt_secret=TEST_JWT_SECRET,
     )
     config.settings = test_settings
     yield test_settings
@@ -90,9 +92,23 @@ def portfolio_service(
     return PortfolioService()
 
 
+@pytest.fixture
+def test_auth_token(settings_override: Settings) -> str:
+    """Generate a valid JWT token for the bootstrap admin user (id=1)."""
+    from app.services.auth_service import AuthService
+    svc = AuthService()
+    return svc.create_token(user_id=1, username="admin", is_admin=True)
+
+
+@pytest.fixture
+def auth_headers(test_auth_token: str) -> dict:
+    """HTTP headers with valid Bearer token."""
+    return {"Authorization": f"Bearer {test_auth_token}"}
+
+
 @pytest_asyncio.fixture
-async def client() -> AsyncGenerator:
-    """Create async test client."""
+async def client(settings_override: Settings) -> AsyncGenerator:
+    """Create async test client with settings override applied."""
     from httpx import AsyncClient, ASGITransport
 
     transport = ASGITransport(app=app)

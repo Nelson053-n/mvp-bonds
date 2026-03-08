@@ -2,7 +2,7 @@
 FastAPI dependencies for authentication and portfolio access.
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.services.auth_service import auth_service
@@ -27,7 +27,7 @@ async def get_current_user(
     return payload  # {"sub": user_id, "username": ...}
 
 
-async def get_optional_user(request) -> dict | None:
+async def get_optional_user(request: Request) -> dict | None:
     """
     Try to extract JWT token from Authorization header.
     Returns None if no token or invalid token (for public/share routes).

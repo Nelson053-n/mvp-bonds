@@ -21,9 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
+    # Rate limiting for password reset: username -> list of request timestamps
+    _reset_rate: dict[str, list[float]] = {}
+    _RESET_RATE_WINDOW = 900   # 15 min window
+    _RESET_RATE_MAX = 3        # max 3 requests per window
+
     def __init__(self) -> None:
-        if not settings.jwt_secret:
-            raise ValueError("MVP_JWT_SECRET is required")
+        pass  # jwt_secret is validated by pydantic Settings (required field)
 
     def register(self, username: str, password: str) -> dict:
         """
@@ -130,11 +134,26 @@ class AuthService:
         for k in expired:
             del self._reset_codes[k]
 
+    def _check_reset_rate_limit(self, username: str) -> bool:
+        """Return True if request is allowed, False if rate-limited."""
+        now = time.time()
+        cutoff = now - self._RESET_RATE_WINDOW
+        timestamps = [t for t in self._reset_rate.get(username, []) if t > cutoff]
+        if len(timestamps) >= self._RESET_RATE_MAX:
+            return False
+        timestamps.append(now)
+        self._reset_rate[username] = timestamps
+        return True
+
     async def request_password_reset(self, username: str, lang: str = "ru") -> str:
         """
         Generate a 6-digit reset code for user and send it via Telegram and/or email.
-        Returns one of: 'telegram', 'email', 'both', 'none'.
+        Returns one of: 'telegram', 'email', 'both', 'none', 'rate_limited'.
         """
+        if not self._check_reset_rate_limit(username):
+            logger.warning("Reset rate limit exceeded for username=%s", username)
+            return "rate_limited"
+
         self._cleanup_reset_codes()
         user = storage_service.get_user_by_username_for_reset(username)
         if not user:

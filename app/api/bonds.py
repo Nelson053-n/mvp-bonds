@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import time
 from datetime import date, timedelta
 from typing import Any
@@ -8,6 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_current_user
+from app.services.moex_service import moex_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/bonds", tags=["bonds"])
@@ -43,6 +45,7 @@ _MIN_ALLOWED_SCORE = _RATING_ORDER.index(_MIN_ALLOWED_RATING)  # 10
 
 _bonds_cache: list[dict[str, Any]] | None = None
 _bonds_cache_ts: float = 0.0
+_bonds_cache_lock: asyncio.Lock | None = None  # initialised lazily after event loop starts
 BONDS_CACHE_TTL = 3600  # seconds
 
 
@@ -78,7 +81,7 @@ async def _fetch_board(
         f"&securities.columns=SECID,SHORTNAME,PREVLEGALCLOSEPRICE,"
         f"COUPONPERCENT,COUPONPERIOD,FACEVALUE,MATDATE,OFFERDATE,LOTSIZE"
         f"&marketdata.columns=SECID,YIELD,VALTODAY"
-        f"&limit=100"
+        f"&limit=1000"
     )
     try:
         resp = await client.get(url)
@@ -168,18 +171,27 @@ async def _fetch_all_bonds() -> list[dict[str, Any]]:
 
 
 async def _get_bonds_cached() -> list[dict[str, Any]]:
-    global _bonds_cache, _bonds_cache_ts
+    global _bonds_cache, _bonds_cache_ts, _bonds_cache_lock
+    # Initialise lock lazily (requires a running event loop)
+    if _bonds_cache_lock is None:
+        _bonds_cache_lock = asyncio.Lock()
+
     now = time.time()
     if _bonds_cache is not None and (now - _bonds_cache_ts) < BONDS_CACHE_TTL:
         return _bonds_cache
 
-    bonds = await _fetch_all_bonds()
-    if bonds:
-        _bonds_cache = bonds
-        _bonds_cache_ts = now
-    elif _bonds_cache is not None:
-        return _bonds_cache  # stale cache on error
-    return bonds or []
+    async with _bonds_cache_lock:
+        # Re-check inside lock to avoid thundering herd
+        if _bonds_cache is not None and (time.time() - _bonds_cache_ts) < BONDS_CACHE_TTL:
+            return _bonds_cache
+
+        bonds = await _fetch_all_bonds()
+        if bonds:
+            _bonds_cache = bonds
+            _bonds_cache_ts = time.time()
+        elif _bonds_cache is not None:
+            return _bonds_cache  # stale cache on error
+    return _bonds_cache or []
 
 
 def _adjust_risk_for_amount(risk: str, amount: float) -> str:
@@ -187,8 +199,6 @@ def _adjust_risk_for_amount(risk: str, amount: float) -> str:
     if amount >= 10_000_000 and risk in ("elevated", "high"):
         return "moderate"
     if amount >= 5_000_000 and risk == "high":
-        return "elevated"
-    if amount >= 3_000_000 and risk == "high":
         return "elevated"
     return risk
 
@@ -244,13 +254,11 @@ async def suggest_portfolio(
     if len(filtered) < 5:
         filtered = pool  # widen if too few candidates
 
-    # Step 3: sort by proximity to target yield, take top-25 for rating fetch
+    # Step 3: sort by proximity to target yield, take top-50 for rating fetch
     filtered.sort(key=lambda b: abs(b["coupon_percent"] - yield_target))
-    candidates = filtered[:25]
+    candidates = filtered[:50]
 
     # Step 4: fetch ratings in parallel for top candidates
-    from app.services.moex_service import moex_service
-
     async def _fetch_rating(bond: dict) -> dict:
         try:
             rating = await moex_service._get_smartlab_credit_rating(bond["ticker"])
@@ -294,13 +302,13 @@ async def suggest_portfolio(
     ))
 
     # Step 8: budget allocation with weighted random sampling to increase diversity
-    max_items = 10
+    max_items = 12
     selected: list[dict] = []
     total_cost = 0.0
     remaining = amount
 
     # Precompute candidate purchase metadata
-    pool = []
+    alloc_pool = []
     for bond in candidates:
         lot_price = (bond["price"] / 100.0) * bond["face_value"] * bond["lot_size"]
         if lot_price <= 0:
@@ -309,7 +317,7 @@ async def suggest_portfolio(
         est_lots = max(1, round((amount / max_items) / lot_price))
         est_cost = est_lots * lot_price
         purchase_price = round((bond["price"] / 100.0) * bond["face_value"], 2)
-        pool.append({
+        alloc_pool.append({
             "bond": bond,
             "lot_price": lot_price,
             "est_lots": est_lots,
@@ -317,12 +325,10 @@ async def suggest_portfolio(
             "purchase_price": purchase_price,
         })
 
-    import random
-
     # Continue selecting while budget allows and we have candidates
-    while len(selected) < max_items and pool and remaining >= 1:
+    while len(selected) < max_items and alloc_pool and remaining >= 1:
         # Filter feasible candidates given remaining budget (at least one lot)
-        feasible = [p for p in pool if p["lot_price"] <= remaining]
+        feasible = [p for p in alloc_pool if p["lot_price"] <= remaining]
         if not feasible:
             break
 
@@ -348,7 +354,7 @@ async def suggest_portfolio(
 
         # Skip if somehow cost is zero
         if cost <= 0:
-            pool = [p for p in pool if p is not chosen]
+            alloc_pool = [p for p in alloc_pool if p is not chosen]
             continue
 
         bond = chosen["bond"]
@@ -373,7 +379,7 @@ async def suggest_portfolio(
         remaining = amount - total_cost
 
         # Remove chosen from pool
-        pool = [p for p in pool if p is not chosen]
+        alloc_pool = [p for p in alloc_pool if p is not chosen]
 
     if not selected:
         raise HTTPException(404, "Не удалось подобрать бумаги под заданные параметры")

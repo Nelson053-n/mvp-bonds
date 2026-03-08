@@ -814,7 +814,7 @@
                   <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;" data-i18n="tbl.annualCoupon">Годовой<br>купон</th>
                   <th data-sort-key="market_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.yield">Рын.<br>доход.</th>
                   <th data-sort-key="maturity_date" data-i18n="tbl.maturity">Погашение</th>
-                  <th data-sort-key="offer_date" data-i18n="tbl.offer">Оферта</th>
+                  <th id="th-offer" data-sort-key="offer_date" data-i18n="tbl.offer">Оферта</th>
                   <th class="no-sort actions-column" data-i18n="tbl.actions">Действия</th>
                 </tr>
               </thead>
@@ -2124,7 +2124,7 @@
           const res = await apiFetch(`/bonds/suggest?amount=1000000&yield=${avgYield.toFixed(1)}&risk=${riskKey}`);
           if (!res.ok) throw new Error();
           const data = await res.json();
-          const bonds = (data.bonds || []).slice(0, 6);
+          const bonds = (data.bonds || []).slice(0, 12);
           if (bonds.length === 0) { section.style.display = 'none'; return; }
 
           // Filter out bonds already in portfolio
@@ -2133,7 +2133,7 @@
           if (filtered.length === 0) { section.style.display = 'none'; return; }
 
           grid.innerHTML = '';
-          filtered.slice(0, 6).forEach(b => {
+          filtered.slice(0, 12).forEach(b => {
             const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
             const offerNote = b.offer_date ? ` · ${window._lang === 'en' ? 'offer' : 'оферта'} ${b.offer_date.substring(0,7)}` : '';
             const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--slate-100);color:var(--slate-600);margin-right:6px;">${b.rating}</span>` : '';
@@ -2705,7 +2705,7 @@
           }
 
           addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
-          addCell(tr, row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : '');  // Оферта
+          { const td = document.createElement('td'); td.className = 'col-offer'; td.textContent = row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : ''; tr.appendChild(td); }  // Оферта
 
           // Actions (only in edit mode)
           if (!isReadOnly) {
@@ -2754,6 +2754,12 @@
           }
           tableBody.appendChild(tr);
         }
+
+        // Show offer column only when at least one bond has an offer date
+        const hasOfferDate = rows.some(r => r.type === 'bond' && r.offer_date);
+        const thOffer = document.getElementById('th-offer');
+        if (thOffer) thOffer.style.display = hasOfferDate ? '' : 'none';
+        document.querySelectorAll('.col-offer').forEach(el => { el.style.display = hasOfferDate ? '' : 'none'; });
 
         if (rows.length === 0) { setEmptyState(true); drawMonthlyChart(tableRows); return; }
 
