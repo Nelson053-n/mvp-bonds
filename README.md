@@ -1,112 +1,71 @@
-# MVP LLM Portfolio Backend
+# MVP Bonds — портфель облигаций и акций
 
-MVP backend для портфеля с источником данных MOEX.
+Веб-приложение для учёта инвестиционного портфеля на Московской бирже. Данные берутся из MOEX ISS API, хранятся в SQLite, UI — одностраничный дашборд.
 
-## Что делает LLM
+## Возможности
 
-- определяет тип инструмента (`stock` / `bond`)
-- валидирует пользовательский ввод
-- формирует короткий комментарий (1 строка)
+- **Акции и облигации** — добавление по тикеру, автоматическое определение типа инструмента
+- **Рыночные данные** — текущая цена, НКД, доходность к погашению, даты купонов, кредитный рейтинг (smart-lab + MOEX)
+- **Мультипортфели** — несколько портфелей на аккаунт, переключение между ними
+- **Шаринг** — публичная ссылка на портфель с опциональной защитой паролем
+- **AI-комментарий** — короткий комментарий к каждой строке от LLM (stub или OpenAI-совместимый)
+- **Аутентификация** — JWT + bcrypt, первый запуск создаёт admin-пользователя
 
-LLM не делает расчёты.
-
-## Что делает backend
-
-- получает рыночные данные из MOEX API
-- рассчитывает текущую стоимость, прибыль и долю
-- собирает строку таблицы
-- передаёт в LLM только итоговые метрики для комментария
-- хранит добавленные бумаги в SQLite (`data/portfolio.db`)
-- подтягивает кредитный рейтинг облигации со страницы smart-lab по тикеру (например `ruAAA (03.03.2026)`), с fallback на MOEX
-
-## Запуск
+## Быстрый старт
 
 ```bash
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+MVP_JWT_SECRET=your_secret_key uvicorn app.main:app --reload
 ```
 
-> Для текущего окружения Python 3.14 используются совместимые версии
-> из `requirements.txt` (включая `pydantic` beta).
+Дашборд: http://localhost:8000
+
+При первом запуске в логах будет выведен пароль admin-пользователя.
 
 ## Переменные окружения
 
-Префикс переменных: `MVP_`
+Префикс `MVP_`:
 
-- `MVP_LLM_MODE=stub|openai` (по умолчанию `stub`)
-- `MVP_SQLITE_DB_PATH=data/portfolio.db`
-- `MVP_OPENAI_API_KEY=...` (нужен только при `openai`)
-- `MVP_OPENAI_BASE_URL=https://api.openai.com/v1`
-- `MVP_OPENAI_MODEL=gpt-4o-mini`
+| Переменная | Обязательная | По умолчанию |
+|---|---|---|
+| `MVP_JWT_SECRET` | Да | — |
+| `MVP_SQLITE_DB_PATH` | Нет | `data/portfolio.db` |
+| `MVP_LLM_MODE` | Нет | `stub` |
+| `MVP_OPENAI_API_KEY` | При `llm_mode=openai` | — |
+| `MVP_OPENAI_BASE_URL` | Нет | `https://api.openai.com/v1` |
+| `MVP_OPENAI_MODEL` | Нет | `gpt-4o-mini` |
+| `MVP_LOG_FORMAT` | Нет | `text` |
 
-## Эндпоинты
+SMTP-переменные (`MVP_SMTP_*`) — опционально для email-уведомлений.
 
-### Дашборд
+## Тесты
 
-- `GET /` — одностраничный дашборд (форма добавления + таблица портфеля)
-- `GET /api-info` — служебная информация по API
-
-### `POST /portfolio/validate`
-
-```json
-{
-  "user_input": {
-    "ticker": "SBER",
-    "quantity": 10,
-    "purchase_price": 250
-  }
-}
+```bash
+pytest                              # все тесты с покрытием
+pytest tests/test_api.py           # один файл
+pytest tests/test_api.py::test_health  # один тест
 ```
 
-Ответ:
+## Архитектура
 
-```json
-{
-  "instrument_type": "stock",
-  "validated": true,
-  "warnings": []
-}
+```
+app/
+├── main.py                  # FastAPI, роутеры, lifespan (запуск кэша)
+├── config.py                # Pydantic Settings (env vars)
+├── models.py                # Pydantic-модели запросов и ответов
+├── api/                     # Тонкий API-слой (auth, portfolios, bonds, settings, admin)
+├── services/
+│   ├── portfolio_service.py # Оркестратор (MOEX + storage + cache + LLM)
+│   ├── moex_service.py      # MOEX ISS API (акции и облигации)
+│   ├── storage_service.py   # SQLite (пользователи, портфели, инструменты)
+│   ├── cache_service.py     # Фоновое обновление метрик в памяти
+│   ├── auth_service.py      # JWT + bcrypt
+│   └── llm_service.py       # AI-комментарии (stub / OpenAI)
+└── ui/
+    └── dashboard.html       # Весь фронтенд в одном файле (vanilla JS)
 ```
 
-### `POST /portfolio/instruments`
-
-```json
-{
-  "ticker": "SU26238RMFS4",
-  "quantity": 100,
-  "purchase_price": 920
-}
-```
-
-Ответ (формат строки таблицы):
-
-```json
-{
-  "name": "...",
-  "type": "bond",
-  "current_price": 97.1,
-  "purchase_price": 920,
-  "quantity": 100,
-  "current_value": 97100,
-  "profit": 5100,
-  "ai_comment": "Доходность выше средней, бумага торгуется ниже номинала."
-}
-```
-
-### `GET /portfolio/table`
-
-Возвращает таблицу портфеля с обязательными полями и полями по типу инструмента.
-
-### `DELETE /portfolio/instruments/{item_id}`
-
-Удаляет конкретную строку из портфеля.
-
-### `DELETE /portfolio/instruments/cleanup/not-found`
-
-Удаляет бумаги, которые не находятся на бирже (нет рыночных данных MOEX).
-
-## Ограничения MVP
-
-- без рекомендаций купить/продать
-- без прогнозов, рейтингов, multi-agent, графиков
-- хранение портфеля в локальном SQLite (без авторизации и многопользовательского режима)
+LLM определяет тип инструмента и формирует короткий комментарий. Все расчёты делает backend на основе данных MOEX.
