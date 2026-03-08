@@ -26,6 +26,22 @@ class AuthService:
     _RESET_RATE_WINDOW = 900   # 15 min window
     _RESET_RATE_MAX = 3        # max 3 requests per window
 
+    # Rate limiting for login: ip/username -> list of request timestamps
+    _login_rate: dict[str, list[float]] = {}
+    _LOGIN_RATE_WINDOW = 300   # 5 min window
+    _LOGIN_RATE_MAX = 20       # max 20 attempts per window
+
+    def _check_login_rate_limit(self, key: str) -> bool:
+        """Return True if login attempt is allowed, False if rate-limited."""
+        now = time.time()
+        cutoff = now - self._LOGIN_RATE_WINDOW
+        timestamps = [t for t in self._login_rate.get(key, []) if t > cutoff]
+        if len(timestamps) >= self._LOGIN_RATE_MAX:
+            return False
+        timestamps.append(now)
+        self._login_rate[key] = timestamps
+        return True
+
     def __init__(self) -> None:
         pass  # jwt_secret is validated by pydantic Settings (required field)
 
@@ -59,11 +75,17 @@ class AuthService:
             "access_token": self.create_token(user_id, username, False),
         }
 
-    def login(self, username: str, password: str) -> dict | None:
+    def login(self, username: str, password: str, client_ip: str = "") -> dict | None:
         """
         Authenticate a user by username and password.
         Returns token dict on success, None on failure.
         """
+        # Rate limit by username to prevent enumeration + bruteforce
+        rate_key = f"login:{username}"
+        if not self._check_login_rate_limit(rate_key):
+            logger.warning("Login rate limit exceeded for username=%s ip=%s", username, client_ip)
+            return None
+
         user = storage_service.get_user_by_username(username)
         if not user:
             return None

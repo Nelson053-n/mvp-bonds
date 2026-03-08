@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 
 import bcrypt
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
 
 from app.api.auth import router as auth_router
 from app.api.bonds import router as bonds_router
@@ -32,6 +32,14 @@ _NO_CACHE_HEADERS = {
     "Expires": "0",
 }
 
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +57,16 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    for header, value in _SECURITY_HEADERS.items():
+        response.headers[header] = value
+    return response
+
+
 app.include_router(auth_router)
 app.include_router(bonds_router)
 app.include_router(portfolios_router)
