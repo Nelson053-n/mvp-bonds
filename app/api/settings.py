@@ -15,6 +15,11 @@ class NotificationSettings(BaseModel):
     tg_lang: str = Field(default="ru", pattern="^(ru|en)$")
 
 
+class PersonalNotificationsInput(BaseModel):
+    coupon_notif_enabled: bool
+    coupon_notif_days: int = Field(..., ge=1, le=30)
+
+
 @router.get("/notifications", response_model=NotificationSettings)
 async def get_notifications(admin: dict = Depends(get_admin_user)) -> NotificationSettings:
     s = storage_service.get_all_settings()
@@ -54,3 +59,21 @@ async def test_notification(
         msg,
     )
     return {"success": ok}
+
+
+@router.get("/notifications/personal")
+async def get_personal_notifications(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    return storage_service.get_user_notification_settings(current_user["sub"])
+
+
+@router.post("/notifications/personal")
+async def update_personal_notifications(
+    payload: PersonalNotificationsInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    storage_service.update_user_notification_settings(
+        current_user["sub"], payload.coupon_notif_enabled, payload.coupon_notif_days
+    )
+    return {"ok": True}

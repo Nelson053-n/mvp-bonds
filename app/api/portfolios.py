@@ -4,6 +4,7 @@ Portfolio management API: CRUD operations and sharing.
 
 import csv
 import io
+import time
 import uuid
 
 import bcrypt
@@ -12,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user, get_portfolio_or_403
+from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.storage_service import storage_service
 
@@ -41,6 +43,7 @@ class PortfoliosListResponse(BaseModel):
 
 class SharePortfolioInput(BaseModel):
     password: str | None = Field(None, min_length=1, max_length=100)
+    expires_in_days: int | None = Field(default=None, ge=1, le=365)
 
 
 class SharePortfolioResponse(BaseModel):
@@ -76,6 +79,9 @@ async def create_portfolio(
 ) -> dict:
     """Create a new portfolio for current user."""
     user_id = current_user["sub"]
+    count = storage_service.count_portfolios(user_id)
+    if count >= app_settings.max_portfolios_per_user:
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_portfolios_per_user} портфелей на аккаунт")
     portfolio_id = storage_service.create_portfolio(user_id, payload.name)
     portfolio = storage_service.get_portfolio(portfolio_id)
 
@@ -279,10 +285,13 @@ async def create_share_link(
             payload.password.encode(), bcrypt.gensalt()
         ).decode()
 
+    expires_at = int(time.time()) + payload.expires_in_days * 86400 if payload.expires_in_days else None
+
     storage_service.update_portfolio(
         portfolio_id,
         share_token=share_token,
         share_password_hash=share_password_hash,
+        share_expires_at=expires_at,
     )
 
     return {
@@ -316,3 +325,16 @@ async def merge_portfolio(
     await get_portfolio_or_403(target_id, current_user)
     moved = storage_service.merge_portfolios(portfolio_id, target_id)
     return {"moved": moved}
+
+
+@router.get("/{portfolio_id}/snapshots")
+async def get_snapshots(
+    portfolio_id: int,
+    days: int = 90,
+    current_user: dict = Depends(get_current_user),
+) -> list[dict]:
+    """Get portfolio value history."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    if days not in (30, 90, 365):
+        days = 90
+    return storage_service.get_portfolio_snapshots(portfolio_id, days)

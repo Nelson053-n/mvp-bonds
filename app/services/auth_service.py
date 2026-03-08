@@ -21,26 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    # Rate limiting for password reset: username -> list of request timestamps
-    _reset_rate: dict[str, list[float]] = {}
+    # Rate limiting for password reset (via SQLite)
     _RESET_RATE_WINDOW = 900   # 15 min window
     _RESET_RATE_MAX = 3        # max 3 requests per window
 
-    # Rate limiting for login: ip/username -> list of request timestamps
-    _login_rate: dict[str, list[float]] = {}
+    # Rate limiting for login (via SQLite)
     _LOGIN_RATE_WINDOW = 300   # 5 min window
     _LOGIN_RATE_MAX = 20       # max 20 attempts per window
 
     def _check_login_rate_limit(self, key: str) -> bool:
-        """Return True if login attempt is allowed, False if rate-limited."""
-        now = time.time()
-        cutoff = now - self._LOGIN_RATE_WINDOW
-        timestamps = [t for t in self._login_rate.get(key, []) if t > cutoff]
-        if len(timestamps) >= self._LOGIN_RATE_MAX:
-            return False
-        timestamps.append(now)
-        self._login_rate[key] = timestamps
-        return True
+        """Rate limit via SQLite — survives server restarts."""
+        return storage_service.check_rate_limit(key, self._LOGIN_RATE_WINDOW, self._LOGIN_RATE_MAX)
 
     def __init__(self) -> None:
         pass  # jwt_secret is validated by pydantic Settings (required field)
@@ -157,15 +148,8 @@ class AuthService:
             del self._reset_codes[k]
 
     def _check_reset_rate_limit(self, username: str) -> bool:
-        """Return True if request is allowed, False if rate-limited."""
-        now = time.time()
-        cutoff = now - self._RESET_RATE_WINDOW
-        timestamps = [t for t in self._reset_rate.get(username, []) if t > cutoff]
-        if len(timestamps) >= self._RESET_RATE_MAX:
-            return False
-        timestamps.append(now)
-        self._reset_rate[username] = timestamps
-        return True
+        key = f"reset:{username}"
+        return storage_service.check_rate_limit(key, self._RESET_RATE_WINDOW, self._RESET_RATE_MAX)
 
     async def request_password_reset(self, username: str, lang: str = "ru") -> str:
         """

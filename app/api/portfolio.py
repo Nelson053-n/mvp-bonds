@@ -6,10 +6,11 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_portfolio_or_403
+from app.config import settings as app_settings
 from app.exceptions import AppError, InstrumentNotFoundError
 from app.models import (
     AddInstrumentInput,
@@ -49,6 +50,9 @@ async def add_instrument(
 ) -> dict:
     """Add instrument to portfolio."""
     await get_portfolio_or_403(portfolio_id, current_user)
+    item_count = storage_service.count_items(portfolio_id)
+    if item_count >= app_settings.max_items_per_portfolio:
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
     logger.info("Add instrument request: portfolio_id=%s payload=%s", portfolio_id, getattr(payload, 'model_dump', lambda: payload)())
     try:
         row = await portfolio_service.add_instrument(portfolio_id, payload)
@@ -356,3 +360,56 @@ async def import_csv(
         cache_service.invalidate(portfolio_id)
 
     return {"added": added, "errors": len(errors), "error_details": errors}
+
+
+# ── Price alerts ─────────────────────────────────────────────────────────────
+
+class CreateAlertInput(BaseModel):
+    alert_type: str = Field(..., pattern="^(above|below)$")
+    target_price: float = Field(..., gt=0)
+
+
+@router.get("/portfolios/{portfolio_id}/instruments/{item_id}/alerts")
+async def get_item_alerts(
+    portfolio_id: int,
+    item_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Get price alerts for an instrument."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    alerts = storage_service.get_price_alerts_for_item(item_id)
+    return {"alerts": alerts}
+
+
+@router.post("/portfolios/{portfolio_id}/instruments/{item_id}/alerts")
+async def create_item_alert(
+    portfolio_id: int,
+    item_id: int,
+    payload: CreateAlertInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Create price alert for an instrument."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    item = storage_service.get_item(item_id, portfolio_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Инструмент не найден")
+    alert_id = storage_service.create_price_alert(
+        current_user["sub"], portfolio_id, item_id,
+        item["ticker"], payload.alert_type, payload.target_price
+    )
+    return {"id": alert_id, "ok": True}
+
+
+@router.delete("/portfolios/{portfolio_id}/instruments/{item_id}/alerts/{alert_id}")
+async def delete_item_alert(
+    portfolio_id: int,
+    item_id: int,
+    alert_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Delete price alert."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    deleted = storage_service.delete_price_alert(alert_id, current_user["sub"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Алерт не найден")
+    return {"deleted": True}
