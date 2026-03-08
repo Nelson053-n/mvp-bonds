@@ -3748,7 +3748,7 @@
         const okBtn = document.getElementById('confirm-modal-ok');
         const cancelBtn = document.getElementById('confirm-modal-cancel');
         function closeConfirm() { overlay.style.display = 'none'; _confirmCallback = null; }
-        okBtn.addEventListener('click', () => { closeConfirm(); if (_confirmCallback) _confirmCallback(); });
+        okBtn.addEventListener('click', () => { const cb = _confirmCallback; closeConfirm(); if (cb) cb(); });
         cancelBtn.addEventListener('click', closeConfirm);
         overlay.addEventListener('click', e => { if (e.target === overlay) closeConfirm(); });
       })();
@@ -4549,6 +4549,7 @@
             document.getElementById(`sp-row-${id}`)?.remove();
             await loadPortfolios();
             updatePortfolioSelector();
+            settingsLoadPortfolios();
             if (portfolioId === id) { portfolioId = portfolios[0]?.id || null; renderTable(); }
           } catch(e) { alert(t('settings.portfolios.deleteError')); }
         });
