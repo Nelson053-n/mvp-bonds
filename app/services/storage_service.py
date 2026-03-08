@@ -1,7 +1,10 @@
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from app.config import settings
+
+_UNSET: Any = object()  # sentinel for "not provided" in update_portfolio
 
 
 class StorageService:
@@ -11,6 +14,8 @@ class StorageService:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
@@ -550,8 +555,8 @@ class StorageService:
         self,
         portfolio_id: int,
         name: str | None = None,
-        share_token: str | None = ...,
-        share_password_hash: str | None = ...,
+        share_token: str | None = _UNSET,
+        share_password_hash: str | None = _UNSET,
     ) -> int:
         updates = []
         values = []
@@ -559,10 +564,10 @@ class StorageService:
         if name is not None:
             updates.append("name = ?")
             values.append(name)
-        if share_token is not ...:
+        if share_token is not _UNSET:
             updates.append("share_token = ?")
             values.append(share_token)
-        if share_password_hash is not ...:
+        if share_password_hash is not _UNSET:
             updates.append("share_password_hash = ?")
             values.append(share_password_hash)
 
@@ -757,10 +762,6 @@ class StorageService:
             moved = int(cursor.rowcount)
             conn.commit()
         return moved
-
-    def get_all_items(self, portfolio_id: int) -> list[dict]:
-        """Get all items for a portfolio (minimal fields for export)."""
-        return self.get_items(portfolio_id)
 
     def get_all_portfolios_with_users(self) -> list[dict]:
         with self._connect() as conn:

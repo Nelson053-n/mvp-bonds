@@ -166,9 +166,8 @@ class MOEXService:
         if not value:
             return None
         try:
-            year, month, day = value.split("-")
-            return date(int(year), int(month), int(day))
-        except Exception:
+            return date.fromisoformat(value)
+        except (ValueError, TypeError):
             return None
 
     async def _get_credit_rating(self, secid: str) -> str | None:

@@ -206,6 +206,8 @@ async def move_instrument(
     moved = storage_service.move_instrument(item_id, portfolio_id, payload.target_portfolio_id)
     if not moved:
         raise HTTPException(status_code=404, detail="Инструмент не найден")
+    cache_service.invalidate(portfolio_id)
+    cache_service.invalidate(payload.target_portfolio_id)
     return {"moved": True}
 
 
