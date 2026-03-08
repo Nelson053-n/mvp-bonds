@@ -9,18 +9,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user
+from app.api.deps import get_admin_user
 from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
-    if not current_user.get("is_admin"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступ запрещён")
-    return current_user
 
 
 class ChangePasswordInput(BaseModel):

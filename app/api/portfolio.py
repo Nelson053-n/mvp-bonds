@@ -6,6 +6,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_portfolio_or_403
@@ -22,6 +23,9 @@ from app.models import (
 from app.services.cache_service import cache_service
 from app.services.portfolio_service import portfolio_service
 from app.services.storage_service import storage_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["instruments"])
 
@@ -45,13 +49,16 @@ async def add_instrument(
 ) -> dict:
     """Add instrument to portfolio."""
     await get_portfolio_or_403(portfolio_id, current_user)
-
+    logger.info("Add instrument request: portfolio_id=%s payload=%s", portfolio_id, getattr(payload, 'model_dump', lambda: payload)())
     try:
         row = await portfolio_service.add_instrument(portfolio_id, payload)
     except InstrumentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.detail) from exc
     except AppError as exc:
         raise HTTPException(status_code=400, detail=exc.detail) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error while adding instrument to portfolio_id=%s", portfolio_id)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера") from exc
 
     return {
         "id": row.id,
@@ -65,6 +72,24 @@ async def add_instrument(
         "profit": row.profit,
         "ai_comment": row.ai_comment,
     }
+
+
+@router.post("/portfolios/{portfolio_id}/instruments/bulk")
+async def add_instruments_bulk(
+    portfolio_id: int,
+    payloads: list[AddInstrumentInput],
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Add multiple instruments at once, with a single cache refresh."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    try:
+        result = await portfolio_service.add_instruments_bulk(portfolio_id, payloads)
+    except AppError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+    except Exception:
+        logger.exception("Unexpected error in bulk add for portfolio_id=%s", portfolio_id)
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+    return result  # {"added": [...], "failed": [...]}
 
 
 @router.delete("/portfolios/{portfolio_id}/instruments/{item_id}")
@@ -163,6 +188,29 @@ async def update_coupon_rate(
     }
 
 
+class MoveInstrumentInput(BaseModel):
+    target_portfolio_id: int
+
+
+@router.post("/portfolios/{portfolio_id}/instruments/{item_id}/move")
+async def move_instrument(
+    portfolio_id: int,
+    item_id: int,
+    payload: MoveInstrumentInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, bool]:
+    """Move instrument to another portfolio owned by the same user."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    await get_portfolio_or_403(payload.target_portfolio_id, current_user)
+
+    moved = storage_service.move_instrument(item_id, portfolio_id, payload.target_portfolio_id)
+    if not moved:
+        raise HTTPException(status_code=404, detail="Инструмент не найден")
+    cache_service.invalidate(portfolio_id)
+    cache_service.invalidate(payload.target_portfolio_id)
+    return {"moved": True}
+
+
 @router.delete("/portfolios/{portfolio_id}/instruments/cleanup/not-found")
 async def delete_not_found_instruments(
     portfolio_id: int,
@@ -185,7 +233,11 @@ async def get_table(
     """Get portfolio table."""
     await get_portfolio_or_403(portfolio_id, current_user)
 
-    rows = await portfolio_service.get_table(portfolio_id)
+    try:
+        rows = await portfolio_service.get_table(portfolio_id)
+    except Exception:
+        logger.exception("Error in get_table for portfolio_id=%s user_id=%s", portfolio_id, current_user["sub"])
+        raise
     return PortfolioTableResponse(items=rows)
 
 
@@ -233,7 +285,10 @@ async def import_csv(
     """
     await get_portfolio_or_403(portfolio_id, current_user)
 
-    content = await file.read()
+    _MAX_CSV_SIZE = 1 * 1024 * 1024  # 1 MB
+    content = await file.read(_MAX_CSV_SIZE + 1)
+    if len(content) > _MAX_CSV_SIZE:
+        raise HTTPException(status_code=413, detail="Файл слишком большой (максимум 1 МБ)")
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:

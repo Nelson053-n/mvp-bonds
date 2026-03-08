@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 import logging
+from typing import TYPE_CHECKING
 
 from app.models import (
     AddInstrumentInput,
@@ -15,7 +16,16 @@ from app.services.moex_service import moex_service
 from app.services.storage_service import storage_service
 from app.exceptions import ValidationError, InstrumentNotFoundError
 
+if TYPE_CHECKING:
+    from app.services.cache_service import CacheService
+
 logger = logging.getLogger(__name__)
+
+
+def _get_cache() -> "CacheService":
+    """Lazy import to break circular dependency with cache_service."""
+    from app.services.cache_service import cache_service
+    return cache_service
 
 
 @dataclass
@@ -28,6 +38,22 @@ class PortfolioItem:
     manual_coupon: float | None
     manual_coupon_rate: float | None
 
+    @classmethod
+    def from_dict(cls, item: dict) -> "PortfolioItem":
+        return cls(
+            id=int(item["id"]),
+            ticker=str(item["ticker"]),
+            instrument_type=str(item["instrument_type"]),
+            quantity=float(item["quantity"]),
+            purchase_price=float(item["purchase_price"]),
+            manual_coupon=(
+                float(item["manual_coupon"]) if item["manual_coupon"] is not None else None
+            ),
+            manual_coupon_rate=(
+                float(item["manual_coupon_rate"]) if item.get("manual_coupon_rate") is not None else None
+            ),
+        )
+
 
 class PortfolioService:
     async def validate(
@@ -35,9 +61,29 @@ class PortfolioService:
     ) -> ValidationResponse:
         return await llm_service.validate_instrument(payload)
 
+    async def _fetch_snapshot_and_price(
+        self, ticker: str, instrument_type: str, override_price: float | None
+    ) -> tuple[object, float]:
+        """Fetch MOEX snapshot and compute purchase price. Returns (snapshot, price)."""
+        if instrument_type == "bond":
+            snapshot = await moex_service.get_bond_snapshot(ticker)
+            if override_price is None:
+                nominal = snapshot.nominal or 1000.0
+                price = round(
+                    (snapshot.clean_price_percent / 100.0) * nominal + (snapshot.aci or 0.0), 2
+                )
+            else:
+                price = override_price
+        else:
+            snapshot = await moex_service.get_stock_snapshot(ticker)
+            price = override_price if override_price is not None else snapshot.current_price
+        return snapshot, price
+
     async def add_instrument(
         self, portfolio_id: int, payload: AddInstrumentInput
     ) -> InstrumentMetrics:
+        logger.info("add_instrument called: portfolio_id=%s ticker=%s quantity=%s purchase_price=%s",
+                    portfolio_id, payload.ticker, payload.quantity, payload.purchase_price)
         validation = await self.validate(payload)
         if not validation.validated:
             warnings_msg = (
@@ -51,27 +97,23 @@ class PortfolioService:
 
         ticker = payload.ticker.upper().strip()
         try:
-            if validation.instrument_type == "bond":
-                await moex_service.get_bond_snapshot(ticker)
-            else:
-                await moex_service.get_stock_snapshot(ticker)
-        except Exception as exc:
-            logger.error("Failed to fetch market data for %s: %s", ticker, exc)
+            _, purchase_price = await self._fetch_snapshot_and_price(
+                ticker, validation.instrument_type, payload.purchase_price
+            )
+        except Exception:
+            logger.exception("Failed to fetch market data for %s", ticker)
             raise
 
         new_id = storage_service.add_item(
             ticker=ticker,
             instrument_type=validation.instrument_type,
             quantity=payload.quantity,
-            purchase_price=payload.purchase_price,
+            purchase_price=purchase_price,
             portfolio_id=portfolio_id,
         )
-        logger.info(
-            "Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id
-        )
+        logger.info("Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id)
 
-        from app.services.cache_service import cache_service
-        rows = await cache_service.refresh(portfolio_id)
+        rows = await _get_cache().refresh(portfolio_id)
         for row in rows:
             if row.id == new_id:
                 return row
@@ -83,12 +125,71 @@ class PortfolioService:
             "Не удалось сформировать строку для добавленной бумаги"
         )
 
+    async def add_instruments_bulk(
+        self, portfolio_id: int, payloads: list[AddInstrumentInput]
+    ) -> dict:
+        """Add multiple instruments in parallel with retries, refresh cache once.
+
+        Returns {"added": [...tickers], "failed": [...tickers]}.
+        """
+        MAX_RETRIES = 3
+        RETRY_DELAYS = [1.0, 2.0]  # seconds before each retry
+
+        async def _prepare_with_retry(payload: AddInstrumentInput) -> tuple:
+            ticker = payload.ticker.upper().strip()
+            last_exc: Exception | None = None
+            for attempt in range(MAX_RETRIES):
+                try:
+                    validation = await self.validate(payload)
+                    if not validation.validated:
+                        raise ValidationError("Ошибка валидации", "; ".join(validation.warnings))
+                    _, price = await self._fetch_snapshot_and_price(
+                        ticker, validation.instrument_type, payload.purchase_price
+                    )
+                    return ticker, validation.instrument_type, payload.quantity, price
+                except ValidationError:
+                    raise  # не ретраим ошибки валидации
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt < len(RETRY_DELAYS):
+                        logger.warning("Bulk add attempt %d failed for %s: %s — retrying", attempt + 1, ticker, exc)
+                        await asyncio.sleep(RETRY_DELAYS[attempt])
+                    else:
+                        logger.error("Bulk add failed after %d attempts for %s: %s", MAX_RETRIES, ticker, exc)
+            raise last_exc  # type: ignore[misc]
+
+        results = await asyncio.gather(
+            *[_prepare_with_retry(p) for p in payloads], return_exceptions=True
+        )
+
+        added_tickers: list[str] = []
+        failed_tickers: list[str] = []
+        added_ids: list[int] = []
+
+        for payload, res in zip(payloads, results):
+            ticker = payload.ticker.upper().strip()
+            if isinstance(res, Exception):
+                failed_tickers.append(ticker)
+                continue
+            t, itype, quantity, price = res
+            new_id = storage_service.add_item(
+                ticker=t,
+                instrument_type=itype,
+                quantity=quantity,
+                purchase_price=price,
+                portfolio_id=portfolio_id,
+            )
+            added_ids.append(new_id)
+            added_tickers.append(t)
+
+        await _get_cache().refresh(portfolio_id)
+        return {"added": added_tickers, "failed": failed_tickers}
+
     def delete_instrument(self, portfolio_id: int, item_id: int) -> bool:
         deleted = storage_service.delete_item(item_id, portfolio_id)
         if deleted > 0:
             logger.info("Deleted instrument ID %d from portfolio_id=%d", item_id, portfolio_id)
-            from app.services.cache_service import cache_service
-            cache_service.invalidate(portfolio_id)
+            _get_cache().invalidate(portfolio_id)
         return deleted > 0
 
     async def update_instrument(
@@ -109,8 +210,7 @@ class PortfolioService:
             )
             raise InstrumentNotFoundError(item_id)
 
-        from app.services.cache_service import cache_service
-        rows = await cache_service.refresh(portfolio_id)
+        rows = await _get_cache().refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 logger.info("Updated instrument ID %d", item_id)
@@ -136,8 +236,7 @@ class PortfolioService:
             )
             raise InstrumentNotFoundError(item_id)
 
-        from app.services.cache_service import cache_service
-        rows = await cache_service.refresh(portfolio_id)
+        rows = await _get_cache().refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 logger.info("Updated coupon for instrument ID %d", item_id)
@@ -162,8 +261,7 @@ class PortfolioService:
         if updated == 0:
             raise InstrumentNotFoundError(item_id)
 
-        from app.services.cache_service import cache_service
-        rows = await cache_service.refresh(portfolio_id)
+        rows = await _get_cache().refresh(portfolio_id)
         for row in rows:
             if row.id == item_id:
                 return row
@@ -172,41 +270,27 @@ class PortfolioService:
 
     async def remove_not_found_instruments(self, portfolio_id: int) -> int:
         stored_items = [
-            PortfolioItem(
-                id=int(item["id"]),
-                ticker=str(item["ticker"]),
-                instrument_type=str(item["instrument_type"]),
-                quantity=float(item["quantity"]),
-                purchase_price=float(item["purchase_price"]),
-                manual_coupon=(
-                    float(item["manual_coupon"])
-                    if item["manual_coupon"] is not None
-                    else None
-                ),
-                manual_coupon_rate=(
-                    float(item["manual_coupon_rate"])
-                    if item.get("manual_coupon_rate") is not None
-                    else None
-                ),
-            )
+            PortfolioItem.from_dict(item)
             for item in storage_service.get_items(portfolio_id)
         ]
 
-        missing_ids: list[int] = []
-        for item in stored_items:
+        async def _check_exists(item: PortfolioItem) -> int | None:
+            """Return item.id if not found on MOEX, else None."""
             try:
                 if item.instrument_type == "bond":
                     await moex_service.get_bond_snapshot(item.ticker)
                 else:
                     await moex_service.get_stock_snapshot(item.ticker)
+                return None
             except Exception as exc:
                 logger.warning(
                     "Instrument %s (%s) not found on MOEX: %s",
-                    item.ticker,
-                    item.instrument_type,
-                    exc,
+                    item.ticker, item.instrument_type, exc,
                 )
-                missing_ids.append(item.id)
+                return item.id
+
+        results = await asyncio.gather(*(_check_exists(item) for item in stored_items))
+        missing_ids = [item_id for item_id in results if item_id is not None]
 
         if missing_ids:
             deleted_count = storage_service.delete_items(missing_ids, portfolio_id)
@@ -231,23 +315,7 @@ class PortfolioService:
     # ------------------------------------------------------------------
     async def get_table_fresh(self, portfolio_id: int) -> list[InstrumentMetrics]:
         stored_items = [
-            PortfolioItem(
-                id=int(item["id"]),
-                ticker=str(item["ticker"]),
-                instrument_type=str(item["instrument_type"]),
-                quantity=float(item["quantity"]),
-                purchase_price=float(item["purchase_price"]),
-                manual_coupon=(
-                    float(item["manual_coupon"])
-                    if item["manual_coupon"] is not None
-                    else None
-                ),
-                manual_coupon_rate=(
-                    float(item["manual_coupon_rate"])
-                    if item.get("manual_coupon_rate") is not None
-                    else None
-                ),
-            )
+            PortfolioItem.from_dict(item)
             for item in storage_service.get_items(portfolio_id)
         ]
 
@@ -358,25 +426,30 @@ class PortfolioService:
                         ai_comment=f"Нет рыночных данных: {str(exc)}",
                     )
 
-        raw_rows = await asyncio.gather(
+        raw_rows = list(await asyncio.gather(
             *(fetch_row(item) for item in stored_items)
-        )
-        raw_rows = list(raw_rows)
+        ))
 
         total_value = sum(item.current_value for item in raw_rows)
-        finalized: list[InstrumentMetrics] = []
-
         for row in raw_rows:
             row.weight = (
                 round((row.current_value / total_value) * 100, 2)
                 if total_value > 0
                 else 0.0
             )
+
+        # Generate AI comments in parallel
+        async def _gen_comment(row: InstrumentMetrics) -> InstrumentMetrics:
             if not row.ai_comment:
                 row.ai_comment = await llm_service.generate_comment(row)
-            finalized.append(row)
+            return row
 
-            # Persist rating to DB so we can detect changes across restarts
+        finalized: list[InstrumentMetrics] = list(
+            await asyncio.gather(*(_gen_comment(row) for row in raw_rows))
+        )
+
+        # Persist ratings to DB so changes are detectable across restarts
+        for row in finalized:
             if row.current_price > 0:
                 storage_service.update_rating(row.id, portfolio_id, row.company_rating)
 

@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     jwt_secret: str  # Required, no default — fail fast if not set
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 72
+    # SMTP for password reset emails (optional)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 
