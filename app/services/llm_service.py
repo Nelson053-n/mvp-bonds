@@ -58,10 +58,10 @@ class LLMService:
         if payload.quantity <= 0:
             warnings.append("Количество должно быть больше нуля.")
 
-        if payload.purchase_price <= 0:
+        if payload.purchase_price is not None and payload.purchase_price <= 0:
             warnings.append("Цена покупки должна быть больше нуля.")
 
-        if instrument_type == "stock" and payload.purchase_price < 1:
+        if instrument_type == "stock" and payload.purchase_price is not None and payload.purchase_price < 1:
             warnings.append("Для акции цена выглядит как доля, а не рубли.")
 
         return ValidationResponse(

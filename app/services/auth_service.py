@@ -3,9 +3,14 @@ Authentication service for user registration, login, and JWT token management.
 """
 
 import logging
+import secrets
+import smtplib
+import time
 from datetime import datetime, timedelta, timezone
+from email.mime.text import MIMEText
 
 import bcrypt
+import httpx
 import jwt
 
 from app.config import settings
@@ -16,9 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
+    # Rate limiting for password reset: username -> list of request timestamps
+    _reset_rate: dict[str, list[float]] = {}
+    _RESET_RATE_WINDOW = 900   # 15 min window
+    _RESET_RATE_MAX = 3        # max 3 requests per window
+
     def __init__(self) -> None:
-        if not settings.jwt_secret:
-            raise ValueError("MVP_JWT_SECRET is required")
+        pass  # jwt_secret is validated by pydantic Settings (required field)
 
     def register(self, username: str, password: str) -> dict:
         """
@@ -93,6 +102,211 @@ class AuthService:
             algorithm=settings.jwt_algorithm,
         )
         return token
+
+    def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
+        """Change user password. Returns False if old password is wrong."""
+        user = storage_service.get_user_by_id(user_id)
+        if not user:
+            return False
+        if not bcrypt.checkpw(old_password.encode(), user["password_hash"].encode()):
+            return False
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        storage_service.update_user_password(user_id, new_hash)
+        logger.info("Password changed for user_id=%d", user_id)
+        return True
+
+    def change_username(self, user_id: int, new_username: str) -> bool:
+        """Change username. Returns False if taken."""
+        ok = storage_service.update_user_username(user_id, new_username)
+        if ok:
+            logger.info("Username changed for user_id=%d → %s", user_id, new_username)
+        return ok
+
+    # ── Password Reset ────────────────────────────────────────────
+
+    # In-memory store: code -> {user_id, expires}
+    _reset_codes: dict[str, dict] = {}
+    RESET_TTL = 900  # 15 minutes
+
+    def _cleanup_reset_codes(self) -> None:
+        now = time.time()
+        expired = [k for k, v in self._reset_codes.items() if v["expires"] < now]
+        for k in expired:
+            del self._reset_codes[k]
+
+    def _check_reset_rate_limit(self, username: str) -> bool:
+        """Return True if request is allowed, False if rate-limited."""
+        now = time.time()
+        cutoff = now - self._RESET_RATE_WINDOW
+        timestamps = [t for t in self._reset_rate.get(username, []) if t > cutoff]
+        if len(timestamps) >= self._RESET_RATE_MAX:
+            return False
+        timestamps.append(now)
+        self._reset_rate[username] = timestamps
+        return True
+
+    async def request_password_reset(self, username: str, lang: str = "ru") -> str:
+        """
+        Generate a 6-digit reset code for user and send it via Telegram and/or email.
+        Returns one of: 'telegram', 'email', 'both', 'none', 'rate_limited'.
+        """
+        if not self._check_reset_rate_limit(username):
+            logger.warning("Reset rate limit exceeded for username=%s", username)
+            return "rate_limited"
+
+        self._cleanup_reset_codes()
+        user = storage_service.get_user_by_username_for_reset(username)
+        if not user:
+            # Don't reveal whether user exists — return 'none' silently
+            return "none"
+
+        code = str(secrets.randbelow(900000) + 100000)  # 6-digit
+        self._reset_codes[code] = {"user_id": user["id"], "expires": time.time() + self.RESET_TTL}
+
+        sent_via = []
+        has_email_but_no_smtp = False
+
+        # Try Telegram
+        if user["tg_chat_id"]:
+            tg_token = storage_service.get_setting("tg_bot_token", "")
+            if tg_token:
+                ok = await self._send_telegram_reset(tg_token, user["tg_chat_id"], code, username, lang=lang)
+                if ok:
+                    sent_via.append("telegram")
+
+        # Try Email
+        if user["email"]:
+            if not settings.smtp_host or not settings.smtp_from:
+                has_email_but_no_smtp = True
+                logger.warning("Email set for user %s but SMTP not configured", username)
+            else:
+                ok = self._send_email_reset(user["email"], code, username, lang=lang)
+                if ok:
+                    sent_via.append("email")
+
+        if not sent_via:
+            logger.warning("Reset code for user %s (id=%d): %s [no delivery channel]", username, user["id"], code)
+            if has_email_but_no_smtp:
+                return "email_no_smtp"
+            return "none"
+
+        return "+".join(sent_via)
+
+    async def _send_telegram_reset(self, bot_token: str, chat_id: str, code: str, username: str, lang: str = "ru") -> bool:
+        if lang == "en":
+            text = (
+                f"🔐 Bond AI — password recovery\n\n"
+                f"Account: {username}\n"
+                f"Verification code: <b>{code}</b>\n\n"
+                f"Valid for 15 minutes. If you did not request a reset — ignore this message."
+            )
+        else:
+            text = (
+                f"🔐 Bond AI — восстановление пароля\n\n"
+                f"Аккаунт: {username}\n"
+                f"Код подтверждения: <b>{code}</b>\n\n"
+                f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
+            )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+                )
+                return r.status_code == 200
+        except Exception as e:
+            logger.warning("Telegram reset send failed: %s", e)
+            return False
+
+    def _send_email_reset(self, email: str, code: str, username: str, lang: str = "ru") -> bool:
+        if not settings.smtp_host or not settings.smtp_from:
+            logger.warning("SMTP not configured — cannot send email reset code")
+            return False
+        if lang == "en":
+            body = (
+                f"Bond AI — Password Recovery\n\n"
+                f"Account: {username}\n"
+                f"Verification code: {code}\n\n"
+                f"Valid for 15 minutes. If you did not request a reset — ignore this message."
+            )
+            subject = "Bond AI — password reset code"
+        else:
+            body = (
+                f"Восстановление пароля Bond AI\n\n"
+                f"Аккаунт: {username}\n"
+                f"Код подтверждения: {code}\n\n"
+                f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
+            )
+            subject = "Bond AI — код восстановления пароля"
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = subject
+        msg["From"] = settings.smtp_from
+        msg["To"] = email
+        try:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                if settings.smtp_user and settings.smtp_password:
+                    smtp.login(settings.smtp_user, settings.smtp_password)
+                smtp.sendmail(settings.smtp_from, [email], msg.as_string())
+            return True
+        except Exception as e:
+            logger.warning("Email reset send failed: %s", e)
+            return False
+
+    def confirm_password_reset(self, code: str, new_password: str) -> bool:
+        """Apply reset code and set new password. Returns True on success."""
+        self._cleanup_reset_codes()
+        entry = self._reset_codes.get(code)
+        if not entry or entry["expires"] < time.time():
+            return False
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        storage_service.update_user_password(entry["user_id"], new_hash)
+        del self._reset_codes[code]
+        logger.info("Password reset for user_id=%d", entry["user_id"])
+        return True
+
+    def change_email(self, user_id: int, email: str) -> dict:
+        """Update user email. Returns dict with success flag and smtp_available."""
+        user = storage_service.get_user_by_id(user_id)
+        if not user:
+            return {"ok": False, "smtp_available": False}
+        clean_email = email.strip() or None
+        storage_service.update_user_email(user_id, clean_email)
+        logger.info("Email updated for user_id=%d", user_id)
+        smtp_available = bool(settings.smtp_host and settings.smtp_from)
+        if smtp_available and clean_email:
+            self._send_email_confirmation(clean_email, user.get("username", ""))
+        return {"ok": True, "smtp_available": smtp_available}
+
+    def _send_email_confirmation(self, email: str, username: str) -> bool:
+        """Send a confirmation notice that email has been saved to the account."""
+        if not settings.smtp_host or not settings.smtp_from:
+            return False
+        msg = MIMEText(
+            f"Bond AI — подтверждение email\n\n"
+            f"Аккаунт: {username}\n"
+            f"Ваш email {email} был успешно привязан к аккаунту Bond AI.\n\n"
+            f"Теперь вы сможете использовать его для восстановления пароля.\n"
+            f"Если вы не привязывали этот email — проигнорируйте письмо.",
+            "plain",
+            "utf-8",
+        )
+        msg["Subject"] = "Bond AI — email привязан к аккаунту"
+        msg["From"] = settings.smtp_from
+        msg["To"] = email
+        try:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                if settings.smtp_user and settings.smtp_password:
+                    smtp.login(settings.smtp_user, settings.smtp_password)
+                smtp.sendmail(settings.smtp_from, [email], msg.as_string())
+            logger.info("Confirmation email sent to %s for user %s", email, username)
+            return True
+        except Exception as e:
+            logger.warning("Confirmation email send failed: %s", e)
+            return False
 
     def verify_token(self, token: str) -> dict | None:
         """

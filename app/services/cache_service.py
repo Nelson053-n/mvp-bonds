@@ -162,14 +162,16 @@ class CacheService:
         """Background loop that refreshes all cached portfolios periodically."""
         while True:
             try:
-                # Refresh all portfolios that have been accessed
-                for portfolio_id in list(self._caches.keys()):
-                    try:
-                        await self.refresh(portfolio_id)
-                    except Exception:
-                        logger.exception(
-                            "Background refresh error for portfolio_id=%d", portfolio_id
-                        )
+                portfolio_ids = list(self._caches.keys())
+                if portfolio_ids:
+                    async def _refresh_one(pid: int) -> None:
+                        try:
+                            await self.refresh(pid)
+                        except Exception:
+                            logger.exception(
+                                "Background refresh error for portfolio_id=%d", pid
+                            )
+                    await asyncio.gather(*(_refresh_one(pid) for pid in portfolio_ids))
             except Exception:
                 logger.exception("Background cache refresh error")
             await asyncio.sleep(self.refresh_interval)

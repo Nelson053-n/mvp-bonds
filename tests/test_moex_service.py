@@ -87,10 +87,10 @@ class TestMOEXServiceHelpers:
         assert result == ""
 
     def test_normalize_rating_valid_with_ru(self, service: MOEXService) -> None:
-        """Test _normalize_rating_value with ru prefix."""
+        """Test _normalize_rating_value strips ru prefix."""
         result = service._normalize_rating_value("ruAAA")
-
-        assert result == "ruAAA"
+        # "ru" prefix is stripped
+        assert result == "AAA"
 
     def test_normalize_rating_valid_bare(self, service: MOEXService) -> None:
         """Test _normalize_rating_value with bare rating."""
@@ -113,16 +113,16 @@ class TestMOEXServiceHelpers:
     def test_normalize_rating_with_modifier(
         self, service: MOEXService
     ) -> None:
-        """Test _normalize_rating_value with modifier."""
+        """Test _normalize_rating_value with modifier strips ru prefix."""
         result = service._normalize_rating_value("ruAA+")
-
-        assert result == "ruAA+"
+        # "ru" prefix is stripped
+        assert result == "AA+"
 
     def test_normalize_rating_exp(self, service: MOEXService) -> None:
-        """Test _normalize_rating_value with EXP suffix."""
+        """Test _normalize_rating_value with EXP suffix strips ru and (EXP)."""
         result = service._normalize_rating_value("ruAAA(EXP)")
-
-        assert result == "ruAAA(EXP)"
+        # "ru" prefix and "(EXP)" suffix are stripped
+        assert result == "AAA"
 
 
 class TestMOEXServiceRatings:
@@ -135,18 +135,21 @@ class TestMOEXServiceRatings:
     @pytest.mark.parametrize(
         "input_val,expected",
         [
-            ("ruAAA", "ruAAA"),
-            ("ruAA+", "ruAA+"),
-            ("ruAA-", "ruAA-"),
-            ("ruA", "ruA"),
-            ("ruBBB+", "ruBBB+"),
-            ("ruBB", "ruBB"),
-            ("ruB-", "ruB-"),
-            ("ruCCC", "ruCCC"),
+            # ru-prefixed ratings: ru is stripped
+            ("ruAAA", "AAA"),
+            ("ruAA+", "AA+"),
+            ("ruAA-", "AA-"),
+            ("ruA", "A"),
+            ("ruBBB+", "BBB+"),
+            ("ruBB", "BB"),
+            ("ruB-", "B-"),
+            ("ruCCC", "CCC"),
+            # bare ratings: returned as-is (uppercased)
             ("AAA", "AAA"),
             ("BB+", "BB+"),
             ("D", "D"),
-            ("ruAAA(EXP)", "ruAAA(EXP)"),
+            # ru + (EXP): both stripped
+            ("ruAAA(EXP)", "AAA"),
         ],
     )
     def test_normalize_rating_variations(

@@ -1,7 +1,10 @@
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from app.config import settings
+
+_UNSET: Any = object()  # sentinel for "not provided" in update_portfolio
 
 
 class StorageService:
@@ -11,6 +14,8 @@ class StorageService:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
@@ -85,6 +90,16 @@ class StorageService:
                     "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
                 )
                 conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN tg_chat_id TEXT")
             except sqlite3.OperationalError:
                 pass
 
@@ -436,7 +451,7 @@ class StorageService:
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -448,6 +463,8 @@ class StorageService:
             "password_hash": row[2],
             "created_at": row[3],
             "is_admin": bool(row[4]),
+            "email": row[5],
+            "tg_chat_id": row[6],
         }
 
     # ── Portfolios ──────────────────────────────────────────────────────────
@@ -538,8 +555,8 @@ class StorageService:
         self,
         portfolio_id: int,
         name: str | None = None,
-        share_token: str | None = ...,
-        share_password_hash: str | None = ...,
+        share_token: str | None = _UNSET,
+        share_password_hash: str | None = _UNSET,
     ) -> int:
         updates = []
         values = []
@@ -547,10 +564,10 @@ class StorageService:
         if name is not None:
             updates.append("name = ?")
             values.append(name)
-        if share_token is not ...:
+        if share_token is not _UNSET:
             updates.append("share_token = ?")
             values.append(share_token)
-        if share_password_hash is not ...:
+        if share_password_hash is not _UNSET:
             updates.append("share_password_hash = ?")
             values.append(share_password_hash)
 
@@ -624,6 +641,127 @@ class StorageService:
             )
             conn.commit()
             return int(cursor.rowcount)
+
+    def update_user_username(self, user_id: int, new_username: str) -> bool:
+        """Returns False if username already taken."""
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT id FROM users WHERE username = ? AND id != ?",
+                (new_username, user_id),
+            ).fetchone()
+            if existing:
+                return False
+            conn.execute(
+                "UPDATE users SET username = ? WHERE id = ?",
+                (new_username, user_id),
+            )
+            conn.commit()
+            return True
+
+    def update_user_tg_chat_id(self, user_id: int, tg_chat_id: str | None) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET tg_chat_id = ? WHERE id = ?",
+                (tg_chat_id, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def get_user_by_username_for_reset(self, username: str) -> dict | None:
+        """Returns minimal user info for password reset (email, tg_chat_id)."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, email, tg_chat_id FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+        if not row:
+            return None
+        return {"id": int(row[0]), "email": row[1], "tg_chat_id": row[2]}
+
+    def update_user_email(self, user_id: int, email: str | None) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET email = ? WHERE id = ?",
+                (email, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
+    def move_instrument(self, item_id: int, from_portfolio_id: int, to_portfolio_id: int) -> bool:
+        """Move an instrument from one portfolio to another. Returns True if moved."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET portfolio_id = ? WHERE id = ? AND portfolio_id = ?",
+                (to_portfolio_id, item_id, from_portfolio_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount) > 0
+
+    def get_portfolios_with_item_counts(self, user_id: int) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT p.id, p.name, p.created_at,
+                       COUNT(pi.id) as item_count,
+                       COALESCE(SUM(pi.quantity * pi.purchase_price), 0) as total_cost,
+                       GROUP_CONCAT(pi.company_rating) as ratings
+                FROM portfolios p
+                LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
+                WHERE p.user_id = ?
+                GROUP BY p.id
+                ORDER BY p.id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            ratings_raw = row[5] or ""
+            ratings = [r.strip() for r in ratings_raw.split(",") if r.strip()]
+            risk = self._calc_risk_from_ratings(ratings)
+            result.append({
+                "id": int(row[0]),
+                "name": row[1],
+                "created_at": row[2],
+                "item_count": int(row[3]),
+                "total_cost": round(float(row[4]), 2),
+                "risk": risk,
+            })
+        return result
+
+    @staticmethod
+    def _calc_risk_from_ratings(ratings: list[str]) -> str:
+        """Determine portfolio risk level from instrument ratings."""
+        if not ratings:
+            return "unknown"
+        _map = {
+            "AAA": 0, "AA+": 1, "AA": 1, "AA-": 1,
+            "A+": 2, "A": 2, "A-": 2,
+            "BBB+": 3, "BBB": 3, "BBB-": 3,
+            "BB+": 4, "BB": 4, "BB-": 4,
+            "B+": 5, "B": 5, "B-": 5,
+        }
+        scores = [_map.get(r.upper(), 3) for r in ratings]
+        avg = sum(scores) / len(scores)
+        if avg <= 1.5:
+            return "conservative"
+        if avg <= 2.5:
+            return "low"
+        if avg <= 3.5:
+            return "moderate"
+        if avg <= 4.5:
+            return "high"
+        return "aggressive"
+
+    def merge_portfolios(self, source_id: int, target_id: int) -> int:
+        """Move all items from source portfolio into target. Returns count moved."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET portfolio_id = ? WHERE portfolio_id = ?",
+                (target_id, source_id),
+            )
+            moved = int(cursor.rowcount)
+            conn.commit()
+        return moved
 
     def get_all_portfolios_with_users(self) -> list[dict]:
         with self._connect() as conn:

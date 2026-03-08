@@ -10,7 +10,7 @@ InstrumentType = Literal["stock", "bond"]
 class AddInstrumentInput(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=32)
     quantity: float = Field(..., gt=0)
-    purchase_price: float = Field(..., gt=0)
+    purchase_price: float | None = Field(None, gt=0)  # None = auto-fetch from MOEX
 
 
 class UpdateInstrumentInput(BaseModel):
