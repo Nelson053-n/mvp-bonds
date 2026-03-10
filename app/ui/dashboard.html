@@ -7563,17 +7563,12 @@
         if (forceStart) {
           // New user just registered — clear flag and launch wizard immediately
           localStorage.removeItem('mvp_start_onboarding');
-          localStorage.removeItem('mvp_onboarding_done');
+          localStorage.setItem('mvp_onboarding_done', '1');
           const overlay = document.getElementById('onboarding-overlay');
           if (overlay) { overlay.style.display = 'flex'; }
           return;
         }
-        // Show only for returning users with no instruments
-        if (localStorage.getItem('mvp_onboarding_done')) return;
-        if (!portfolioId) return;
-        if (tableRows && tableRows.length > 0) return;
-        const overlay = document.getElementById('onboarding-overlay');
-        if (overlay) { overlay.style.display = 'flex'; }
+        // Only show once ever — never auto-show for existing users switching portfolios
       }
 
       function closeOnboarding() {
