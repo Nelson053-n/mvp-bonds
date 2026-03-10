@@ -69,8 +69,9 @@ class PortfolioService:
             snapshot = await moex_service.get_bond_snapshot(ticker)
             if override_price is None:
                 nominal = snapshot.nominal or 1000.0
+                # Сохраняем чистую цену (без НКД) — как котировка на бирже
                 price = round(
-                    (snapshot.clean_price_percent / 100.0) * nominal + (snapshot.aci or 0.0), 2
+                    (snapshot.clean_price_percent / 100.0) * nominal, 2
                 )
             else:
                 price = override_price
@@ -330,13 +331,16 @@ class PortfolioService:
                             item.ticker
                         )
                         nominal = snapshot.nominal or 1000.0
-                        current_price = (
+                        clean_price = (
                             (snapshot.clean_price_percent / 100.0) * nominal
-                            + (snapshot.aci or 0.0)
                         )
-                        current_value = current_price * item.quantity
+                        dirty_price = clean_price + (snapshot.aci or 0.0)
+                        # current_price в таблице — чистая цена (как на бирже)
+                        current_price = clean_price
+                        # стоимость позиции считается по грязной цене
+                        current_value = dirty_price * item.quantity
                         profit = (
-                            (current_price - item.purchase_price)
+                            (dirty_price - item.purchase_price)
                             * item.quantity
                         )
                         return InstrumentMetrics(
