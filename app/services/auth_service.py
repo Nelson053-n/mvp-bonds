@@ -51,13 +51,6 @@ class AuthService:
         except ValueError as e:
             raise AuthError(str(e)) from e
 
-        # Create default portfolio for new user
-        try:
-            storage_service.create_portfolio(user_id, "Основной портфель")
-            logger.info("Default portfolio created for user: %s (id=%d)", username, user_id)
-        except Exception as e:
-            logger.warning("Failed to create default portfolio for user %d: %s", user_id, e)
-
         logger.info("User registered: %s (id=%d)", username, user_id)
         return {
             "user_id": user_id,

@@ -1,6 +1,5 @@
-const CACHE_NAME = 'bond-ai-v1';
+const CACHE_NAME = 'bond-ai-v5';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
 ];
 
@@ -37,7 +36,7 @@ self.addEventListener('fetch', (event) => {
   // Cache-first for static assets, network-first for HTML
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/'))
+      fetch(event.request).catch(() => caches.match('/app') || caches.match('/'))
     );
     return;
   }

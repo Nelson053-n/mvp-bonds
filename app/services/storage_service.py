@@ -963,6 +963,17 @@ class StorageService:
             rows = conn.execute("SELECT id, user_id, name FROM portfolios").fetchall()
         return [{"id": r[0], "user_id": r[1], "name": r[2]} for r in rows]
 
+    def get_all_portfolio_items_for_rating(self) -> list[dict]:
+        """Return one item per unique ticker (for daily rating refresh)."""
+        with self._connect() as conn:
+            rows = conn.execute("""
+                SELECT MIN(id) as id, MIN(portfolio_id) as portfolio_id, ticker, instrument_type
+                FROM portfolio_items
+                GROUP BY ticker
+                ORDER BY ticker
+            """).fetchall()
+        return [{"id": r[0], "portfolio_id": r[1], "ticker": r[2], "instrument_type": r[3]} for r in rows]
+
     def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float) -> None:
         """Save daily snapshot. Upsert by date."""
         from datetime import date

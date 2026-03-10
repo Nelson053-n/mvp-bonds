@@ -88,6 +88,34 @@ async def _notification_loop():
             pass
 
 
+async def _rating_refresh_loop():
+    """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC."""
+    from datetime import datetime, timezone
+    while True:
+        now = datetime.now(timezone.utc)
+        secs_to_3am = ((3 - now.hour) % 24) * 3600 - now.minute * 60 - now.second
+        if secs_to_3am <= 0:
+            secs_to_3am += 86400
+        await asyncio.sleep(secs_to_3am)
+        try:
+            items = storage_service.get_all_portfolio_items_for_rating()
+            sem = asyncio.Semaphore(3)
+
+            async def _refresh_one(item):
+                async with sem:
+                    try:
+                        rating = await moex_service.refresh_rating(item["ticker"])
+                        if rating is not None:
+                            storage_service.update_rating(item["id"], item["portfolio_id"], rating)
+                    except Exception:
+                        pass
+
+            await asyncio.gather(*(_refresh_one(i) for i in items))
+            logger.info("Daily rating refresh: %d tickers processed", len(items))
+        except Exception:
+            logger.exception("Daily rating refresh failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: start background refresh (portfolios are lazy-loaded)
@@ -96,6 +124,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_cleanup_shares_loop())
     asyncio.create_task(_snapshot_loop())
     asyncio.create_task(_notification_loop())
+    asyncio.create_task(_rating_refresh_loop())
     yield
     # Shutdown
     logger.info("Shutting down application")
@@ -150,6 +179,14 @@ async def service_worker():
 @app.get("/", response_class=HTMLResponse)
 async def root() -> HTMLResponse:
     return HTMLResponse(
+        landing_path.read_text(encoding="utf-8"),
+        headers=_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def dashboard() -> HTMLResponse:
+    return HTMLResponse(
         dashboard_path.read_text(encoding="utf-8"),
         headers=_NO_CACHE_HEADERS,
     )
@@ -157,6 +194,7 @@ async def root() -> HTMLResponse:
 
 @app.get("/landing", response_class=HTMLResponse)
 async def landing() -> HTMLResponse:
+    """Kept for backwards compatibility — redirects to /."""
     return HTMLResponse(
         landing_path.read_text(encoding="utf-8"),
         headers=_NO_CACHE_HEADERS,
@@ -214,6 +252,31 @@ async def get_shared_portfolio_table(
 
     rows = await portfolio_service.get_table(portfolio["id"])
     return {"items": rows}
+
+
+@app.get("/share/{share_token}/snapshots")
+async def get_shared_portfolio_snapshots(
+    share_token: str,
+    days: int = 90,
+    x_share_password: str | None = Header(None),
+) -> list[dict]:
+    """Portfolio value history for shared view (public, no auth required)."""
+    portfolio = storage_service.get_portfolio_by_share_token(share_token)
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Портфель не найден")
+
+    if portfolio.get("share_expires_at") and portfolio["share_expires_at"] < int(time.time()):
+        raise HTTPException(status_code=404, detail="Ссылка устарела")
+
+    if portfolio["share_password_hash"]:
+        if not x_share_password:
+            raise HTTPException(status_code=403, detail="Требуется пароль")
+        if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
+            raise HTTPException(status_code=403, detail="Неверный пароль")
+
+    if days not in (30, 90, 365):
+        days = 90
+    return storage_service.get_portfolio_snapshots(portfolio["id"], days)
 
 
 @app.get("/health")

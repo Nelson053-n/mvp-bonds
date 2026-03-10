@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import get_admin_user
 from app.services.storage_service import storage_service
+from app.services.moex_service import moex_service
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,52 @@ class SetAdminInput(BaseModel):
     is_admin: bool
 
 
+class ToggleSourceInput(BaseModel):
+    enabled: bool
+
+
 # ── Stats ────────────────────────────────────────────────────────────────────
 
 @router.get("/stats")
 async def get_stats(admin: dict = Depends(get_admin_user)) -> dict:
     """Global platform statistics."""
     return storage_service.get_stats()
+
+
+# ── Data Sources ─────────────────────────────────────────────────────────────
+
+@router.get("/data-sources")
+async def get_data_sources(admin: dict = Depends(get_admin_user)) -> list:
+    """Status of external data sources: MOEX price, MOEX rating, SmartLab."""
+    return moex_service.get_sources_status()
+
+
+@router.post("/data-sources/{source}/toggle")
+async def toggle_data_source(
+    source: str,
+    payload: ToggleSourceInput,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """Enable or disable an external data source."""
+    ok = moex_service.set_source_enabled(source, payload.enabled)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Источник данных не найден")
+    logger.info(
+        "Admin %s %s data source %s",
+        admin["username"],
+        "enabled" if payload.enabled else "disabled",
+        source,
+    )
+    return {"ok": True, "source": source, "enabled": payload.enabled}
+
+
+@router.post("/data-sources/ratings/clear-cache")
+async def clear_rating_cache(admin: dict = Depends(get_admin_user)) -> dict:
+    """Clear in-memory rating cache so next refresh re-fetches all ratings."""
+    count = len(moex_service._credit_rating_cache)
+    moex_service._credit_rating_cache.clear()
+    logger.info("Admin %s cleared rating cache (%d entries)", admin["username"], count)
+    return {"ok": True, "cleared": count}
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
