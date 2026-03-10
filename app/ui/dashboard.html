@@ -836,6 +836,7 @@
       body.mobile-mode th, body.mobile-mode td { padding: 5px 6px; }
       body.mobile-mode .mobile-toggle-bar { display: flex; }
       body.mobile-mode .brand-badge { display: none; }
+      body.mobile-mode #analytics-type-card { display: none !important; }
       /* В мобильном режиме скрываем кнопку выхода и лишние кнопки из topbar-right */
       body.mobile-mode #btn-logout,
       body.mobile-mode #btn-guide,
@@ -1031,7 +1032,7 @@
 
         <!-- Charts row -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
-          <div class="card">
+          <div class="card" id="analytics-type-card">
             <div class="card-header"><h2 class="card-title">По типам</h2></div>
             <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
               <canvas id="analytics-type-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
