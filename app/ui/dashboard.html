@@ -2049,6 +2049,15 @@
         return !!shareToken;
       }
 
+      // ── FREE LIMIT SENTINEL ──────────────────────────────────────
+      // Thrown by apiFetch when backend returns FREE_LIMIT_* (403).
+      // upgrade modal is already open — callers should NOT show an error.
+      class FreeLimitError extends Error {
+        constructor() { super('FREE_LIMIT'); this.name = 'FreeLimitError'; }
+      }
+      // Returns true if the error should be silently ignored (upgrade modal already shown)
+      function isFreeLimitError(e) { return e instanceof FreeLimitError; }
+
       // ── HTML ESCAPE ──────────────────────────────────────────────
       function esc(s) {
         if (s == null) return '';
@@ -2085,7 +2094,7 @@
             const d = await cloned.json();
             if (d && typeof d.detail === 'string' && d.detail.startsWith('FREE_LIMIT_')) {
               openUpgradeModal();
-              return null;
+              throw new FreeLimitError();
             }
           } catch(_) {}
         }
@@ -3914,7 +3923,6 @@
           url = `/portfolios/${portfolioId}/table?ts=${Date.now()}`;
         }
         const resp = await apiFetch(url, { cache: 'no-store' });
-        if (!resp) return;  // intercepted (e.g. FREE_LIMIT upgrade modal shown)
         if (resp.status === 403) {
           // Password required - show modal instead of prompt
           return new Promise((resolve, reject) => {
@@ -4186,6 +4194,7 @@
             setTimeout(() => initOnboarding(), 1500);
           }
         } catch (err) {
+          if (isFreeLimitError(err)) return; // upgrade modal already shown
           showLoginScreen();
         }
       }
@@ -6230,6 +6239,7 @@
         if (newPw.length < 8) { status.textContent = t('settings.account.pwMinLength'); status.className = 'status error'; return; }
         try {
           const r = await apiFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
+          if (!r) return;
           if (r.status === 204) {
             status.textContent = t('settings.account.pwChanged');
             status.className = 'status ok';
@@ -6238,10 +6248,13 @@
             document.getElementById('acc-new-pw2').value = '';
           } else {
             const d = await r.json().catch(() => ({}));
-            status.textContent = d.detail || t('settings.account.pwError');
+            const msg = typeof d.detail === 'string' ? d.detail : t('settings.account.pwError');
+            status.textContent = msg;
             status.className = 'status error';
           }
-        } catch(e) { status.textContent = t('settings.account.pwConnError'); status.className = 'status error'; }
+        } catch(e) {
+          if (!isFreeLimitError(e)) { status.textContent = t('settings.account.pwConnError'); status.className = 'status error'; }
+        }
       });
 
       // Change email
@@ -7660,8 +7673,8 @@
               headers: {'Content-Type':'application/json'},
               body: JSON.stringify({ name: portName }),
             });
-            const portData = await portRes.json();
             if (!portRes.ok) throw new Error('Ошибка создания портфеля');
+            const portData = await portRes.json();
             targetPortfolioId = portData.id;
           }
 
@@ -7704,7 +7717,7 @@
         } catch(e) {
           btn.disabled = false;
           btn.textContent = '✓ Добавить всё в портфель';
-          alert(t('err.addFailed'));
+          if (!isFreeLimitError(e)) alert(t('err.addFailed'));
         }
       }
 
