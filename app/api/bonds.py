@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_optional_user
 from app.services.moex_service import moex_service
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,55 @@ _RATING_ORDER = [
 ]
 _MIN_ALLOWED_RATING = "BB+"
 _MIN_ALLOWED_SCORE = _RATING_ORDER.index(_MIN_ALLOWED_RATING)  # 10
+
+# Static rating dictionary for well-known Russian issuers (ISIN prefix or ticker prefix).
+# Updated manually; used as fallback when external rating sources are unavailable.
+# Source: ACRA / Expert RA public disclosures (2024-2025).
+_STATIC_RATINGS: dict[str, str] = {
+    # ОФЗ — государство
+    "SU": "AAA",
+    # Банки и финансы
+    "SBER": "AAA", "VTBN": "AA+", "VTBB": "AA+", "GAZP": "AA+",
+    "ROSB": "AA+", "ALFB": "AA", "TINK": "AA-", "RSHB": "AA+",
+    "RSHBS": "AA+", "BNKST": "AA",
+    # Крупные корпорации
+    "LKOH": "AAA", "NVTK": "AAA", "ROSN": "AAA", "TATN": "AA+",
+    "MGNT": "AA", "MTSS": "AA", "MVID": "A+",
+    # Лизинг / квазигосударственные
+    "GTLK": "AA+", "STLK": "AA", "RESO": "A+",
+    # Региональные и муниципальные (обычно A-BBB)
+    "MSK": "AA+", "SPB": "AA",
+}
+
+# MOEX listing level → approximate rating proxy (when no real rating available).
+# LISTLEVEL 1 = top-tier (OFZ, Sber, etc.) ≈ AAA/AA
+# LISTLEVEL 2 = mid-tier ≈ A/BBB
+# LISTLEVEL 3 = speculative ≈ BB
+_LISTLEVEL_RATING: dict[int, str] = {
+    1: "AA",
+    2: "BBB",
+    3: "BB",
+}
+
+
+def _static_rating(ticker: str) -> str | None:
+    """Return static rating by ticker prefix, or None if unknown."""
+    upper = ticker.upper()
+    for prefix, rating in _STATIC_RATINGS.items():
+        if upper.startswith(prefix):
+            return rating
+    return None
+
+
+def _rating_from_listlevel(listlevel: int | None) -> str | None:
+    """Convert MOEX listing level to approximate rating proxy."""
+    if listlevel is None:
+        return None
+    try:
+        return _LISTLEVEL_RATING.get(int(listlevel))
+    except (ValueError, TypeError):
+        return None
+
 
 _bonds_cache: list[dict[str, Any]] | None = None
 _bonds_cache_ts: float = 0.0
@@ -79,7 +128,7 @@ async def _fetch_board(
         f"/boards/{board}/securities.json"
         f"?iss.meta=off&iss.only=securities,marketdata"
         f"&securities.columns=SECID,SHORTNAME,PREVLEGALCLOSEPRICE,"
-        f"COUPONPERCENT,COUPONPERIOD,FACEVALUE,MATDATE,OFFERDATE,LOTSIZE"
+        f"COUPONPERCENT,COUPONPERIOD,FACEVALUE,MATDATE,OFFERDATE,LOTSIZE,LISTLEVEL"
         f"&marketdata.columns=SECID,YIELD,VALTODAY"
         f"&limit=1000"
     )
@@ -142,6 +191,10 @@ async def _fetch_board(
 
         period_int = int(coupon_period) if coupon_period else None
 
+        listlevel = bond.get("LISTLEVEL")
+        # Pre-fill rating from static dict or listlevel proxy
+        pre_rating = _static_rating(secid) or _rating_from_listlevel(listlevel)
+
         results.append({
             "ticker": secid,
             "name": bond.get("SHORTNAME", secid),
@@ -155,7 +208,8 @@ async def _fetch_board(
             "coupon_frequency": _coupon_frequency(period_int),
             "market_yield": float(market_yield) if market_yield else float(coupon),
             "board": board,
-            "rating": None,
+            "listlevel": int(listlevel) if listlevel else None,
+            "rating": pre_rating,
         })
 
     return results
@@ -225,12 +279,39 @@ def _rating_below_floor(rating: str | None) -> bool:
     return score > _MIN_ALLOWED_SCORE
 
 
+@router.get("/search")
+async def search_bonds(
+    q: str = Query(..., min_length=1, max_length=64),
+    limit: int = Query(8, ge=1, le=20),
+    _user: dict | None = Depends(get_optional_user),
+) -> list[dict]:
+    """Full-text search by ticker or name across cached bond list."""
+    all_bonds = await _get_bonds_cached()
+    q_upper = q.strip().upper()
+    results: list[dict] = []
+    for b in all_bonds:
+        ticker = (b.get("ticker") or "").upper()
+        name   = (b.get("name")   or "").upper()
+        if q_upper in ticker or q_upper in name:
+            results.append({
+                "ticker":        b["ticker"],
+                "name":          b["name"],
+                "coupon_percent": b["coupon_percent"],
+                "maturity":      b.get("maturity"),
+                "rating":        b.get("rating"),
+                "price":         round(b["price"], 2),
+            })
+        if len(results) >= limit:
+            break
+    return results
+
+
 @router.get("/suggest")
 async def suggest_portfolio(
     amount: float = Query(..., ge=10_000, le=100_000_000),
     yield_target: float = Query(..., ge=5, le=30, alias="yield"),
     risk: str = Query(..., pattern="^(ultra_low|low|moderate|elevated|high)$"),
-    _user: dict = Depends(get_current_user),
+    _user: dict | None = Depends(get_optional_user),
 ) -> dict:
     all_bonds = await _get_bonds_cached()
     if not all_bonds:
@@ -259,13 +340,19 @@ async def suggest_portfolio(
     candidates = filtered[:50]
 
     # Step 4: fetch ratings in parallel for top candidates
+    # If bond already has a pre-filled rating (static dict or listlevel proxy), skip external fetch.
     async def _fetch_rating(bond: dict) -> dict:
+        if bond.get("rating"):
+            return bond  # already resolved from static dict or listlevel
         try:
             rating = await moex_service._get_smartlab_credit_rating(bond["ticker"])
             if rating is None:
                 rating = await moex_service._get_credit_rating(bond["ticker"])
         except Exception:
             rating = None
+        # Last resort: use listlevel proxy (already in bond dict)
+        if rating is None:
+            rating = _rating_from_listlevel(bond.get("listlevel"))
         return {**bond, "rating": rating}
 
     rated: list[dict] = list(
@@ -362,6 +449,7 @@ async def suggest_portfolio(
             "ticker": bond["ticker"],
             "name": bond["name"],
             "rating": bond.get("rating"),
+            "listlevel": bond.get("listlevel"),
             "coupon_percent": round(bond["coupon_percent"], 2),
             "coupon_frequency": bond["coupon_frequency"],
             "price": round(bond["price"], 2),

@@ -4,16 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bond AI — Умный портфель облигаций с AI-аналитикой</title>
+  <meta name="description" content="Подбирайте облигации под ваш риск-профиль, отслеживайте купонный доход и получайте уведомления в Telegram. Данные MOEX в реальном времени.">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Bond AI">
+  <meta name="theme-color" content="#020817">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    /* ─── CSS Variables ─────────────────────────────────── */
     :root {
+      --blue-400: #60a5fa;
+      --blue-500: #3b82f6;
+      --blue-600: #2563eb;
+      --blue-700: #1d4ed8;
+      --indigo-400: #818cf8;
+      --indigo-500: #6366f1;
+      --purple-400: #c084fc;
+      --purple-500: #a855f7;
+      --green-400: #4ade80;
+      --green-500: #22c55e;
+      --green-600: #16a34a;
+      --cyan-400: #22d3ee;
+      --sky-400: #38bdf8;
       --slate-50:  #f8fafc;
       --slate-100: #f1f5f9;
       --slate-200: #e2e8f0;
@@ -24,60 +35,113 @@
       --slate-700: #334155;
       --slate-800: #1e293b;
       --slate-900: #0f172a;
-
-      --blue-50:  #eff6ff;
-      --blue-100: #dbeafe;
-      --blue-200: #bfdbfe;
-      --blue-500: #3b82f6;
-      --blue-600: #2563eb;
-      --blue-700: #1d4ed8;
-
-      --green-100: #dcfce7;
-      --green-500: #22c55e;
-      --green-600: #16a34a;
-
-      --purple-500: #a855f7;
-      --purple-600: #9333ea;
-
-      --red-100: #fee2e2;
-      --red-500: #ef4444;
-      --red-600: #dc2626;
-
+      --bg:        #020817;
       --radius-sm: 6px;
       --radius:    8px;
       --radius-lg: 12px;
-
-      --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
-      --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
-      --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
-      --shadow-lg: 0 10px 15px rgba(0,0,0,.08), 0 4px 6px rgba(0,0,0,.05);
+      --radius-xl: 16px;
     }
 
-    /* ─── Reset & Base ───────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     html { scroll-behavior: smooth; }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--slate-50);
-      color: var(--slate-800);
+      background: var(--bg);
+      color: var(--slate-300);
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    /* ─── Topbar ─────────────────────────────────────────── */
+    /* ─── MESH GRID ─────────────────────────────────────────── */
+    .mesh-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(148,163,184,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.04) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+
+    /* ─── ORBS ──────────────────────────────────────────────── */
+    .orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      will-change: transform;
+    }
+    .orb-1 {
+      width: 700px; height: 700px;
+      top: -200px; left: -150px;
+      background: radial-gradient(circle, rgba(37,99,235,.6) 0%, rgba(37,99,235,.18) 45%, transparent 70%);
+      animation: orbDrift1 13s ease-in-out infinite;
+    }
+    .orb-2 {
+      width: 600px; height: 600px;
+      bottom: -120px; right: -120px;
+      background: radial-gradient(circle, rgba(99,102,241,.55) 0%, rgba(99,102,241,.15) 45%, transparent 70%);
+      animation: orbDrift2 17s ease-in-out infinite;
+    }
+    .orb-3 {
+      width: 440px; height: 440px;
+      top: 40%; left: 50%;
+      background: radial-gradient(circle, rgba(14,165,233,.45) 0%, rgba(14,165,233,.12) 45%, transparent 70%);
+      animation: orbDrift3 11s ease-in-out infinite;
+    }
+    .orb-4 {
+      width: 380px; height: 380px;
+      top: 20%; right: 18%;
+      background: radial-gradient(circle, rgba(168,85,247,.4) 0%, rgba(168,85,247,.1) 45%, transparent 70%);
+      animation: orbDrift4 15s ease-in-out infinite;
+    }
+    @keyframes orbDrift1 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%      { transform: translate(50px,40px) scale(1.06); }
+      66%      { transform: translate(-30px,60px) scale(.96); }
+    }
+    @keyframes orbDrift2 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      40%      { transform: translate(-60px,-40px) scale(1.08); }
+      70%      { transform: translate(40px,-15px) scale(.94); }
+    }
+    @keyframes orbDrift3 {
+      0%,100% { transform: translate(-50%,-50%) scale(1); }
+      30%      { transform: translate(-50%,-50%) translate(30px,-50px) scale(1.1); }
+      70%      { transform: translate(-50%,-50%) translate(-40px,25px) scale(.91); }
+    }
+    @keyframes orbDrift4 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      35%      { transform: translate(-20px,35px) scale(1.07); }
+      70%      { transform: translate(25px,-20px) scale(.93); }
+    }
+
+    /* ─── TOPBAR ─────────────────────────────────────────────── */
     .topbar {
       position: fixed;
       top: 0; left: 0; right: 0;
       z-index: 100;
-      background: var(--slate-900);
       height: 56px;
       display: flex;
       align-items: center;
       padding: 0 24px;
       gap: 12px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
+      background: rgba(2,8,23,.75);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(148,163,184,.08);
+      transition: box-shadow .2s;
+    }
+    .topbar.scrolled {
+      box-shadow: 0 1px 24px rgba(0,0,0,.45);
     }
 
     .topbar-logo {
@@ -87,895 +151,1221 @@
       text-decoration: none;
       flex-shrink: 0;
     }
-
-    .logo-square {
-      width: 28px;
-      height: 28px;
-      background: var(--blue-600);
+    .logo-sq {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
       border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 15px; color: #fff;
       letter-spacing: -.5px;
+      box-shadow: 0 0 14px rgba(37,99,235,.45);
     }
-
     .logo-text {
-      font-weight: 700;
-      font-size: 15px;
-      color: #fff;
-      letter-spacing: -.2px;
+      font-weight: 700; font-size: 15px; color: #fff; letter-spacing: -.2px;
     }
-
     .logo-badge {
-      font-size: 9px;
-      font-weight: 700;
-      color: var(--blue-200);
-      background: rgba(59,130,246,.18);
-      border: 1px solid rgba(59,130,246,.3);
-      border-radius: 4px;
-      padding: 1px 5px;
-      letter-spacing: .5px;
-      text-transform: uppercase;
+      font-size: 9px; font-weight: 700;
+      color: var(--blue-400);
+      background: rgba(59,130,246,.15);
+      border: 1px solid rgba(59,130,246,.28);
+      border-radius: 4px; padding: 1px 5px;
+      letter-spacing: .5px; text-transform: uppercase;
     }
-
     .topbar-spacer { flex: 1; }
+    .topbar-nav { display: flex; align-items: center; gap: 8px; }
 
-    .topbar-nav {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
+    /* ─── BUTTONS ────────────────────────────────────────────── */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: var(--radius-sm);
-      padding: 7px 14px;
-      cursor: pointer;
-      transition: all .15s ease;
-      text-decoration: none;
-      border: 1.5px solid transparent;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      border-radius: var(--radius-sm); padding: 7px 14px;
+      cursor: pointer; transition: all .15s ease;
+      text-decoration: none; border: 1.5px solid transparent; white-space: nowrap;
     }
-
-    .btn-outline-white {
-      background: transparent;
-      border-color: rgba(255,255,255,.25);
-      color: rgba(255,255,255,.85);
+    .btn-ghost {
+      background: transparent; border-color: rgba(148,163,184,.2); color: var(--slate-300);
     }
-    .btn-outline-white:hover {
-      border-color: rgba(255,255,255,.55);
-      color: #fff;
-      background: rgba(255,255,255,.07);
+    .btn-ghost:hover {
+      border-color: rgba(148,163,184,.4); color: #fff; background: rgba(255,255,255,.05);
     }
-
-    .btn-blue {
-      background: var(--blue-600);
-      border-color: var(--blue-600);
-      color: #fff;
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border-color: transparent; color: #fff;
+      box-shadow: 0 0 20px rgba(37,99,235,.35);
     }
-    .btn-blue:hover {
-      background: var(--blue-700);
-      border-color: var(--blue-700);
+    .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(37,99,235,.35);
+      box-shadow: 0 4px 24px rgba(37,99,235,.55);
+      filter: brightness(1.08);
     }
-
-    .btn-blue-lg {
-      font-size: 15px;
-      padding: 12px 28px;
-      border-radius: var(--radius);
+    .btn-primary:active { transform: translateY(0); }
+    .btn-lg {
+      font-size: 15px; padding: 13px 32px; border-radius: var(--radius);
     }
-
-    .btn-outline-dark {
-      background: transparent;
-      border-color: var(--slate-300);
-      color: var(--slate-700);
-      font-size: 15px;
-      padding: 12px 24px;
-      border-radius: var(--radius);
+    .btn-xl {
+      font-size: 16px; padding: 15px 40px; border-radius: var(--radius-lg);
     }
-    .btn-outline-dark:hover {
-      border-color: var(--slate-400);
-      color: var(--slate-900);
-      background: var(--slate-100);
+    .btn-outline {
+      background: rgba(255,255,255,.04); border-color: rgba(148,163,184,.18);
+      color: var(--slate-300); font-size: 15px; padding: 13px 28px; border-radius: var(--radius);
     }
-
-    .btn-blue-outline {
-      background: transparent;
-      border-color: var(--blue-600);
-      color: var(--blue-600);
-      font-size: 13px;
-      font-weight: 600;
-      padding: 7px 16px;
-    }
-    .btn-blue-outline:hover {
-      background: var(--blue-600);
-      color: #fff;
+    .btn-outline:hover {
+      border-color: rgba(148,163,184,.35); color: #fff; background: rgba(255,255,255,.07);
       transform: translateY(-1px);
     }
 
-    /* ─── Hero ───────────────────────────────────────────── */
+    /* ─── HERO ───────────────────────────────────────────────── */
     .hero {
+      position: relative; z-index: 1;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-      padding: 80px 24px 60px;
-    }
-
-    /* Animated orbit blobs */
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    .orbit {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: .55;
-    }
-
-    .orbit-blue {
-      width: 520px; height: 520px;
-      background: radial-gradient(circle, rgba(59,130,246,.55) 0%, rgba(37,99,235,.2) 60%, transparent 100%);
-      top: -140px; left: -100px;
-      animation: orbitFloat1 8s ease-in-out infinite;
-    }
-
-    .orbit-green {
-      width: 420px; height: 420px;
-      background: radial-gradient(circle, rgba(34,197,94,.45) 0%, rgba(22,163,74,.15) 60%, transparent 100%);
-      bottom: -100px; right: 5%;
-      animation: orbitFloat2 10s ease-in-out infinite;
-    }
-
-    .orbit-purple {
-      width: 360px; height: 360px;
-      background: radial-gradient(circle, rgba(168,85,247,.4) 0%, rgba(147,51,234,.12) 60%, transparent 100%);
-      top: 30%; right: 15%;
-      animation: orbitFloat3 12s ease-in-out infinite;
-    }
-
-    @keyframes orbitFloat1 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33%       { transform: translate(40px, 30px) scale(1.05); }
-      66%       { transform: translate(-20px, 50px) scale(.97); }
-    }
-    @keyframes orbitFloat2 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      40%       { transform: translate(-50px, -30px) scale(1.08); }
-      70%       { transform: translate(30px, -10px) scale(.95); }
-    }
-    @keyframes orbitFloat3 {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      30%       { transform: translate(20px, -40px) scale(1.1); }
-      70%       { transform: translate(-30px, 20px) scale(.92); }
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      padding: 100px 24px 80px;
       text-align: center;
-      max-width: 720px;
     }
+    .hero-inner { max-width: 760px; position: relative; }
 
-    .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+    /* Eyebrow pill */
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
       background: rgba(37,99,235,.1);
-      border: 1px solid rgba(37,99,235,.2);
-      color: var(--blue-600);
-      font-size: 12px;
-      font-weight: 600;
-      border-radius: 100px;
-      padding: 5px 12px;
-      margin-bottom: 24px;
-      letter-spacing: .3px;
+      border: 1px solid rgba(59,130,246,.25);
+      border-radius: 100px; padding: 6px 16px;
+      font-size: 12px; font-weight: 600;
+      color: var(--blue-400); letter-spacing: .4px;
+      margin-bottom: 28px;
     }
-
-    .hero-eyebrow-dot {
-      width: 6px; height: 6px;
-      background: var(--blue-500);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
+    .eyebrow-dot {
+      width: 7px; height: 7px;
+      background: var(--blue-500); border-radius: 50%;
+      box-shadow: 0 0 6px var(--blue-500);
+      animation: blink 2s ease-in-out infinite;
     }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: .5; transform: scale(1.3); }
+    @keyframes blink {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.4; transform:scale(1.4); }
     }
 
     .hero h1 {
-      font-size: clamp(32px, 5.5vw, 56px);
+      font-size: clamp(34px, 6vw, 62px);
       font-weight: 800;
-      color: var(--slate-900);
-      line-height: 1.15;
-      letter-spacing: -1.5px;
-      margin-bottom: 20px;
+      line-height: 1.1;
+      letter-spacing: -2px;
+      color: #fff;
+      margin-bottom: 22px;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(135deg, var(--blue-400) 0%, var(--indigo-400) 50%, var(--purple-400) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
 
-    .hero h1 .accent {
-      background: linear-gradient(135deg, var(--blue-600), var(--purple-500));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero-subtitle {
+    .hero-sub {
       font-size: clamp(15px, 2vw, 18px);
-      color: var(--slate-500);
-      max-width: 560px;
-      margin: 0 auto 36px;
-      line-height: 1.7;
+      color: var(--slate-400);
+      max-width: 560px; margin: 0 auto 40px;
+      line-height: 1.75;
     }
 
     .hero-actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 48px;
+      display: flex; gap: 12px; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 52px;
     }
 
-    .hero-badges {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
+    /* Trust badges */
+    .trust-row {
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
     }
-
-    .hero-badge {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      background: #fff;
-      border: 1px solid var(--slate-200);
-      border-radius: 100px;
-      padding: 7px 14px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--slate-600);
-      box-shadow: var(--shadow-sm);
+    .trust-badge {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(148,163,184,.1);
+      border-radius: 100px; padding: 7px 15px;
+      font-size: 12px; font-weight: 500; color: var(--slate-400);
+      backdrop-filter: blur(4px);
     }
+    .trust-badge .icon { font-size: 13px; }
 
-    .hero-badge-icon {
-      font-size: 14px;
+    /* ─── TICKER STRIP ──────────────────────────────────────── */
+    .ticker-wrap {
+      position: relative; z-index: 1;
+      overflow: hidden;
+      padding: 20px 0;
+      border-top: 1px solid rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+      background: rgba(255,255,255,.015);
+      backdrop-filter: blur(4px);
+      mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
     }
-
-    /* ─── Section common ─────────────────────────────────── */
-    section {
-      padding: 80px 24px;
+    .ticker-track {
+      display: flex; gap: 32px; width: max-content;
+      animation: tickerScroll 30s linear infinite;
     }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
+    .ticker-wrap:hover .ticker-track { animation-play-state: paused; }
+    @keyframes tickerScroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
     }
-
-    .section-label {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--blue-600);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
+    .ticker-item {
+      display: flex; align-items: center; gap: 10px;
+      white-space: nowrap; flex-shrink: 0;
     }
+    .ticker-name { font-size: 13px; font-weight: 600; color: var(--slate-300); }
+    .ticker-yield { font-size: 12px; font-weight: 700; color: var(--green-400); }
+    .ticker-price { font-size: 12px; color: var(--slate-500); }
+    .ticker-sep { color: rgba(148,163,184,.2); font-size: 18px; }
 
-    .section-title {
-      font-size: clamp(24px, 3.5vw, 36px);
-      font-weight: 800;
-      color: var(--slate-900);
-      letter-spacing: -.8px;
-      margin-bottom: 14px;
-      line-height: 1.2;
+    /* ─── STATS STRIP ───────────────────────────────────────── */
+    .stats-strip {
+      position: relative; z-index: 1;
+      padding: 60px 24px;
     }
-
-    .section-subtitle {
-      font-size: 16px;
-      color: var(--slate-500);
-      max-width: 520px;
-      line-height: 1.65;
+    .stats-grid {
+      max-width: 900px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: rgba(148,163,184,.08);
+      border: 1px solid rgba(148,163,184,.08);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
     }
-
-    .section-header {
-      margin-bottom: 48px;
-    }
-
-    .section-header.centered {
+    .stat-cell {
+      background: rgba(255,255,255,.02);
+      padding: 36px 20px;
       text-align: center;
+      transition: background .2s;
     }
-
-    .section-header.centered .section-subtitle {
-      margin: 0 auto;
+    .stat-cell:hover { background: rgba(255,255,255,.04); }
+    .stat-num {
+      font-size: clamp(30px, 4.5vw, 44px);
+      font-weight: 800; color: #fff; letter-spacing: -1.5px;
+      line-height: 1; margin-bottom: 8px;
     }
+    .stat-num .accent { color: var(--blue-400); }
+    .stat-label { font-size: 13px; color: var(--slate-500); font-weight: 500; }
 
-    /* ─── Features grid ──────────────────────────────────── */
-    .features {
-      background: var(--slate-100);
+    /* ─── SECTION COMMON ────────────────────────────────────── */
+    section { position: relative; z-index: 1; padding: 80px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    .section-eyebrow {
+      font-size: 11px; font-weight: 700; color: var(--blue-400);
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px;
     }
+    .section-title {
+      font-size: clamp(24px, 3.5vw, 38px);
+      font-weight: 800; color: #fff; letter-spacing: -.8px;
+      margin-bottom: 14px; line-height: 1.2;
+    }
+    .section-sub {
+      font-size: 16px; color: var(--slate-500); max-width: 520px; line-height: 1.7;
+    }
+    .section-head { margin-bottom: 52px; }
+    .section-head.centered { text-align: center; }
+    .section-head.centered .section-sub { margin: 0 auto; }
 
+    /* ─── FEATURES ──────────────────────────────────────────── */
+    .features-bg {
+      background: rgba(255,255,255,.012);
+      border-top: 1px solid rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+    }
     .features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
+      gap: 1px;
+      background: rgba(148,163,184,.07);
+      border: 1px solid rgba(148,163,184,.07);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
     }
-
     .feature-card {
-      background: #fff;
-      border: 1px solid var(--slate-200);
-      border-radius: var(--radius-lg);
-      padding: 28px;
-      box-shadow: var(--shadow);
-      transition: transform .15s ease, box-shadow .15s ease;
-    }
-
-    .feature-card:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .feature-icon {
-      width: 48px; height: 48px;
-      border-radius: var(--radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      margin-bottom: 18px;
-    }
-
-    .feature-icon.blue   { background: var(--blue-50); }
-    .feature-icon.green  { background: var(--green-100); }
-    .feature-icon.purple { background: #f3e8ff; }
-
-    .feature-card h3 {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--slate-900);
-      margin-bottom: 10px;
-      letter-spacing: -.2px;
-    }
-
-    .feature-card p {
-      font-size: 14px;
-      color: var(--slate-500);
-      line-height: 1.65;
-    }
-
-    /* ─── Demo section ───────────────────────────────────── */
-    .demo {
-      background: var(--slate-50);
-    }
-
-    .demo-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    .demo-stat-card {
-      background: #fff;
-      border: 1px solid var(--slate-200);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .demo-stat-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--slate-400);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 6px;
-    }
-
-    .demo-stat-value {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--slate-900);
-      letter-spacing: -.5px;
-    }
-
-    .demo-stat-value.green { color: var(--green-600); }
-    .demo-stat-value.blue  { color: var(--blue-600); }
-
-    /* Table wrapper with overlay */
-    .demo-table-wrap {
-      background: #fff;
-      border: 1px solid var(--slate-200);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-md);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .demo-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    .demo-table thead tr {
-      background: var(--slate-50);
-      border-bottom: 1px solid var(--slate-200);
-    }
-
-    .demo-table th {
-      padding: 11px 16px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--slate-400);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      white-space: nowrap;
-    }
-
-    .demo-table td {
-      padding: 13px 16px;
-      border-bottom: 1px solid var(--slate-100);
-      color: var(--slate-700);
-      vertical-align: middle;
-    }
-
-    .demo-table tbody tr:last-child td { border-bottom: none; }
-
-    .demo-table tbody tr {
-      transition: background .1s ease;
-    }
-
-    .demo-table tbody tr:hover {
-      background: var(--slate-50);
-    }
-
-    .instrument-name {
-      font-weight: 600;
-      color: var(--slate-900);
-      font-size: 13px;
-    }
-
-    .instrument-ticker {
-      font-size: 11px;
-      color: var(--slate-400);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      margin-top: 1px;
-    }
-
-    .type-badge {
-      display: inline-flex;
-      align-items: center;
-      font-size: 11px;
-      font-weight: 600;
-      border-radius: 4px;
-      padding: 2px 7px;
-      white-space: nowrap;
-    }
-
-    .type-bond  { background: var(--blue-50);   color: var(--blue-600);  border: 1px solid var(--blue-100); }
-    .type-stock { background: var(--green-100);  color: var(--green-600); border: 1px solid #bbf7d0; }
-
-    .coupon-val  { font-weight: 700; color: var(--green-600); }
-    .coupon-none { color: var(--slate-300); }
-
-    .price-val { font-weight: 700; color: var(--slate-900); }
-
-    /* Table overlay */
-    .demo-overlay {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 200px;
-      background: linear-gradient(to bottom, transparent 0%, rgba(255,255,255,.97) 55%, #fff 100%);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding-bottom: 28px;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .demo-overlay-inner {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .demo-overlay-text {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--slate-600);
-    }
-
-    /* ─── Stats strip ────────────────────────────────────── */
-    .stats-strip {
-      background: var(--slate-900);
-      padding: 48px 24px;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 0;
-    }
-
-    .stat-item {
-      text-align: center;
-      padding: 24px 20px;
-      border-right: 1px solid rgba(255,255,255,.08);
-    }
-
-    .stat-item:last-child { border-right: none; }
-
-    .stat-number {
-      font-size: clamp(28px, 4vw, 40px);
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -1px;
-      margin-bottom: 6px;
-      line-height: 1;
-    }
-
-    .stat-number .stat-accent { color: var(--blue-500); }
-
-    .stat-desc {
-      font-size: 13px;
-      color: var(--slate-400);
-      font-weight: 500;
-    }
-
-    /* ─── CTA section ────────────────────────────────────── */
-    .cta-section {
-      background: linear-gradient(135deg, var(--blue-600) 0%, #1a40af 100%);
-      padding: 80px 24px;
-      text-align: center;
+      background: rgba(2,8,23,.85);
+      padding: 32px 28px;
+      transition: background .2s;
       position: relative;
       overflow: hidden;
     }
-
-    .cta-section::before {
+    .feature-card::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(37,99,235,.08) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity .3s;
     }
+    .feature-card:hover { background: rgba(15,23,42,.9); }
+    .feature-card:hover::before { opacity: 1; }
 
-    .cta-section .container { position: relative; z-index: 1; }
-
-    .cta-section h2 {
-      font-size: clamp(24px, 4vw, 40px);
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -.8px;
-      margin-bottom: 14px;
-      line-height: 1.2;
-    }
-
-    .cta-section p {
-      font-size: 16px;
-      color: rgba(255,255,255,.75);
-      margin-bottom: 32px;
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .btn-white {
-      background: #fff;
-      border-color: #fff;
-      color: var(--blue-700);
-      font-size: 15px;
-      padding: 12px 28px;
+    .feature-icon-wrap {
+      width: 48px; height: 48px;
       border-radius: var(--radius);
-      font-weight: 700;
-      box-shadow: 0 4px 16px rgba(0,0,0,.15);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .fi-blue   { background: rgba(37,99,235,.15); box-shadow: 0 0 16px rgba(37,99,235,.15); }
+    .fi-green  { background: rgba(22,163,74,.15);  box-shadow: 0 0 16px rgba(22,163,74,.12); }
+    .fi-purple { background: rgba(168,85,247,.15); box-shadow: 0 0 16px rgba(168,85,247,.12); }
+    .fi-cyan   { background: rgba(6,182,212,.15);  box-shadow: 0 0 16px rgba(6,182,212,.12); }
+    .fi-amber  { background: rgba(217,119,6,.15);  box-shadow: 0 0 16px rgba(217,119,6,.12); }
+    .fi-rose   { background: rgba(225,29,72,.15);  box-shadow: 0 0 16px rgba(225,29,72,.12); }
+
+    .feature-card h3 {
+      font-size: 16px; font-weight: 700; color: #fff;
+      margin-bottom: 10px; letter-spacing: -.2px;
+    }
+    .feature-card p { font-size: 14px; color: var(--slate-500); line-height: 1.7; }
+
+    /* ─── DEMO BLOCK ────────────────────────────────────────── */
+    .demo-block {
+      background: rgba(148,163,184,.06);
+      border: 1px solid rgba(148,163,184,.1);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
     }
 
-    .btn-white:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0,0,0,.2);
-      background: var(--blue-50);
+    /* Mock window chrome */
+    .window-chrome {
+      background: rgba(255,255,255,.03);
+      border-bottom: 1px solid rgba(148,163,184,.08);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chrome-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .chrome-dot.red    { background: #ef4444; }
+    .chrome-dot.yellow { background: #f59e0b; }
+    .chrome-dot.green  { background: #22c55e; }
+    .chrome-title {
+      margin-left: 8px; font-size: 12px; color: var(--slate-600); font-weight: 500;
     }
 
-    /* ─── Footer ─────────────────────────────────────────── */
-    .footer {
-      background: var(--slate-900);
-      padding: 20px 24px;
+    /* KPI row */
+    .demo-kpi-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 1px; background: rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+    }
+    .demo-kpi {
+      background: rgba(2,8,23,.9);
+      padding: 20px 18px;
+    }
+    .demo-kpi-label {
+      font-size: 10px; font-weight: 700; color: var(--slate-600);
+      text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px;
+    }
+    .demo-kpi-value {
+      font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -.5px;
+    }
+    .demo-kpi-value.green { color: var(--green-400); }
+    .demo-kpi-value.blue  { color: var(--blue-400); }
+    .demo-kpi-delta {
+      font-size: 11px; font-weight: 600; color: var(--green-500); margin-top: 3px;
+    }
+
+    /* Table */
+    .demo-table-wrap { position: relative; overflow: hidden; }
+    .demo-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .demo-table thead tr {
+      background: rgba(255,255,255,.025);
+      border-bottom: 1px solid rgba(148,163,184,.08);
+    }
+    .demo-table th {
+      padding: 11px 16px;
+      font-size: 10px; font-weight: 700; color: var(--slate-600);
+      text-transform: uppercase; letter-spacing: .6px; text-align: left; white-space: nowrap;
+    }
+    .demo-table td {
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(148,163,184,.05);
+      color: var(--slate-400); vertical-align: middle;
+    }
+    .demo-table tbody tr:last-child td { border-bottom: none; }
+    .demo-table tbody tr { transition: background .1s; }
+    .demo-table tbody tr:hover { background: rgba(255,255,255,.025); }
+
+    .inst-name { font-weight: 600; color: #fff; font-size: 13px; }
+    .inst-ticker {
+      font-size: 10px; color: var(--slate-600);
+      font-family: 'SF Mono','Fira Code',monospace; margin-top: 2px;
+    }
+    .type-badge {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 7px;
+    }
+    .tb-bond { background: rgba(37,99,235,.15); color: var(--blue-400); border: 1px solid rgba(37,99,235,.2); }
+    .tb-ofz  { background: rgba(14,165,233,.12); color: var(--sky-400);  border: 1px solid rgba(14,165,233,.2); }
+
+    .coupon-v { font-weight: 700; color: var(--green-400); }
+    .price-v  { font-weight: 700; color: #fff; }
+
+    /* Table fade + CTA overlay */
+    .demo-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 220px;
+      background: linear-gradient(to bottom, transparent 0%, rgba(2,8,23,.98) 60%, var(--bg) 100%);
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 32px;
+    }
+    .demo-overlay-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .demo-overlay-text { font-size: 14px; color: var(--slate-500); font-weight: 500; }
+
+    /* ─── HOW IT WORKS ──────────────────────────────────────── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+      position: relative;
+    }
+    .steps-grid::before {
+      content: '';
+      position: absolute;
+      top: 28px; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(59,130,246,.3) 20%, rgba(99,102,241,.3) 50%, rgba(168,85,247,.3) 80%, transparent);
+      pointer-events: none;
+    }
+    .step-card {
+      padding: 32px 24px;
       text-align: center;
-      border-top: 1px solid rgba(255,255,255,.06);
+      position: relative;
+    }
+    .step-num {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 20px; font-weight: 800; color: #fff;
+      position: relative; z-index: 1;
+    }
+    .sn-1 { background: linear-gradient(135deg, #2563eb, #4f46e5); box-shadow: 0 0 24px rgba(37,99,235,.4); }
+    .sn-2 { background: linear-gradient(135deg, #4f46e5, #7c3aed); box-shadow: 0 0 24px rgba(99,102,241,.4); }
+    .sn-3 { background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 0 24px rgba(168,85,247,.4); }
+    .sn-4 { background: linear-gradient(135deg, #a855f7, #ec4899); box-shadow: 0 0 24px rgba(168,85,247,.35); }
+    .step-card h4 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .step-card p  { font-size: 13px; color: var(--slate-500); line-height: 1.65; }
+
+    /* ─── PRICING ───────────────────────────────────────────── */
+    .pricing-section {
+      background: rgba(255,255,255,.012);
+      border-top: 1px solid rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+    }
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px; max-width: 860px; margin: 0 auto;
+    }
+    .plan-card {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(148,163,184,.1);
+      border-radius: var(--radius-xl);
+      padding: 32px 28px;
+      position: relative; overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .plan-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.4);
+    }
+    .plan-card.featured {
+      border-color: rgba(59,130,246,.4);
+      background: rgba(37,99,235,.07);
+    }
+    .plan-card.featured::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,.15) 0%, transparent 70%);
+    }
+    .plan-popular {
+      position: absolute; top: 20px; right: 20px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff; font-size: 10px; font-weight: 700;
+      border-radius: 100px; padding: 3px 10px;
+      letter-spacing: .5px; text-transform: uppercase;
+    }
+    .plan-name { font-size: 14px; font-weight: 700; color: var(--slate-400); margin-bottom: 12px; }
+    .plan-price {
+      font-size: 42px; font-weight: 800; color: #fff; letter-spacing: -2px;
+      line-height: 1; margin-bottom: 6px;
+    }
+    .plan-price sup { font-size: 20px; letter-spacing: 0; vertical-align: super; }
+    .plan-period { font-size: 13px; color: var(--slate-600); margin-bottom: 24px; }
+    .plan-desc { font-size: 13px; color: var(--slate-500); margin-bottom: 24px; line-height: 1.65; }
+    .plan-divider { height: 1px; background: rgba(148,163,184,.08); margin-bottom: 20px; }
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .plan-features li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--slate-400); line-height: 1.5;
+    }
+    .pf-check { color: var(--green-500); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .pf-dash  { color: var(--slate-700); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ─── CTA ───────────────────────────────────────────────── */
+    .cta-section {
+      text-align: center;
+      padding: 100px 24px;
+      position: relative; z-index: 1;
+    }
+    .cta-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse, rgba(37,99,235,.25) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-section h2 {
+      font-size: clamp(26px, 4vw, 44px); font-weight: 800;
+      color: #fff; letter-spacing: -1px; margin-bottom: 16px; line-height: 1.15;
+      position: relative;
+    }
+    .cta-section p {
+      font-size: 17px; color: var(--slate-500);
+      max-width: 480px; margin: 0 auto 36px; line-height: 1.7;
+      position: relative;
+    }
+    .cta-fine {
+      margin-top: 18px !important;
+      font-size: 13px !important; color: var(--slate-700) !important;
     }
 
-    .footer p {
-      font-size: 12px;
-      color: var(--slate-500);
-      line-height: 1.8;
+    /* ─── FOOTER ────────────────────────────────────────────── */
+    .footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid rgba(148,163,184,.07);
+      padding: 24px;
+      text-align: center;
+    }
+    .footer p { font-size: 12px; color: var(--slate-700); line-height: 2; }
+    .footer-sep { margin: 0 8px; opacity: .35; }
+
+    /* ─── ONBOARDING WIZARD ─────────────────────────────────── */
+    .wiz-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(2,8,23,.85);
+      backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .wiz-overlay.open { display: flex; }
+
+    .wiz-card {
+      background: #0d1829;
+      border: 1px solid rgba(148,163,184,.12);
+      border-radius: 20px;
+      width: 100%; max-width: 540px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.6);
+      overflow: hidden;
+      position: relative;
+      animation: wizIn .25s ease;
+    }
+    @keyframes wizIn {
+      from { opacity:0; transform:scale(.96) translateY(12px); }
+      to   { opacity:1; transform:scale(1)   translateY(0); }
     }
 
-    .footer-sep {
-      margin: 0 8px;
-      opacity: .4;
+    /* Glow top-edge */
+    .wiz-card::before {
+      content:'';
+      position:absolute; top:0; left:10%; right:10%; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(59,130,246,.6), rgba(99,102,241,.6), transparent);
     }
 
-    /* ─── Responsive ─────────────────────────────────────── */
+    .wiz-progress {
+      height: 3px;
+      background: rgba(148,163,184,.1);
+    }
+    .wiz-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #4f46e5);
+      transition: width .4s ease;
+      box-shadow: 0 0 8px rgba(37,99,235,.6);
+    }
+
+    .wiz-body { padding: 32px 32px 28px; }
+
+    .wiz-step { display: none; }
+    .wiz-step.active { display: block; }
+
+    .wiz-step-label {
+      font-size: 11px; font-weight: 700;
+      color: var(--blue-400); letter-spacing: 1px;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .wiz-title {
+      font-size: 22px; font-weight: 800; color: #fff;
+      letter-spacing: -.5px; margin-bottom: 8px; line-height: 1.2;
+    }
+    .wiz-desc {
+      font-size: 14px; color: var(--slate-500); margin-bottom: 24px; line-height: 1.65;
+    }
+
+    /* Risk cards */
+    .risk-grid { display: grid; gap: 10px; }
+    .risk-card {
+      display: flex; align-items: center; gap: 14px;
+      border: 1.5px solid rgba(148,163,184,.12);
+      border-radius: 12px; padding: 14px 16px;
+      cursor: pointer;
+      transition: all .15s;
+      background: rgba(255,255,255,.02);
+    }
+    .risk-card:hover {
+      border-color: rgba(59,130,246,.4);
+      background: rgba(37,99,235,.06);
+    }
+    .risk-card.selected {
+      border-color: var(--blue-500);
+      background: rgba(37,99,235,.1);
+      box-shadow: 0 0 0 1px rgba(37,99,235,.3);
+    }
+    .risk-icon { font-size: 22px; flex-shrink: 0; }
+    .risk-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .risk-hint { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+
+    /* Amount */
+    .wiz-amount-input {
+      width: 100%; padding: 14px 48px 14px 18px;
+      background: rgba(255,255,255,.04);
+      border: 1.5px solid rgba(148,163,184,.15);
+      border-radius: 10px;
+      font-size: 20px; font-weight: 700; color: #fff;
+      font-family: inherit; outline: none;
+      transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    .wiz-amount-input:focus { border-color: var(--blue-500); }
+    .wiz-amount-suffix {
+      position: absolute; right: 16px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 16px; color: var(--slate-500); font-weight: 600;
+    }
+    .wiz-presets {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 12px;
+    }
+    .wiz-preset {
+      padding: 8px 4px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(148,163,184,.12);
+      border-radius: 8px;
+      font-size: 12px; font-weight: 600; color: var(--slate-400);
+      cursor: pointer; transition: all .15s; font-family: inherit;
+    }
+    .wiz-preset:hover { border-color: var(--blue-500); color: var(--blue-400); background: rgba(37,99,235,.08); }
+
+    /* Loading */
+    .wiz-loading {
+      text-align: center; padding: 32px 0;
+    }
+    .wiz-spinner {
+      width: 48px; height: 48px; margin: 0 auto 20px;
+      border-radius: 50%;
+      border: 3px solid rgba(59,130,246,.15);
+      border-top-color: var(--blue-500);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .wiz-loading-text { font-size: 15px; color: var(--slate-400); }
+    .wiz-loading-sub  { font-size: 12px; color: var(--slate-600); margin-top: 6px; }
+
+    /* Results */
+    .wiz-summary-row {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 1px; background: rgba(148,163,184,.08);
+      border: 1px solid rgba(148,163,184,.08);
+      border-radius: 12px; overflow: hidden; margin-bottom: 20px;
+    }
+    .wiz-summary-cell {
+      background: rgba(255,255,255,.025);
+      padding: 14px 12px; text-align: center;
+    }
+    .wiz-sum-label { font-size: 10px; font-weight: 700; color: var(--slate-600); text-transform: uppercase; letter-spacing: .5px; }
+    .wiz-sum-value { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -.5px; margin-top: 4px; }
+    .wiz-sum-value.green { color: var(--green-400); }
+    .wiz-sum-value.blue  { color: var(--blue-400); }
+
+    .wiz-bonds-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; }
+    .wiz-bonds-list::-webkit-scrollbar { width: 4px; }
+    .wiz-bonds-list::-webkit-scrollbar-track { background: transparent; }
+    .wiz-bonds-list::-webkit-scrollbar-thumb { background: rgba(148,163,184,.2); border-radius: 2px; }
+
+    .wiz-bond-row {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(148,163,184,.08);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .wiz-bond-icon {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800; color: var(--blue-400);
+      background: rgba(37,99,235,.15);
+    }
+    .wiz-bond-name { font-size: 13px; font-weight: 600; color: #fff; }
+    .wiz-bond-meta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+    .wiz-bond-right { margin-left: auto; text-align: right; flex-shrink: 0; }
+    .wiz-bond-yield { font-size: 14px; font-weight: 700; color: var(--green-400); }
+    .wiz-bond-cost  { font-size: 11px; color: var(--slate-600); margin-top: 2px; }
+
+    /* Register CTA in wizard */
+    .wiz-register-box {
+      background: linear-gradient(135deg, rgba(37,99,235,.12), rgba(99,102,241,.1));
+      border: 1px solid rgba(59,130,246,.25);
+      border-radius: 14px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+    }
+    .wiz-register-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .wiz-register-sub   { font-size: 13px; color: var(--slate-500); margin-bottom: 16px; line-height: 1.55; }
+    .wiz-reg-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .wiz-reg-input {
+      width: 100%; padding: 11px 14px;
+      background: rgba(255,255,255,.05);
+      border: 1.5px solid rgba(148,163,184,.15);
+      border-radius: 8px;
+      font-size: 14px; color: #fff; font-family: inherit; outline: none;
+      transition: border-color .15s; box-sizing: border-box;
+    }
+    .wiz-reg-input::placeholder { color: var(--slate-600); }
+    .wiz-reg-input:focus { border-color: var(--blue-500); }
+    .wiz-reg-msg { font-size: 12px; min-height: 16px; margin-bottom: 4px; }
+    .wiz-reg-msg.error   { color: #f87171; }
+    .wiz-reg-msg.success { color: var(--green-400); }
+
+    /* Footer buttons */
+    .wiz-footer {
+      display: flex; align-items: center; gap: 10px; margin-top: 8px;
+    }
+    .wiz-btn-back {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(148,163,184,.15);
+      border-radius: 8px; padding: 10px 18px;
+      font-size: 13px; font-weight: 600; color: var(--slate-400);
+      cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .wiz-btn-back:hover { color: #fff; border-color: rgba(148,163,184,.3); }
+    .wiz-btn-next {
+      flex: 1;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border: none; border-radius: 8px; padding: 12px 24px;
+      font-size: 14px; font-weight: 700; color: #fff;
+      cursor: pointer; font-family: inherit; transition: all .15s;
+      box-shadow: 0 0 20px rgba(37,99,235,.3);
+    }
+    .wiz-btn-next:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 24px rgba(37,99,235,.45); }
+    .wiz-btn-next:disabled { opacity:.45; cursor:default; transform:none; box-shadow:none; filter:none; }
+    .wiz-btn-skip {
+      background: none; border: none; font-size: 12px;
+      color: var(--slate-600); cursor: pointer; font-family: inherit;
+      padding: 4px 0; text-decoration: underline; text-underline-offset: 3px;
+      transition: color .15s; white-space: nowrap;
+    }
+    .wiz-btn-skip:hover { color: var(--slate-400); }
+
+    .wiz-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(148,163,184,.12);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 14px; color: var(--slate-400);
+      transition: all .15s; z-index: 1;
+    }
+    .wiz-close:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+    /* ─── REVEAL ANIMATION ──────────────────────────────────── */
+    .reveal {
+      opacity: 0; transform: translateY(20px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ─── RESPONSIVE ────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .demo-kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .stats-grid   { grid-template-columns: 1fr; }
+      .stat-cell    { padding: 28px 20px; }
+    }
     @media (max-width: 640px) {
       .topbar { padding: 0 16px; }
-
-      .btn-outline-white { display: none; }
-
+      .btn-ghost { display: none; }
       section { padding: 56px 16px; }
-
-      .stats-grid { grid-template-columns: 1fr; }
-      .stat-item  { border-right: none; border-bottom: 1px solid rgba(255,255,255,.08); }
-      .stat-item:last-child { border-bottom: none; }
-
-      .demo-stats { grid-template-columns: repeat(2, 1fr); }
-
-      .demo-table th:nth-child(5),
-      .demo-table td:nth-child(5) { display: none; }
-
-      .hero-badges { gap: 8px; }
-      .hero-badge  { font-size: 12px; padding: 6px 10px; }
-    }
-
-    @media (max-width: 420px) {
       .hero-actions { flex-direction: column; align-items: stretch; }
       .hero-actions .btn { justify-content: center; }
-
-      .demo-stats { grid-template-columns: 1fr 1fr; }
-
-      .demo-table th:nth-child(4),
-      .demo-table td:nth-child(4) { display: none; }
+      .demo-table th:nth-child(5), .demo-table td:nth-child(5) { display: none; }
+      .steps-grid::before { display: none; }
+    }
+    @media (max-width: 420px) {
+      .demo-kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .demo-table th:nth-child(4), .demo-table td:nth-child(4) { display: none; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ═══ TOPBAR ═══════════════════════════════════════════ -->
-  <header class="topbar">
+  <!-- Background layers -->
+  <div class="mesh-bg"></div>
+  <div class="orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+  </div>
+
+  <!-- ═══ TOPBAR ════════════════════════════════════════════ -->
+  <header class="topbar" id="topbar">
     <a href="/" class="topbar-logo">
-      <div class="logo-square">B</div>
+      <div class="logo-sq">B</div>
       <span class="logo-text">Bond AI</span>
       <span class="logo-badge">BETA</span>
     </a>
     <div class="topbar-spacer"></div>
     <nav class="topbar-nav">
-      <button class="btn btn-outline-white" onclick="window.location.href='/?auth=login'">Войти</button>
-      <button class="btn btn-blue" onclick="window.location.href='/?auth=register'">Попробовать бесплатно</button>
+      <button class="btn btn-ghost" onclick="landingAuthOpen('login')">Войти</button>
+      <button class="btn btn-primary" onclick="wizOpen()">Попробовать бесплатно</button>
     </nav>
   </header>
 
   <!-- ═══ HERO ══════════════════════════════════════════════ -->
   <section class="hero">
-    <div class="hero-bg">
-      <div class="orbit orbit-blue"></div>
-      <div class="orbit orbit-green"></div>
-      <div class="orbit orbit-purple"></div>
-    </div>
+    <div class="hero-inner">
 
-    <div class="hero-content">
-      <div class="hero-eyebrow">
-        <div class="hero-eyebrow-dot"></div>
-        Работает на Claude AI · Данные MOEX в реальном времени
+      <div class="eyebrow">
+        <div class="eyebrow-dot"></div>
+        Claude AI · Данные MOEX в реальном времени
       </div>
 
-      <h1>Умный портфель облигаций<br>с <span class="accent">AI-аналитикой</span></h1>
+      <h1>Управляйте портфелем<br>облигаций <span class="grad">умнее с AI</span></h1>
 
-      <p class="hero-subtitle">
-        Подбирайте облигации под ваш риск-профиль, отслеживайте купонный доход
-        и получайте уведомления — всё в одном месте.
+      <p class="hero-sub">
+        AI подбирает оптимальный набор облигаций под ваш риск-профиль.
+        Купоны, доходность, уведомления — всё в одном инструменте.
       </p>
 
       <div class="hero-actions">
-        <button class="btn btn-blue btn-blue-lg" onclick="window.location.href='/?auth=register'">
-          Начать бесплатно &rarr;
+        <button class="btn btn-primary btn-xl" onclick="wizOpen()">
+          Начать бесплатно &nbsp;&rarr;
         </button>
-        <button class="btn btn-outline-dark" onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">
+        <button class="btn btn-outline" onclick="document.getElementById('demo-section').scrollIntoView({behavior:'smooth'})">
           Смотреть демо
         </button>
       </div>
 
-      <div class="hero-badges">
-        <div class="hero-badge">
-          <span class="hero-badge-icon">🎁</span>
-          Бесплатно
-        </div>
-        <div class="hero-badge">
-          <span class="hero-badge-icon">🏦</span>
-          Без брокера
-        </div>
-        <div class="hero-badge">
-          <span class="hero-badge-icon">📈</span>
-          MOEX данные
-        </div>
+      <div class="trust-row">
+        <div class="trust-badge"><span class="icon">🎁</span> Бесплатно навсегда</div>
+        <div class="trust-badge"><span class="icon">🏦</span> Без брокера</div>
+        <div class="trust-badge"><span class="icon">⚡</span> Обновление каждые 2 мин</div>
+        <div class="trust-badge"><span class="icon">🔔</span> Уведомления в Telegram</div>
       </div>
+
     </div>
   </section>
 
+  <!-- ═══ TICKER ════════════════════════════════════════════ -->
+  <div class="ticker-wrap">
+    <div class="ticker-track" id="ticker">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- ═══ STATS STRIP ═══════════════════════════════════════ -->
+  <div class="stats-strip">
+    <div class="stats-grid reveal">
+      <div class="stat-cell">
+        <div class="stat-num"><span class="accent">1 200</span>+</div>
+        <div class="stat-label">облигаций с MOEX</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num"><span class="accent">2</span> мин</div>
+        <div class="stat-label">интервал обновления данных</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num">0 ₽</div>
+        <div class="stat-label">стоимость — навсегда бесплатно</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ FEATURES ══════════════════════════════════════════ -->
-  <section class="features">
+  <section class="features-bg">
     <div class="container">
-      <div class="section-header centered">
-        <div class="section-label">Возможности</div>
-        <h2 class="section-title">Всё для умного инвестирования</h2>
-        <p class="section-subtitle">Современные инструменты, раньше доступные только профессионалам — теперь для каждого.</p>
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Возможности</div>
+        <h2 class="section-title">Всё для умного инвестора</h2>
+        <p class="section-sub">Профессиональные инструменты, которые раньше были доступны только управляющим фондами.</p>
       </div>
 
-      <div class="features-grid">
+      <div class="features-grid reveal">
         <div class="feature-card">
-          <div class="feature-icon blue">🤖</div>
+          <div class="feature-icon-wrap fi-blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l2 2 4-4 2 2"/></svg>
+          </div>
           <h3>AI-подбор портфеля</h3>
-          <p>Укажите сумму и риск-профиль — AI автоматически подберёт оптимальный набор облигаций с учётом текущей доходности и ваших целей.</p>
+          <p>Укажите сумму и уровень риска — Claude AI мгновенно составит диверсифицированный портфель с учётом текущей доходности и рейтингов эмитентов.</p>
         </div>
-
         <div class="feature-card">
-          <div class="feature-icon green">📊</div>
+          <div class="feature-icon-wrap fi-green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
+          </div>
           <h3>Аналитика в реальном времени</h3>
-          <p>Актуальные цены с Московской биржи, купонный доход, доходность к погашению — данные обновляются автоматически каждые 2 минуты.</p>
+          <p>Цены, купонная доходность и YTM с MOEX обновляются каждые 2 минуты. P&amp;L по каждой позиции и по портфелю целиком.</p>
         </div>
-
         <div class="feature-card">
-          <div class="feature-icon purple">🔔</div>
-          <h3>Уведомления в Telegram</h3>
-          <p>Получайте оповещения о купонных выплатах и изменениях цен прямо в мессенджер. Никогда не пропустите важное событие.</p>
+          <div class="feature-icon-wrap fi-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <h3>Telegram-уведомления</h3>
+          <p>Получайте оповещения о купонных выплатах за N дней. Настройте пороги цены — алерт придёт в момент достижения.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap fi-cyan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <h3>Купонный календарь</h3>
+          <p>Все ближайшие выплаты по вашим облигациям в одном месте. Планируйте денежный поток на месяц вперёд.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap fi-amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
+          </div>
+          <h3>PDF-отчёты</h3>
+          <p>Выгружайте детальный отчёт по портфелю в один клик. Удобно для налоговой декларации или для личного архива.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap fi-rose">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <h3>Совместный доступ</h3>
+          <p>Поделитесь портфелем по ссылке с коллегой или советником. Опциональная защита паролем. Ссылка автоматически истекает.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ═══ DEMO ═══════════════════════════════════════════════ -->
-  <section class="demo" id="demo">
+  <section id="demo-section">
     <div class="container">
-      <div class="section-header centered">
-        <div class="section-label">Демо</div>
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Демо</div>
         <h2 class="section-title">Посмотрите как это работает</h2>
-        <p class="section-subtitle">Пример портфеля с реальными инструментами. Зарегистрируйтесь, чтобы добавить свои.</p>
+        <p class="section-sub">Живой пример портфеля. Зарегистрируйтесь, чтобы добавить свои инструменты.</p>
       </div>
 
-      <!-- Mini stat cards -->
-      <div class="demo-stats">
-        <div class="demo-stat-card">
-          <div class="demo-stat-label">Стоимость портфеля</div>
-          <div class="demo-stat-value">485 230 ₽</div>
+      <div class="demo-block reveal">
+        <div class="window-chrome">
+          <div class="chrome-dot red"></div>
+          <div class="chrome-dot yellow"></div>
+          <div class="chrome-dot green"></div>
+          <span class="chrome-title">Bond AI — Мой портфель</span>
         </div>
-        <div class="demo-stat-card">
-          <div class="demo-stat-label">Прибыль</div>
-          <div class="demo-stat-value green">+3.2%</div>
-        </div>
-        <div class="demo-stat-card">
-          <div class="demo-stat-label">Годовой купон</div>
-          <div class="demo-stat-value blue">28 400 ₽</div>
-        </div>
-        <div class="demo-stat-card">
-          <div class="demo-stat-label">Риск-профиль</div>
-          <div class="demo-stat-value">Умеренный</div>
-        </div>
-      </div>
 
-      <!-- Table -->
-      <div class="demo-table-wrap">
-        <table class="demo-table">
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Тикер</th>
-              <th>Тип</th>
-              <th>Куп. доход</th>
-              <th>Погашение</th>
-              <th>Цена</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <div class="instrument-name">ОФЗ 26238</div>
-              </td>
-              <td><div class="instrument-ticker">SU26238RMFS4</div></td>
-              <td><span class="type-badge type-bond">Облигация</span></td>
-              <td><span class="coupon-val">7.1%</span></td>
-              <td>2041-05-15</td>
-              <td><span class="price-val">98.50 ₽</span></td>
-            </tr>
-            <tr>
-              <td>
-                <div class="instrument-name">Сбербанк</div>
-              </td>
-              <td><div class="instrument-ticker">SBER</div></td>
-              <td><span class="type-badge type-stock">Акция</span></td>
-              <td><span class="coupon-none">—</span></td>
-              <td><span class="coupon-none">—</span></td>
-              <td><span class="price-val">312.4 ₽</span></td>
-            </tr>
-            <tr>
-              <td>
-                <div class="instrument-name">МТС Банк 001Р-01</div>
-              </td>
-              <td><div class="instrument-ticker">RU000A106SK2</div></td>
-              <td><span class="type-badge type-bond">Облигация</span></td>
-              <td><span class="coupon-val">12.3%</span></td>
-              <td>2026-08-20</td>
-              <td><span class="price-val">101.2 ₽</span></td>
-            </tr>
-            <tr>
-              <td>
-                <div class="instrument-name">Газпром</div>
-              </td>
-              <td><div class="instrument-ticker">GAZP</div></td>
-              <td><span class="type-badge type-stock">Акция</span></td>
-              <td><span class="coupon-none">—</span></td>
-              <td><span class="coupon-none">—</span></td>
-              <td><span class="price-val">145.8 ₽</span></td>
-            </tr>
-            <tr>
-              <td>
-                <div class="instrument-name">Россети БО-001Р</div>
-              </td>
-              <td><div class="instrument-ticker">RU000A105TS5</div></td>
-              <td><span class="type-badge type-bond">Облигация</span></td>
-              <td><span class="coupon-val">9.8%</span></td>
-              <td>2027-03-10</td>
-              <td><span class="price-val">99.70 ₽</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="demo-kpi-row">
+          <div class="demo-kpi">
+            <div class="demo-kpi-label">Стоимость</div>
+            <div class="demo-kpi-value">485 230 ₽</div>
+            <div class="demo-kpi-delta">↑ +3.2% с начала</div>
+          </div>
+          <div class="demo-kpi">
+            <div class="demo-kpi-label">Годовой купон</div>
+            <div class="demo-kpi-value blue">28 400 ₽</div>
+            <div class="demo-kpi-delta">≈ 2 367 ₽/мес</div>
+          </div>
+          <div class="demo-kpi">
+            <div class="demo-kpi-label">Ср. доходность</div>
+            <div class="demo-kpi-value green">14.8%</div>
+            <div class="demo-kpi-delta">YTM к погашению</div>
+          </div>
+          <div class="demo-kpi">
+            <div class="demo-kpi-label">Следующий купон</div>
+            <div class="demo-kpi-value">14 апр</div>
+            <div class="demo-kpi-delta">через 36 дней</div>
+          </div>
+        </div>
 
-        <!-- Overlay -->
-        <div class="demo-overlay">
-          <div class="demo-overlay-inner">
-            <p class="demo-overlay-text">Зарегистрируйтесь, чтобы управлять своим портфелем</p>
-            <button class="btn btn-blue" onclick="window.location.href='/?auth=register'">
-              Создать аккаунт бесплатно &rarr;
-            </button>
+        <div class="demo-table-wrap">
+          <table class="demo-table">
+            <thead>
+              <tr>
+                <th>Инструмент</th>
+                <th>Тикер</th>
+                <th>Тип</th>
+                <th>Купон</th>
+                <th>Погашение</th>
+                <th>Цена</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="inst-name">ОФЗ 26238</div><div class="inst-ticker">SU26238RMFS4</div></td>
+                <td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">SU26238RMFS4</span></td>
+                <td><span class="type-badge tb-ofz">ОФЗ</span></td>
+                <td><span class="coupon-v">7.10%</span></td>
+                <td style="color:var(--slate-600);">2041-05-15</td>
+                <td><span class="price-v">98.50 ₽</span></td>
+              </tr>
+              <tr>
+                <td><div class="inst-name">МТС Банк 001Р-01</div><div class="inst-ticker">RU000A106SK2</div></td>
+                <td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">MTSBP1</span></td>
+                <td><span class="type-badge tb-bond">Корп.</span></td>
+                <td><span class="coupon-v">12.3%</span></td>
+                <td style="color:var(--slate-600);">2026-08-20</td>
+                <td><span class="price-v">101.2 ₽</span></td>
+              </tr>
+              <tr>
+                <td><div class="inst-name">Россети БО-001Р</div><div class="inst-ticker">RU000A105TS5</div></td>
+                <td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">RSTI1P1</span></td>
+                <td><span class="type-badge tb-bond">Корп.</span></td>
+                <td><span class="coupon-v">9.80%</span></td>
+                <td style="color:var(--slate-600);">2027-03-10</td>
+                <td><span class="price-v">99.70 ₽</span></td>
+              </tr>
+              <tr>
+                <td><div class="inst-name">ОФЗ 26226</div><div class="inst-ticker">SU26226RMFS9</div></td>
+                <td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">SU26226RMFS9</span></td>
+                <td><span class="type-badge tb-ofz">ОФЗ</span></td>
+                <td><span class="coupon-v">7.95%</span></td>
+                <td style="color:var(--slate-600);">2026-10-07</td>
+                <td><span class="price-v">96.20 ₽</span></td>
+              </tr>
+              <tr>
+                <td><div class="inst-name">Газпром 3Р-01</div><div class="inst-ticker">RU000A104JQ3</div></td>
+                <td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">GAZPR1</span></td>
+                <td><span class="type-badge tb-bond">Корп.</span></td>
+                <td><span class="coupon-v">11.5%</span></td>
+                <td style="color:var(--slate-600);">2028-06-15</td>
+                <td><span class="price-v">103.1 ₽</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="demo-overlay">
+            <div class="demo-overlay-inner">
+              <p class="demo-overlay-text">Добавьте собственные инструменты и получите AI-анализ</p>
+              <button class="btn btn-primary btn-lg" onclick="wizOpen()">
+                Создать аккаунт бесплатно &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ STATS STRIP ════════════════════════════════════════ -->
-  <div class="stats-strip">
+  <!-- ═══ HOW IT WORKS ═══════════════════════════════════════ -->
+  <section>
     <div class="container">
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-number"><span class="stat-accent">1 200</span>+</div>
-          <div class="stat-desc">облигаций на MOEX</div>
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Как это работает</div>
+        <h2 class="section-title">Четыре шага до готового портфеля</h2>
+      </div>
+      <div class="steps-grid reveal">
+        <div class="step-card">
+          <div class="step-num sn-1">1</div>
+          <h4>Зарегистрируйтесь</h4>
+          <p>30 секунд. Никаких документов, карт или брокерских счетов.</p>
         </div>
-        <div class="stat-item">
-          <div class="stat-number">Бесплатно</div>
-          <div class="stat-desc">навсегда, без скрытых платежей</div>
+        <div class="step-card">
+          <div class="step-num sn-2">2</div>
+          <h4>Укажите параметры</h4>
+          <p>Сумма инвестиций, горизонт и уровень риска — от консервативного до агрессивного.</p>
         </div>
-        <div class="stat-item">
-          <div class="stat-number"><span class="stat-accent">2</span> мин</div>
-          <div class="stat-desc">интервал обновления данных</div>
+        <div class="step-card">
+          <div class="step-num sn-3">3</div>
+          <h4>Получите портфель</h4>
+          <p>AI подберёт диверсифицированный набор облигаций с обоснованием каждой позиции.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num sn-4">4</div>
+          <h4>Следите в реальном времени</h4>
+          <p>Цены, купоны, P&amp;L и Telegram-уведомления — всё обновляется автоматически.</p>
         </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- ═══ PRICING ════════════════════════════════════════════ -->
+  <section class="pricing-section">
+    <div class="container">
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Тарифы</div>
+        <h2 class="section-title">Просто и честно</h2>
+        <p class="section-sub">Все основные функции бесплатны навсегда. Никаких скрытых платежей.</p>
+      </div>
+      <div class="pricing-grid reveal">
+
+        <div class="plan-card">
+          <div class="plan-name">Базовый</div>
+          <div class="plan-price">0 <sup>₽</sup></div>
+          <div class="plan-period">навсегда бесплатно</div>
+          <div class="plan-desc">Всё необходимое для управления личным портфелем облигаций.</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li><span class="pf-check">✓</span> До 5 портфелей</li>
+            <li><span class="pf-check">✓</span> Цены MOEX каждые 2 минуты</li>
+            <li><span class="pf-check">✓</span> AI-подбор портфеля</li>
+            <li><span class="pf-check">✓</span> Купонный календарь</li>
+            <li><span class="pf-check">✓</span> Telegram-уведомления</li>
+            <li><span class="pf-check">✓</span> PDF-экспорт</li>
+            <li><span class="pf-check">✓</span> Поделиться ссылкой</li>
+          </ul>
+          <button class="btn btn-outline" style="width:100%;justify-content:center;" onclick="wizOpen()">
+            Начать бесплатно
+          </button>
+        </div>
+
+        <div class="plan-card featured">
+          <div class="plan-popular">Скоро</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price" style="background:linear-gradient(135deg,var(--blue-400),var(--indigo-400),var(--purple-400));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+            TBD
+          </div>
+          <div class="plan-period">в разработке</div>
+          <div class="plan-desc">Расширенные возможности для серьёзных инвесторов.</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li><span class="pf-check">✓</span> Неограниченные портфели</li>
+            <li><span class="pf-check">✓</span> Обновление каждую минуту</li>
+            <li><span class="pf-check">✓</span> Расширенная AI-аналитика</li>
+            <li><span class="pf-check">✓</span> Исторические snapshots</li>
+            <li><span class="pf-check">✓</span> Ценовые алерты без лимита</li>
+            <li><span class="pf-check">✓</span> API-доступ</li>
+            <li><span class="pf-dash">—</span> Приоритетная поддержка</li>
+          </ul>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="wizOpen()">
+            Войти в лист ожидания
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </section>
 
   <!-- ═══ CTA ═══════════════════════════════════════════════ -->
   <section class="cta-section">
-    <div class="container">
-      <h2>Начните управлять портфелем<br>прямо сейчас</h2>
-      <p>Бесплатная регистрация за 30 секунд. Никакой кредитной карты.</p>
-      <button class="btn btn-white" onclick="window.location.href='/?auth=register'">
-        Создать аккаунт бесплатно
-      </button>
-    </div>
+    <div class="cta-glow"></div>
+    <h2>Начните прямо сейчас —<br>это займёт 30 секунд</h2>
+    <p>Бесплатная регистрация. Никакой кредитной карты. Никакого брокерского счёта.</p>
+    <button class="btn btn-primary btn-xl" onclick="wizOpen()">
+      Создать аккаунт бесплатно
+    </button>
+    <p class="cta-fine">Уже есть аккаунт? <a href="/app?auth=login" style="color:var(--blue-400);text-decoration:none;">Войти →</a></p>
   </section>
+
+  <!-- ═══ ONBOARDING WIZARD ════════════════════════════════ -->
+  <div class="wiz-overlay" id="wiz-overlay">
+    <div class="wiz-card" id="wiz-card">
+      <button class="wiz-close" id="wiz-close" title="Закрыть">✕</button>
+      <div class="wiz-progress"><div class="wiz-progress-bar" id="wiz-bar" style="width:25%"></div></div>
+      <div class="wiz-body">
+
+        <!-- Step 1: Risk -->
+        <div class="wiz-step active" id="wiz-s1">
+          <div class="wiz-step-label">Шаг 1 из 3 · Профиль</div>
+          <div class="wiz-title">Ваш уровень риска</div>
+          <div class="wiz-desc">AI подберёт облигации под ваш инвестиционный стиль — прямо сейчас, без регистрации.</div>
+          <div class="risk-grid" id="wiz-risk-grid">
+            <div class="risk-card" data-risk="ultra_low" data-yield="9">
+              <span class="risk-icon">🛡️</span>
+              <div>
+                <div class="risk-name">Консервативный</div>
+                <div class="risk-hint">ОФЗ и гособлигации · доходность 8–11%</div>
+              </div>
+            </div>
+            <div class="risk-card" data-risk="low" data-yield="12">
+              <span class="risk-icon">⚖️</span>
+              <div>
+                <div class="risk-name">Умеренный</div>
+                <div class="risk-hint">Корпоративные 1-го эшелона · 11–15%</div>
+              </div>
+            </div>
+            <div class="risk-card" data-risk="moderate" data-yield="16">
+              <span class="risk-icon">📈</span>
+              <div>
+                <div class="risk-name">Сбалансированный</div>
+                <div class="risk-hint">Широкий рынок корп. облигаций · 15–20%</div>
+              </div>
+            </div>
+            <div class="risk-card" data-risk="high" data-yield="21">
+              <span class="risk-icon">🚀</span>
+              <div>
+                <div class="risk-name">Агрессивный</div>
+                <div class="risk-hint">ВДО и высокодоходные бумаги · 20%+</div>
+              </div>
+            </div>
+          </div>
+          <div class="wiz-footer" style="margin-top:24px;">
+            <button class="wiz-btn-skip" id="wiz-skip1" onclick="wizClose()">Пропустить</button>
+            <button class="wiz-btn-next" id="wiz-next1" disabled onclick="wizGoStep2()">Далее →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Amount -->
+        <div class="wiz-step" id="wiz-s2">
+          <div class="wiz-step-label">Шаг 2 из 3 · Сумма</div>
+          <div class="wiz-title">Сумма инвестиций</div>
+          <div class="wiz-desc">AI распределит бюджет по инструментам с учётом размера лота и диверсификации.</div>
+          <div style="position:relative;">
+            <input class="wiz-amount-input" id="wiz-amount" type="number" min="10000" max="100000000" step="10000" value="100000" />
+            <span class="wiz-amount-suffix">₽</span>
+          </div>
+          <div id="wiz-amount-label" style="margin-top:8px;font-size:13px;color:var(--slate-500);"></div>
+          <div class="wiz-presets">
+            <button class="wiz-preset" onclick="wizSetAmount(50000)">50 000 ₽</button>
+            <button class="wiz-preset" onclick="wizSetAmount(100000)">100 000 ₽</button>
+            <button class="wiz-preset" onclick="wizSetAmount(500000)">500 000 ₽</button>
+            <button class="wiz-preset" onclick="wizSetAmount(1000000)">1 000 000 ₽</button>
+          </div>
+          <div class="wiz-footer" style="margin-top:24px;">
+            <button class="wiz-btn-back" onclick="wizGoStep1()">← Назад</button>
+            <button class="wiz-btn-next" onclick="wizGoStep3()">Подобрать портфель →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Loading + Result -->
+        <div class="wiz-step" id="wiz-s3">
+          <!-- Loading state -->
+          <div id="wiz-loading">
+            <div class="wiz-loading">
+              <div class="wiz-spinner"></div>
+              <div class="wiz-loading-text">AI анализирует рынок...</div>
+              <div class="wiz-loading-sub">Загружаем данные с MOEX и подбираем облигации</div>
+            </div>
+          </div>
+          <!-- Result state -->
+          <div id="wiz-result" style="display:none;">
+            <div class="wiz-step-label">Шаг 3 из 3 · Результат</div>
+            <div class="wiz-title">Ваш портфель готов</div>
+            <div class="wiz-desc" id="wiz-result-desc"></div>
+            <div class="wiz-summary-row" id="wiz-summary"></div>
+            <div class="wiz-bonds-list" id="wiz-bonds"></div>
+            <div class="wiz-register-box">
+              <div class="wiz-register-title">💾 Сохраните портфель бесплатно</div>
+              <div class="wiz-register-sub">Создайте аккаунт за 30 секунд — и мы автоматически добавим эти облигации в ваш портфель. Отслеживайте цены, купоны и доходность в реальном времени.</div>
+              <div class="wiz-reg-fields">
+                <input class="wiz-reg-input" id="wiz-reg-user" type="text" placeholder="Придумайте логин" autocomplete="username" />
+                <input class="wiz-reg-input" id="wiz-reg-pass" type="password" placeholder="Пароль (мин. 6 символов)" autocomplete="new-password" />
+              </div>
+              <div class="wiz-reg-msg" id="wiz-reg-msg"></div>
+              <button class="wiz-btn-next" id="wiz-reg-btn" onclick="wizRegister()" style="width:100%;">
+                Создать аккаунт и сохранить портфель
+              </button>
+            </div>
+            <div style="text-align:center;">
+              <button class="wiz-btn-skip" onclick="wizClose()">Войти в существующий аккаунт →</button>
+            </div>
+          </div>
+          <!-- Error state -->
+          <div id="wiz-error" style="display:none;text-align:center;padding:32px 0;">
+            <div style="font-size:32px;margin-bottom:16px;">⚠️</div>
+            <div style="font-size:15px;color:var(--slate-400);margin-bottom:8px;">Не удалось загрузить данные</div>
+            <div style="font-size:13px;color:var(--slate-600);margin-bottom:24px;">Проверьте соединение и попробуйте ещё раз</div>
+            <button class="wiz-btn-next" onclick="wizGoStep3()" style="max-width:200px;margin:0 auto;display:block;">Попробовать снова</button>
+          </div>
+          <div class="wiz-footer" id="wiz-s3-footer" style="display:none;">
+            <button class="wiz-btn-back" onclick="wizGoStep2()">← Изменить</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ FOOTER ════════════════════════════════════════════ -->
   <footer class="footer">
@@ -989,45 +1379,387 @@
   </footer>
 
   <script>
-    // Smooth scroll for any anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-      a.addEventListener('click', e => {
-        const target = document.querySelector(a.getAttribute('href'));
-        if (target) {
-          e.preventDefault();
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Topbar scroll effect
+    const topbar = document.getElementById('topbar');
+    window.addEventListener('scroll', () => {
+      topbar.classList.toggle('scrolled', window.scrollY > 10);
+    }, { passive: true });
+
+    // Reveal on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
         }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach((el, i) => {
+      el.style.transitionDelay = (i * 0.05) + 's';
+      observer.observe(el);
+    });
+
+    // ═══════════════════════════════════════════════════
+    // ONBOARDING WIZARD
+    // ═══════════════════════════════════════════════════
+    let _wizRisk = null;
+    let _wizYield = 12;
+    let _wizSuggested = [];
+
+    function wizOpen() {
+      document.getElementById('wiz-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function wizClose() {
+      document.getElementById('wiz-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+      // If we have results, redirect to login page
+      if (_wizSuggested.length > 0) {
+        window.location.href = '/app?auth=login';
+      }
+    }
+
+    // Close on overlay click
+    document.getElementById('wiz-overlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('wiz-overlay')) wizClose();
+    });
+    document.getElementById('wiz-close').addEventListener('click', wizClose);
+
+    // Risk card selection
+    document.querySelectorAll('.risk-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.risk-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        _wizRisk  = card.dataset.risk;
+        _wizYield = parseInt(card.dataset.yield);
+        document.getElementById('wiz-next1').disabled = false;
       });
     });
 
-    // Topbar shadow on scroll
-    const topbar = document.querySelector('.topbar');
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > 8) {
-        topbar.style.boxShadow = '0 1px 12px rgba(0,0,0,.25)';
-      } else {
-        topbar.style.boxShadow = 'none';
+    function wizSetStep(n) {
+      document.querySelectorAll('.wiz-step').forEach(s => s.classList.remove('active'));
+      document.getElementById('wiz-s' + n).classList.add('active');
+      const pct = { 1: 25, 2: 60, 3: 100 };
+      document.getElementById('wiz-bar').style.width = pct[n] + '%';
+    }
+
+    function wizGoStep1() { wizSetStep(1); }
+    function wizGoStep2() { wizSetStep(2); wizUpdateAmountLabel(); }
+
+    function wizUpdateAmountLabel() {
+      const v = parseInt(document.getElementById('wiz-amount').value) || 0;
+      const el = document.getElementById('wiz-amount-label');
+      if (v >= 1000000) el.textContent = (v/1000000).toFixed(v%1000000===0?0:1) + ' млн ₽';
+      else if (v >= 1000) el.textContent = (v/1000).toFixed(0) + ' тыс ₽';
+      else el.textContent = v + ' ₽';
+    }
+
+    function wizSetAmount(v) {
+      document.getElementById('wiz-amount').value = v;
+      wizUpdateAmountLabel();
+    }
+
+    document.getElementById('wiz-amount').addEventListener('input', wizUpdateAmountLabel);
+
+    async function wizGoStep3() {
+      const amount = parseInt(document.getElementById('wiz-amount').value) || 100000;
+      if (amount < 10000) { alert('Минимальная сумма 10 000 ₽'); return; }
+
+      wizSetStep(3);
+      document.getElementById('wiz-loading').style.display = '';
+      document.getElementById('wiz-result').style.display  = 'none';
+      document.getElementById('wiz-error').style.display   = 'none';
+      document.getElementById('wiz-s3-footer').style.display = 'none';
+
+      try {
+        const res = await fetch(`/bonds/suggest?amount=${amount}&yield=${_wizYield}&risk=${_wizRisk}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Ошибка подбора');
+
+        _wizSuggested = (data.bonds || []).map(b => ({
+          ticker: b.ticker, name: b.name,
+          instrument_type: 'bond',
+          quantity: b.lots * b.lot_size,
+          lots: b.lots, lot_size: b.lot_size,
+          purchase_price: b.purchase_price,
+          coupon_percent: b.coupon_percent,
+          maturity: b.maturity,
+          total_cost: b.total_cost,
+        }));
+
+        wizRenderResult(data, amount);
+
+        document.getElementById('wiz-loading').style.display = 'none';
+        document.getElementById('wiz-result').style.display  = '';
+        document.getElementById('wiz-s3-footer').style.display = 'flex';
+      } catch(e) {
+        document.getElementById('wiz-loading').style.display = 'none';
+        document.getElementById('wiz-error').style.display   = '';
       }
-    }, { passive: true });
+    }
 
-    // Animate elements into view
-    const observerOpts = { threshold: 0.12, rootMargin: '0px 0px -40px 0px' };
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translateY(0)';
-          observer.unobserve(entry.target);
-        }
+    function wizRenderResult(data, budget) {
+      const { bonds, summary } = data;
+      const fmt = v => new Intl.NumberFormat('ru-RU').format(Math.round(v));
+      const avgYield = summary.avg_yield || (bonds.reduce((s,b) => s+b.coupon_percent, 0) / bonds.length);
+
+      // Desc
+      const riskLabels = { ultra_low:'Консервативный', low:'Умеренный', moderate:'Сбалансированный', elevated:'Повышенный', high:'Агрессивный' };
+      document.getElementById('wiz-result-desc').textContent =
+        `AI подобрал ${bonds.length} облигаций · профиль: ${riskLabels[summary.risk] || summary.risk}`;
+
+      // Summary
+      document.getElementById('wiz-summary').innerHTML = `
+        <div class="wiz-summary-cell">
+          <div class="wiz-sum-label">Вложено</div>
+          <div class="wiz-sum-value">${fmt(summary.total_cost)} ₽</div>
+        </div>
+        <div class="wiz-summary-cell">
+          <div class="wiz-sum-label">Ср. доходность</div>
+          <div class="wiz-sum-value green">${avgYield.toFixed(1)}%</div>
+        </div>
+        <div class="wiz-summary-cell">
+          <div class="wiz-sum-label">Инструментов</div>
+          <div class="wiz-sum-value blue">${bonds.length}</div>
+        </div>
+      `;
+
+      // Bonds list
+      const list = document.getElementById('wiz-bonds');
+      list.innerHTML = '';
+      bonds.forEach(b => {
+        const mat = b.maturity ? b.maturity.substring(0,7) : '—';
+        const cost = b.total_cost ? fmt(b.total_cost) + ' ₽' : '';
+        const row = document.createElement('div');
+        row.className = 'wiz-bond-row';
+        row.innerHTML = `
+          <div class="wiz-bond-icon">${b.ticker.substring(0,2)}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="wiz-bond-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
+            <div class="wiz-bond-meta">${b.ticker} · ${b.lots} лот · погашение ${mat}</div>
+          </div>
+          <div class="wiz-bond-right">
+            <div class="wiz-bond-yield">${b.coupon_percent}%</div>
+            <div class="wiz-bond-cost">${cost}</div>
+          </div>
+        `;
+        list.appendChild(row);
       });
-    }, observerOpts);
+    }
 
-    // Apply to feature cards and demo stat cards
-    document.querySelectorAll('.feature-card, .demo-stat-card').forEach((el, i) => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(18px)';
-      el.style.transition = `opacity .4s ease ${i * 0.07}s, transform .4s ease ${i * 0.07}s, box-shadow .15s ease`;
-      observer.observe(el);
+    async function wizRegister() {
+      const username = document.getElementById('wiz-reg-user').value.trim();
+      const password = document.getElementById('wiz-reg-pass').value.trim();
+      const btn = document.getElementById('wiz-reg-btn');
+      const msg = document.getElementById('wiz-reg-msg');
+
+      if (!username || username.length < 3) { msg.className='wiz-reg-msg error'; msg.textContent='Логин минимум 3 символа'; return; }
+      if (!password || password.length < 6) { msg.className='wiz-reg-msg error'; msg.textContent='Пароль минимум 6 символов'; return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Создаём аккаунт...';
+      msg.textContent = '';
+
+      try {
+        // Register
+        const regRes = await fetch('/auth/register', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ username, password })
+        });
+        const regData = await regRes.json();
+        if (!regRes.ok) throw new Error(regData.detail || 'Ошибка регистрации');
+
+        const token = regData.access_token;
+        localStorage.setItem('mvp_auth_token', token);
+        localStorage.setItem('mvp_username', regData.username);
+        localStorage.setItem('mvp_last_username', username);
+        localStorage.setItem('mvp_onboarding_done', '1'); // skip wizard on dashboard — we already have results
+
+        btn.textContent = 'Сохраняем портфель...';
+
+        // Create portfolio
+        const portRes = await fetch('/portfolios', {
+          method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+          body: JSON.stringify({ name: 'Мой портфель' })
+        });
+        const portData = await portRes.json();
+        if (!portRes.ok) throw new Error('Ошибка создания портфеля');
+
+        const portfolioId = portData.id;
+
+        // Bulk add bonds
+        if (_wizSuggested.length > 0) {
+          const payloads = _wizSuggested.map(b => ({
+            ticker: b.ticker,
+            instrument_type: 'bond',
+            quantity: b.quantity,
+            purchase_price: b.purchase_price || 100,
+          }));
+          await fetch(`/portfolios/${portfolioId}/instruments/bulk`, {
+            method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+            body: JSON.stringify(payloads)
+          });
+        }
+
+        msg.className = 'wiz-reg-msg success';
+        msg.textContent = '✓ Готово! Переходим в приложение...';
+        btn.textContent = '✓ Аккаунт создан!';
+
+        setTimeout(() => { window.location.href = '/app'; }, 900);
+
+      } catch(e) {
+        msg.className = 'wiz-reg-msg error';
+        msg.textContent = e.message || 'Ошибка. Попробуйте ещё раз';
+        btn.disabled = false;
+        btn.textContent = 'Создать аккаунт и сохранить портфель';
+      }
+    }
+
+    // Enter key in reg fields
+    document.getElementById('wiz-reg-pass').addEventListener('keydown', e => {
+      if (e.key === 'Enter') wizRegister();
+    });
+
+    // Ticker
+    const TICKERS = [
+      { name: 'ОФЗ 26238',         ticker: 'SU26238RMFS4', yield: '7.1%',  price: '98.50' },
+      { name: 'МТС Банк 001Р-01',  ticker: 'RU000A106SK2', yield: '12.3%', price: '101.2' },
+      { name: 'Россети БО-001Р',   ticker: 'RU000A105TS5', yield: '9.8%',  price: '99.70' },
+      { name: 'ОФЗ 26226',         ticker: 'SU26226RMFS9', yield: '7.95%', price: '96.20' },
+      { name: 'Газпром 3Р-01',     ticker: 'RU000A104JQ3', yield: '11.5%', price: '103.1' },
+      { name: 'Сбербанк БО-25Р',   ticker: 'RU000A104SU7', yield: '13.2%', price: '100.5' },
+      { name: 'Норникель 1Р-16',   ticker: 'RU000A104ZK2', yield: '10.9%', price: '97.80' },
+      { name: 'ОФЗ 26241',         ticker: 'SU26241RMFS8', yield: '8.65%', price: '94.10' },
+    ];
+
+    const track = document.getElementById('ticker');
+    const items = [...TICKERS, ...TICKERS]; // double for seamless loop
+    items.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'ticker-item';
+      el.innerHTML = `
+        <span class="ticker-name">${t.name}</span>
+        <span class="ticker-yield">${t.yield}</span>
+        <span class="ticker-price">${t.price} ₽</span>
+        <span class="ticker-sep">·</span>
+      `;
+      track.appendChild(el);
+    });
+  </script>
+
+  <!-- ── LANDING AUTH MODAL ─────────────────────────────────── -->
+  <div id="landing-auth-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(2,8,23,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;">
+    <div style="background:#0d1829;border:1px solid rgba(148,163,184,.12);border-radius:20px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 32px 64px -12px rgba(0,0,0,.7);margin:16px;">
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:1px solid rgba(148,163,184,.1);">
+        <button id="landing-tab-login" onclick="landingAuthOpen('login')"
+          style="flex:1;padding:14px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:#60a5fa;border-bottom:2px solid #3b82f6;font-family:inherit;transition:.15s;">
+          Войти
+        </button>
+        <button id="landing-tab-register" onclick="landingAuthOpen('register')"
+          style="flex:1;padding:14px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;color:rgba(148,163,184,.6);font-family:inherit;transition:.15s;">
+          Зарегистрироваться
+        </button>
+      </div>
+      <!-- Body -->
+      <div style="padding:28px 28px 24px;">
+        <h2 style="margin:0 0 6px;font-size:20px;font-weight:700;color:#f1f5f9;" id="landing-auth-title">Добро пожаловать</h2>
+        <p style="margin:0 0 20px;font-size:13px;color:#64748b;" id="landing-auth-sub">Войдите в свой аккаунт Bond AI</p>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Логин</label>
+          <input id="landing-auth-username" type="text" placeholder="username" autocomplete="username"
+            style="width:100%;height:40px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.2);border-radius:8px;padding:0 12px;font-size:14px;color:#f1f5f9;font-family:inherit;box-sizing:border-box;outline:none;transition:.15s;"
+            onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(148,163,184,.2)'"
+            onkeydown="if(event.key==='Enter')landingAuthSubmit()">
+        </div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">Пароль</label>
+          <input id="landing-auth-password" type="password" placeholder="••••••••" autocomplete="current-password"
+            style="width:100%;height:40px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.2);border-radius:8px;padding:0 12px;font-size:14px;color:#f1f5f9;font-family:inherit;box-sizing:border-box;outline:none;transition:.15s;"
+            onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(148,163,184,.2)'"
+            onkeydown="if(event.key==='Enter')landingAuthSubmit()">
+        </div>
+        <div id="landing-auth-status" style="min-height:16px;margin-bottom:12px;font-size:12px;color:#f87171;"></div>
+        <button onclick="landingAuthSubmit()" id="landing-auth-submit"
+          style="width:100%;height:42px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;"
+          onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+          Войти
+        </button>
+        <button onclick="landingAuthClose()" style="width:100%;height:36px;margin-top:8px;background:none;border:none;font-size:13px;color:rgba(148,163,184,.5);cursor:pointer;font-family:inherit;">
+          Отмена
+        </button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let _landingAuthTab = 'login';
+    function landingAuthOpen(tab) {
+      _landingAuthTab = tab || 'login';
+      const modal = document.getElementById('landing-auth-modal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      const titleEl  = document.getElementById('landing-auth-title');
+      const subEl    = document.getElementById('landing-auth-sub');
+      const submitEl = document.getElementById('landing-auth-submit');
+      const tabLogin = document.getElementById('landing-tab-login');
+      const tabReg   = document.getElementById('landing-tab-register');
+      if (_landingAuthTab === 'register') {
+        if (titleEl) titleEl.textContent = 'Создать аккаунт';
+        if (subEl)   subEl.textContent = 'Регистрация займёт 30 секунд';
+        if (submitEl) submitEl.textContent = 'Зарегистрироваться';
+        if (tabLogin)  { tabLogin.style.color = 'rgba(148,163,184,.6)'; tabLogin.style.borderBottom = '2px solid transparent'; }
+        if (tabReg)    { tabReg.style.color = '#60a5fa'; tabReg.style.borderBottom = '2px solid #3b82f6'; }
+      } else {
+        if (titleEl) titleEl.textContent = 'Добро пожаловать';
+        if (subEl)   subEl.textContent = 'Войдите в свой аккаунт Bond AI';
+        if (submitEl) submitEl.textContent = 'Войти';
+        if (tabLogin)  { tabLogin.style.color = '#60a5fa'; tabLogin.style.borderBottom = '2px solid #3b82f6'; }
+        if (tabReg)    { tabReg.style.color = 'rgba(148,163,184,.6)'; tabReg.style.borderBottom = '2px solid transparent'; }
+      }
+      document.getElementById('landing-auth-status').textContent = '';
+      setTimeout(() => document.getElementById('landing-auth-username').focus(), 50);
+    }
+    function landingAuthClose() {
+      const modal = document.getElementById('landing-auth-modal');
+      if (modal) modal.style.display = 'none';
+    }
+    async function landingAuthSubmit() {
+      const username = document.getElementById('landing-auth-username').value.trim();
+      const password = document.getElementById('landing-auth-password').value;
+      const statusEl = document.getElementById('landing-auth-status');
+      const submitBtn = document.getElementById('landing-auth-submit');
+      if (!username || !password) { statusEl.textContent = 'Введите логин и пароль'; return; }
+      statusEl.textContent = 'Проверяем...';
+      statusEl.style.color = '#94a3b8';
+      submitBtn.disabled = true;
+      const endpoint = _landingAuthTab === 'register' ? '/auth/register' : '/auth/login';
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({username, password})
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          statusEl.textContent = data.detail || (resp.status === 429 ? 'Слишком много попыток' : 'Ошибка входа');
+          statusEl.style.color = '#f87171';
+          submitBtn.disabled = false;
+          return;
+        }
+        if (data.access_token) {
+          localStorage.setItem('mvp_auth_token', data.access_token);
+          if (data.username) localStorage.setItem('mvp_username', data.username);
+          window.location.href = '/app';
+        }
+      } catch(e) {
+        statusEl.textContent = 'Ошибка сети';
+        statusEl.style.color = '#f87171';
+        submitBtn.disabled = false;
+      }
+    }
+    // Close on backdrop click
+    document.getElementById('landing-auth-modal').addEventListener('click', function(e) {
+      if (e.target === this) landingAuthClose();
     });
   </script>
 </body>

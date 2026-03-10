@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>if (location.pathname === '/') location.replace('/app');</script>
     <title>Bond AI</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
     <link rel="manifest" href="/manifest.json">
@@ -10,13 +11,17 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Bond AI">
-    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
+      /* ── THEME INIT (prevents flash) ────────────────────────── */
+      :root { color-scheme: dark; }
+      [data-theme="light"] { color-scheme: light; }
+
       :root {
-        /* Slate palette */
+        /* Slate palette (keep for compatibility) */
         --slate-50:  #f8fafc;
         --slate-100: #f1f5f9;
         --slate-200: #e2e8f0;
@@ -30,46 +35,139 @@
         /* Blue */
         --blue-50:  #eff6ff;
         --blue-100: #dbeafe;
+        --blue-400: #60a5fa;
         --blue-500: #3b82f6;
         --blue-600: #2563eb;
         --blue-700: #1d4ed8;
-        /* Semantic */
+        /* Extended palette */
+        --indigo-500: #6366f1;
+        --purple-400: #c084fc;
+        --green-400:  #4ade80;
+        --green-500:  #22c55e;
+        --green-600:  #16a34a;
+        --red-400:    #f87171;
+        --red-600:    #dc2626;
+        --cyan-400:   #22d3ee;
+        --sky-400:    #38bdf8;
+        --amber-400:  #f59e0b;
+        --rose-400:   #fb7185;
+        /* Semantic (old light) */
         --green-50:  #f0fdf4;
-        --green-600: #16a34a;
         --red-50:    #fef2f2;
         --red-100:   #fee2e2;
-        --red-600:   #dc2626;
         /* Layout */
         --radius-sm: 6px;
         --radius:    8px;
         --radius-lg: 12px;
+        --radius-xl: 16px;
         --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .05);
         --shadow:    0 1px 3px 0 rgb(0 0 0 / .10), 0 1px 2px -1px rgb(0 0 0 / .10);
         --shadow-md: 0 4px 6px -1px rgb(0 0 0 / .10), 0 2px 4px -2px rgb(0 0 0 / .10);
+
+        /* ── DARK THEME TOKENS (default) ── */
+        color-scheme: dark;
+        --bg:               #020817;
+        --bg-elevated:      rgba(255,255,255,.025);
+        --bg-card:          rgba(148,163,184,.06);
+        --border:           rgba(148,163,184,.1);
+        --border-strong:    rgba(148,163,184,.18);
+        --text-primary:     #f1f5f9;
+        --text-secondary:   #94a3b8;
+        --text-muted:       #64748b;
+        --topbar-bg:        rgba(2,8,23,.82);
+        --topbar-border:    rgba(148,163,184,.08);
+        --table-header-bg:  rgba(255,255,255,.025);
+        --table-row-hover:  rgba(255,255,255,.03);
+        --table-border:     rgba(148,163,184,.07);
+        --input-bg:         rgba(255,255,255,.05);
+        --input-border:     rgba(148,163,184,.2);
+        --modal-bg:         #0d1829;
+        --stat-value-color: #ffffff;
+        --skeleton-from:    rgba(148,163,184,.08);
+        --skeleton-to:      rgba(148,163,184,.15);
+        --btn-sec-bg:       rgba(255,255,255,.06);
+        --btn-sec-border:   rgba(148,163,184,.2);
+        --btn-sec-color:    #94a3b8;
+        --info-bg:          rgba(37,99,235,.08);
+        --info-border:      rgba(37,99,235,.2);
+        --info-color:       #93c5fd;
+        --select-bg:        #1e293b;
       }
+
+      /* ── LIGHT THEME OVERRIDES ── */
+      [data-theme="light"] {
+        color-scheme: light;
+        --bg:               #f8fafc;
+        --bg-elevated:      #ffffff;
+        --bg-card:          #ffffff;
+        --border:           #e2e8f0;
+        --border-strong:    #cbd5e1;
+        --text-primary:     #0f172a;
+        --text-secondary:   #475569;
+        --text-muted:       #94a3b8;
+        --topbar-bg:        rgba(15,23,42,.97);
+        --topbar-border:    rgba(255,255,255,.06);
+        --table-header-bg:  #f8fafc;
+        --table-row-hover:  #f8fafc;
+        --table-border:     #f1f5f9;
+        --input-bg:         #ffffff;
+        --input-border:     #cbd5e1;
+        --modal-bg:         #ffffff;
+        --stat-value-color: #0f172a;
+        --skeleton-from:    #f1f5f9;
+        --skeleton-to:      #e2e8f0;
+        --btn-sec-bg:       #ffffff;
+        --btn-sec-border:   #e2e8f0;
+        --btn-sec-color:    #334155;
+        --info-bg:          #eff6ff;
+        --info-border:      #dbeafe;
+        --info-color:       #475569;
+        --select-bg:        #ffffff;
+      }
+      [data-theme="light"] .orbs { opacity: 0.2; }
+      [data-theme="light"] .mesh-bg { opacity: 0.35; }
 
       *, *::before, *::after { box-sizing: border-box; }
       button, input, select, textarea { font-family: inherit; }
+
+      /* ── MESH BACKGROUND ─────────────────────────────────────── */
+      .mesh-bg {
+        position: fixed; inset: 0; pointer-events: none; z-index: 0;
+        background-image:
+          linear-gradient(rgba(148,163,184,.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(148,163,184,.04) 1px, transparent 1px);
+        background-size: 44px 44px;
+      }
+      .orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+      .orb  { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform; }
+      .orb-1 { width:700px;height:700px;top:-200px;left:-150px;background:radial-gradient(circle,rgba(37,99,235,.55) 0%,rgba(37,99,235,.18) 45%,transparent 70%);animation:orbDrift1 13s ease-in-out infinite; }
+      .orb-2 { width:600px;height:600px;bottom:-150px;right:-100px;background:radial-gradient(circle,rgba(99,102,241,.5) 0%,rgba(99,102,241,.14) 45%,transparent 70%);animation:orbDrift2 16s ease-in-out infinite; }
+      .orb-3 { width:400px;height:400px;top:40%;left:55%;background:radial-gradient(circle,rgba(14,165,233,.4) 0%,rgba(14,165,233,.1) 45%,transparent 70%);animation:orbDrift3 10s ease-in-out infinite; }
+      .orb-4 { width:350px;height:350px;top:20%;right:25%;background:radial-gradient(circle,rgba(168,85,247,.38) 0%,rgba(168,85,247,.08) 45%,transparent 70%);animation:orbDrift4 14s ease-in-out infinite; }
+      @keyframes orbDrift1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(60px,-40px) scale(1.08)} 66%{transform:translate(-30px,50px) scale(.95)} }
+      @keyframes orbDrift2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-50px,60px) scale(1.06)} 66%{transform:translate(40px,-30px) scale(.97)} }
+      @keyframes orbDrift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(30px,40px) scale(1.04)} }
+      @keyframes orbDrift4 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-40px,-20px) scale(1.05)} }
 
       body {
         margin: 0;
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
         font-size: 13px;
-        background: var(--slate-100);
-        color: var(--slate-800);
+        background: var(--bg);
+        color: var(--text-primary);
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
       }
 
       /* ── TOPBAR ───────────────────────────────────────────────── */
       .topbar {
-        background-color: var(--slate-900);
-        background-image: linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);
-        background-size: 44px 44px;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        box-shadow: var(--shadow-md);
+        background: var(--topbar-bg);
+        border-bottom: 1px solid var(--topbar-border);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 200;
       }
       .topbar-inner {
         max-width: 1400px;
@@ -139,31 +237,36 @@
       .nav-btn.active { color: #fff; border-bottom-color: var(--blue-500); }
 
       .analytics-period-btn {
-        padding: 3px 10px; font-size: 11px; border: 1px solid var(--slate-200);
-        border-radius: 6px; background: none; cursor: pointer; color: var(--slate-500);
-        transition: all .15s;
+        padding: 3px 10px; font-size: 11px; border: 1px solid var(--border);
+        border-radius: 6px; background: none; cursor: pointer; color: var(--text-muted);
+        font-family: inherit; transition: all .15s;
       }
       .analytics-period-btn:hover, .analytics-period-btn.active {
         background: var(--blue-600); color: #fff; border-color: var(--blue-600);
       }
 
       /* ── LAYOUT ──────────────────────────────────────────────── */
-      .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+      .container {
+        max-width: 1400px; margin: 0 auto; padding: 20px;
+        padding-top: 76px; /* compensate for fixed topbar (56px) + 20px gap */
+        position: relative; z-index: 1;
+      }
       .panel { display: none; }
       .panel.active { display: block; }
 
       /* ── CARDS ───────────────────────────────────────────────── */
       .card {
-        background: #fff;
-        border: 1px solid var(--slate-200);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         margin-bottom: 16px;
         overflow: hidden;
       }
       .card-header {
         padding: 14px 18px;
-        border-bottom: 1px solid var(--slate-100);
+        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -172,7 +275,7 @@
       .card-title {
         font-size: 13px;
         font-weight: 600;
-        color: var(--slate-700);
+        color: var(--text-secondary);
         margin: 0;
         letter-spacing: -.1px;
       }
@@ -181,37 +284,42 @@
       /* ── STAT CARDS ──────────────────────────────────────────── */
       .stat-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin-bottom: 8px;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        margin-bottom: 16px;
       }
       .stat-card {
-        background: #fff;
-        border: 1px solid var(--slate-200);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-sm);
-        padding: 16px 18px;
+        background: var(--bg-card);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        padding: 18px 16px;
+        transition: background .2s;
       }
+      .stat-card:hover { background: var(--bg-elevated); }
       .stat-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--slate-400);
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: .6px;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       .stat-value {
         font-size: 22px;
-        font-weight: 700;
-        color: var(--slate-900);
+        font-weight: 800;
+        color: var(--stat-value-color);
         letter-spacing: -.5px;
-        line-height: 1.2;
+        line-height: 1.1;
       }
-      .stat-value.positive { color: var(--green-600); }
-      .stat-value.negative { color: #f87171; }
+      .stat-value.positive { color: var(--green-400); }
+      .stat-value.negative { color: var(--red-400); }
       .stat-sub {
         font-size: 11px;
-        color: var(--slate-400);
+        color: var(--text-muted);
         margin-top: 4px;
       }
 
@@ -226,25 +334,25 @@
       .field label {
         font-size: 11px;
         font-weight: 600;
-        color: var(--slate-500);
+        color: var(--text-muted);
         letter-spacing: .2px;
       }
       .input {
         height: 36px;
-        border: 1px solid var(--slate-300);
+        border: 1px solid var(--input-border);
         border-radius: var(--radius);
         padding: 0 10px;
         font-size: 13px;
         font-family: inherit;
-        color: var(--slate-800);
-        background: #fff;
+        color: var(--text-primary);
+        background: var(--input-bg);
         width: 100%;
         transition: border-color .15s, box-shadow .15s;
         outline: none;
       }
       .input:focus {
         border-color: var(--blue-500);
-        box-shadow: 0 0 0 3px var(--blue-100);
+        box-shadow: 0 0 0 3px rgba(59,130,246,.15);
       }
       input[type="number"].input { appearance: textfield; -moz-appearance: textfield; }
       input[type="number"].input::-webkit-outer-spin-button,
@@ -253,29 +361,30 @@
       /* ── MODAL ───────────────────────────────────────────────── */
       .modal-overlay {
         display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5); z-index: 1000;
+        background: rgba(0,0,0,0.65); z-index: 1000;
         align-items: center; justify-content: center;
       }
       .modal-overlay.show { display: flex; }
       .modal {
-        background: #fff; border-radius: var(--radius-lg);
-        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        background: var(--modal-bg); border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        box-shadow: 0 20px 60px -10px rgba(0,0,0,.5);
         padding: 24px; max-width: 500px; width: 90%;
         max-height: 80vh; overflow-y: auto;
       }
       .modal-header { margin-bottom: 16px; }
       .modal-title {
-        font-size: 18px; font-weight: 700; color: var(--slate-900); margin: 0;
+        font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;
       }
       .modal-body { margin: 16px 0; }
       .modal-field {
         margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;
       }
-      .modal-field label { font-size: 12px; font-weight: 600; color: var(--slate-600); }
+      .modal-field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
       .modal-field input:not(.input), .modal-field textarea {
-        padding: 8px 10px; border: 1px solid var(--slate-300); border-radius: var(--radius);
+        padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius);
         font-family: inherit; font-size: 13px;
-        background: var(--slate-50); color: var(--slate-800);
+        background: var(--input-bg); color: var(--text-primary);
         width: 100%; box-sizing: border-box; outline: none;
         transition: border-color .15s;
       }
@@ -293,7 +402,7 @@
         font-size: 13px; font-weight: 600; cursor: pointer;
       }
       .modal-actions .btn-primary { background: var(--blue-600); color: #fff; }
-      .modal-actions .btn-secondary { background: var(--slate-200); color: var(--slate-800); }
+      .modal-actions .btn-secondary { background: var(--btn-sec-bg); color: var(--btn-sec-color); border: 1px solid var(--btn-sec-border); }
       .modal-actions .btn-danger { background: var(--red-600); color: #fff; }
 
       /* ── BUTTONS ─────────────────────────────────────────────── */
@@ -303,38 +412,36 @@
         background: var(--blue-600); color: #fff;
         font-family: inherit; font-size: 13px; font-weight: 600;
         padding: 0 16px; cursor: pointer; white-space: nowrap;
-        box-shadow: var(--shadow-sm);
-        transition: background .15s, box-shadow .15s, transform .1s;
+        transition: background .15s, transform .1s;
         text-decoration: none;
         letter-spacing: -.1px;
       }
-      .btn:hover { background: var(--blue-700); box-shadow: var(--shadow); }
+      .btn:hover { background: var(--blue-700); }
       .btn:active { transform: translateY(1px); }
       .btn:disabled { opacity: .55; cursor: default; transform: none; }
 
       .btn-secondary {
-        background: #fff;
-        color: var(--slate-700);
-        border: 1px solid var(--slate-300);
-        box-shadow: var(--shadow-sm);
+        background: var(--btn-sec-bg);
+        color: var(--btn-sec-color);
+        border: 1px solid var(--btn-sec-border);
       }
-      .btn-secondary:hover { background: var(--slate-50); box-shadow: var(--shadow); }
+      .btn-secondary:hover { opacity: .85; }
       .btn-danger, .btn.btn-danger { background: var(--red-600); color: #fff; border: none; }
       .btn-danger:hover, .btn.btn-danger:hover { background: #b91c1c; }
 
       .btn-sm {
         height: 22px; font-size: 10px; padding: 0 8px; border-radius: var(--radius-sm);
-        background: var(--slate-100); color: var(--slate-500);
-        border: 1px solid var(--slate-200); cursor: pointer; font-family: inherit;
+        background: var(--btn-sec-bg); color: var(--text-muted);
+        border: 1px solid var(--btn-sec-border); cursor: pointer; font-family: inherit;
         font-weight: 600; box-shadow: none;
         transition: background .15s, color .15s, border-color .15s;
       }
-      .btn-sm:hover { background: #fee2e2; color: var(--red-600); border-color: #fecaca; }
+      .btn-sm:hover { background: rgba(220,38,38,.15); color: var(--red-400); border-color: rgba(220,38,38,.3); }
 
       .btn-sm-move {
         height: 22px; font-size: 10px; padding: 0 8px; border-radius: var(--radius-sm);
-        background: #ede9fe; color: #7c3aed;
-        border: 1px solid #c4b5fd; cursor: pointer; font-family: inherit;
+        background: rgba(124,58,237,.15); color: #a78bfa;
+        border: 1px solid rgba(124,58,237,.3); cursor: pointer; font-family: inherit;
         font-weight: 600; box-shadow: none;
         transition: background .15s, color .15s;
       }
@@ -342,20 +449,20 @@
 
       /* ── SUGGEST CARDS ───────────────────────────────────────── */
       .suggest-card {
-        background: #fff;
-        border: 1px solid var(--slate-200);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
         border-radius: var(--radius);
         padding: 12px 14px;
         display: flex;
         align-items: center;
         gap: 12px;
-        transition: border-color .15s, box-shadow .15s;
+        transition: border-color .15s, background .15s;
       }
-      .suggest-card:hover { border-color: var(--blue-500); box-shadow: 0 2px 8px rgba(37,99,235,.1); }
+      .suggest-card:hover { border-color: var(--blue-500); background: var(--bg-elevated); }
       .suggest-card-body { flex: 1; min-width: 0; }
-      .suggest-card-name { font-size: 13px; font-weight: 600; color: var(--slate-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .suggest-card-meta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
-      .suggest-card-yield { font-size: 16px; font-weight: 700; color: var(--green-600); white-space: nowrap; }
+      .suggest-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .suggest-card-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+      .suggest-card-yield { font-size: 16px; font-weight: 700; color: var(--green-400); white-space: nowrap; }
       .suggest-card-add {
         width: 28px; height: 28px; border-radius: 50%;
         background: var(--blue-600); color: #fff;
@@ -365,16 +472,16 @@
         transition: background .15s, transform .1s;
       }
       .suggest-card-add:hover { background: var(--blue-700); transform: scale(1.1); }
-      .suggest-card-add:disabled { background: var(--slate-300); cursor: default; transform: none; }
+      .suggest-card-add:disabled { background: var(--text-muted); cursor: default; transform: none; }
 
       /* ── MOVE POPOVER ────────────────────────────────────────── */
       #move-popover {
         position: fixed; z-index: 9999;
         min-width: 230px;
-        background: #fff;
-        border: 1px solid var(--slate-200);
+        background: var(--modal-bg);
+        border: 1px solid var(--border-strong);
         border-radius: var(--radius-lg);
-        box-shadow: 0 8px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.07);
+        box-shadow: 0 8px 32px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.2);
         padding: 14px 16px;
         animation: popoverIn .12s ease;
       }
@@ -383,13 +490,13 @@
         to   { opacity: 1; transform: translateY(0)  scale(1); }
       }
       #move-popover-title {
-        font-size: 12px; font-weight: 700; color: var(--slate-700);
+        font-size: 12px; font-weight: 700; color: var(--text-secondary);
         margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
       }
       #move-popover-select {
         width: 100%; font-size: 12px; padding: 5px 8px;
-        border: 1px solid var(--slate-200); border-radius: var(--radius-sm);
-        background: var(--slate-50); color: var(--slate-800);
+        border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+        background: var(--input-bg); color: var(--text-primary);
         margin-bottom: 10px; cursor: pointer;
       }
       #move-popover-select:focus { outline: 2px solid #7c3aed; outline-offset: 1px; }
@@ -398,7 +505,7 @@
       /* ── SECTION HEADER ─────────────────────────────────────── */
       .section-header {
         padding: 24px 0 20px;
-        border-bottom: 1px solid var(--slate-200);
+        border-bottom: 1px solid var(--border);
         margin-bottom: 20px;
       }
       .section-header-row {
@@ -408,11 +515,11 @@
       }
       .section-title {
         font-size: 18px; font-weight: 700;
-        color: var(--slate-900); letter-spacing: -.4px;
+        color: var(--text-primary); letter-spacing: -.4px;
         margin: 0 0 4px 0;
       }
       .section-desc {
-        font-size: 13px; color: var(--slate-500); margin: 0;
+        font-size: 13px; color: var(--text-secondary); margin: 0;
         line-height: 1.55;
       }
 
@@ -427,27 +534,37 @@
 
       /* ── INFO BOX ────────────────────────────────────────────── */
       .info-box {
-        background: var(--blue-50); border: 1px solid var(--blue-100);
+        background: var(--info-bg); border: 1px solid var(--info-border);
         border-radius: var(--radius); padding: 14px 16px;
-        font-size: 12px; color: var(--slate-600); line-height: 1.65;
+        font-size: 12px; color: var(--info-color); line-height: 1.65;
       }
-      .info-box b { color: var(--slate-700); }
+      .info-box b { color: var(--text-secondary); }
       .info-box code {
-        background: #fff; border: 1px solid var(--blue-100);
+        background: var(--bg-elevated); border: 1px solid var(--border);
         border-radius: 3px; padding: 1px 5px; font-size: 11px;
-        color: var(--slate-700);
+        color: var(--text-secondary);
+      }
+      .info-box-warning {
+        background: rgba(251,191,36,.08); border-color: rgba(251,191,36,.25);
+        color: var(--amber-400);
+      }
+      [data-theme="light"] .info-box-warning {
+        background: #fefce8; border-color: #fde047; color: #854d0e;
       }
 
       /* ── INLINE SELECT ───────────────────────────────────────── */
       .select-input {
-        height: 36px; border: 1px solid var(--slate-300);
+        height: 36px; border: 1px solid var(--input-border);
         border-radius: var(--radius); padding: 0 10px;
         font-size: 13px; font-family: inherit;
-        color: var(--slate-800); background: #fff; width: 100%;
+        color: var(--text-primary); background: var(--select-bg); width: 100%;
         outline: none; cursor: pointer;
         transition: border-color .15s;
+        color-scheme: inherit;
       }
       .select-input:focus { border-color: var(--blue-500); }
+      select { color-scheme: inherit; }
+      select option { background: var(--select-bg); color: var(--text-primary); }
 
       /* ── NOTIFICATIONS ───────────────────────────────────────── */
       .notif-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; align-items: end; margin-bottom: 16px; }
@@ -458,42 +575,41 @@
       .file-label {
         display: inline-flex; align-items: center;
         padding: 0 14px; height: 36px;
-        background: #fff; border: 1px solid var(--slate-300);
+        background: var(--btn-sec-bg); border: 1px solid var(--btn-sec-border);
         border-radius: var(--radius); cursor: pointer;
-        font-size: 13px; font-weight: 600; color: var(--slate-700);
-        box-shadow: var(--shadow-sm);
-        transition: background .15s, box-shadow .15s;
+        font-size: 13px; font-weight: 600; color: var(--btn-sec-color);
+        transition: opacity .15s;
       }
-      .file-label:hover { background: var(--slate-50); box-shadow: var(--shadow); }
+      .file-label:hover { opacity: .85; }
       input[type="file"] { display: none; }
 
       /* ── TABLE ───────────────────────────────────────────────── */
-      .table-wrap { overflow-x: auto; }
+      .table-wrap { overflow-x: auto; overflow-y: visible; }
       table {
         width: 100%; border-collapse: collapse; font-size: 11px;
-        background: #fff; white-space: nowrap;
+        background: transparent; white-space: nowrap;
       }
       th {
-        background: var(--slate-50);
+        background: var(--table-header-bg);
         padding: 8px 7px;
         text-align: center;
         vertical-align: middle;
         white-space: nowrap;
         font-size: 10px;
-        font-weight: 600;
-        color: var(--slate-500);
+        font-weight: 700;
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: .5px;
         cursor: pointer;
         user-select: none;
-        border-bottom: 1px solid var(--slate-200);
-        border-right: 1px solid var(--slate-100);
+        border-bottom: 1px solid var(--table-border);
+        border-right: 1px solid var(--table-border);
         transition: background .1s;
       }
       th:last-child { border-right: none; }
-      th:hover { background: var(--slate-100); color: var(--slate-700); }
+      th:hover { background: var(--bg-elevated); color: var(--text-secondary); }
       th.no-sort { cursor: default; }
-      th.no-sort:hover { background: var(--slate-50); color: var(--slate-500); }
+      th.no-sort:hover { background: var(--table-header-bg); color: var(--text-muted); }
       th.wrap { white-space: normal; line-height: 1.3; }
 
       /* Hide actions column in read-only mode */
@@ -504,34 +620,40 @@
         text-align: center;
         vertical-align: middle;
         white-space: nowrap;
-        border-bottom: 1px solid var(--slate-100);
-        border-right: 1px solid var(--slate-100);
-        color: var(--slate-700);
+        border-bottom: 1px solid var(--table-border);
+        border-right: 1px solid var(--table-border);
+        color: var(--text-secondary);
       }
       td:last-child { border-right: none; }
 
-      tbody tr:hover td { background: var(--slate-50); }
+      tbody tr:hover td { background: var(--table-row-hover); }
 
       td.col-name { text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-      td.col-name a { color: var(--blue-600); text-decoration: none; font-weight: 500; }
+      td.col-name a { color: var(--blue-400); text-decoration: none; font-weight: 500; }
       td.col-name a:hover { text-decoration: underline; }
 
-      .profit-positive { color: var(--green-600); font-weight: 600; }
-      .profit-negative { color: var(--red-600); font-weight: 600; }
+      .profit-positive { color: var(--green-400); font-weight: 600; }
+      .profit-negative { color: var(--red-400); font-weight: 600; }
 
       .summary-row td {
-        background: var(--slate-50);
+        background: var(--table-header-bg);
         font-weight: 700;
         font-size: 11px;
-        color: var(--slate-700);
-        border-top: 2px solid var(--slate-200);
+        color: var(--text-secondary);
+        border-top: 2px solid var(--border);
       }
-      .summary-row td.sum-positive { color: var(--green-600); }
-      .summary-row td.sum-negative { color: var(--red-600); }
+      .summary-row td.sum-positive { color: var(--green-400); }
+      .summary-row td.sum-negative { color: var(--red-400); }
+
+      /* ── SCROLLBAR ───────────────────────────────────────────── */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.2); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.35); }
 
       /* ── RATING ──────────────────────────────────────────────── */
       .rating-cell { min-width: 80px; }
-      .rating-track { position: relative; width: 100%; height: 14px; border-radius: 999px; background: var(--slate-200); overflow: hidden; }
+      .rating-track { position: relative; width: 100%; height: 14px; border-radius: 999px; background: var(--border-strong); overflow: hidden; }
       .rating-fill  { height: 100%; border-radius: 999px; }
       .rating-label {
         position: absolute; inset: 0;
@@ -544,16 +666,17 @@
       /* ── EDITABLE INPUTS IN TABLE ────────────────────────────── */
       .editable-input {
         width: 52px; height: 20px;
-        border: 1px solid var(--slate-300); border-radius: 4px;
+        border: 1px solid var(--input-border); border-radius: 4px;
         text-align: center; font-size: 10px; font-family: inherit;
-        padding: 0 2px; color: var(--slate-700);
+        padding: 0 2px; color: var(--text-primary);
+        background: var(--input-bg);
         appearance: textfield; -moz-appearance: textfield;
         transition: border-color .15s, box-shadow .15s;
         outline: none;
       }
       .editable-input:focus {
         border-color: var(--blue-500);
-        box-shadow: 0 0 0 2px var(--blue-100);
+        box-shadow: 0 0 0 2px rgba(59,130,246,.15);
       }
       .editable-input::-webkit-outer-spin-button,
       .editable-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -631,18 +754,19 @@
       /* Skeleton rows */
       .skel-cell {
         display: inline-block; width: 60%; height: 11px; border-radius: 5px;
-        background: linear-gradient(90deg, var(--slate-100) 25%, var(--slate-200) 50%, var(--slate-100) 75%);
+        background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-to) 50%, var(--skeleton-from) 75%);
         background-size: 600px 100%;
         animation: shimmer 1.3s infinite linear;
         vertical-align: middle;
       }
 
       /* ── SETTINGS TABS ───────────────────────────────────────── */
+      .settings-tabs { border-bottom: 1px solid var(--border) !important; }
       .stab-btn {
         background: none;
         border: none;
         border-bottom: 2px solid transparent;
-        color: var(--slate-500);
+        color: var(--text-muted);
         cursor: pointer;
         font-size: 13px;
         font-weight: 500;
@@ -650,8 +774,8 @@
         margin-bottom: -1px;
         transition: color .15s, border-color .15s;
       }
-      .stab-btn:hover { color: var(--slate-800); }
-      .stab-btn.stab-active { color: var(--blue-600); border-bottom-color: var(--blue-600); font-weight: 600; }
+      .stab-btn:hover { color: var(--text-primary); }
+      .stab-btn.stab-active { color: var(--blue-400); border-bottom-color: var(--blue-400); font-weight: 600; }
 
       /* ── LANGUAGE SELECT ─────────────────────────────────────── */
       #lang-select option { background: #1e293b; color: #f1f5f9; }
@@ -677,25 +801,25 @@
         display: none;
         text-align: center;
         padding: 12px;
-        border-top: 1px solid var(--slate-200);
-        background: var(--slate-50);
+        border-top: 1px solid var(--border);
+        background: var(--bg-card);
         font-size: 12px;
-        color: var(--slate-500);
+        color: var(--text-muted);
         gap: 8px;
         flex-wrap: wrap;
         justify-content: center;
       }
       .mobile-toggle-btn {
         background: none;
-        border: 1px solid var(--slate-300);
+        border: 1px solid var(--btn-sec-border);
         border-radius: 16px;
-        color: var(--slate-600);
+        color: var(--text-secondary);
         cursor: pointer;
         font-size: 12px;
         padding: 4px 14px;
         transition: background .15s, color .15s;
       }
-      .mobile-toggle-btn.active { background: var(--slate-800); color: #fff; border-color: var(--slate-800); }
+      .mobile-toggle-btn.active { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-strong); }
 
       @media (max-width: 640px) {
         .mobile-toggle-bar { display: flex; }
@@ -719,8 +843,8 @@
         flex-wrap: wrap;
         gap: 4px;
         padding: 8px 12px;
-        background: var(--slate-900);
-        border-top: 1px solid var(--slate-700);
+        background: var(--topbar-bg);
+        border-top: 1px solid var(--topbar-border);
       }
       .mobile-nav { display: none; }
       .mobile-nav .nav-btn {
@@ -758,17 +882,23 @@
   </head>
   <body>
 
+    <!-- Background effects -->
+    <div class="mesh-bg"></div>
+    <div class="orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="orb orb-4"></div>
+    </div>
+
     <!-- TOPBAR -->
-    <nav class="topbar">
+    <nav class="topbar" style="position:fixed;top:0;left:0;right:0;z-index:200;">
       <div class="topbar-inner">
         <div class="topbar-brand" data-panel="panel-table" style="cursor:pointer;">
           <div class="brand-mark">B</div>
           <span class="brand-name">Bond AI</span>
         </div>
         <div class="topbar-nav">
-          <button class="nav-btn" data-panel="panel-analytics" data-i18n="nav.analytics">Аналитика</button>
-          <button class="nav-btn" data-panel="panel-watchlist" data-i18n="nav.watchlist">Вишлист</button>
-          <button class="nav-btn" data-panel="panel-add" data-i18n="nav.add">Добавить бумагу</button>
           <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
           <button class="nav-btn" id="nav-admin" data-panel="panel-admin" style="display:none; color:#f59e0b;">Администратор</button>
         </div>
@@ -779,12 +909,9 @@
     <!-- Mobile nav (visible only in mobile-mode) -->
     <div class="mobile-nav" id="mobile-nav">
       <div id="mobile-portfolio-wrap" style="display:none;width:100%;padding:6px 12px 0;box-sizing:border-box;">
-        <select id="mobile-portfolio-selector" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:13px;"></select>
+        <select id="mobile-portfolio-selector" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--input-bg);color:var(--text-primary);font-size:13px;"></select>
       </div>
       <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
-      <button class="nav-btn" data-panel="panel-analytics" data-i18n="nav.analytics">Аналитика</button>
-      <button class="nav-btn" data-panel="panel-watchlist" data-i18n="nav.watchlist">Вишлист</button>
-      <button class="nav-btn" data-panel="panel-add" data-i18n="nav.add">Добавить бумагу</button>
       <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
     </div>
 
@@ -796,7 +923,7 @@
         <!-- Stat cards -->
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-label" data-i18n="stat.value">Стоимость портфеля</div>
+            <div class="stat-label" data-i18n="stat.value">Стоимость</div>
             <div class="stat-value" id="stat-value">—</div>
             <div class="stat-sub" id="stat-value-sub">&nbsp;</div>
           </div>
@@ -806,12 +933,12 @@
             <div class="stat-sub" id="stat-profit-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label" data-i18n="stat.coupon">Годовой купонный доход</div>
+            <div class="stat-label" data-i18n="stat.coupon">Купонный доход</div>
             <div class="stat-value" id="stat-coupon">—</div>
             <div class="stat-sub" id="stat-coupon-sub">&nbsp;</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label" data-i18n="stat.riskProfile">Инвестиционный профиль</div>
+            <div class="stat-label" data-i18n="stat.riskProfile">Профиль риска</div>
             <div class="stat-value" id="stat-risk" style="font-size:16px;">—</div>
             <div class="stat-sub" id="stat-risk-sub">&nbsp;</div>
           </div>
@@ -827,18 +954,15 @@
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 12px;">
+        <div style="margin-bottom:4px;">
           <div id="table-status" class="status"></div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-            <span id="last-update-time" style="font-size:11px;color:var(--slate-400);"></span>
-            <button id="btn-refresh" onclick="manualRefresh()" style="display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--slate-200);border-radius:6px;background:#fff;cursor:pointer;font-size:12px;color:var(--slate-600);transition:all .15s;" title="Обновить данные">
-              <svg id="refresh-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2A5 5 0 1 0 11 6.5"/><polyline points="10.5 1 10.5 3.5 8 3.5"/></svg>
-              Обновить
-            </button>
-          </div>
         </div>
 
         <div class="card" style="padding: 0;">
+          <div class="card-header" style="border-bottom:1px solid var(--border);">
+            <h2 class="card-title">Портфель</h2>
+            <button class="btn" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -879,17 +1003,12 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- ── PANEL: ANALYTICS ──────────────────────────────────────── -->
-      <div id="panel-analytics" class="panel">
-        <div class="section-header">
-          <h1 class="section-title" data-i18n="analytics.title">Аналитика портфеля</h1>
-        </div>
+        <!-- ── ANALYTICS (embedded) ───────────────────────────── -->
 
         <!-- Portfolio history chart -->
         <div class="card" id="analytics-history-card">
-          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="card-header">
             <h2 class="card-title">Динамика стоимости</h2>
             <div style="display:flex;gap:6px;">
               <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
@@ -898,27 +1017,24 @@
             </div>
           </div>
           <div style="padding:12px 16px;">
-            <div id="analytics-history-empty" style="display:none;text-align:center;color:var(--slate-400);padding:40px;">История накапливается — данные появятся через 1–2 дня</div>
             <canvas id="analytics-history-chart" height="200"></canvas>
           </div>
         </div>
 
         <!-- Charts row -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
-          <!-- Allocation by type -->
           <div class="card">
             <div class="card-header"><h2 class="card-title">По типам</h2></div>
             <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
               <canvas id="analytics-type-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;"></div>
+              <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);"></div>
             </div>
           </div>
-          <!-- Allocation by issuer -->
           <div class="card">
             <div class="card-header"><h2 class="card-title">По эмитентам (топ-5)</h2></div>
             <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
               <canvas id="analytics-issuer-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;"></div>
+              <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);"></div>
             </div>
           </div>
         </div>
@@ -926,90 +1042,39 @@
         <!-- Top performers -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
           <div class="card">
-            <div class="card-header"><h2 class="card-title">🏆 Лучшие позиции</h2></div>
+            <div class="card-header"><h2 class="card-title">Лучшие позиции</h2></div>
             <div id="analytics-top-gain" style="padding:0;"></div>
           </div>
           <div class="card">
-            <div class="card-header"><h2 class="card-title">📉 Слабые позиции</h2></div>
+            <div class="card-header"><h2 class="card-title">Слабые позиции</h2></div>
             <div id="analytics-top-loss" style="padding:0;"></div>
           </div>
         </div>
+
+        <!-- SWOT Analysis -->
+        <div class="card" id="swot-card">
+          <div class="card-header">
+            <h2 class="card-title">Анализ портфеля</h2>
+          </div>
+          <div id="swot-body" style="padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="card" id="recommendations-card">
+          <div class="card-header">
+            <h2 class="card-title">Рекомендации для диверсификации</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="loadPortfolioRecommendations()">Обновить</button>
+          </div>
+          <div id="recommendations-grid" style="padding:16px 18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;"></div>
+        </div>
+
       </div>
 
-      <!-- ── PANEL: ADD INSTRUMENT ──────────────────────────────── -->
-      <div id="panel-add" class="panel">
-        <div class="section-header section-header-row">
-          <div style="flex:1;">
-            <h1 class="section-title" data-i18n="add.title">Добавить инструмент</h1>
-            <p class="section-desc" data-i18n="add.desc">Введите тикер, количество и цену покупки. AI-валидация проверит инструмент перед добавлением в портфель.</p>
-          </div>
-          <button class="btn" style="margin-top:24px;white-space:nowrap;flex-shrink:0;" onclick="openCreatePortfolioModal()" data-i18n="settings.portfolios.new">+ Новый портфель</button>
-        </div>
-        <div class="panel-cols panel-cols-auto">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title" data-i18n="add.params">Параметры позиции</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <form id="add-form">
-                <div style="display:flex;flex-direction:column;gap:14px;">
-                  <div class="field">
-                    <label for="ticker" data-i18n="add.ticker">Тикер / ISIN / название</label>
-                    <input id="ticker" name="ticker" type="text" class="input" placeholder="Например: SBER, RU000A106SK2" data-i18n-placeholder="add.tickerPlaceholder" required />
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <div class="field">
-                      <label for="quantity" data-i18n="add.qty">Количество</label>
-                      <input id="quantity" name="quantity" type="number" class="input" step="0.01" min="0.01" placeholder="0" required />
-                    </div>
-                    <div class="field">
-                      <label for="purchase_price" data-i18n="add.price">Цена покупки</label>
-                      <input id="purchase_price" name="purchase_price" type="number" class="input" step="0.01" min="0.01" placeholder="0.00" required />
-                    </div>
-                  </div>
-                  <div>
-                    <button class="btn" id="submit-btn" type="submit" style="width:100%;" data-i18n="add.btn">Добавить в портфель</button>
-                  </div>
-                </div>
-              </form>
-              <div id="add-status" class="status"></div>
-              <div class="info-box" style="margin-top:auto;background:var(--slate-50);border-color:var(--slate-200);">
-                <b data-i18n="add.aiTitle">ИИ-валидация</b><br>
-                <span data-i18n="add.aiDesc" style="font-size:12px;color:var(--slate-600);">Перед добавлением система проверит тикер через MOEX, загрузит текущую цену, купон и дату погашения автоматически.</span>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title" data-i18n="add.hints">Подсказки</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-              <div class="info-box">
-                <b data-i18n="add.hint1title">Корпоративные облигации</b><br>
-                <span data-i18n-html="add.hint1body">Введите тикер или ISIN: <code>RU000A106SK2</code>, <code>RU000A107HR5</code> и т.д.</span><br>
-                <a href="https://www.moex.com/ru/listing/securities-list.aspx?trade=1&type=bonds" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;" data-i18n="add.hint1link">Список облигаций на Мосбирже →</a>
-              </div>
-              <div class="info-box">
-                <b data-i18n="add.hint2title">Облигации федерального займа (ОФЗ)</b><br>
-                <span data-i18n-html="add.hint2body">Введите тикер: <code>SU26238RMFS4</code>, <code>SU26240RMFS0</code> и т.д.</span><br>
-                <a href="https://www.moex.com/s3079" target="_blank" rel="noopener" style="color:var(--blue-600);font-weight:600;" data-i18n="add.hint2link">Список ОФЗ на Мосбирже →</a>
-              </div>
-              <div class="info-box">
-                <b data-i18n="add.hint3title">Цена покупки</b><br>
-                <span data-i18n="add.hint3body">Полная цена в рублях: чистая цена + НКД на дату сделки.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- Suggestions section -->
-        <div id="add-suggestions-section" style="display:none;margin-top:24px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-            <h2 style="font-size:16px;font-weight:700;color:var(--slate-800);margin:0;" id="add-suggestions-title" data-i18n="add.suggestTitle">Рекомендуемые облигации</h2>
-            <span id="add-suggestions-risk" style="font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600;"></span>
-          </div>
-          <div id="add-suggestions-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;"></div>
-        </div>
-      </div>
+      <!-- ── PANEL: ANALYTICS (legacy, hidden) ─────────────────── -->
+      <div id="panel-analytics" class="panel" style="display:none!important;"></div>
+
+      <!-- ── PANEL: ADD (legacy, hidden — form moved to modal) ─── -->
+      <div id="panel-add" class="panel" style="display:none!important;"></div>
 
       <!-- ── PANEL: SETTINGS ───────────────────────────────────── -->
       <div id="panel-settings" class="panel">
@@ -1082,7 +1147,7 @@
                   <p style="font-size:11px;color:var(--slate-500);margin:4px 0 0;" data-i18n="settings.account.tgHint">
                     Как узнать: напишите @userinfobot в Telegram. Используется глобальный Bot Token из раздела «Уведомления».
                   </p>
-                  <div class="info-box" style="margin-top:8px;font-size:12px;background:#fefce8;border-color:#fde047;color:#854d0e;" data-i18n="settings.account.tgTokenWarning">
+                  <div class="info-box info-box-warning" style="margin-top:8px;font-size:12px;" data-i18n="settings.account.tgTokenWarning">
                     ⚠️ Для работы восстановления пароля не забудьте указать токен бота в разделе «Уведомления».
                   </div>
                 </div>
@@ -1143,6 +1208,19 @@
                   <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
                 </div>
                 <div class="field">
+                  <label data-i18n="settings.coupon_notif_title">Уведомления о купонах</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
+                    <input type="checkbox" id="coupon-notif-enabled">
+                    <span style="font-size:13px;" data-i18n="settings.coupon_notif_enable">Включить уведомления о купонах</span>
+                  </label>
+                  <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:var(--text-muted);" data-i18n="settings.coupon_notif_days">За дней:</span>
+                    <input type="number" id="coupon-notif-days" min="1" max="30" value="3" class="input" style="width:60px;" />
+                    <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
+                  </div>
+                  <div id="coupon-notif-status" class="status"></div>
+                </div>
+                <div class="field">
                   <label for="tg-lang" data-i18n="settings.notif.lang">Язык уведомлений</label>
                   <select id="tg-lang" class="select-input">
                     <option value="ru" data-i18n="settings.notif.langRu">Русский</option>
@@ -1177,26 +1255,6 @@
             </div>
           </div>
 
-          <!-- Coupon notifications (personal) -->
-          <div class="card" id="settings-notifications-personal" style="margin-top:16px;">
-            <div class="card-header">
-              <h2 class="card-title" data-i18n="settings.coupon_notif_title">Уведомления о купонах</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <p class="settings-hint" data-i18n="settings.coupon_notif_hint">Получайте уведомление в Telegram за N дней до выплаты купона</p>
-              <label class="toggle-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                <input type="checkbox" id="coupon-notif-enabled">
-                <span data-i18n="settings.coupon_notif_enable">Включить уведомления о купонах</span>
-              </label>
-              <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
-                <label for="coupon-notif-days" data-i18n="settings.coupon_notif_days">Дней до выплаты:</label>
-                <input type="number" id="coupon-notif-days" min="1" max="30" value="3" style="width:60px;" class="input" />
-                <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
-              </div>
-              <p id="coupon-notif-hint-tg" class="settings-hint" style="display:none;color:var(--amber-600,#d97706);" data-i18n="settings.coupon_notif_no_tg">Для уведомлений нужно привязать Telegram-аккаунт (укажите Chat ID в разделе «Аккаунт»)</p>
-              <div id="coupon-notif-status" class="status"></div>
-            </div>
-          </div>
         </div>
 
         <!-- ── TAB: Import/Export ── -->
@@ -1358,6 +1416,21 @@
           </div>
         </div>
 
+        <!-- Data Sources -->
+        <div class="card" style="margin-top:16px;" id="adm-sources-card">
+          <div class="card-header">
+            <h2 class="card-title">Источники данных</h2>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminClearRatingCache()">Сбросить кэш рейтингов</button>
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadSources()">↺</button>
+            </div>
+          </div>
+          <div id="adm-sources-body" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+          <div id="adm-sources-info" style="padding:0 16px 12px;font-size:11px;color:var(--text-muted);line-height:1.5;">
+            Статистика накапливается с момента последнего запуска сервера. Рейтинги кэшируются в памяти до перезапуска или ручного сброса — при следующем обновлении портфеля будут запрошены повторно.
+          </div>
+        </div>
+
         <div id="adm-status" class="status" style="margin-top:12px;"></div>
       </div>
 
@@ -1379,48 +1452,15 @@
         </div>
       </div>
 
-      <!-- ── PANEL: WATCHLIST ───────────────────────────────── -->
-      <div id="panel-watchlist" class="panel">
-        <div class="section-header">
-          <h1 class="section-title" data-i18n="watchlist.title">Список наблюдения</h1>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-            <div>
-              <label style="display:block;font-size:12px;margin-bottom:4px" data-i18n="watchlist.ticker">Тикер</label>
-              <input type="text" id="watchlist-ticker" placeholder="SBER" style="width:100px" maxlength="32">
-            </div>
-            <div>
-              <label style="display:block;font-size:12px;margin-bottom:4px" data-i18n="watchlist.type">Тип</label>
-              <select id="watchlist-type">
-                <option value="bond">Облигация</option>
-                <option value="stock">Акция</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:120px">
-              <label style="display:block;font-size:12px;margin-bottom:4px" data-i18n="watchlist.note">Заметка</label>
-              <input type="text" id="watchlist-note" placeholder="Необязательно" style="width:100%" maxlength="200">
-            </div>
-            <button class="btn-primary" id="btn-add-watchlist" data-i18n="watchlist.add">Добавить</button>
-          </div>
-        </div>
-        <div id="watchlist-table-wrap">
-          <table class="portfolio-table" id="watchlist-table">
-            <thead>
-              <tr>
-                <th data-i18n="watchlist.col_ticker">Тикер</th>
-                <th data-i18n="watchlist.col_name">Название</th>
-                <th data-i18n="watchlist.col_price">Цена</th>
-                <th data-i18n="watchlist.col_type">Тип</th>
-                <th data-i18n="watchlist.col_note">Заметка</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="watchlist-tbody"></tbody>
-          </table>
-          <div id="watchlist-empty" style="display:none;text-align:center;padding:40px;color:var(--slate-400)" data-i18n="watchlist.empty">Список наблюдения пуст</div>
-        </div>
-      </div>
+      <!-- ── PANEL: WATCHLIST (removed) ──────────────────── -->
+      <div id="panel-watchlist" class="panel" style="display:none!important;"></div>
+      <!-- Watchlist JS compatibility stubs -->
+      <input type="hidden" id="watchlist-ticker">
+      <input type="hidden" id="watchlist-note">
+      <select id="watchlist-type" style="display:none"><option value="bond">Облигация</option></select>
+      <button id="btn-add-watchlist" style="display:none"></button>
+      <tbody id="watchlist-tbody" style="display:none"></tbody>
+      <div id="watchlist-empty" style="display:none"></div>
 
     </div><!-- /container -->
 
@@ -1432,9 +1472,9 @@
     </div>
 
     <!-- Site Footer -->
-    <footer style="border-top: 1px solid #1e293b; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px;">
-      <span style="font-size: 11px; color: #475569;">© <script>document.write(new Date().getFullYear())</script> Bond AI &nbsp;·&nbsp; <span data-i18n="footer.disclaimer">Не является инвестиционной рекомендацией</span></span>
-      <span style="font-size: 11px; color: #475569;"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: #3b82f6; text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
+    <footer style="border-top: 1px solid var(--border); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px; position:relative;z-index:1;">
+      <span style="font-size: 11px; color: var(--text-muted);">© <script>document.write(new Date().getFullYear())</script> Bond AI &nbsp;·&nbsp; <span data-i18n="footer.disclaimer">Не является инвестиционной рекомендацией</span></span>
+      <span style="font-size: 11px; color: var(--text-muted);"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: var(--blue-400); text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
     </footer>
 
     <!-- Share Portfolio Modal -->
@@ -1465,6 +1505,38 @@
       </div>
     </div>
 
+    <!-- ── ADD INSTRUMENT MODAL ──────────────────────────────────── -->
+    <div id="add-instrument-modal" class="modal-overlay" style="display:none;">
+      <div class="modal" style="max-width:460px;">
+        <div class="modal-header">
+          <h2 class="modal-title">Добавить бумагу</h2>
+        </div>
+        <div class="modal-body">
+          <div id="add-suggest-list" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+          <div class="modal-field" style="position:relative;">
+            <label>Тикер или название</label>
+            <input type="text" id="add-modal-ticker" class="input" placeholder="Например: SU26238RMFS4 или Сбербанк" autocomplete="off">
+            <div id="add-modal-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.3);max-height:240px;overflow-y:auto;margin-top:2px;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="modal-field">
+              <label>Количество (шт.)</label>
+              <input type="number" id="add-modal-qty" class="input" placeholder="1" min="1" value="1">
+            </div>
+            <div class="modal-field">
+              <label>Цена покупки (%)</label>
+              <input type="number" id="add-modal-price" class="input" placeholder="100" step="0.01">
+            </div>
+          </div>
+          <div id="add-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeAddInstrumentModal()">Отмена</button>
+          <button class="btn-primary" onclick="submitAddInstrumentModal()">Добавить</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Universal Confirm Modal -->
     <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;">
       <div class="modal" style="max-width:360px;">
@@ -1472,7 +1544,7 @@
           <h2 class="modal-title" id="confirm-modal-title"></h2>
         </div>
         <div class="modal-body">
-          <p id="confirm-modal-message" style="margin:0;color:var(--slate-700);font-size:14px;line-height:1.5;"></p>
+          <p id="confirm-modal-message" style="margin:0;color:var(--text-secondary);font-size:14px;line-height:1.5;"></p>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" id="confirm-modal-cancel" data-i18n="confirm.cancel">Отмена</button>
@@ -1488,7 +1560,7 @@
           <h2 class="modal-title" data-i18n="shareView.pwTitle">Защищённый портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--slate-600);" data-i18n="shareView.pwDesc">Для просмотра этого портфеля необходим пароль:</p>
+          <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--text-secondary);" data-i18n="shareView.pwDesc">Для просмотра этого портфеля необходим пароль:</p>
           <input type="password" id="password-modal-input" class="input" placeholder="Введите пароль" data-i18n-placeholder="shareView.pwInput">
           <div id="password-modal-status" class="status error" style="min-height:18px;margin-top:6px;"></div>
         </div>
@@ -1526,7 +1598,7 @@
           <h2 class="modal-title" data-i18n="modal.deletePortfolio.title">Удалить портфель</h2>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--slate-700);"><span data-i18n="modal.deletePortfolio.confirmText">Вы уверены, что хотите удалить</span> <strong id="delete-portfolio-name"></strong>?</p>
+          <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--text-secondary);"><span data-i18n="modal.deletePortfolio.confirmText">Вы уверены, что хотите удалить</span> <strong id="delete-portfolio-name"></strong>?</p>
           <div class="info-box" style="background:var(--red-50);border-color:#fecaca;" data-i18n="modal.deletePortfolio.warning">
             ⚠️ Это действие нельзя отменить. Все позиции и ссылки для совместного доступа будут удалены.
           </div>
@@ -1556,15 +1628,15 @@
           <h2 class="modal-title">Ценовые алерты</h2>
         </div>
         <div class="modal-body">
-          <div id="alert-list" style="margin-bottom:12px;min-height:24px;font-size:13px;color:var(--slate-700);"></div>
-          <hr style="border:none;border-top:1px solid var(--slate-200);margin:12px 0;">
-          <h4 style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:var(--slate-700);">Новый алерт</h4>
+          <div id="alert-list" style="margin-bottom:12px;min-height:24px;font-size:13px;color:var(--text-secondary);"></div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">
+          <h4 style="margin:0 0 8px 0;font-size:13px;font-weight:600;color:var(--text-secondary);">Новый алерт</h4>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <select id="alert-type" style="height:32px;border:1px solid var(--slate-300);border-radius:var(--radius-sm);padding:0 8px;font-size:13px;background:#fff;color:var(--slate-800);">
+            <select id="alert-type" class="input" style="height:32px;padding:0 8px;font-size:13px;width:auto;">
               <option value="above">Выше</option>
               <option value="below">Ниже</option>
             </select>
-            <input type="number" id="alert-price" placeholder="Цена" step="0.01" style="width:100px;height:32px;border:1px solid var(--slate-300);border-radius:var(--radius-sm);padding:0 8px;font-size:13px;">
+            <input type="number" id="alert-price" placeholder="Цена" step="0.01" class="input" style="width:100px;height:32px;padding:0 8px;font-size:13px;">
             <button class="btn" onclick="createPriceAlert()" style="height:32px;padding:0 14px;font-size:13px;">Добавить</button>
           </div>
           <div id="alert-modal-status" class="status" style="min-height:16px;margin-top:8px;font-size:12px;"></div>
@@ -1576,74 +1648,106 @@
     </div>
 
     <!-- ── ONBOARDING WIZARD ──────────────────────────────────────── -->
-<div id="onboarding-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:8000;background:rgba(15,23,42,0.85);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;box-shadow:0 25px 50px -12px rgba(0,0,0,.4);overflow:hidden;">
+<style>
+  #onboarding-overlay { font-family: 'Inter', sans-serif; }
+  .ob-card { background: #0d1829; border: 1px solid rgba(148,163,184,.12); border-radius: 20px; width: 100%; max-width: 520px; overflow: hidden; box-shadow: 0 32px 64px -12px rgba(0,0,0,.7), 0 0 0 1px rgba(99,102,241,.08); }
+  .ob-step-label { font-size: 11px; font-weight: 600; color: #60a5fa; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+  .ob-h2 { margin: 0 0 8px; font-size: 22px; font-weight: 700; color: #f1f5f9; }
+  .ob-sub { margin: 0 0 24px; color: #64748b; font-size: 14px; }
+  .ob-risk-card { border: 1.5px solid rgba(148,163,184,.15); border-radius: 12px; padding: 14px 16px; cursor: pointer; transition: all .15s; background: rgba(255,255,255,.03); }
+  .ob-risk-card:hover { border-color: rgba(99,102,241,.4); background: rgba(99,102,241,.07); }
+  .ob-risk-card.selected { border-color: #3b82f6; background: rgba(59,130,246,.12); }
+  .ob-risk-card .rc-title { font-weight: 600; color: #e2e8f0; }
+  .ob-risk-card .rc-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .ob-btn { border: none; border-radius: 10px; padding: 11px 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .ob-btn-primary { background: #3b82f6; color: #fff; }
+  .ob-btn-primary:hover:not(:disabled) { background: #2563eb; transform: translateY(-1px); }
+  .ob-btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .ob-btn-ghost { background: rgba(255,255,255,.06); border: 1px solid rgba(148,163,184,.15); color: #94a3b8; }
+  .ob-btn-ghost:hover { background: rgba(255,255,255,.1); color: #e2e8f0; }
+  .ob-btn-success { background: #16a34a; color: #fff; }
+  .ob-amount-input { width: 100%; padding: 12px 40px 12px 16px; background: rgba(255,255,255,.06); border: 1.5px solid rgba(148,163,184,.15); border-radius: 10px; font-size: 16px; font-weight: 600; color: #f1f5f9; outline: none; box-sizing: border-box; transition: border-color .15s; }
+  .ob-amount-input:focus { border-color: #3b82f6; }
+  .ob-amount-input::placeholder { color: #475569; }
+  .ob-preset-btn { padding: 8px 6px; border: 1px solid rgba(148,163,184,.15); border-radius: 8px; background: rgba(255,255,255,.04); cursor: pointer; font-size: 12px; color: #94a3b8; transition: all .15s; }
+  .ob-preset-btn:hover { border-color: rgba(59,130,246,.4); color: #60a5fa; background: rgba(59,130,246,.08); }
+  .ob-result-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid rgba(148,163,184,.1); border-radius: 10px; margin-bottom: 8px; background: rgba(255,255,255,.03); }
+  .ob-result-item:hover { background: rgba(255,255,255,.06); }
+  .ob-result-name { font-weight: 600; font-size: 13px; color: #e2e8f0; }
+  .ob-result-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .ob-result-qty { font-weight: 600; color: #cbd5e1; font-size: 13px; }
+  .ob-result-price { color: #64748b; font-size: 11px; }
+  .ob-skip-btn { background: none; border: none; color: #475569; cursor: pointer; font-size: 13px; transition: color .15s; }
+  .ob-skip-btn:hover { color: #94a3b8; }
+</style>
+<div id="onboarding-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:8000;background:rgba(2,8,23,.88);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;">
+  <div class="ob-card">
     <!-- Progress bar -->
-    <div style="height:3px;background:var(--slate-100);">
-      <div id="ob-progress" style="height:100%;background:var(--blue-600);transition:width .4s ease;width:33%;"></div>
+    <div style="height:2px;background:rgba(148,163,184,.12);">
+      <div id="ob-progress" style="height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);transition:width .4s ease;width:33%;"></div>
     </div>
-    <div style="padding:32px;">
+    <div style="padding:32px;" class="ob-card-inner">
       <!-- Step 1: Risk profile -->
       <div id="ob-step-1">
-        <div style="font-size:11px;font-weight:600;color:var(--blue-600);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Шаг 1 из 3</div>
-        <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:var(--slate-900);">Ваш инвестиционный профиль</h2>
-        <p style="margin:0 0 24px;color:var(--slate-500);font-size:14px;">Выберите подходящий уровень риска — AI подберёт облигации под ваш стиль инвестирования.</p>
+        <div class="ob-step-label">Шаг 1 из 3</div>
+        <h2 class="ob-h2">Ваш инвестиционный профиль</h2>
+        <p class="ob-sub">Выберите подходящий уровень риска — AI подберёт облигации под ваш стиль инвестирования.</p>
         <div id="ob-risk-cards" style="display:grid;gap:10px;">
-          <div class="ob-risk-card" data-risk="ultra_low" style="border:2px solid var(--slate-200);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;">
-            <div style="font-weight:600;color:var(--slate-800);">🛡️ Консервативный</div>
-            <div style="font-size:12px;color:var(--slate-500);margin-top:2px;">ОФЗ и гособлигации, минимальный риск, доходность 8–11%</div>
+          <div class="ob-risk-card" data-risk="ultra_low">
+            <div class="rc-title">🛡️ Консервативный</div>
+            <div class="rc-sub">ОФЗ и гособлигации, минимальный риск, доходность 8–11%</div>
           </div>
-          <div class="ob-risk-card" data-risk="low" style="border:2px solid var(--slate-200);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;">
-            <div style="font-weight:600;color:var(--slate-800);">⚖️ Умеренный</div>
-            <div style="font-size:12px;color:var(--slate-500);margin-top:2px;">Корпоративные облигации первого эшелона, доходность 11–15%</div>
+          <div class="ob-risk-card" data-risk="low">
+            <div class="rc-title">⚖️ Умеренный</div>
+            <div class="rc-sub">Корпоративные облигации первого эшелона, доходность 11–15%</div>
           </div>
-          <div class="ob-risk-card" data-risk="moderate" style="border:2px solid var(--slate-200);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;">
-            <div style="font-weight:600;color:var(--slate-800);">📈 Сбалансированный</div>
-            <div style="font-size:12px;color:var(--slate-500);margin-top:2px;">Смешанный портфель, облигации + акции, доходность 15–20%</div>
+          <div class="ob-risk-card" data-risk="moderate">
+            <div class="rc-title">📈 Сбалансированный</div>
+            <div class="rc-sub">Смешанный портфель, облигации + акции, доходность 15–20%</div>
           </div>
-          <div class="ob-risk-card" data-risk="high" style="border:2px solid var(--slate-200);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;">
-            <div style="font-weight:600;color:var(--slate-800);">🚀 Агрессивный</div>
-            <div style="font-size:12px;color:var(--slate-500);margin-top:2px;">ВДО и акции роста, высокая доходность с повышенным риском</div>
+          <div class="ob-risk-card" data-risk="high">
+            <div class="rc-title">🚀 Агрессивный</div>
+            <div class="rc-sub">ВДО и акции роста, высокая доходность с повышенным риском</div>
           </div>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:24px;">
-          <button id="ob-skip" style="background:none;border:none;color:var(--slate-400);cursor:pointer;font-size:13px;margin-right:auto;" onclick="closeOnboarding()">Пропустить</button>
-          <button id="ob-next-1" style="background:var(--blue-600);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;opacity:.4;pointer-events:none;" onclick="obGoStep2()">Далее →</button>
+        <div style="display:flex;justify-content:flex-end;margin-top:24px;gap:12px;align-items:center;">
+          <button class="ob-skip-btn" onclick="closeOnboarding()">Пропустить</button>
+          <button id="ob-next-1" class="ob-btn ob-btn-primary" style="opacity:.4;pointer-events:none;" onclick="obGoStep2()">Далее →</button>
         </div>
       </div>
       <!-- Step 2: Amount -->
       <div id="ob-step-2" style="display:none;">
-        <div style="font-size:11px;font-weight:600;color:var(--blue-600);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Шаг 2 из 3</div>
-        <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:var(--slate-900);">Сумма инвестиций</h2>
-        <p style="margin:0 0 24px;color:var(--slate-500);font-size:14px;">Укажите сумму, которую хотите вложить. AI подберёт оптимальный набор инструментов.</p>
+        <div class="ob-step-label">Шаг 2 из 3</div>
+        <h2 class="ob-h2">Сумма инвестиций</h2>
+        <p class="ob-sub">Укажите сумму, которую хотите вложить. AI подберёт оптимальный набор инструментов.</p>
         <div style="margin-bottom:16px;">
-          <label style="font-size:13px;font-weight:500;color:var(--slate-700);display:block;margin-bottom:8px;">Сумма инвестиций</label>
+          <label style="font-size:13px;font-weight:500;color:#94a3b8;display:block;margin-bottom:8px;">Сумма инвестиций</label>
           <div style="position:relative;">
-            <input id="ob-amount" type="number" min="10000" max="100000000" step="10000" value="100000" style="width:100%;padding:12px 40px 12px 16px;border:2px solid var(--slate-200);border-radius:8px;font-size:16px;font-weight:600;color:var(--slate-900);outline:none;box-sizing:border-box;transition:border-color .15s;" oninput="obUpdateAmount()" onfocus="this.style.borderColor='var(--blue-600)'" onblur="this.style.borderColor='var(--slate-200)'" />
-            <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--slate-400);font-size:14px;">₽</span>
+            <input id="ob-amount" type="number" min="10000" max="100000000" step="10000" value="100000" class="ob-amount-input" oninput="obUpdateAmount()" />
+            <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#475569;font-size:14px;">₽</span>
           </div>
-          <div id="ob-amount-display" style="margin-top:8px;font-size:13px;color:var(--slate-500);"></div>
+          <div id="ob-amount-display" style="margin-top:8px;font-size:13px;color:#64748b;"></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px;">
-          <button onclick="obSetAmount(50000)" style="padding:8px;border:1px solid var(--slate-200);border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--slate-600);transition:all .15s;" onmouseover="this.style.borderColor='var(--blue-600)';this.style.color='var(--blue-600)'" onmouseout="this.style.borderColor='var(--slate-200)';this.style.color='var(--slate-600)'">50 000 ₽</button>
-          <button onclick="obSetAmount(100000)" style="padding:8px;border:1px solid var(--slate-200);border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--slate-600);transition:all .15s;" onmouseover="this.style.borderColor='var(--blue-600)';this.style.color='var(--blue-600)'" onmouseout="this.style.borderColor='var(--slate-200)';this.style.color='var(--slate-600)'">100 000 ₽</button>
-          <button onclick="obSetAmount(500000)" style="padding:8px;border:1px solid var(--slate-200);border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--slate-600);transition:all .15s;" onmouseover="this.style.borderColor='var(--blue-600)';this.style.color='var(--blue-600)'" onmouseout="this.style.borderColor='var(--slate-200)';this.style.color='var(--slate-600)'">500 000 ₽</button>
-          <button onclick="obSetAmount(1000000)" style="padding:8px;border:1px solid var(--slate-200);border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--slate-600);transition:all .15s;" onmouseover="this.style.borderColor='var(--blue-600)';this.style.color='var(--blue-600)'" onmouseout="this.style.borderColor='var(--slate-200)';this.style.color='var(--slate-600)'">1 000 000 ₽</button>
+          <button onclick="obSetAmount(50000)" class="ob-preset-btn">50 000 ₽</button>
+          <button onclick="obSetAmount(100000)" class="ob-preset-btn">100 000 ₽</button>
+          <button onclick="obSetAmount(500000)" class="ob-preset-btn">500 000 ₽</button>
+          <button onclick="obSetAmount(1000000)" class="ob-preset-btn">1 000 000 ₽</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <button onclick="obGoStep1()" style="background:none;border:1px solid var(--slate-200);border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;color:var(--slate-600);">← Назад</button>
-          <button onclick="obGoStep3()" style="background:var(--blue-600);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;">Подобрать портфель →</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <button onclick="obGoStep1()" class="ob-btn ob-btn-ghost">← Назад</button>
+          <button onclick="obGoStep3()" class="ob-btn ob-btn-primary">Подобрать портфель →</button>
         </div>
       </div>
       <!-- Step 3: AI result -->
       <div id="ob-step-3" style="display:none;">
-        <div style="font-size:11px;font-weight:600;color:var(--blue-600);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Шаг 3 из 3</div>
-        <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:var(--slate-900);">Ваш портфель готов</h2>
-        <p style="margin:0 0 20px;color:var(--slate-500);font-size:14px;">AI подобрал инструменты под ваш профиль. Добавьте их в портфель одним кликом.</p>
-        <div id="ob-result" style="max-height:240px;overflow-y:auto;margin-bottom:20px;"></div>
+        <div class="ob-step-label">Шаг 3 из 3</div>
+        <h2 class="ob-h2">Ваш портфель готов</h2>
+        <p class="ob-sub">AI подобрал инструменты под ваш профиль. Добавьте их в портфель одним кликом.</p>
+        <div id="ob-result" style="max-height:240px;overflow-y:auto;margin-bottom:20px;scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.2) transparent;"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-          <button onclick="obGoStep2()" style="background:none;border:1px solid var(--slate-200);border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;color:var(--slate-600);">← Изменить</button>
-          <button id="ob-add-all" onclick="obAddAll()" style="background:var(--green-600);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;flex:1;">✓ Добавить всё в портфель</button>
+          <button onclick="obGoStep2()" class="ob-btn ob-btn-ghost">← Изменить</button>
+          <button id="ob-add-all" onclick="obAddAll()" class="ob-btn ob-btn-success" style="flex:1;">✓ Добавить всё в портфель</button>
         </div>
       </div>
     </div>
@@ -1652,6 +1756,37 @@
 
     <!-- __SHARE_INJECT__ -->
     <script>
+      // ── THEME INIT (runs before DOMContentLoaded) ────────────────
+      (function(){
+        const t = localStorage.getItem('mvp_theme') || 'dark';
+        if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+      })();
+
+      const SVG_MOON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+      const SVG_SUN  = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+
+      function toggleTheme() {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.setItem('mvp_theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+          localStorage.setItem('mvp_theme', 'light');
+        }
+        updateThemeBtn();
+        // Redraw charts with new theme colors
+        document.dispatchEvent(new Event('theme-change'));
+      }
+
+      function updateThemeBtn() {
+        const btn = document.getElementById('btn-theme-toggle');
+        if (!btn) return;
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        btn.innerHTML = isLight ? SVG_MOON : SVG_SUN;
+        btn.title = isLight ? 'Тёмная тема' : 'Светлая тема';
+      }
+
       // ── NAV ─────────────────────────────────────────────────────
       const navBtns = document.querySelectorAll('.nav-btn');
       const panels  = document.querySelectorAll('.panel');
@@ -1666,12 +1801,7 @@
           }
         });
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
-        if (id === 'panel-add') loadAddSuggestions();
-        if (id === 'panel-analytics') {
-          renderAnalytics(tableRows);
-          loadAnalyticsHistory(90);
-        }
-        if (id === 'panel-watchlist') loadWatchlist();
+        // panel-add and panel-analytics/watchlist are removed; no-op for them
       }
       navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
       document.querySelector('.topbar-brand').addEventListener('click', () => showPanel('panel-table'));
@@ -1785,21 +1915,26 @@
       }
 
       // ── CACHE ────────────────────────────────────────────────────
+      function _cacheKey(pid) { return `${TABLE_CACHE_KEY}_${pid || 0}`; }
+      function _cacheTsKey(pid) { return `${TABLE_CACHE_TS_KEY}_${pid || 0}`; }
       function persistTableCache() {
-        localStorage.setItem(TABLE_CACHE_KEY, JSON.stringify(tableRows));
-        localStorage.setItem(TABLE_CACHE_TS_KEY, String(Date.now()));
+        if (!portfolioId) return;
+        localStorage.setItem(_cacheKey(portfolioId), JSON.stringify(tableRows));
+        localStorage.setItem(_cacheTsKey(portfolioId), String(Date.now()));
       }
       function loadTableCache() {
+        const savedId = localStorage.getItem('mvp_active_portfolio_id');
+        if (!savedId) return false;
         try {
-          const raw = localStorage.getItem(TABLE_CACHE_KEY);
+          const raw = localStorage.getItem(_cacheKey(savedId));
           if (!raw) return false;
           const p = JSON.parse(raw);
-          if (!Array.isArray(p)) return false;
+          if (!Array.isArray(p) || p.length === 0) return false;
           tableRows = p; return true;
         } catch { return false; }
       }
       function getLastSyncTimestamp() {
-        const p = Number(localStorage.getItem(TABLE_CACHE_TS_KEY));
+        const p = Number(localStorage.getItem(_cacheTsKey(portfolioId)));
         return Number.isFinite(p) ? p : 0;
       }
 
@@ -1985,24 +2120,31 @@
         if (!el) return;
         const today = new Date();
         let nearest = null;
-        let nearestAmount = 0;
+        let nearestRow = null;
         rows.forEach(row => {
           if (!row.next_coupon_date) return;
           const d = new Date(row.next_coupon_date);
           if (d < today) return;
-          if (!nearest || d < nearest) {
-            nearest = d;
-            nearestAmount = row.your_annual_coupon ? (row.your_annual_coupon / (row.coupon_frequency || 2)) : 0;
-          }
+          if (!nearest || d < nearest) { nearest = d; nearestRow = row; }
         });
-        if (nearest) {
+        if (nearest && nearestRow) {
           const diff = Math.round((nearest - today) / 864e5);
           el.textContent = nearest.toLocaleDateString('ru', {day:'numeric',month:'short'});
-          sub.textContent = diff <= 7 ? `через ${diff} дн.` : nearestAmount > 0 ? `≈ ${Math.round(nearestAmount).toLocaleString('ru')} ₽` : '';
           el.style.color = diff <= 7 ? 'var(--green-600)' : '';
+          if (sub) {
+            const emitter = (nearestRow.name || nearestRow.ticker || '').replace(/\s*(АО|ПАО|ООО)\s*/gi,'').trim().substring(0, 18);
+            const couponAmt = nearestRow.coupon != null && nearestRow.quantity > 0
+              ? Math.round(nearestRow.coupon * nearestRow.quantity) : null;
+            const amtStr = couponAmt ? `${couponAmt.toLocaleString('ru')} ₽` : null;
+            if (diff <= 7) {
+              sub.textContent = `через ${diff} дн.` + (emitter ? ` · ${emitter}` : '');
+            } else {
+              sub.textContent = [emitter, amtStr].filter(Boolean).join(' · ');
+            }
+          }
         } else {
           el.textContent = '—';
-          sub.textContent = '';
+          if (sub) sub.textContent = '';
         }
       }
 
@@ -2047,7 +2189,7 @@
         // Donut hole
         ctx.beginPath();
         ctx.arc(cx, cy, r * 0.55, 0, 2 * Math.PI);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || 'rgba(2,8,23,.95)';
         ctx.fill();
       }
 
@@ -2110,17 +2252,19 @@
           el.innerHTML = '';
           items.slice(0, 5).forEach(r => {
             const row = document.createElement('div');
-            row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--slate-100);';
+            row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--table-border);transition:background .1s;';
+            row.addEventListener('mouseover', () => { row.style.background = 'var(--table-row-hover)'; });
+            row.addEventListener('mouseout',  () => { row.style.background = ''; });
             const left = document.createElement('div');
             const name = document.createElement('div');
-            name.style.cssText = 'font-weight:500;font-size:13px;';
+            name.style.cssText = 'font-weight:500;font-size:13px;color:var(--text-primary);';
             name.textContent = r.name || r.ticker;
             const ticker = document.createElement('div');
-            ticker.style.cssText = 'font-size:11px;color:var(--slate-400);';
+            ticker.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;';
             ticker.textContent = r.ticker;
             left.appendChild(name); left.appendChild(ticker);
             const right = document.createElement('div');
-            right.style.cssText = `font-weight:600;font-size:13px;color:${r.profit >= 0 ? 'var(--green-600)' : 'var(--red-600)'};`;
+            right.style.cssText = `font-weight:600;font-size:13px;color:${r.profit >= 0 ? 'var(--green-400)' : 'var(--red-400)'};`;
             right.textContent = `${r.profit >= 0 ? '+' : ''}${Math.round(r.profit).toLocaleString('ru')} ₽`;
             row.appendChild(left); row.appendChild(right);
             el.appendChild(row);
@@ -2131,25 +2275,80 @@
       }
 
       async function loadAnalyticsHistory(days = 90) {
-        if (!portfolioId) return;
         // Update active button
         document.querySelectorAll('.analytics-period-btn').forEach(btn => {
           btn.classList.toggle('active', parseInt(btn.dataset.days) === days);
         });
+        const canvas = document.getElementById('analytics-history-chart');
         try {
-          const r = await apiFetch(`/portfolios/${portfolioId}/snapshots?days=${days}`);
-          const snapshots = await r.json();
-          const canvas = document.getElementById('analytics-history-chart');
-          const empty = document.getElementById('analytics-history-empty');
-          if (!snapshots || snapshots.length < 2) {
-            if (canvas) canvas.style.display = 'none';
-            if (empty) empty.style.display = '';
+          let snapshots;
+          if (shareToken) {
+            const headers = {};
+            if (sharePassword) headers['X-Share-Password'] = sharePassword;
+            const r = await fetch(`/share/${shareToken}/snapshots?days=${days}`, { headers });
+            if (!r.ok) throw new Error('fetch failed');
+            snapshots = await r.json();
+          } else if (portfolioId) {
+            const r = await apiFetch(`/portfolios/${portfolioId}/snapshots?days=${days}`);
+            snapshots = await r.json();
+          } else {
             return;
           }
-          if (canvas) canvas.style.display = '';
-          if (empty) empty.style.display = 'none';
+          if (!snapshots || snapshots.length < 2) {
+            if (canvas) { canvas._snapshots = null; drawHistoryChartEmpty(canvas); }
+            return;
+          }
+          if (canvas) { canvas._snapshots = snapshots; }
           drawHistoryChart(canvas, snapshots);
-        } catch(e) {}
+        } catch(e) {
+          if (canvas) drawHistoryChartEmpty(canvas);
+        }
+      }
+
+      function drawHistoryChartEmpty(canvas) {
+        if (!canvas) return;
+        const parent = canvas.parentElement;
+        const W = (parent ? parent.clientWidth : 0) || canvas.offsetWidth || 600;
+        const H = 200;
+        canvas.width = W;
+        canvas.height = H;
+        canvas.style.width = '100%';
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, W, H);
+        const pad = { t: 16, r: 16, b: 48, l: 56 };
+        const chartW = W - pad.l - pad.r;
+        const chartH = H - pad.t - pad.b;
+        const st = getComputedStyle(document.documentElement);
+        const gridClr  = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.1)';
+        const labelClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
+        const lineClr  = st.getPropertyValue('--border').trim() || 'rgba(148,163,184,.25)';
+
+        // Grid lines
+        ctx.strokeStyle = gridClr; ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = pad.t + (chartH / 4) * i;
+          ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        }
+
+        // Zero line at bottom of chart area
+        const zeroY = pad.t + chartH;
+        ctx.strokeStyle = lineClr; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(W - pad.r, zeroY); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Y label "0"
+        ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText('0', pad.l - 4, zeroY);
+
+        // Bottom caption centered
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.font = '600 12px Inter,sans-serif';
+        ctx.fillStyle = labelClr;
+        ctx.fillText('История накапливается', W / 2, H - 24);
+        ctx.font = '11px Inter,sans-serif';
+        ctx.fillStyle = lineClr;
+        ctx.fillText('Данные появятся через сутки после первого запуска', W / 2, H - 8);
       }
 
       function drawHistoryChart(canvas, snapshots) {
@@ -2169,18 +2368,24 @@
         const xScale = (i) => pad.l + (i / (snapshots.length - 1)) * chartW;
         const yScale = (v) => pad.t + chartH - ((v - minV) / (maxV - minV || 1)) * chartH;
 
+        const st = getComputedStyle(document.documentElement);
+        const gridClr  = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.1)';
+        const labelClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
+        const lineClr  = st.getPropertyValue('--blue-500').trim() || '#3b82f6';
+        const dashClr  = st.getPropertyValue('--border').trim() || 'rgba(148,163,184,.15)';
+
         // Grid lines
-        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        ctx.strokeStyle = gridClr; ctx.lineWidth = 1;
         for (let i = 0; i <= 4; i++) {
           const y = pad.t + (chartH / 4) * i;
           ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
           const val = maxV - ((maxV - minV) / 4) * i;
-          ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'right';
+          ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'right';
           ctx.fillText(Math.round(val / 1000) + 'k', pad.l - 4, y + 3);
         }
 
         // Cost baseline
-        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = dashClr; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
         ctx.beginPath();
         costs.forEach((c, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(c)) : ctx.lineTo(xScale(i), yScale(c)); });
         ctx.stroke(); ctx.setLineDash([]);
@@ -2192,18 +2397,18 @@
         ctx.lineTo(xScale(0), H - pad.b);
         ctx.closePath();
         const grad = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
-        grad.addColorStop(0, 'rgba(37,99,235,0.2)'); grad.addColorStop(1, 'rgba(37,99,235,0)');
+        grad.addColorStop(0, 'rgba(59,130,246,0.2)'); grad.addColorStop(1, 'rgba(59,130,246,0)');
         ctx.fillStyle = grad; ctx.fill();
 
         // Value line
-        ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2.5;
+        ctx.strokeStyle = lineClr; ctx.lineWidth = 2.5;
         ctx.beginPath();
         values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
         ctx.stroke();
 
         // X labels (every N)
         const step = Math.max(1, Math.floor(snapshots.length / 6));
-        ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'center';
         snapshots.forEach((s, i) => {
           if (i % step === 0 || i === snapshots.length - 1) {
             ctx.fillText(s.date.substring(5), xScale(i), H - pad.b + 14);
@@ -2259,7 +2464,7 @@
         const slots = [];
         for (let i = 0; i < 12; i++) {
           const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, hasOffer: false });
+          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, hasOffer: false, bonds: [] });
         }
         for (const row of rows) {
           if (row.type !== 'bond') continue;
@@ -2271,7 +2476,10 @@
           for (const pd of payDates) {
             for (const slot of slots) {
               if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
-                slot.income += coupon * qty; break;
+                const amount = coupon * qty;
+                slot.income += amount;
+                slot.bonds.push({ name: row.name || row.ticker, ticker: row.ticker, coupon, qty, amount });
+                break;
               }
             }
           }
@@ -2321,16 +2529,23 @@
         const barW   = slotW * 0.58;
         const maxInc = Math.max(...data.map(d => d.income), 1);
 
+        const stM = getComputedStyle(document.documentElement);
+        const mGridClr  = stM.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.1)';
+        const mLabelClr = stM.getPropertyValue('--text-muted').trim() || '#64748b';
+        const mBgClr    = stM.getPropertyValue('--bg-card').trim() || 'rgba(255,255,255,.03)';
+        const mBarClr   = stM.getPropertyValue('--blue-400').trim() || '#60a5fa';
+        const mYAxisClr = stM.getPropertyValue('--border').trim() || 'rgba(148,163,184,.15)';
+
         // Background
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = mBgClr;
         ctx.fillRect(0, 0, W, H);
 
         // Grid lines + Y labels
         const gridCount = 4;
-        ctx.strokeStyle = '#e2e8f0';
+        ctx.strokeStyle = mGridClr;
         ctx.lineWidth   = 1;
         ctx.font        = '500 9px Inter, system-ui, sans-serif';
-        ctx.fillStyle   = '#94a3b8';
+        ctx.fillStyle   = mLabelClr;
         ctx.textAlign   = 'right';
         for (let i = 0; i <= gridCount; i++) {
           const y   = PAD_T + chartH * (1 - i / gridCount);
@@ -2355,7 +2570,7 @@
           const cx   = x + barW / 2;
 
           if (barH > 0) {
-            ctx.fillStyle = d.hasOffer ? '#f59e0b' : '#60a5fa';
+            ctx.fillStyle = d.hasOffer ? '#f59e0b' : mBarClr;
             const radius = Math.min(4, barH / 2);
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
@@ -2405,7 +2620,7 @@
           }
 
           // Month name at bottom
-          ctx.fillStyle = '#64748b';
+          ctx.fillStyle = mLabelClr;
           ctx.font      = '9px Inter, system-ui, sans-serif';
           const now = new Date();
           const lbl = getMonthNames()[d.month] + (d.year !== now.getFullYear() ? ' \'' + String(d.year).slice(2) : '');
@@ -2426,11 +2641,89 @@
         ctx.save();
         ctx.translate(10, H / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle  = '#cbd5e1';
+        ctx.fillStyle  = mYAxisClr;
         ctx.font       = '9px Inter, system-ui, sans-serif';
         ctx.textAlign  = 'center';
         ctx.fillText(t('chart.yLabel'), 0, 0);
         ctx.restore();
+
+        // ── Tooltip on mousemove ──────────────────────────────────
+        let _chartTooltip = document.getElementById('_monthly_chart_tooltip');
+        if (!_chartTooltip) {
+          _chartTooltip = document.createElement('div');
+          _chartTooltip.id = '_monthly_chart_tooltip';
+          _chartTooltip.style.cssText = [
+            'position:fixed;z-index:9999;pointer-events:none;',
+            'background:#1e293b;border:1px solid rgba(148,163,184,.2);',
+            'border-radius:8px;padding:10px 13px;',
+            'box-shadow:0 8px 32px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);',
+            'font-family:Inter,sans-serif;font-size:12px;color:#f1f5f9;',
+            'min-width:180px;max-width:260px;display:none;backdrop-filter:none;',
+          ].join('');
+          document.body.appendChild(_chartTooltip);
+        }
+
+        // Attach tooltip listeners (remove old ones first)
+        if (canvas._tooltipAbort) canvas._tooltipAbort.abort();
+        canvas._tooltipAbort = new AbortController();
+        const _sig = { signal: canvas._tooltipAbort.signal };
+        canvas.addEventListener('mousemove', (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+          // Find which bar slot
+          let found = null;
+          data.forEach((d, i) => {
+            const x = PAD_L + i * slotW + (slotW - barW) / 2;
+            const barH2 = d.income > 0 ? (d.income / maxInc) * chartH : 0;
+            const y2 = PAD_T + chartH - barH2;
+            if (mx >= x - 4 && mx <= x + barW + 4 && my >= PAD_T && my <= H - PAD_B) {
+              found = { d, x, barY: y2, cx: x + barW / 2 };
+            }
+          });
+          if (!found || !found.d.income) {
+            _chartTooltip.style.display = 'none';
+            return;
+          }
+          const { d } = found;
+          const monthName = getMonthNames()[d.month] + (d.year !== new Date().getFullYear() ? ' ' + d.year : '');
+          const total = d.income;
+          // Sort bonds by amount desc
+          const sorted = [...d.bonds].sort((a, b) => b.amount - a.amount);
+          let rows_html = sorted.map(b => {
+            const shortName = b.name.length > 22 ? b.name.substring(0, 21) + '…' : b.name;
+            return `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--border,rgba(148,163,184,.08));">
+              <span style="color:var(--text-secondary,#94a3b8);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${b.name}">${shortName}</span>
+              <span style="font-weight:600;white-space:nowrap;color:var(--green-400,#4ade80);">+${Math.round(b.amount).toLocaleString('ru')} ₽</span>
+            </div>`;
+          }).join('');
+          _chartTooltip.innerHTML = `
+            <div style="font-weight:700;font-size:13px;margin-bottom:7px;color:var(--text-primary,#f1f5f9);">${monthName}</div>
+            ${rows_html}
+            <div style="display:flex;justify-content:space-between;gap:12px;padding-top:6px;margin-top:2px;font-weight:700;">
+              <span>Итого</span>
+              <span style="color:var(--green-400,#4ade80);">+${Math.round(total).toLocaleString('ru')} ₽</span>
+            </div>`;
+          // Position tooltip near cursor, keep within viewport
+          const TW = 264, TH = _chartTooltip.offsetHeight || 120;
+          let tx = e.clientX + 14;
+          let ty = e.clientY - TH / 2;
+          if (tx + TW > window.innerWidth - 8) tx = e.clientX - TW - 14;
+          if (ty < 8) ty = 8;
+          if (ty + TH > window.innerHeight - 8) ty = window.innerHeight - TH - 8;
+          _chartTooltip.style.left = tx + 'px';
+          _chartTooltip.style.top  = ty + 'px';
+          // Solid background depending on theme
+          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          _chartTooltip.style.background = isLight ? '#ffffff' : '#1e293b';
+          _chartTooltip.style.color      = isLight ? '#0f172a' : '#f1f5f9';
+          _chartTooltip.style.border     = isLight ? '1px solid #e2e8f0' : '1px solid rgba(148,163,184,.2)';
+          _chartTooltip.style.display = 'block';
+        }, _sig);
+
+        canvas.addEventListener('mouseleave', () => {
+          _chartTooltip.style.display = 'none';
+        }, _sig);
       }
 
       // ── EDITABLE CELLS ───────────────────────────────────────────
@@ -2631,7 +2924,7 @@
         section.style.display = 'block';
         riskBadge.textContent = riskInfo.label;
         riskBadge.style.cssText = `font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600;background:${riskInfo.color}22;color:${riskInfo.color};border:1px solid ${riskInfo.color}44;`;
-        grid.innerHTML = `<div style="color:var(--slate-400);font-size:13px;padding:8px 0;">${t('add.suggestLoading')}</div>`;
+        grid.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">${t('add.suggestLoading')}</div>`;
 
         try {
           const res = await apiFetch(`/bonds/suggest?amount=1000000&yield=${avgYield.toFixed(1)}&risk=${riskKey}`);
@@ -2649,7 +2942,7 @@
           filtered.slice(0, 12).forEach(b => {
             const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
             const offerNote = b.offer_date ? ` · ${window._lang === 'en' ? 'offer' : 'оферта'} ${b.offer_date.substring(0,7)}` : '';
-            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--slate-100);color:var(--slate-600);margin-right:6px;">${b.rating}</span>` : '';
+            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg-elevated);color:var(--text-muted);margin-right:6px;">${b.rating}</span>` : '';
             const card = document.createElement('div');
             card.className = 'suggest-card';
             card.innerHTML = `
@@ -2969,9 +3262,25 @@
 
         let cardsHtml = bonds.map((b, i) => {
           const ratingValue = b.rating || b.company_rating || null;
-          const ratingHtml = ratingValue
-            ? `<span class="pw-rating-badge">${ratingValue}</span>`
-            : `<span class="pw-rating-badge" style="background:rgba(100,116,139,.15);color:#64748b;border-color:rgba(100,116,139,.2);">—</span>`;
+          let ratingHtml;
+          if (ratingValue) {
+            // Colour by rating tier
+            const rv = ratingValue.toUpperCase().split('(')[0].trim();
+            const isTop = ['AAA','AA+','AA','AA-'].includes(rv);
+            const isMid = ['A+','A','A-','BBB+','BBB','BBB-'].includes(rv);
+            const rBg = isTop ? 'rgba(34,197,94,.15)' : isMid ? 'rgba(59,130,246,.15)' : 'rgba(251,191,36,.15)';
+            const rColor = isTop ? '#4ade80' : isMid ? '#60a5fa' : '#fbbf24';
+            const rBorder = isTop ? 'rgba(34,197,94,.3)' : isMid ? 'rgba(59,130,246,.25)' : 'rgba(251,191,36,.3)';
+            ratingHtml = `<span class="pw-rating-badge" style="background:${rBg};color:${rColor};border-color:${rBorder};">${ratingValue}</span>`;
+          } else if (b.listlevel) {
+            const lvlLabel = ['', 'Ур.1', 'Ур.2', 'Ур.3'][b.listlevel] || `Ур.${b.listlevel}`;
+            const lvlColor = b.listlevel === 1 ? '#4ade80' : b.listlevel === 2 ? '#60a5fa' : '#94a3b8';
+            const lvlBg = b.listlevel === 1 ? 'rgba(34,197,94,.1)' : b.listlevel === 2 ? 'rgba(59,130,246,.1)' : 'rgba(148,163,184,.1)';
+            const lvlBorder = b.listlevel === 1 ? 'rgba(34,197,94,.2)' : b.listlevel === 2 ? 'rgba(59,130,246,.2)' : 'rgba(148,163,184,.2)';
+            ratingHtml = `<span class="pw-rating-badge" title="Уровень листинга MOEX" style="background:${lvlBg};color:${lvlColor};border-color:${lvlBorder};">${lvlLabel}</span>`;
+          } else {
+            ratingHtml = `<span class="pw-rating-badge" style="background:rgba(100,116,139,.15);color:#64748b;border-color:rgba(100,116,139,.2);">—</span>`;
+          }
           const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
           const offerNote = b.offer_date ? ` · ${t('wizard.offer')} ${b.offer_date.substring(0,7)}` : '';
           const freq = freqLabel(b.coupon_frequency || 2);
@@ -3151,6 +3460,26 @@
         }
       }
 
+      function showToast(msg, duration = 1800) {
+        let toast = document.getElementById('_toast_notification');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.id = '_toast_notification';
+          toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px 18px;font-size:13px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:9999;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;';
+          document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        clearTimeout(toast._timer);
+        requestAnimationFrame(() => {
+          toast.style.opacity = '1';
+          toast.style.transform = 'translateX(-50%) translateY(0)';
+        });
+        toast._timer = setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateX(-50%) translateY(8px)';
+        }, duration);
+      }
+
       function renderTable() {
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
@@ -3189,7 +3518,20 @@
             : 'https://smart-lab.ru/q/bonds/' + encodeURIComponent(row.ticker) + '/';
           link.target  = '_blank'; link.rel = 'noopener noreferrer';
           link.textContent = fmt(row.name); link.title = fmt(row.name);
-          nameTd.appendChild(link); tr.appendChild(nameTd);
+          nameTd.appendChild(link);
+          // Ticker badge — click to copy
+          if (row.ticker) {
+            const tickerBadge = document.createElement('span');
+            tickerBadge.textContent = row.ticker;
+            tickerBadge.title = 'Скопировать тикер';
+            tickerBadge.style.cssText = 'display:block;font-size:10px;color:var(--text-muted);cursor:pointer;width:fit-content;';
+            tickerBadge.onclick = (e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(row.ticker).then(() => showToast(`Скопировано: ${row.ticker}`));
+            };
+            nameTd.appendChild(tickerBadge);
+          }
+          tr.appendChild(nameTd);
 
           tr.appendChild(createRatingCell(row.company_rating));
           addCell(tr, fmt(row.current_price));
@@ -3402,44 +3744,10 @@
         tableRows = payload.items || [];
         if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
         renderTable();
+        scheduleAnalytics();
       }
 
-      // ── ADD FORM ─────────────────────────────────────────────────
-      const addStatusEl = document.getElementById('add-status');
-      const submitBtn   = document.getElementById('submit-btn');
-      document.getElementById('add-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!portfolioId) { setStatus(addStatusEl, 'Портфель не выбран.', true); return; }
-        setStatus(addStatusEl, 'Проверка данных...');
-        submitBtn.disabled = true;
-        const frm = e.target;
-        const payload = {
-          ticker:         frm.ticker.value.trim(),
-          quantity:       Number(frm.quantity.value),
-          purchase_price: Number(frm.purchase_price.value),
-        };
-        try {
-          const vResp = await apiFetch(`/portfolios/${portfolioId}/validate`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_input: payload }),
-          });
-          const v = await vResp.json();
-          if (!vResp.ok) throw new Error('Ошибка валидации запроса.');
-          if (!v.validated) { setStatus(addStatusEl, 'Не пройдена: ' + (v.warnings || []).join(' '), true); return; }
-          const typeLabel = v.instrument_type === 'bond' ? 'облигация' : v.instrument_type === 'stock' ? 'акция' : v.instrument_type;
-          setStatus(addStatusEl, 'Тип: ' + typeLabel + '. Добавление...');
-          const aResp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const ar = await aResp.json();
-          if (!aResp.ok) throw new Error(ar.detail || 'Не удалось добавить бумагу.');
-          await syncTableFromServer();
-          setStatus(addStatusEl, 'Бумага добавлена.');
-          frm.reset(); showPanel('panel-table');
-        } catch (err) { setStatus(addStatusEl, err.message || 'Ошибка запроса.', true); }
-        finally { submitBtn.disabled = false; }
-      });
+      // ── ADD FORM (legacy stubs — форма перенесена в #add-instrument-modal) ───────
 
       // ── NOTIFICATIONS ─────────────────────────────────────────────
       const notifStatusEl = document.getElementById('notif-status');
@@ -3448,6 +3756,7 @@
       const tgThreshInput = document.getElementById('tg-threshold');
       const tgLangSelect  = document.getElementById('tg-lang');
       async function loadNotifSettings() {
+        if (!_currentUserIsAdmin) return;
         try {
           const r = await apiFetch('/settings/notifications');
           if (!r.ok) return;
@@ -3489,8 +3798,6 @@
         const daysInput  = document.getElementById('coupon-notif-days');
         const saveBtn    = document.getElementById('btn-save-coupon-notif');
         const statusEl   = document.getElementById('coupon-notif-status');
-        const tgWarning  = document.getElementById('coupon-notif-hint-tg');
-
         if (!enabledChk) return;
 
         // Toggle days row on checkbox change
@@ -3506,19 +3813,6 @@
             enabledChk.checked = !!s.coupon_notif_enabled;
             daysInput.value    = s.coupon_notif_days ?? 3;
             daysRow.style.display = enabledChk.checked ? 'flex' : 'none';
-          }
-        } catch {}
-
-        // Check if user has tg_chat_id set
-        try {
-          const r2 = await apiFetch('/auth/me/portfolios-stats');
-          if (r2.ok) {
-            const me = await r2.json();
-            if (!me.tg_chat_id) {
-              tgWarning.style.display = 'block';
-            } else {
-              tgWarning.style.display = 'none';
-            }
           }
         } catch {}
 
@@ -3569,7 +3863,8 @@
         if (!portfolioId) { setStatus(ioExportStatusEl, 'Портфель не выбран.', true); return; }
         setStatus(ioExportStatusEl, 'Экспорт PDF...');
         try {
-          const resp = await apiFetch(`/portfolios/${portfolioId}/report.pdf`);
+          const pdfLang = (window._lang === 'en') ? 'en' : 'ru';
+          const resp = await apiFetch(`/portfolios/${portfolioId}/report.pdf?lang=${pdfLang}`);
           if (!resp.ok) { setStatus(ioExportStatusEl, 'Ошибка экспорта PDF.', true); return; }
           const blob = await resp.blob();
           const url = URL.createObjectURL(blob);
@@ -3773,6 +4068,7 @@
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
+                localStorage.setItem('mvp_start_onboarding', '1');
                 regBtn.textContent = t('auth.registered');
                 setAuthMsg(t('auth.accountCreated'), 'success');
                 setTimeout(() => location.reload(), 700);
@@ -4066,7 +4362,19 @@
             const passwordInput = document.getElementById('auth-password');
             if (btn1) btn1.onclick = handleLogin;
             if (btn2) btn2.onclick = handleRegister;
-            if (usernameInput) usernameInput.focus();
+
+            // Auto-focus register form if ?auth=register in URL
+            const _urlAuth = new URLSearchParams(window.location.search).get('auth');
+            if (_urlAuth === 'register') {
+              // Highlight register button and show hint
+              if (btn2) {
+                btn2.style.outline = '2px solid #3b82f6';
+                btn2.style.outlineOffset = '2px';
+                setTimeout(() => { if (btn2) { btn2.style.outline = ''; btn2.style.outlineOffset = ''; } }, 2000);
+              }
+              setAuthMsg(t('auth.createAccountHint') || 'Введите логин и пароль, затем нажмите «Зарегистрироваться»', 'success');
+              if (usernameInput) usernameInput.focus();
+            } else if (usernameInput) usernameInput.focus();
             // Float label logic
             [usernameInput, passwordInput].forEach(inp => {
               if (!inp) return;
@@ -4211,6 +4519,17 @@
           }
 
           if (topbarRight) {
+            // Theme toggle button
+            const themeBtn = document.createElement('button');
+            themeBtn.id = 'btn-theme-toggle';
+            themeBtn.title = 'Светлая тема';
+            themeBtn.style.cssText = 'width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);transition:.15s;padding:0;';
+            themeBtn.onmouseover = () => themeBtn.style.borderColor = 'var(--border-strong)';
+            themeBtn.onmouseout  = () => themeBtn.style.borderColor = 'var(--border)';
+            themeBtn.onclick = toggleTheme;
+            topbarRight.appendChild(themeBtn);
+            updateThemeBtn();
+
             // Language switcher buttons
             const langWrap = document.createElement('div');
             langWrap.style.display = 'flex';
@@ -4264,6 +4583,20 @@
           option.selected = p.id === portfolioId;
           selector.appendChild(option);
         }
+        // «+ Добавить портфель» в конце списка
+        const addOpt = document.createElement('option');
+        addOpt.value = '__new__';
+        addOpt.textContent = '+ Добавить портфель';
+        addOpt.style.color = 'var(--blue-500, #3b82f6)';
+        addOpt.style.fontStyle = 'italic';
+        selector.appendChild(addOpt);
+        // Update portfolio name in topbar
+        const nameEl = document.getElementById('topbar-portfolio-name');
+        if (nameEl) {
+          const active = portfolios.find(p => p.id === portfolioId);
+          nameEl.textContent = active ? active.name : '';
+          nameEl.style.display = active ? '' : 'none';
+        }
         // Size to longest name
         if (portfolios.length) {
           const longest = portfolios.reduce((a, b) => a.name.length > b.name.length ? a : b).name;
@@ -4286,6 +4619,10 @@
             opt.selected = p.id === portfolioId;
             mobileSel.appendChild(opt);
           }
+          const mobileAddOpt = document.createElement('option');
+          mobileAddOpt.value = '__new__';
+          mobileAddOpt.textContent = '+ Добавить портфель';
+          mobileSel.appendChild(mobileAddOpt);
           mobileWrap.style.display = portfolios.length > 1 ? 'block' : 'none';
         }
 
@@ -4312,11 +4649,18 @@
         const mobileSel = document.getElementById('mobile-portfolio-selector');
         if (mobileSel) {
           mobileSel.addEventListener('change', (e) => {
+            if (e.target.value === '__new__') {
+              e.target.value = String(portfolioId);
+              openCreatePortfolioModal();
+              return;
+            }
             const newId = Number(e.target.value);
             if (newId !== portfolioId) {
               portfolioId = newId;
+              _analyticsLoaded = false;
               localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
               showPanel('panel-table');
+              if (loadTableCache()) renderTable();
               syncTableFromServer().catch(err => console.error('Failed to sync:', err));
             }
           });
@@ -4331,24 +4675,30 @@
             container.style.display = 'flex';
             container.style.alignItems = 'center';
             container.style.gap = '8px';
-            container.style.marginLeft = 'auto';
-            container.style.marginRight = '16px';
             const sel = document.createElement('select');
             sel.id = 'portfolio-selector';
             sel.style.padding = '4px 8px';
             sel.style.borderRadius = '4px';
-            sel.style.border = '1px solid #334155';
-            sel.style.background = '#1e293b';
-            sel.style.color = '#f1f5f9';
+            sel.style.border = '1px solid var(--border)';
+            sel.style.background = 'var(--input-bg)';
+            sel.style.color = 'var(--text-primary)';
             sel.style.fontSize = '12px';
             sel.style.lineHeight = '1';
             sel.style.height = '26px';
             sel.addEventListener('change', (e) => {
+              if (e.target.value === '__new__') {
+                // Сбросить выбор обратно на активный портфель
+                e.target.value = String(portfolioId);
+                openCreatePortfolioModal();
+                return;
+              }
               const newId = Number(e.target.value);
               if (newId !== portfolioId) {
                 portfolioId = newId;
+                _analyticsLoaded = false;
                 localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
                 showPanel('panel-table');
+                if (loadTableCache()) renderTable();
                 syncTableFromServer().catch(err => console.error('Failed to sync:', err));
               }
             });
@@ -4356,6 +4706,34 @@
             topbarNav.insertBefore(container, topbarNav.firstChild);
           }
         }
+
+        // Add portfolio name + update time + refresh button to topbar-right (once)
+        const topbarRight = document.getElementById('topbar-right');
+        if (topbarRight && !document.getElementById('topbar-portfolio-name')) {
+          // Имя портфеля
+          const nameSpan = document.createElement('span');
+          nameSpan.id = 'topbar-portfolio-name';
+          nameSpan.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-secondary);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px;border-right:1px solid var(--border);';
+
+          // Обновлено ЧЧ:ММ
+          const timeSpan = document.createElement('span');
+          timeSpan.id = 'last-update-time';
+          timeSpan.style.cssText = 'font-size:11px;color:var(--text-muted);white-space:nowrap;';
+
+          // Кнопка Обновить
+          const refreshBtn = document.createElement('button');
+          refreshBtn.id = 'btn-refresh';
+          refreshBtn.title = 'Обновить данные (R)';
+          refreshBtn.onclick = manualRefresh;
+          refreshBtn.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--btn-sec-border);border-radius:6px;background:var(--btn-sec-bg);cursor:pointer;font-size:12px;color:var(--text-secondary);transition:all .15s;white-space:nowrap;';
+          refreshBtn.innerHTML = '<svg id="refresh-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2A5 5 0 1 0 11 6.5"/><polyline points="10.5 1 10.5 3.5 8 3.5"/></svg>Обновить';
+
+          // Вставить в начало topbar-right (перед темой/языком/выходом)
+          topbarRight.insertBefore(refreshBtn, topbarRight.firstChild);
+          topbarRight.insertBefore(timeSpan, topbarRight.firstChild);
+          topbarRight.insertBefore(nameSpan, topbarRight.firstChild);
+        }
+
         updatePortfolioSelector();
       }
 
@@ -4385,7 +4763,9 @@
         loadShareStatus();
       }
 
+      let _shareModalPrevPortfolioId = null;
       function openShareModalFor(id) {
+        _shareModalPrevPortfolioId = portfolioId;
         portfolioId = id;
         openShareModal();
       }
@@ -4393,6 +4773,11 @@
       function closeShareModal() {
         const overlay = document.getElementById('share-modal-overlay');
         if (overlay) overlay.classList.remove('show');
+        // Restore portfolioId if it was changed for share modal
+        if (_shareModalPrevPortfolioId !== null) {
+          portfolioId = _shareModalPrevPortfolioId;
+          _shareModalPrevPortfolioId = null;
+        }
       }
 
       function showPasswordModal() {
@@ -4831,10 +5216,10 @@
             syncTableFromServer().catch(() => {});
           }, SYNC_INTERVAL_MS);
         } else {
-          // Authenticated view
+          // Authenticated view — load cache first for instant display, then fetch fresh
+          if (loadTableCache()) renderTable();
           initAuth().then(() => {
             loadNotifSettings();
-            if (loadTableCache()) renderTable();
             setInterval(() => {
               if (!portfolioId) return;
               if (window._wizardBusy) return;
@@ -4852,6 +5237,113 @@
         await adminLoadStats();
         await adminLoadUsers();
         await adminLoadPortfolios();
+        adminLoadSources().catch(() => {});
+      }
+
+      // ── Data Sources ─────────────────────────────────────────────────────
+      function _fmtAgo(seconds) {
+        if (seconds === null || seconds === undefined) return '—';
+        if (seconds < 60) return `${seconds}с назад`;
+        if (seconds < 3600) return `${Math.floor(seconds/60)}м назад`;
+        if (seconds < 86400) return `${Math.floor(seconds/3600)}ч назад`;
+        return `${Math.floor(seconds/86400)}д назад`;
+      }
+
+      function _sourceStatusColor(s) {
+        if (!s.enabled) return 'var(--text-muted)';
+        if (s.errors > 0 && s.hits === 0) return 'var(--red-400)';
+        if (s.blocked > 0) return 'var(--amber-400)';
+        if (s.last_error_code) return 'var(--amber-400)';
+        if (s.hits > 0) return 'var(--green-400)';
+        return 'var(--text-muted)';
+      }
+
+      function _sourceStatusLabel(s) {
+        if (!s.enabled) return 'Отключён';
+        if (s.blocked > 0 && s.hits === 0) return 'Заблокирован';
+        if (s.errors > 0 && s.hits === 0) return 'Ошибка';
+        if (s.blocked > 0) return 'Частичная блокировка';
+        if (s.requests === 0) return 'Нет запросов';
+        if (s.hits > 0) return 'Работает';
+        return 'Нет данных';
+      }
+
+      async function adminLoadSources() {
+        const body = document.getElementById('adm-sources-body');
+        if (!body) return;
+        try {
+          const r = await apiFetch('/admin/data-sources');
+          if (!r.ok) throw new Error();
+          const sources = await r.json();
+          body.innerHTML = '';
+          sources.forEach(s => {
+            const color = _sourceStatusColor(s);
+            const label = _sourceStatusLabel(s);
+            const hitRate = s.hit_rate !== null ? `${s.hit_rate}%` : '—';
+
+            const card = document.createElement('div');
+            card.style.cssText = `background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;`;
+
+            card.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0;"></span>
+                  <span style="font-weight:600;font-size:13px;color:var(--text-primary);">${s.label}</span>
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--text-muted);">
+                  <input type="checkbox" id="src-toggle-${s.name}" ${s.enabled ? 'checked' : ''} style="cursor:pointer;" onchange="adminToggleSource('${s.name}', this.checked)">
+                  Включён
+                </label>
+              </div>
+              <div style="font-size:11px;color:${color};font-weight:600;margin-bottom:8px;">${label}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;color:var(--text-secondary);">
+                <div>Запросов: <b style="color:var(--text-primary);">${s.requests}</b></div>
+                <div>Успешных: <b style="color:var(--green-400);">${s.hits}</b></div>
+                <div>Ошибок: <b style="color:${s.errors > 0 ? 'var(--red-400)' : 'var(--text-primary)'};">${s.errors}</b></div>
+                <div>Блокировок: <b style="color:${s.blocked > 0 ? 'var(--amber-400)' : 'var(--text-primary)'};">${s.blocked}</b></div>
+                <div>Hit rate: <b style="color:var(--text-primary);">${hitRate}</b></div>
+                <div>Последний: <b style="color:var(--text-primary);">${_fmtAgo(s.last_attempt_ago)}</b></div>
+              </div>
+              ${s.last_error_code ? `<div style="margin-top:8px;font-size:10px;color:var(--red-400);background:rgba(248,113,113,.08);border-radius:4px;padding:4px 8px;">
+                HTTP ${s.last_error_code}${s.last_error_msg ? ': ' + s.last_error_msg : ''}
+              </div>` : ''}
+            `;
+            body.appendChild(card);
+          });
+        } catch(e) {
+          body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Не удалось загрузить данные</div>';
+        }
+      }
+
+      async function adminToggleSource(name, enabled) {
+        try {
+          const r = await apiFetch(`/admin/data-sources/${name}/toggle`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ enabled }),
+          });
+          if (!r.ok) throw new Error();
+        } catch(e) {
+          // Revert checkbox on error
+          const cb = document.getElementById(`src-toggle-${name}`);
+          if (cb) cb.checked = !enabled;
+          alert('Ошибка изменения настройки');
+        }
+      }
+
+      async function adminClearRatingCache() {
+        try {
+          const r = await apiFetch('/admin/data-sources/ratings/clear-cache', { method: 'POST' });
+          const d = await r.json();
+          const statusEl = document.getElementById('adm-status');
+          statusEl.textContent = `Кэш рейтингов сброшен (${d.cleared} записей). При следующем обновлении портфеля рейтинги запросятся повторно.`;
+          statusEl.className = 'status ok';
+          setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'status'; }, 5000);
+        } catch(e) {
+          const statusEl = document.getElementById('adm-status');
+          statusEl.textContent = 'Ошибка сброса кэша';
+          statusEl.className = 'status error';
+        }
       }
 
       async function adminLoadStats() {
@@ -5083,7 +5575,9 @@
       }
 
       // Show admin panel tab if user is admin
+      let _currentUserIsAdmin = false;
       function setupAdminNav(isAdmin) {
+        _currentUserIsAdmin = isAdmin;
         const btn = document.getElementById('nav-admin');
         if (btn && isAdmin) btn.style.display = '';
       }
@@ -5188,9 +5682,9 @@
 
             // td: actions
             const tdActions = document.createElement('td');
-            tdActions.style.whiteSpace = 'nowrap';
+            tdActions.style.cssText = 'white-space:nowrap;text-align:right;';
             const actionsDiv = document.createElement('div');
-            actionsDiv.style.cssText = 'display:flex;gap:4px;align-items:center;flex-wrap:nowrap;';
+            actionsDiv.style.cssText = 'display:flex;gap:4px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;';
 
             // merge select + button
             const others = allPortfolios.filter(x => x.id !== p.id);
@@ -5218,7 +5712,7 @@
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-sm';
             editBtn.id = `sp-edit-${p.id}`;
-            editBtn.style.cssText = 'color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);';
+            editBtn.style.cssText = 'color:var(--text-secondary);background:var(--bg-elevated);border-color:var(--border);';
             editBtn.textContent = t('portfolio.rename');
             editBtn.addEventListener('click', () => settingsEditPortfolio(p.id));
 
@@ -5233,7 +5727,7 @@
             // share btn
             const shareBtn = document.createElement('button');
             shareBtn.className = 'btn-sm';
-            shareBtn.style.cssText = 'color:var(--slate-600);background:var(--slate-100);border-color:var(--slate-200);';
+            shareBtn.style.cssText = 'color:var(--text-secondary);background:var(--bg-elevated);border-color:var(--border);';
             shareBtn.title = t('nav.share');
             shareBtn.textContent = t('settings.portfolios.shareBtn');
             shareBtn.addEventListener('click', () => openShareModalFor(p.id));
@@ -5241,7 +5735,7 @@
             // delete btn
             const delBtn = document.createElement('button');
             delBtn.className = 'btn-sm';
-            delBtn.style.cssText = 'color:var(--red-600);background:#fee2e2;border-color:#fecaca;';
+            delBtn.style.cssText = 'color:var(--red-400);background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.25);';
             delBtn.title = t('settings.portfolios.deleteTitle');
             delBtn.textContent = t('settings.portfolios.deleteBtn');
             delBtn.addEventListener('click', () => settingsDeletePortfolio(p.id, p.name));
@@ -5411,69 +5905,498 @@
       });
 
       // ── WATCHLIST ─────────────────────────────────────────────────
-      async function loadWatchlist() {
-        const resp = await apiFetch('/watchlist');
-        const data = await resp.json();
-        const tbody = document.getElementById('watchlist-tbody');
-        const empty = document.getElementById('watchlist-empty');
-        const table = document.getElementById('watchlist-table');
-        tbody.innerHTML = '';
-        if (!data.items || data.items.length === 0) {
-          table.style.display = 'none';
-          empty.style.display = 'block';
+      // ── WATCHLIST STUBS (panel removed) ─────────────────────────
+      async function loadWatchlist() {}
+      async function addToWatchlist() {}
+      async function removeFromWatchlist() {}
+
+      // ── ANALYTICS LAZY LOAD ──────────────────────────────────────
+      let _analyticsLoaded = false;
+      function scheduleAnalytics() {
+        _analyticsLoaded = false;
+        const targetIds = ['analytics-history-card','swot-card','recommendations-card'];
+        const obs = new IntersectionObserver(entries => {
+          if (entries.some(e => e.isIntersecting) && !_analyticsLoaded && tableRows.length) {
+            _analyticsLoaded = true;
+            renderAnalytics(tableRows);
+            loadAnalyticsHistory(90);
+            renderSwotAnalysis(tableRows);
+            loadPortfolioRecommendations();
+          }
+        }, { threshold: 0.05 });
+        targetIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) obs.observe(el);
+        });
+      }
+
+      // ── SWOT ANALYSIS ────────────────────────────────────────────
+      function _swotPickDiversified(tagged, maxCount) {
+        const result = [], usedCats = new Set();
+        for (const item of tagged) {
+          if (result.length >= maxCount) break;
+          if (!usedCats.has(item.cat)) { result.push(item.text); usedCats.add(item.cat); }
+        }
+        for (const item of tagged) {
+          if (result.length >= maxCount) break;
+          if (!result.includes(item.text)) result.push(item.text);
+        }
+        return result;
+      }
+
+      function renderSwotAnalysis(rows) {
+        const body = document.getElementById('swot-body');
+        if (!body) return;
+        if (!rows || rows.length === 0) {
+          body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;grid-column:1/-1;padding:8px 0;">Нет данных для анализа</p>';
           return;
         }
-        table.style.display = '';
-        empty.style.display = 'none';
-        data.items.forEach(item => {
-          const tr = document.createElement('tr');
-          const cells = [
-            item.ticker,
-            item.name || '—',
-            item.current_price != null ? item.current_price.toFixed(2) : '—',
-            item.instrument_type === 'bond' ? (t('instrument.bond') || 'Облигация') : (t('instrument.stock') || 'Акция'),
-            item.note || ''
-          ];
-          cells.forEach(c => {
-            const td = document.createElement('td');
-            td.textContent = c;
-            tr.appendChild(td);
+        // Each fact: { cat, score, text }
+        // score — приоритет (выше = важнее показывать первым)
+        const facts_S = [];
+        const facts_W = [];
+        const S = (cat, score, text) => facts_S.push({ cat, score, text });
+        const W = (cat, score, text) => facts_W.push({ cat, score, text });
+        const now = new Date();
+        const bonds = rows.filter(r => r.type === 'bond' || !r.type);
+
+        // ── 1. YTM (доходность к погашению) ──────────────────────────
+        const withYtm = bonds.filter(r => r.market_yield != null && r.market_yield > 0);
+        if (withYtm.length) {
+          const tw = withYtm.reduce((s,r) => s + (r.weight||0), 0) || 1;
+          const avgYtm = withYtm.reduce((s,r) => s + (r.market_yield||0)*(r.weight||0)/tw, 0);
+          if (avgYtm >= 20)      S('ytm', 90, `YTM ${avgYtm.toFixed(1)}% — существенно выше рынка, высокий доход с риском`);
+          else if (avgYtm >= 16) S('ytm', 80, `YTM ${avgYtm.toFixed(1)}% — выше ключевой ставки`);
+          else if (avgYtm >= 12) S('ytm', 50, `YTM ${avgYtm.toFixed(1)}% — соответствует рыночному уровню`);
+          else if (avgYtm >= 8)  W('ytm', 70, `YTM ${avgYtm.toFixed(1)}% — ниже ключевой ставки, реальная доходность отрицательная`);
+          else                   W('ytm', 90, `YTM ${avgYtm.toFixed(1)}% — портфель существенно проигрывает депозиту`);
+        }
+
+        // ── 2. Купонный денежный поток ────────────────────────────────
+        const withCoupon = bonds.filter(r => r.coupon > 0 && r.quantity > 0 && r.current_value > 0);
+        if (withCoupon.length) {
+          const totalVal = withCoupon.reduce((s,r) => s + r.current_value, 0);
+          const annualCoupon = withCoupon.reduce((s,r) => {
+            const freq = r.coupon_period > 0 ? Math.round(365 / r.coupon_period) : 2;
+            return s + r.coupon * r.quantity * freq;
+          }, 0);
+          const couponYield = totalVal > 0 ? annualCoupon / totalVal * 100 : 0;
+          if (couponYield >= 16)     S('cashflow', 85, `Купонный доход ${couponYield.toFixed(1)}%/год — высокий денежный поток`);
+          else if (couponYield >= 11) S('cashflow', 55, `Купонный доход ${couponYield.toFixed(1)}%/год — стабильные выплаты`);
+          else if (couponYield < 6 && couponYield > 0) W('cashflow', 60, `Купонный доход лишь ${couponYield.toFixed(1)}%/год — слабый денежный поток`);
+        }
+
+        // ── 3. Диверсификация — единый блок (эмитенты + концентрация) ─
+        // Собираем по эмитентам: один тикер = один эмитент (серии объединяем)
+        const issuerWeights = {};
+        rows.forEach(r => {
+          const key = (r.name||r.ticker||'?')
+            .replace(/\s*(АО|ПАО|ООО|ОФЗ)\s*/gi, '')
+            .split(/[\s\-]/)[0].substring(0, 12);
+          issuerWeights[key] = (issuerWeights[key]||0) + (r.weight||0);
+        });
+        const issuerCount = Object.keys(issuerWeights).length;
+        const maxIssuerW = Math.max(0, ...Object.values(issuerWeights));
+        const maxItemW   = rows.length ? Math.max(...rows.map(r => r.weight||0)) : 0;
+        const topIssuerName = Object.entries(issuerWeights).sort((a,b)=>b[1]-a[1])[0]?.[0] || '?';
+
+        if (maxIssuerW > 40) {
+          W('diversification', 95, `Один эмитент (${topIssuerName}) — ${maxIssuerW.toFixed(0)}% портфеля: критический кредитный риск`);
+        } else if (maxIssuerW > 25) {
+          W('diversification', 75, `Один эмитент (${topIssuerName}) занимает ${maxIssuerW.toFixed(0)}% — снизить для безопасности`);
+        } else if (maxItemW > 30) {
+          W('diversification', 65, `Одна бумага занимает ${maxItemW.toFixed(0)}% портфеля — высокая концентрация`);
+        } else if (issuerCount >= 8 && maxIssuerW < 20) {
+          S('diversification', 80, `${issuerCount} эмитентов, максимальная доля ${maxIssuerW.toFixed(0)}% — отличная диверсификация`);
+        } else if (issuerCount >= 5 && maxIssuerW < 30) {
+          S('diversification', 55, `${issuerCount} эмитентов — хороший уровень диверсификации`);
+        } else if (issuerCount <= 2) {
+          W('diversification', 85, `Только ${issuerCount} эмитента — высокая концентрация кредитного риска`);
+        }
+
+        // ── 4. Срочная структура (лестница погашений) ─────────────────
+        const yearMap = {};
+        const shortBonds = [], longBonds = [];
+        bonds.forEach(r => {
+          if (!r.maturity_date) return;
+          const mat = new Date(r.maturity_date);
+          yearMap[mat.getFullYear()] = (yearMap[mat.getFullYear()]||0) + 1;
+          const yrs = (mat - now) / (365.25*24*3600e3);
+          if (yrs < 1) shortBonds.push(r);
+          if (yrs > 5) longBonds.push(r);
+        });
+        const clusteredYears = Object.values(yearMap).filter(v => v >= 3).length;
+        const spreadYears = Object.keys(yearMap).length;
+        if (shortBonds.length >= 2) {
+          const sw = shortBonds.reduce((s,r)=>s+(r.weight||0),0);
+          W('maturity', 80, `${shortBonds.length} бумаги (${sw.toFixed(0)}%) гасятся в течение года — нужен план реинвестирования`);
+        } else if (clusteredYears > 0) {
+          W('maturity', 55, `Кластеризация: ${clusteredYears} года с 3+ погашениями — реинвестиционный риск`);
+        } else if (longBonds.length >= 3) {
+          const lw = longBonds.reduce((s,r)=>s+(r.weight||0),0);
+          W('maturity', 50, `${longBonds.length} бумаги (${lw.toFixed(0)}%) со сроком 5+ лет — высокий процентный риск`);
+        } else if (spreadYears >= 4 && !clusteredYears) {
+          S('maturity', 65, `Лестница погашений по ${spreadYears} годам — снижен реинвестиционный риск`);
+        }
+
+        // ── 5. ОФЗ / государственная защита ──────────────────────────
+        const ofzWeight = rows.filter(r => r.ticker && /^SU\d/.test(r.ticker))
+          .reduce((s,r) => s + (r.weight||0), 0);
+        if (ofzWeight >= 30) S('ofz', 70, `ОФЗ: ${ofzWeight.toFixed(0)}% портфеля — надёжная государственная защита`);
+        else if (ofzWeight >= 15) S('ofz', 40, `ОФЗ ${ofzWeight.toFixed(0)}% — есть государственная защита`);
+        else if (ofzWeight < 5 && rows.length >= 4) W('ofz', 40, 'Нет ОФЗ — портфель полностью в корпоративном кредитном риске');
+
+        // ── 6. Кредитные рейтинги ─────────────────────────────────────
+        const isRated = r => r.company_rating && r.company_rating !== 'N/A' && r.company_rating !== '—';
+        const highRated = rows.filter(r => isRated(r) && /^(AAA|AA[^-]|ruAAA|ruAA[^-])/i.test(r.company_rating));
+        const unrated   = rows.filter(r => !isRated(r));
+        if (highRated.length >= 3) S('rating', 75, `${highRated.length} бумаги с рейтингом AA+/AAA — высококачественный кредитный профиль`);
+        else if (highRated.length >= 1) S('rating', 40, `${highRated.length} бумаги с рейтингом AA/AAA присутствуют в портфеле`);
+        if (unrated.length >= Math.ceil(rows.length / 2)) W('rating', 70, `${unrated.length} из ${rows.length} бумаг без рейтинга — кредитный риск не определён`);
+        else if (unrated.length >= 3) W('rating', 50, `${unrated.length} бумаг без рейтинга — рекомендуется проверить эмитентов`);
+
+        // ── 7. P&L и убытки ───────────────────────────────────────────
+        const totalProfit = rows.reduce((s,r)=>s+(r.profit||0),0);
+        const totalCost   = rows.reduce((s,r)=>s+(r.purchase_price||0)*(r.quantity||0),0);
+        const lossRows    = rows.filter(r => (r.profit||0) < -100); // > 100 ₽ убытка
+        if (totalCost > 0) {
+          const pnlPct = totalProfit / totalCost * 100;
+          if (pnlPct >= 15)      S('pnl', 85, `Портфель +${pnlPct.toFixed(1)}% к цене покупки — отличный результат`);
+          else if (pnlPct >= 5)  S('pnl', 60, `Портфель в плюсе: +${pnlPct.toFixed(1)}% к цене покупки`);
+          else if (pnlPct < -10) W('pnl', 85, `Портфель −${Math.abs(pnlPct).toFixed(1)}% — значительный убыток, рассмотрите ребалансировку`);
+          else if (pnlPct < -3)  W('pnl', 60, `Портфель в минусе: ${pnlPct.toFixed(1)}% к цене покупки`);
+        }
+        if (lossRows.length >= 3 && lossRows.length > rows.length * 0.4) {
+          const totalLoss = lossRows.reduce((s,r)=>s+(r.profit||0),0);
+          W('losses', 65, `${lossRows.length} убыточных позиций на ${Math.abs(totalLoss).toLocaleString('ru')} ₽`);
+        }
+
+        // ── 8. Оферты ────────────────────────────────────────────────
+        const nearOffer = bonds.filter(r => {
+          const d = r.buyback_date || r.offer_date;
+          if (!d) return false;
+          const days = (new Date(d) - now) / (24*3600e3);
+          return days > 0 && days < 180;
+        });
+        if (nearOffer.length) {
+          W('offer', 85, `Оферта через <180 дней: ${nearOffer.map(r=>r.ticker).join(', ')} — риск досрочного погашения`);
+        }
+
+        // Сортируем по score убыванию, выбираем 2 из разных категорий
+        facts_S.sort((a,b) => b.score - a.score);
+        facts_W.sort((a,b) => b.score - a.score);
+        const strengths  = _swotPickDiversified(facts_S, 2);
+        const weaknesses = _swotPickDiversified(facts_W, 2);
+
+        body.innerHTML = '';
+        const mkSection = (title, items, color, accent, arrow) => {
+          const div = document.createElement('div');
+          div.style.cssText = `background:${color};border:1px solid ${color.replace('.08','0.18')};border-radius:var(--radius-lg);padding:14px 16px;`;
+          div.innerHTML = `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:${accent};margin-bottom:10px;">${arrow} ${title}</div>`;
+          if (!items.length) {
+            div.innerHTML += `<p style="font-size:12px;color:var(--text-muted);margin:0;">Нет замечаний</p>`;
+          } else {
+            items.forEach(item => {
+              const p = document.createElement('p');
+              p.style.cssText = 'margin:0 0 7px;font-size:12px;color:var(--text-secondary);display:flex;gap:6px;align-items:flex-start;line-height:1.45;';
+              p.innerHTML = `<span style="flex-shrink:0;color:${accent};margin-top:1px;">${arrow}</span><span>${item}</span>`;
+              div.appendChild(p);
+            });
+          }
+          return div;
+        };
+        body.appendChild(mkSection('Сильные стороны', strengths, 'rgba(74,222,128,.08)', 'var(--green-400)', '↑'));
+        body.appendChild(mkSection('Зоны риска', weaknesses, 'rgba(248,113,113,.08)', 'var(--red-400)', '↓'));
+      }
+
+      // ── PORTFOLIO RECOMMENDATIONS ────────────────────────────────
+      async function loadPortfolioRecommendations() {
+        const grid = document.getElementById('recommendations-grid');
+        if (!grid) return;
+        if (!tableRows.length) {
+          grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Добавьте бумаги в портфель для получения рекомендаций</p>';
+          return;
+        }
+        grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Анализ портфеля...</p>';
+
+        // Analyze portfolio
+        const existingTickers = new Set(tableRows.map(r => r.ticker));
+        const withYtm = tableRows.filter(r => r.ytm != null);
+        const totalWeight = withYtm.reduce((s,r) => s + (r.weight||0), 0) || 1;
+        const avgYtm = withYtm.length ? withYtm.reduce((s,r) => s + (r.ytm||0)*(r.weight||0)/totalWeight, 0) : 13;
+        const hasOFZ = tableRows.some(r => r.ticker && /^SU\d/.test(r.ticker));
+        const issuerMap = {};
+        tableRows.forEach(r => {
+          const key = (r.name||r.ticker||'Unknown').split(' ')[0].substring(0,8);
+          issuerMap[key] = (issuerMap[key]||0) + (r.weight||0);
+        });
+        const maxConcentration = Math.max(0, ...Object.values(issuerMap));
+
+        // Build fetch buckets — 4 штуки с уникальными risk-уровнями
+        const usedRisks = new Set();
+        const addBucket = (risk, yld, rationale) => {
+          if (!usedRisks.has(risk)) { usedRisks.add(risk); return { risk, yield: yld, rationale }; }
+          return null;
+        };
+        const buckets = [
+          !hasOFZ
+            ? addBucket('ultra_low', 8, 'Добавить ОФЗ для защиты от дефолтов')
+            : addBucket('ultra_low', 9, 'ОФЗ-флоатер для защиты от ставки'),
+          maxConcentration > 25
+            ? addBucket('low', 11, 'Снизить концентрацию — добавить качественный эмитент')
+            : addBucket('low', 12, 'Качественные корпораты для баланса'),
+          addBucket('moderate', Math.max(13, Math.round(avgYtm + 1)), 'Повысить доходность портфеля'),
+          avgYtm < 14
+            ? addBucket('elevated', 16, 'Высокодоходная альтернатива')
+            : addBucket('high', 20, 'Агрессивный высокодоходный сегмент'),
+        ].filter(Boolean);
+        const top4 = buckets.slice(0, 4);
+
+        // Parallel fetch
+        const results = await Promise.allSettled(
+          top4.map(b => apiFetch(`/bonds/suggest?risk=${b.risk}&yield=${b.yield}&amount=100000`).then(r=>r.json()))
+        );
+
+        // One card per issuer — avoid recommending 10 series of same company
+        function _issuerKey(bond) {
+          const t = (bond.ticker || '').toUpperCase();
+          if (/^RU\d{9,}/.test(t)) {
+            return (bond.name || bond.short_name || t).split(' ').slice(0, 2).join(' ').toUpperCase().substring(0, 16);
+          }
+          return t.replace(/[-_]?\d+[A-Z]*$/, '').substring(0, 8);
+        }
+
+        const cards = [];
+        const shownIssuers = new Set();
+        // Also block issuers already in portfolio
+        tableRows.forEach(r => shownIssuers.add(_issuerKey(r)));
+
+        results.forEach((res, i) => {
+          if (res.status !== 'fulfilled') return;
+          const items = (res.value.bonds || res.value.suggestions || []).filter(s => !existingTickers.has(s.ticker));
+          const item = items.find(s => !shownIssuers.has(_issuerKey(s)));
+          if (!item) return;
+          shownIssuers.add(_issuerKey(item));
+          cards.push({ ...item, rationale: top4[i].rationale, risk: top4[i].risk });
+        });
+
+        if (!cards.length) {
+          grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Не удалось подобрать рекомендации — портфель уже хорошо диверсифицирован</p>';
+          return;
+        }
+
+        const riskLabel = { ultra_low:'ОФЗ', low:'Низкий', moderate:'Умеренный', elevated:'Выше среднего' };
+        const riskColor = { ultra_low:'var(--green-400)', low:'var(--cyan-400)', moderate:'var(--amber-400)', elevated:'var(--rose-400)' };
+
+        grid.innerHTML = '';
+        cards.forEach(c => {
+          const div = document.createElement('div');
+          div.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:border-color .15s;';
+          div.onmouseover = () => div.style.borderColor = 'var(--blue-500)';
+          div.onmouseout  = () => div.style.borderColor = 'var(--border)';
+          const riskClr = riskColor[c.risk] || 'var(--text-muted)';
+          const riskLbl = riskLabel[c.risk] || c.risk;
+          const coupon  = c.coupon_percent != null ? Number(c.coupon_percent).toFixed(1)+'%' : '—';
+          const ytm     = c.market_yield != null ? Number(c.market_yield).toFixed(1)+'%' : '—';
+          div.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:${riskClr};text-transform:uppercase;">${riskLbl}</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text-muted);">${c.ticker||''}</span>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:8px;line-height:1.3;">${c.name||c.ticker||'—'}</div>
+            <div style="display:flex;gap:12px;margin-bottom:10px;">
+              <span style="font-size:11px;color:var(--text-muted);">Купон <strong style="color:var(--text-secondary);">${coupon}</strong></span>
+              <span style="font-size:11px;color:var(--text-muted);">YTM <strong style="color:var(--text-secondary);">${ytm}</strong></span>
+            </div>
+            <div style="font-size:11px;color:var(--blue-400);background:rgba(59,130,246,.08);border-radius:6px;padding:5px 8px;margin-bottom:10px;">${c.rationale}</div>
+            <button onclick="addRecommendedBond('${c.ticker||''}',${c.purchase_price||100})"
+              style="width:100%;height:28px;font-size:12px;font-weight:600;background:var(--blue-600);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:.15s;"
+              onmouseover="this.style.background='var(--blue-700)'" onmouseout="this.style.background='var(--blue-600)'">
+              + Добавить
+            </button>`;
+          grid.appendChild(div);
+        });
+      }
+
+      async function addRecommendedBond(ticker, price) {
+        if (!portfolioId) return;
+        const modal = document.getElementById('add-instrument-modal');
+        if (modal) {
+          document.getElementById('add-modal-ticker').value = ticker;
+          document.getElementById('add-modal-price').value = price;
+          document.getElementById('add-modal-qty').value = 1;
+          document.getElementById('add-modal-status').textContent = '';
+          modal.style.display = 'flex';
+        }
+      }
+
+      // ── ADD INSTRUMENT MODAL ─────────────────────────────────────
+      function openAddInstrumentModal() {
+        if (!portfolioId) return;
+        const modal = document.getElementById('add-instrument-modal');
+        if (!modal) return;
+        const tickerInput = document.getElementById('add-modal-ticker');
+        tickerInput.value = '';
+        tickerInput.style.textTransform = '';
+        document.getElementById('add-modal-price').value = '';
+        document.getElementById('add-modal-qty').value = 1;
+        document.getElementById('add-modal-status').textContent = '';
+        document.getElementById('add-modal-autocomplete').style.display = 'none';
+        // Load suggest list
+        loadAddSuggestForModal();
+        modal.style.display = 'flex';
+        // Init autocomplete once
+        _initAddModalAutocomplete();
+        setTimeout(() => tickerInput.focus(), 80);
+      }
+
+      let _autocompleteInited = false;
+      function _initAddModalAutocomplete() {
+        if (_autocompleteInited) return;
+        _autocompleteInited = true;
+        const input = document.getElementById('add-modal-ticker');
+        const drop  = document.getElementById('add-modal-autocomplete');
+        let _acTimer = null;
+
+        input.addEventListener('input', () => {
+          clearTimeout(_acTimer);
+          const q = input.value.trim();
+          if (q.length < 2) { drop.style.display = 'none'; return; }
+          _acTimer = setTimeout(() => _doAutocomplete(q), 220);
+        });
+
+        input.addEventListener('keydown', (e) => {
+          const items = drop.querySelectorAll('[data-ac-item]');
+          const active = drop.querySelector('[data-ac-item].ac-active');
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const next = active ? active.nextElementSibling : items[0];
+            if (next) { active && active.classList.remove('ac-active'); next.classList.add('ac-active'); next.scrollIntoView({block:'nearest'}); }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prev = active ? active.previousElementSibling : items[items.length-1];
+            if (prev) { active && active.classList.remove('ac-active'); prev.classList.add('ac-active'); prev.scrollIntoView({block:'nearest'}); }
+          } else if (e.key === 'Enter' && active) {
+            e.preventDefault();
+            active.click();
+          } else if (e.key === 'Escape') {
+            drop.style.display = 'none';
+          }
+        });
+
+        document.addEventListener('mousedown', (e) => {
+          if (!drop.contains(e.target) && e.target !== input) drop.style.display = 'none';
+        });
+      }
+
+      async function _doAutocomplete(q) {
+        const drop = document.getElementById('add-modal-autocomplete');
+        try {
+          const res = await apiFetch(`/bonds/search?q=${encodeURIComponent(q)}&limit=8`);
+          if (!res.ok) return;
+          const items = await res.json();
+          if (!items.length) { drop.style.display = 'none'; return; }
+          drop.innerHTML = '';
+          items.forEach(b => {
+            const row = document.createElement('div');
+            row.setAttribute('data-ac-item', '1');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;transition:background .1s;';
+            row.onmouseover = () => { drop.querySelectorAll('[data-ac-item]').forEach(r => r.classList.remove('ac-active')); row.classList.add('ac-active'); };
+            const coupon = b.coupon_percent != null ? `${Number(b.coupon_percent).toFixed(1)}%` : '';
+            const mat = b.maturity ? b.maturity.substring(0,7) : '';
+            const rating = b.rating ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);">${b.rating}</span>` : '';
+            row.innerHTML = `
+              <div style="min-width:0;flex:1;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${b.ticker}${mat ? ' · ' + mat : ''}${coupon ? ' · ' + coupon : ''}</div>
+              </div>
+              ${rating}`;
+            row.addEventListener('click', () => {
+              const tickerInput = document.getElementById('add-modal-ticker');
+              tickerInput.value = b.ticker;
+              tickerInput.style.textTransform = 'uppercase';
+              if (b.price) document.getElementById('add-modal-price').value = b.price;
+              drop.style.display = 'none';
+            });
+            drop.appendChild(row);
           });
-          const tdBtn = document.createElement('td');
-          const delBtn = document.createElement('button');
-          delBtn.textContent = '✕';
-          delBtn.className = 'btn-icon btn-sm';
-          delBtn.onclick = () => removeFromWatchlist(item.id);
-          tdBtn.appendChild(delBtn);
-          tr.appendChild(tdBtn);
-          tbody.appendChild(tr);
-        });
+          // Style active item
+          const style = document.getElementById('_ac_style');
+          if (!style) {
+            const s = document.createElement('style');
+            s.id = '_ac_style';
+            s.textContent = '[data-ac-item].ac-active{background:var(--bg-elevated);}';
+            document.head.appendChild(s);
+          }
+          drop.style.display = 'block';
+        } catch(e) {}
       }
 
-      async function addToWatchlist() {
-        const ticker = document.getElementById('watchlist-ticker').value.trim().toUpperCase();
-        if (!ticker) return;
-        const type = document.getElementById('watchlist-type').value;
-        const note = document.getElementById('watchlist-note').value.trim();
-        await apiFetch('/watchlist', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ticker, instrument_type: type, note: note || null})
-        });
-        document.getElementById('watchlist-ticker').value = '';
-        document.getElementById('watchlist-note').value = '';
-        await loadWatchlist();
+      function closeAddInstrumentModal() {
+        const modal = document.getElementById('add-instrument-modal');
+        if (modal) modal.style.display = 'none';
       }
 
-      async function removeFromWatchlist(id) {
-        await apiFetch(`/watchlist/${id}`, {method: 'DELETE'});
-        await loadWatchlist();
+      async function loadAddSuggestForModal() {
+        const list = document.getElementById('add-suggest-list');
+        if (!list) return;
+        list.innerHTML = '';
+        try {
+          const resp = await apiFetch('/bonds/suggest?risk=moderate&yield=12&amount=100000');
+          const data = await resp.json();
+          const items = (data.bonds || data.suggestions || []).slice(0,4);
+          items.forEach(s => {
+            const btn = document.createElement('button');
+            btn.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;text-align:left;cursor:pointer;transition:border-color .15s;font-family:inherit;';
+            btn.onmouseover = () => btn.style.borderColor = 'var(--blue-500)';
+            btn.onmouseout  = () => btn.style.borderColor = 'var(--border)';
+            const coupon = s.coupon_percent != null ? Number(s.coupon_percent).toFixed(1)+'%' : '';
+            const shortName = (s.name || s.ticker || '').substring(0, 22);
+            btn.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shortName}</div><div style="font-size:10px;color:var(--text-muted);">${s.ticker}${coupon ? ' · ' + coupon : ''}</div>`;
+            btn.onclick = () => {
+              const inp = document.getElementById('add-modal-ticker');
+              inp.value = s.ticker;
+              inp.style.textTransform = 'uppercase';
+              document.getElementById('add-modal-price').value = s.purchase_price || 100;
+              document.getElementById('add-modal-autocomplete').style.display = 'none';
+            };
+            list.appendChild(btn);
+          });
+        } catch(e) {}
       }
 
-      document.getElementById('btn-add-watchlist').onclick = addToWatchlist;
+      async function submitAddInstrumentModal() {
+        const statusEl = document.getElementById('add-modal-status');
+        const ticker = document.getElementById('add-modal-ticker').value.trim().toUpperCase();
+        const qty = parseInt(document.getElementById('add-modal-qty').value) || 1;
+        const price = parseFloat(document.getElementById('add-modal-price').value) || 100;
+        if (!ticker) { statusEl.textContent = 'Введите тикер'; return; }
+        if (!portfolioId) { statusEl.textContent = 'Портфель не выбран'; return; }
+        statusEl.textContent = 'Добавление...';
+        statusEl.style.color = 'var(--text-muted)';
+        try {
+          const resp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ ticker, quantity: qty, purchase_price: price })
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            statusEl.textContent = err.detail || 'Ошибка добавления';
+            statusEl.style.color = 'var(--red-400)';
+            return;
+          }
+          closeAddInstrumentModal();
+          await syncTableFromServer();
+        } catch(e) {
+          statusEl.textContent = 'Ошибка сети';
+          statusEl.style.color = 'var(--red-400)';
+        }
+      }
 
       // ── LANGUAGE SWITCHER ─────────────────────────────────────────
-      const TRANSLATIONS = {
+      // var (not const) — hoisted, so t() works before this line executes
+      var TRANSLATIONS = {
         ru: {
           'nav.analytics': 'Аналитика',
           'analytics.title': 'Аналитика портфеля',
@@ -5507,6 +6430,7 @@
           'auth.registering': 'Регистрируем...',
           'auth.registered': '✓ Готово!',
           'auth.accountCreated': 'Аккаунт создан! Входим...',
+          'auth.createAccountHint': 'Введите логин и пароль, затем нажмите «Зарегистрироваться»',
           'auth.registerError': 'Ошибка регистрации',
           'auth.minLogin': 'Логин минимум 3 символа',
           'auth.minPassword': 'Пароль минимум 6 символов',
@@ -5827,6 +6751,7 @@
           'auth.registering': 'Registering...',
           'auth.registered': '✓ Done!',
           'auth.accountCreated': 'Account created! Signing in...',
+          'auth.createAccountHint': 'Enter a username and password, then click «Create Account»',
           'auth.registerError': 'Registration failed',
           'auth.minLogin': 'Username must be at least 3 characters',
           'auth.minPassword': 'Password must be at least 6 characters',
@@ -6126,7 +7051,16 @@
       let _obSuggested = [];
 
       function initOnboarding() {
-        // Show only for new users with no instruments
+        const forceStart = localStorage.getItem('mvp_start_onboarding') === '1';
+        if (forceStart) {
+          // New user just registered — clear flag and launch wizard immediately
+          localStorage.removeItem('mvp_start_onboarding');
+          localStorage.removeItem('mvp_onboarding_done');
+          const overlay = document.getElementById('onboarding-overlay');
+          if (overlay) { overlay.style.display = 'flex'; }
+          return;
+        }
+        // Show only for returning users with no instruments
         if (localStorage.getItem('mvp_onboarding_done')) return;
         if (!portfolioId) return;
         if (tableRows && tableRows.length > 0) return;
@@ -6163,66 +7097,115 @@
         document.getElementById('ob-step-3').style.display = '';
         document.getElementById('ob-progress').style.width = '100%';
         const resultEl = document.getElementById('ob-result');
-        resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--slate-400);">🤖 AI подбирает портфель...</div>';
+        resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">🤖 AI подбирает портфель...</div>';
         document.getElementById('ob-add-all').disabled = true;
         try {
-          const yieldMin = {ultra_low:8,low:11,moderate:13,elevated:16,high:18}[_obRisk] || 10;
-          const r = await apiFetch(`/bonds/suggest?amount=${_obAmount}&yield=${yieldMin}&risk=${_obRisk || 'low'}`);
+          const yieldMid = {ultra_low:9,low:12,moderate:15,elevated:18,high:21}[_obRisk] || 12;
+          const r = await apiFetch(`/bonds/suggest?amount=${_obAmount}&yield=${yieldMid}&risk=${_obRisk || 'low'}`);
           const data = await r.json();
-          _obSuggested = data.items || [];
+          _obSuggested = (data.bonds || []).map(b => ({
+            ticker: b.ticker,
+            name: b.name,
+            instrument_type: 'bond',
+            quantity: b.lots * b.lot_size,
+            lots: b.lots,
+            lot_size: b.lot_size,
+            purchase_price: b.purchase_price,
+            coupon_percent: b.coupon_percent,
+            maturity: b.maturity,
+            total_cost: b.total_cost,
+          }));
           if (_obSuggested.length === 0) {
-            resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--slate-400);">Нет подходящих инструментов. Попробуйте изменить параметры.</div>';
+            resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">Нет подходящих инструментов. Попробуйте изменить параметры.</div>';
             return;
           }
           resultEl.innerHTML = '';
           _obSuggested.forEach(item => {
             const div = document.createElement('div');
-            div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--slate-100);border-radius:8px;margin-bottom:8px;';
+            div.className = 'ob-result-item';
             const left = document.createElement('div');
             const name = document.createElement('div');
-            name.style.cssText = 'font-weight:600;font-size:13px;color:var(--slate-800);';
+            name.className = 'ob-result-name';
             name.textContent = item.name || item.ticker;
             const meta = document.createElement('div');
-            meta.style.cssText = 'font-size:11px;color:var(--slate-400);margin-top:2px;';
-            meta.textContent = `${item.ticker} · ${item.instrument_type === 'bond' ? 'Облигация' : 'Акция'}`;
+            meta.className = 'ob-result-meta';
+            meta.textContent = `${item.ticker} · купон ${item.coupon_percent}% · ${item.lots} лот${item.lots === 1 ? '' : item.lots < 5 ? 'а' : 'ов'}`;
             left.appendChild(name); left.appendChild(meta);
             const right = document.createElement('div');
-            right.style.cssText = 'text-align:right;font-size:12px;';
+            right.style.textAlign = 'right';
             const qty = document.createElement('div');
-            qty.style.cssText = 'font-weight:600;color:var(--slate-700);';
+            qty.className = 'ob-result-qty';
             qty.textContent = `${item.quantity} шт.`;
             const price = document.createElement('div');
-            price.style.cssText = 'color:var(--slate-400);';
-            price.textContent = item.purchase_price ? `≈ ${Math.round(item.purchase_price * item.quantity).toLocaleString('ru')} ₽` : '';
+            price.className = 'ob-result-price';
+            price.textContent = item.total_cost ? `≈ ${Math.round(item.total_cost).toLocaleString('ru')} ₽` : '';
             right.appendChild(qty); right.appendChild(price);
             div.appendChild(left); div.appendChild(right);
             resultEl.appendChild(div);
           });
           document.getElementById('ob-add-all').disabled = false;
         } catch(e) {
-          resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red-600);">Ошибка подбора. Попробуйте позже.</div>';
+          resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#f87171;">Ошибка подбора. Попробуйте позже.</div>';
         }
       }
 
       async function obAddAll() {
-        if (!_obSuggested.length || !portfolioId) return;
+        if (!_obSuggested.length) return;
         const btn = document.getElementById('ob-add-all');
         btn.disabled = true;
-        btn.textContent = 'Добавляю...';
+        btn.textContent = 'Создаём портфель...';
         try {
+          // If user has no portfolio yet — create one named after risk level
+          let targetPortfolioId = portfolioId;
+          if (!targetPortfolioId) {
+            const riskNames = {ultra_low:'Консервативный', low:'Осторожный', moderate:'Умеренный', elevated:'Активный', high:'Агрессивный'};
+            const portName = (riskNames[_obRisk] || 'Мой') + ' портфель';
+            const portRes = await apiFetch('/portfolios', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ name: portName }),
+            });
+            const portData = await portRes.json();
+            if (!portRes.ok) throw new Error('Ошибка создания портфеля');
+            targetPortfolioId = portData.id;
+          }
+
+          btn.textContent = 'Добавляю бумаги...';
           const payloads = _obSuggested.map(item => ({
             ticker: item.ticker,
             instrument_type: item.instrument_type,
             quantity: item.quantity,
             purchase_price: item.purchase_price || item.current_price || 100,
           }));
-          await apiFetch(`/portfolios/${portfolioId}/instruments/bulk`, {
+          await apiFetch(`/portfolios/${targetPortfolioId}/instruments/bulk`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify(payloads),
           });
-          closeOnboarding();
-          await syncTableFromServer();
+
+          // Success celebration
+          btn.textContent = '✓ Портфель готов!';
+          btn.style.background = 'var(--green-600)';
+          const overlay = document.getElementById('onboarding-overlay');
+          if (overlay) {
+            const card = overlay.querySelector('.ob-card');
+            if (card) {
+              card.innerHTML = `
+                <div style="text-align:center;padding:40px 24px;">
+                  <div style="font-size:56px;margin-bottom:16px;">🎉</div>
+                  <div style="font-size:22px;font-weight:700;color:var(--slate-800);margin-bottom:8px;">Портфель собран!</div>
+                  <div style="color:var(--slate-500);font-size:14px;margin-bottom:24px;">AI подобрал ${_obSuggested.length} облигаций под ваш профиль</div>
+                  <button onclick="closeOnboarding();location.reload();" style="background:var(--blue-600);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer;">
+                    Смотреть портфель →
+                  </button>
+                </div>`;
+            }
+          }
+
+          // If new portfolio was created, save it so page reload picks it up
+          if (!portfolioId && targetPortfolioId) {
+            localStorage.setItem('mvp_active_portfolio', String(targetPortfolioId));
+          }
         } catch(e) {
           btn.disabled = false;
           btn.textContent = '✓ Добавить всё в портфель';
@@ -6256,6 +7239,7 @@
       });
 
       function t(key) {
+        if (typeof TRANSLATIONS === 'undefined') return key;
         return TRANSLATIONS[window._lang]?.[key] ?? TRANSLATIONS['ru']?.[key] ?? key;
       }
 
@@ -6348,11 +7332,29 @@
       // Apply saved language on load (before login so translations are ready)
       applyLang(window._lang);
 
+      // Redraw charts on theme change
+      document.addEventListener('theme-change', () => {
+        if (tableRows.length) {
+          drawMonthlyChart(tableRows);
+          const histCanvas = document.getElementById('analytics-history-chart');
+          if (histCanvas && histCanvas._snapshots) drawHistoryChart(histCanvas, histCanvas._snapshots);
+          else if (histCanvas && histCanvas.style.display !== 'none') drawHistoryChartEmpty(histCanvas);
+        }
+      });
+
       // Register service worker for PWA
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         });
       }
+
+      // Hotkey R — manual refresh
+      document.addEventListener('keydown', e => {
+        if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey
+          && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
+          if (typeof manualRefresh === 'function') manualRefresh();
+        }
+      });
 
     </script>

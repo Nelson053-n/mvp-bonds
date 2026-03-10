@@ -1,6 +1,7 @@
 from datetime import date
 import logging
 import re
+import time
 from typing import Any
 
 import httpx
@@ -10,6 +11,59 @@ from app.models import BondSnapshot, StockSnapshot
 from app.exceptions import PriceNotFoundError, DataFetchError, RatingNotFoundError
 
 logger = logging.getLogger(__name__)
+
+
+class SourceStats:
+    """Statistics for a single external data source."""
+    def __init__(self, name: str, label: str) -> None:
+        self.name = name
+        self.label = label
+        self.enabled: bool = True
+        self.requests: int = 0
+        self.hits: int = 0       # got useful data
+        self.errors: int = 0     # HTTP / network error
+        self.blocked: int = 0    # 403/429 bot-block responses
+        self.last_attempt: float = 0.0
+        self.last_success: float = 0.0
+        self.last_error_code: int | None = None
+        self.last_error_msg: str = ""
+
+    def record_hit(self) -> None:
+        self.requests += 1
+        self.hits += 1
+        self.last_attempt = time.time()
+        self.last_success = time.time()
+
+    def record_miss(self) -> None:
+        """Got valid response but no useful data (e.g. rating not found in page)."""
+        self.requests += 1
+        self.last_attempt = time.time()
+
+    def record_error(self, status_code: int | None = None, msg: str = "") -> None:
+        self.requests += 1
+        self.errors += 1
+        self.last_attempt = time.time()
+        if status_code in (403, 429, 503):
+            self.blocked += 1
+        self.last_error_code = status_code
+        self.last_error_msg = msg[:120]
+
+    def to_dict(self) -> dict:
+        now = time.time()
+        return {
+            "name": self.name,
+            "label": self.label,
+            "enabled": self.enabled,
+            "requests": self.requests,
+            "hits": self.hits,
+            "errors": self.errors,
+            "blocked": self.blocked,
+            "hit_rate": round(self.hits / self.requests * 100, 1) if self.requests else None,
+            "last_attempt_ago": round(now - self.last_attempt) if self.last_attempt else None,
+            "last_success_ago": round(now - self.last_success) if self.last_success else None,
+            "last_error_code": self.last_error_code,
+            "last_error_msg": self.last_error_msg,
+        }
 
 
 class MOEXService:
@@ -25,6 +79,29 @@ class MOEXService:
 
     def __init__(self) -> None:
         self._credit_rating_cache: dict[str, str | None] = {}
+        self.sources: dict[str, SourceStats] = {
+            "moex_price": SourceStats("moex_price", "MOEX ISS (цены)"),
+            "moex_rating": SourceStats("moex_rating", "MOEX ISS (рейтинг)"),
+            "smartlab": SourceStats("smartlab", "Smart-Lab (рейтинг)"),
+        }
+
+    def get_sources_status(self) -> list[dict]:
+        return [s.to_dict() for s in self.sources.values()]
+
+    def set_source_enabled(self, name: str, enabled: bool) -> bool:
+        if name not in self.sources:
+            return False
+        self.sources[name].enabled = enabled
+        return True
+
+    async def refresh_rating(self, secid: str) -> str | None:
+        """Force re-fetch rating, bypassing in-memory cache."""
+        self._credit_rating_cache.pop(secid, None)
+        self._credit_rating_cache.pop(f"smartlab:{secid}", None)
+        rating = await self._get_smartlab_credit_rating(secid)
+        if rating is None:
+            rating = await self._get_credit_rating(secid)
+        return rating
 
     async def get_stock_snapshot(self, ticker: str) -> StockSnapshot:
         secid = ticker.upper().strip()
@@ -120,18 +197,23 @@ class MOEXService:
 
     async def _fetch(self, url: str) -> dict[str, Any]:
         logger.debug("Fetching data from %s", url)
+        src = self.sources["moex_price"]
         async with httpx.AsyncClient(timeout=30) as client:
             try:
                 response = await client.get(url)
                 response.raise_for_status()
+                src.record_hit()
                 return response.json()
             except httpx.HTTPStatusError as exc:
+                src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
                 logger.error("HTTP error %s while fetching %s", exc.response.status_code, url)
                 raise DataFetchError(url, f"HTTP {exc.response.status_code}") from exc
             except httpx.RequestError as exc:
+                src.record_error(None, str(exc)[:80])
                 logger.error("Request error while fetching %s: %s", url, exc)
                 raise DataFetchError(url, str(exc)) from exc
             except ValueError as exc:
+                src.record_error(None, "Invalid JSON")
                 logger.error("Invalid JSON response from %s", url)
                 raise DataFetchError(url, "Invalid JSON response") from exc
 
@@ -174,6 +256,10 @@ class MOEXService:
         if secid in self._credit_rating_cache:
             return self._credit_rating_cache[secid]
 
+        src = self.sources["moex_rating"]
+        if not src.enabled:
+            return None
+
         url = f"{settings.moex_base_url}/securities/{secid}/description.json"
         try:
             async with httpx.AsyncClient(timeout=5) as client:
@@ -181,6 +267,7 @@ class MOEXService:
                 response.raise_for_status()
                 data = response.json()
         except httpx.HTTPStatusError as exc:
+            src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
             logger.warning(
                 "MOEX description HTTP error %s for %s",
                 exc.response.status_code,
@@ -189,10 +276,12 @@ class MOEXService:
             self._credit_rating_cache[secid] = None
             return None
         except httpx.RequestError as exc:
+            src.record_error(None, str(exc)[:80])
             logger.warning("MOEX description request error for %s: %s", secid, exc)
             self._credit_rating_cache[secid] = None
             return None
         except ValueError:
+            src.record_error(None, "Invalid JSON")
             logger.warning("Invalid JSON from MOEX description for %s", secid)
             self._credit_rating_cache[secid] = None
             return None
@@ -202,6 +291,7 @@ class MOEXService:
         rows = dataset.get("data", [])
 
         if not columns or not rows:
+            src.record_miss()
             logger.debug("No description data for %s", secid)
             self._credit_rating_cache[secid] = None
             return None
@@ -211,6 +301,7 @@ class MOEXService:
         value_idx = self._find_column_index(columns, "value")
 
         if value_idx is None:
+            src.record_miss()
             self._credit_rating_cache[secid] = None
             return None
 
@@ -233,6 +324,7 @@ class MOEXService:
             normalized = self._normalize_rating_value(value)
 
             if key in priority_keys and normalized is not None:
+                src.record_hit()
                 self._credit_rating_cache[secid] = normalized
                 return normalized
 
@@ -241,6 +333,7 @@ class MOEXService:
                 and "рейтинг" in title
                 and normalized is not None
             ):
+                src.record_hit()
                 self._credit_rating_cache[secid] = normalized
                 return normalized
 
@@ -249,6 +342,7 @@ class MOEXService:
                 and "rating" in title
                 and normalized is not None
             ):
+                src.record_hit()
                 self._credit_rating_cache[secid] = normalized
                 return normalized
 
@@ -259,6 +353,10 @@ class MOEXService:
             ):
                 fallback = normalized
 
+        if fallback is not None:
+            src.record_hit()
+        else:
+            src.record_miss()
         self._credit_rating_cache[secid] = fallback
         return fallback
 
@@ -268,6 +366,10 @@ class MOEXService:
         cache_key = f"smartlab:{secid}"
         if cache_key in self._credit_rating_cache:
             return self._credit_rating_cache[cache_key]
+
+        src = self.sources["smartlab"]
+        if not src.enabled:
+            return None
 
         url = f"https://smart-lab.ru/q/bonds/{secid}/"
         headers = {
@@ -284,6 +386,7 @@ class MOEXService:
                 response.raise_for_status()
                 html = response.text
         except httpx.HTTPStatusError as exc:
+            src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
             logger.warning(
                 "SmartLab HTTP error %s for %s",
                 exc.response.status_code,
@@ -292,6 +395,7 @@ class MOEXService:
             self._credit_rating_cache[cache_key] = None
             return None
         except httpx.RequestError as exc:
+            src.record_error(None, str(exc)[:80])
             logger.warning("SmartLab request error for %s: %s", secid, exc)
             self._credit_rating_cache[cache_key] = None
             return None
@@ -301,10 +405,12 @@ class MOEXService:
             rating_match = self._find_rating_anywhere(html)
 
         if rating_match is None:
+            src.record_miss()
             logger.debug("Rating not found for %s on SmartLab", secid)
             self._credit_rating_cache[cache_key] = None
             return None
 
+        src.record_hit()
         rating, rating_pos = rating_match
         rating_date = self._find_nearest_dotted_date(html, rating_pos)
 
