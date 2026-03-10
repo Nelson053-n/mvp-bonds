@@ -836,7 +836,6 @@
       body.mobile-mode th, body.mobile-mode td { padding: 5px 6px; }
       body.mobile-mode .mobile-toggle-bar { display: flex; }
       body.mobile-mode .brand-badge { display: none; }
-      body.read-only-mode #mobile-btn-logout { display: none !important; }
 
       /* Mobile nav drawer */
       body.mobile-mode .mobile-nav {
@@ -907,12 +906,11 @@
       </div>
       <!-- Mobile nav (inside topbar so it stays fixed) -->
       <div class="mobile-nav" id="mobile-nav">
-        <div id="mobile-portfolio-wrap" style="display:none;width:100%;padding:4px 0 2px;box-sizing:border-box;">
+        <div id="mobile-portfolio-wrap" style="width:100%;padding:4px 0 2px;box-sizing:border-box;">
           <select id="mobile-portfolio-selector" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--input-bg);color:var(--text-primary);font-size:13px;"></select>
         </div>
         <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
         <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
-        <button class="nav-btn" id="mobile-btn-logout" style="color:#f87171;" onclick="localStorage.removeItem('mvp_auth_token');localStorage.removeItem('mvp_username');location.reload();" data-i18n="nav.logout">Выйти</button>
       </div>
     </nav>
 
@@ -4744,7 +4742,7 @@
           mobileAddOpt.value = '__new__';
           mobileAddOpt.textContent = '+ Добавить портфель';
           mobileSel.appendChild(mobileAddOpt);
-          mobileWrap.style.display = portfolios.length > 1 ? 'block' : 'none';
+          mobileWrap.style.display = 'block';
         }
 
         // Also update import portfolio selector
