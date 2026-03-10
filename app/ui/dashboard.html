@@ -969,20 +969,20 @@
                 <tr>
                   <th data-sort-key="id" style="min-width:32px;">&#8470;</th>
                   <th data-sort-key="name" data-i18n="tbl.name">Название</th>
-                  <th data-sort-key="company_rating" data-i18n="tbl.rating">Рейтинг</th>
-                  <th data-sort-key="current_price" data-i18n="tbl.curPrice">Тек.&nbsp;цена</th>
+                  <th data-sort-key="company_rating" data-i18n="tbl.rating">Рейтинг<span class="th-info" data-tip="rating">i</span></th>
+                  <th data-sort-key="current_price" data-i18n="tbl.curPrice">Тек.&nbsp;цена<span class="th-info" data-tip="clean_price">i</span></th>
                   <th data-sort-key="quantity" data-i18n="tbl.qty">Кол-во</th>
                   <th data-sort-key="purchase_price" class="wrap" style="min-width:52px;" data-i18n-html="tbl.buyPrice">Цена<br>покупки</th>
-                  <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость</th>
-                  <th data-sort-key="profit" data-i18n="tbl.profit">Прибыль</th>
+                  <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость<span class="th-info" data-tip="current_value">i</span></th>
+                  <th data-sort-key="profit" data-i18n="tbl.profit">Прибыль<span class="th-info" data-tip="profit">i</span></th>
                   <th data-sort-key="weight" data-i18n="tbl.weight">Доля</th>
-                  <th data-sort-key="coupon" style="max-width:48px;" data-i18n="tbl.coupon">Купон</th>
-                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.couponPct">Купон<br>%</th>
+                  <th data-sort-key="coupon" style="max-width:48px;" data-i18n="tbl.coupon">Купон<span class="th-info" data-tip="coupon">i</span></th>
+                  <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.couponPct">Купон<br>%<span class="th-info" data-tip="coupon_rate">i</span></th>
                   <th data-sort-key="coupon_frequency" class="wrap" style="min-width:48px;" data-i18n="tbl.freq">Частота<br>выплат</th>
-                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;" data-i18n="tbl.annualCoupon">Годовой<br>купон</th>
-                  <th data-sort-key="market_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.yield">Рын.<br>доход.</th>
-                  <th data-sort-key="maturity_date" data-i18n="tbl.maturity">Погашение</th>
-                  <th id="th-offer" data-sort-key="offer_date" data-i18n="tbl.offer">Оферта</th>
+                  <th data-sort-key="your_annual_coupon" class="wrap" style="min-width:68px;" data-i18n="tbl.annualCoupon">Годовой<br>купон<span class="th-info" data-tip="annual_coupon">i</span></th>
+                  <th data-sort-key="market_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.yield">Рын.<br>доход.<span class="th-info" data-tip="ytm">i</span></th>
+                  <th data-sort-key="maturity_date" data-i18n="tbl.maturity">Погашение<span class="th-info" data-tip="maturity">i</span></th>
+                  <th id="th-offer" data-sort-key="offer_date" data-i18n="tbl.offer">Оферта<span class="th-info" data-tip="offer">i</span></th>
                   <th class="no-sort actions-column" data-i18n="tbl.actions">Действия</th>
                 </tr>
               </thead>
@@ -1620,6 +1620,115 @@
         <button id="move-popover-confirm" class="btn" style="height:28px;font-size:12px;padding:0 12px;background:#7c3aed;color:#fff;" data-i18n="action.moveConfirm">Перенести →</button>
       </div>
     </div>
+
+    <!-- ── GUIDE MODAL ───────────────────────────────────────────── -->
+    <div id="guide-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeGuideModal()">
+      <div class="modal" style="max-width:680px;width:95%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#6366f1);display:flex;align-items:center;justify-content:center;font-size:16px;">📚</div>
+            <div>
+              <h2 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Справочник инвестора</h2>
+              <p style="margin:0;font-size:11px;color:var(--text-muted);">Всё об облигациях и рисках</p>
+            </div>
+          </div>
+          <button onclick="closeGuideModal()" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;" title="Закрыть">×</button>
+        </div>
+        <!-- Tab bar -->
+        <div id="guide-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;">
+          <button class="guide-tab active" data-tab="basics" onclick="switchGuideTab('basics')">📖 Основы</button>
+          <button class="guide-tab" data-tab="types" onclick="switchGuideTab('types')">🏷️ Виды</button>
+          <button class="guide-tab" data-tab="metrics" onclick="switchGuideTab('metrics')">📊 Показатели</button>
+          <button class="guide-tab" data-tab="risks" onclick="switchGuideTab('risks')">⚠️ Риски</button>
+          <button class="guide-tab" data-tab="glossary" onclick="switchGuideTab('glossary')">🔤 Глоссарий</button>
+        </div>
+        <!-- Content -->
+        <div id="guide-content" style="overflow-y:auto;flex:1;padding:20px 24px;"></div>
+      </div>
+    </div>
+    <style>
+      .guide-tab {
+        padding: 10px 16px;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        white-space: nowrap;
+        transition: color .15s, border-color .15s;
+      }
+      .guide-tab:hover { color: var(--text-secondary); }
+      .guide-tab.active { color: var(--blue-400); border-bottom-color: var(--blue-500); }
+      .guide-section { margin-bottom: 20px; }
+      .guide-section h3 {
+        font-size: 14px; font-weight: 700; color: var(--text-primary);
+        margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;
+      }
+      .guide-section p, .guide-section li {
+        font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 6px 0;
+      }
+      .guide-section ul { padding-left: 18px; margin: 6px 0; }
+      .guide-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 14px 16px;
+        margin-bottom: 12px;
+      }
+      .guide-card h4 {
+        font-size: 13px; font-weight: 700; color: var(--text-primary);
+        margin: 0 0 6px 0; display: flex; align-items: center; gap: 6px;
+      }
+      .guide-card p { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.55; }
+      .guide-badge {
+        display: inline-block; padding: 2px 7px; border-radius: 99px;
+        font-size: 10px; font-weight: 700; letter-spacing: .3px;
+      }
+      .guide-badge-green  { background: rgba(74,222,128,.15); color: var(--green-400); }
+      .guide-badge-yellow { background: rgba(245,158,11,.12); color: var(--amber-400); }
+      .guide-badge-red    { background: rgba(248,113,113,.12); color: var(--red-400); }
+      .guide-badge-blue   { background: rgba(96,165,250,.12); color: var(--blue-400); }
+      .guide-term-row {
+        display: flex; gap: 12px; padding: 10px 0;
+        border-bottom: 1px solid var(--table-border);
+        align-items: flex-start;
+      }
+      .guide-term-row:last-child { border-bottom: none; }
+      .guide-term-row dt {
+        font-size: 12px; font-weight: 700; color: var(--text-primary);
+        min-width: 140px; flex-shrink: 0;
+      }
+      .guide-term-row dd {
+        font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.5;
+      }
+      /* Inline info icon */
+      .th-info {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 13px; height: 13px; border-radius: 50%;
+        background: rgba(96,165,250,.18); color: var(--blue-400);
+        font-size: 9px; font-weight: 700; cursor: pointer;
+        margin-left: 3px; vertical-align: middle; line-height: 1;
+        transition: background .15s;
+        user-select: none;
+      }
+      .th-info:hover { background: rgba(96,165,250,.35); }
+      /* Tiny popover tooltip */
+      .th-popover {
+        position: fixed; z-index: 9999;
+        background: var(--modal-bg); border: 1px solid var(--border-strong);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 8px 24px -4px rgba(0,0,0,.45);
+        padding: 12px 14px; max-width: 260px; min-width: 180px;
+        font-size: 12px; color: var(--text-secondary); line-height: 1.55;
+        pointer-events: none;
+        animation: fadeIn .12s ease;
+      }
+      .th-popover strong { color: var(--text-primary); display: block; margin-bottom: 4px; font-size: 12px; }
+      @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+    </style>
 
     <!-- ── PRICE ALERT MODAL ─────────────────────────────────────── -->
     <div id="price-alert-modal" class="modal-overlay" style="display:none;">
@@ -4519,6 +4628,17 @@
           }
 
           if (topbarRight) {
+            // Guide (?) button
+            const guideBtn = document.createElement('button');
+            guideBtn.id = 'btn-guide';
+            guideBtn.title = 'Справочник инвестора';
+            guideBtn.style.cssText = 'width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;color:var(--blue-400);transition:.15s;padding:0;font-size:15px;font-weight:700;';
+            guideBtn.innerHTML = '?';
+            guideBtn.onmouseover = () => { guideBtn.style.borderColor='var(--blue-500)'; guideBtn.style.background='rgba(96,165,250,.08)'; };
+            guideBtn.onmouseout  = () => { guideBtn.style.borderColor='var(--border)'; guideBtn.style.background='transparent'; };
+            guideBtn.onclick = openGuideModal;
+            topbarRight.appendChild(guideBtn);
+
             // Theme toggle button
             const themeBtn = document.createElement('button');
             themeBtn.id = 'btn-theme-toggle';
@@ -7356,5 +7476,276 @@
           if (typeof manualRefresh === 'function') manualRefresh();
         }
       });
+
+      // ── GUIDE MODAL ────────────────────────────────────────────────
+      const GUIDE_CONTENT = {
+        basics: `
+          <div class="guide-section">
+            <h3>💡 Что такое облигация?</h3>
+            <p>Облигация — это долговая ценная бумага. Покупая облигацию, вы <strong>даёте деньги в долг</strong> эмитенту (государству, региону или компании). Взамен эмитент обязуется регулярно выплачивать вам проценты (купоны) и вернуть номинал в дату погашения.</p>
+          </div>
+          <div class="guide-section">
+            <h3>🔄 Как это работает?</h3>
+            <div class="guide-card">
+              <h4>1. Вы покупаете облигацию</h4>
+              <p>На бирже по рыночной цене. Цена выражается в % от номинала — например, 97,5% при номинале 1000 ₽ означает цену 975 ₽.</p>
+            </div>
+            <div class="guide-card">
+              <h4>2. Получаете купоны</h4>
+              <p>Периодически (обычно раз в полгода или квартал) эмитент перечисляет купонный доход на ваш брокерский счёт.</p>
+            </div>
+            <div class="guide-card">
+              <h4>3. В дату погашения</h4>
+              <p>Эмитент возвращает вам номинальную стоимость (обычно 1000 ₽ за облигацию) независимо от рыночной цены.</p>
+            </div>
+          </div>
+          <div class="guide-section">
+            <h3>⚖️ Облигации vs Акции vs Вклад</h3>
+            <div class="guide-card">
+              <h4>🏦 Банковский вклад</h4>
+              <p>Фиксированный доход, страховка АСВ до 1,4 млн ₽. Простой, но низкая доходность, нельзя продать досрочно без потери процентов.</p>
+            </div>
+            <div class="guide-card">
+              <h4>📄 Облигации</h4>
+              <p>Фиксированный купонный доход, можно продать в любой момент. Доходность выше вклада, риски умеренные. Нет страховки АСВ.</p>
+            </div>
+            <div class="guide-card">
+              <h4>📈 Акции</h4>
+              <p>Потенциально высокий доход, но цена может упасть в разы. Подходят для долгосрочных инвесторов с аппетитом к риску.</p>
+            </div>
+          </div>`,
+
+        types: `
+          <div class="guide-section">
+            <h3>🏛️ По эмитенту</h3>
+            <div class="guide-card">
+              <h4>🇷🇺 ОФЗ — Облигации Федерального Займа <span class="guide-badge guide-badge-green">Минимальный риск</span></h4>
+              <p>Выпускаются Минфином России. Самый надёжный рублёвый инструмент. Купонный доход освобождён от НДФЛ. Ликвидный рынок.</p>
+            </div>
+            <div class="guide-card">
+              <h4>🏙️ Муниципальные (субфедеральные) <span class="guide-badge guide-badge-green">Низкий риск</span></h4>
+              <p>Выпускают регионы и муниципалитеты. Чуть выше доходность, чем у ОФЗ. Риск дефолта минимален при поддержке федерального бюджета.</p>
+            </div>
+            <div class="guide-card">
+              <h4>🏢 Корпоративные <span class="guide-badge guide-badge-yellow">Средний риск</span></h4>
+              <p>Выпускают компании. Доходность выше ОФЗ за счёт кредитного риска. Надёжность зависит от рейтинга: ААА–ВВВ — инвестиционный уровень, BB и ниже — высокодоходные (ВДО).</p>
+            </div>
+            <div class="guide-card">
+              <h4>⚡ ВДО — Высокодоходные облигации <span class="guide-badge guide-badge-red">Высокий риск</span></h4>
+              <p>Облигации небольших компаний с рейтингом BB и ниже или без рейтинга. Купон 18–25%+, но риск дефолта значительно выше. Требуют диверсификации и анализа.</p>
+            </div>
+          </div>
+          <div class="guide-section">
+            <h3>📋 По типу купона</h3>
+            <div class="guide-card">
+              <h4>Фиксированный купон</h4>
+              <p>Ставка неизменна весь срок. Удобно планировать доход. Но при росте ставок ЦБ цена облигации падает.</p>
+            </div>
+            <div class="guide-card">
+              <h4>Переменный (флоатер)</h4>
+              <p>Купон привязан к ключевой ставке ЦБ или RUONIA. Защищает от роста ставок — купон растёт вместе с ними.</p>
+            </div>
+            <div class="guide-card">
+              <h4>Индексируемый (линкер)</h4>
+              <p>Номинал индексируется на инфляцию (ОФЗ-ИН). Защита от обесценивания рубля, но доходность ниже фиксированных.</p>
+            </div>
+          </div>
+          <div class="guide-section">
+            <h3>📅 По сроку</h3>
+            <ul>
+              <li><strong>Краткосрочные</strong> — до 1–2 лет. Меньше процентный риск.</li>
+              <li><strong>Среднесрочные</strong> — 2–5 лет. Баланс доходности и риска.</li>
+              <li><strong>Долгосрочные</strong> — 5+ лет. Выше доходность, но сильнее реагируют на ставки ЦБ.</li>
+            </ul>
+          </div>`,
+
+        metrics: `
+          <div class="guide-section">
+            <h3>📊 Ключевые показатели таблицы</h3>
+            <dl>
+              <div class="guide-term-row">
+                <dt>Чистая цена</dt>
+                <dd>Рыночная цена облигации без учёта НКД. Именно её вы видите на бирже и в котировках. Выражается в рублях (для MOEX — от номинала 1000 ₽).</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>НКД — Накопленный купонный доход</dt>
+                <dd>Часть купона, накопленная с даты последней выплаты. При покупке вы доплачиваете НКД продавцу, при продаже — получаете НКД от покупателя. Включается в стоимость позиции.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Стоимость позиции</dt>
+                <dd>Считается по грязной цене: (чистая цена + НКД) × количество. Отражает реальные деньги, которые вы получите при продаже сегодня.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Купон, ₽</dt>
+                <dd>Размер одной купонной выплаты на одну облигацию в рублях. Например, 42,38 ₽ за полгода.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Купон, %</dt>
+                <dd>Годовая купонная ставка от номинала. Например, 8,5% от 1000 ₽ = 85 ₽ в год.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>YTM — доходность к погашению</dt>
+                <dd>Годовая доходность, если держать облигацию до погашения и реинвестировать купоны. Учитывает разницу между текущей ценой и номиналом. Основной показатель для сравнения.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Рейтинг</dt>
+                <dd>Кредитный рейтинг эмитента от АКРА, Эксперт РА или S&P. AAA — максимальная надёжность, D — дефолт. Инвестиционный уровень: BBB и выше.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Оферта (put-оферта)</dt>
+                <dd>Дата, когда эмитент обязан выкупить облигации по номиналу по вашему требованию. После оферты купон может измениться. Важно следить за датой.</dd>
+              </div>
+              <div class="guide-term-row">
+                <dt>Доля в портфеле</dt>
+                <dd>Процент от общей рыночной стоимости портфеля. Помогает контролировать диверсификацию.</dd>
+              </div>
+            </dl>
+          </div>`,
+
+        risks: `
+          <div class="guide-section">
+            <h3>⚠️ Основные риски</h3>
+            <div class="guide-card" style="border-color:rgba(248,113,113,.25);">
+              <h4>💥 Кредитный риск (риск дефолта) <span class="guide-badge guide-badge-red">Высокий</span></h4>
+              <p>Эмитент может не выплатить купон или не погасить номинал. Характерен для корпоративных облигаций с низким рейтингом (ВДО). Снижается диверсификацией и выбором надёжных эмитентов.</p>
+            </div>
+            <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
+              <h4>📉 Процентный риск <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <p>При росте ключевой ставки ЦБ цены облигаций падают (и наоборот). Чем длиннее срок — тем сильнее реакция. Решение: держать до погашения или выбирать флоатеры.</p>
+            </div>
+            <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
+              <h4>💧 Риск ликвидности <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <p>Некоторые выпуски торгуются редко — трудно продать быстро по справедливой цене. Особенно актуально для ВДО и небольших выпусков. Проверяйте объём торгов перед покупкой.</p>
+            </div>
+            <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
+              <h4>📋 Риск оферты <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <p>После оферты эмитент может сильно снизить купон. Если не предъявить к выкупу и «прозевать» оферту — рискуете получить невыгодный купон. Следите за датами оферт в таблице.</p>
+            </div>
+            <div class="guide-card">
+              <h4>📊 Инфляционный риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
+              <p>Реальная доходность может оказаться ниже инфляции. Частично решается выбором ОФЗ-ИН (линкеров) или флоатеров с привязкой к ставке ЦБ.</p>
+            </div>
+            <div class="guide-card">
+              <h4>🏛️ Налоговый риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
+              <p>Купонный доход и прибыль от продажи облагаются НДФЛ 13–15%. Исключение: ОФЗ — купон не облагается НДФЛ. Используйте ИИС для налоговых льгот.</p>
+            </div>
+          </div>
+          <div class="guide-section">
+            <h3>🛡️ Как снизить риски?</h3>
+            <ul>
+              <li><strong>Диверсификация</strong> — не более 5–7% в одного эмитента, не более 15–20% в одну отрасль</li>
+              <li><strong>Рейтинг</strong> — для консервативного портфеля выбирайте BBB и выше (АКРА/Эксперт РА)</li>
+              <li><strong>Лесенка по срокам</strong> — разные даты погашения снижают процентный риск</li>
+              <li><strong>Следите за офертами</strong> — заранее решайте: предъявлять или держать дальше</li>
+              <li><strong>ИИС</strong> — налоговый вычет до 52 000 ₽/год или освобождение от НДФЛ на доход</li>
+            </ul>
+          </div>`,
+
+        glossary: `
+          <div class="guide-section">
+            <h3>🔤 Глоссарий</h3>
+            <dl>
+              <div class="guide-term-row"><dt>Номинал</dt><dd>Базовая стоимость облигации, которую эмитент возвращает при погашении. Обычно 1000 ₽.</dd></div>
+              <div class="guide-term-row"><dt>Купон</dt><dd>Периодическая выплата процентов держателю облигации.</dd></div>
+              <div class="guide-term-row"><dt>НКД</dt><dd>Накопленный купонный доход — часть купона от последней выплаты до сегодня.</dd></div>
+              <div class="guide-term-row"><dt>Чистая цена</dt><dd>Рыночная цена без НКД. Отображается в котировках.</dd></div>
+              <div class="guide-term-row"><dt>Грязная цена</dt><dd>Чистая цена + НКД. Реальная сумма, уплачиваемая при покупке.</dd></div>
+              <div class="guide-term-row"><dt>YTM</dt><dd>Yield to Maturity — доходность к погашению с учётом реинвестирования купонов.</dd></div>
+              <div class="guide-term-row"><dt>Дюрация</dt><dd>Средневзвешенный срок до получения денежных потоков. Мера процентного риска: выше дюрация — сильнее реакция цены на изменение ставок.</dd></div>
+              <div class="guide-term-row"><dt>Оферта</dt><dd>Право держателя потребовать досрочного погашения по номиналу в определённую дату.</dd></div>
+              <div class="guide-term-row"><dt>Флоатер</dt><dd>Облигация с переменным купоном, привязанным к ставке ЦБ или RUONIA.</dd></div>
+              <div class="guide-term-row"><dt>Линкер (ОФЗ-ИН)</dt><dd>Облигация с номиналом, индексируемым на инфляцию.</dd></div>
+              <div class="guide-term-row"><dt>ОФЗ</dt><dd>Облигации Федерального Займа — государственные долговые бумаги России.</dd></div>
+              <div class="guide-term-row"><dt>ВДО</dt><dd>Высокодоходные облигации — с рейтингом ниже BB или без рейтинга, купон 18%+.</dd></div>
+              <div class="guide-term-row"><dt>АКРА / Эксперт РА</dt><dd>Российские рейтинговые агентства. Рейтинги: ААА → D (АКРА), ruAAA → ruD (Эксперт РА).</dd></div>
+              <div class="guide-term-row"><dt>ИИС</dt><dd>Индивидуальный инвестиционный счёт — даёт налоговые льготы (вычет тип А или освобождение тип Б).</dd></div>
+              <div class="guide-term-row"><dt>Листинг (уровень)</dt><dd>Уровень допуска к торгам на MOEX: 1-й — наивысший, 3-й — минимальные требования.</dd></div>
+              <div class="guide-term-row"><dt>Амортизация</dt><dd>Погашение номинала частями в течение срока обращения, а не единым платежом в конце.</dd></div>
+            </dl>
+          </div>`
+      };
+
+      const TH_TIPS = {
+        rating:        { title: 'Рейтинг', text: 'Кредитный рейтинг от АКРА/Эксперт РА. AAA — максимальная надёжность, D — дефолт. Инвестиционный уровень: BBB и выше.' },
+        clean_price:   { title: 'Текущая цена (чистая)', text: 'Рыночная цена без НКД. Именно её вы видите в котировках на бирже. При покупке к ней добавляется НКД.' },
+        current_value: { title: 'Стоимость позиции', text: 'Рассчитывается по грязной цене (чистая + НКД) × количество. Отражает реальную рыночную стоимость вашей позиции.' },
+        profit:        { title: 'Прибыль / Убыток', text: '(Текущая грязная цена − Цена покупки) × Количество. Учитывает текущий НКД, поэтому со временем незначительно меняется.' },
+        coupon:        { title: 'Купон, ₽', text: 'Размер одной купонной выплаты на одну облигацию в рублях.' },
+        coupon_rate:   { title: 'Купонная ставка, %', text: 'Годовой купон в процентах от номинала (1000 ₽). Например, 8.5% = 85 ₽ в год на бумагу.' },
+        annual_coupon: { title: 'Годовой купон по позиции', text: 'Купон × Количество облигаций × Частота выплат в год. Ваш ожидаемый годовой купонный доход от этой бумаги.' },
+        ytm:           { title: 'Рыночная доходность (YTM)', text: 'Доходность к погашению: годовая доходность при удержании до погашения с реинвестированием купонов. Главный показатель для сравнения облигаций.' },
+        maturity:      { title: 'Дата погашения', text: 'Дата, когда эмитент вернёт номинал (обычно 1000 ₽). Чем дальше — тем выше процентный риск.' },
+        offer:         { title: 'Оферта (put)', text: 'Дата, когда вы можете потребовать досрочный выкуп по номиналу. После оферты купон может измениться — следите за этой датой!' },
+      };
+
+      function openGuideModal(startTab) {
+        const modal = document.getElementById('guide-modal');
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+        switchGuideTab(startTab || 'basics');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeGuideModal() {
+        const modal = document.getElementById('guide-modal');
+        modal.classList.remove('show');
+        setTimeout(() => { modal.style.display = 'none'; document.body.style.overflow = ''; }, 200);
+      }
+
+      function switchGuideTab(tab) {
+        document.querySelectorAll('.guide-tab').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        const content = document.getElementById('guide-content');
+        if (content) {
+          content.innerHTML = GUIDE_CONTENT[tab] || '';
+          content.scrollTop = 0;
+        }
+      }
+
+      // ⓘ popover on table headers
+      (function initThPopovers() {
+        let _pop = null;
+        function removePop() { if (_pop) { _pop.remove(); _pop = null; } }
+
+        document.addEventListener('mouseover', e => {
+          const el = e.target.closest('.th-info');
+          if (!el) return;
+          removePop();
+          const tip = TH_TIPS[el.dataset.tip];
+          if (!tip) return;
+          _pop = document.createElement('div');
+          _pop.className = 'th-popover';
+          _pop.innerHTML = `<strong>${tip.title}</strong>${tip.text}`;
+          document.body.appendChild(_pop);
+          const rect = el.getBoundingClientRect();
+          let top = rect.bottom + 6;
+          let left = rect.left + rect.width / 2 - 130;
+          if (left < 8) left = 8;
+          if (left + 260 > window.innerWidth - 8) left = window.innerWidth - 268;
+          if (top + 120 > window.innerHeight) top = rect.top - 120;
+          _pop.style.top = top + 'px';
+          _pop.style.left = left + 'px';
+        });
+
+        document.addEventListener('mouseout', e => {
+          if (e.target.closest('.th-info')) removePop();
+        });
+
+        // Prevent sort when clicking ⓘ
+        document.addEventListener('click', e => {
+          if (e.target.closest('.th-info')) {
+            e.stopPropagation();
+            const tip = TH_TIPS[e.target.closest('.th-info').dataset.tip];
+            if (tip) {
+              // Map tip key to glossary tab or open basics
+              const tabMap = { rating:'metrics', clean_price:'metrics', current_value:'metrics',
+                profit:'metrics', coupon:'metrics', coupon_rate:'metrics',
+                annual_coupon:'metrics', ytm:'metrics', maturity:'metrics', offer:'metrics' };
+              openGuideModal(tabMap[e.target.closest('.th-info').dataset.tip] || 'glossary');
+            }
+          }
+        }, true);
+      })();
 
     </script>
