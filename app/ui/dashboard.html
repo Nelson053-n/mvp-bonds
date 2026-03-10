@@ -1128,7 +1128,7 @@
                 </div>
                 <div class="field">
                   <label for="acc-new-pw" data-i18n="settings.account.newPw">Новый пароль</label>
-                  <input id="acc-new-pw" type="password" class="input" data-i18n-placeholder="settings.account.newPwPlaceholder" placeholder="Минимум 6 символов" />
+                  <input id="acc-new-pw" type="password" class="input" data-i18n-placeholder="settings.account.newPwPlaceholder" placeholder="Минимум 8 символов" />
                 </div>
                 <div class="field">
                   <label for="acc-new-pw2" data-i18n="settings.account.newPw2">Повторите пароль</label>
@@ -1392,7 +1392,7 @@
                     <th data-i18n="adm.colPortfolios">Портфелей</th>
                     <th data-i18n="adm.colCreated">Дата регистрации</th>
                     <th data-i18n="adm.colRole">Роль</th>
-                    <th class="no-sort">Тариф</th>
+                    <th class="no-sort" data-i18n="adm.colPlan">Тариф</th>
                     <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
@@ -1444,7 +1444,7 @@
           <!-- YooKassa settings -->
           <div style="padding:12px 16px 16px;border-top:1px solid var(--border);">
             <h4 style="margin:0 0 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
-              💳 ЮKassa <span id="adm-yk-status" style="color:var(--text-muted);font-size:11px;font-weight:400;">(заглушка)</span>
+              💳 ЮKassa <span id="adm-yk-status" data-i18n="adm.yookassaStub" style="color:var(--text-muted);font-size:11px;font-weight:400;">(заглушка)</span>
             </h4>
             <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
               <div class="field" style="margin:0;min-width:160px;">
@@ -1455,7 +1455,7 @@
                 <label style="font-size:11px;">Secret Key</label>
                 <input id="adm-yk-secret" type="password" class="input" style="max-width:260px;height:30px;font-size:12px;" placeholder="••••••••">
               </div>
-              <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;" onclick="adminSaveYooKassa()">Сохранить</button>
+              <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;" onclick="adminSaveYooKassa()" data-i18n="adm.yookassaSave">Сохранить</button>
             </div>
             <div id="adm-yk-msg" class="status" style="min-height:16px;font-size:12px;margin-top:8px;"></div>
           </div>
@@ -1465,64 +1465,64 @@
       </div>
 
       <!-- ── Upgrade to Pro modal ── -->
-      <div id="upgrade-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeUpgradeModal()">
+      <div id="upgrade-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;" onclick="if(event.target===this)closeUpgradeModal()">
         <div class="modal" style="max-width:540px;">
           <div class="modal-header">
-            <h2 class="modal-title">⭐ Получить Pro-доступ</h2>
-            <button class="modal-close" onclick="closeUpgradeModal()">✕</button>
+            <h2 class="modal-title" data-i18n="upgrade.title">⭐ Получить Pro-доступ</h2>
+            <button class="modal-close" aria-label="Close" onclick="closeUpgradeModal()">✕</button>
           </div>
           <div class="modal-body" style="padding:16px 20px;">
-            <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;">Разблокируйте все возможности Bond AI</p>
+            <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;" data-i18n="upgrade.subtitle">Разблокируйте все возможности Bond AI</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
               <!-- Free card -->
               <div style="border:1px solid var(--border);border-radius:8px;padding:14px;">
-                <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text-secondary);">📦 Бесплатный</div>
+                <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text-secondary);" data-i18n="upgrade.freePlan">📦 Бесплатный</div>
                 <ul style="margin:0;padding:0 0 0 16px;font-size:12px;color:var(--text-secondary);line-height:2;">
-                  <li>1 портфель</li>
-                  <li>10 бумаг</li>
-                  <li style="color:var(--red-600);">✗ AI-комментарии</li>
-                  <li style="color:var(--red-600);">✗ PDF-отчёт</li>
-                  <li style="color:var(--red-600);">✗ Уведомления</li>
-                  <li style="color:var(--red-600);">✗ Шеринг портфеля</li>
+                  <li data-i18n="upgrade.feat.portfoliosFree">1 портфель</li>
+                  <li data-i18n="upgrade.feat.instrumentsFree">10 бумаг</li>
+                  <li style="color:var(--red-600);" data-i18n="upgrade.feat.aiNo">✗ AI-комментарии</li>
+                  <li style="color:var(--red-600);" data-i18n="upgrade.feat.pdfNo">✗ PDF-отчёт</li>
+                  <li style="color:var(--red-600);" data-i18n="upgrade.feat.notifNo">✗ Уведомления</li>
+                  <li style="color:var(--red-600);" data-i18n="upgrade.feat.shareNo">✗ Шеринг портфеля</li>
                 </ul>
               </div>
               <!-- Pro card -->
               <div style="border:2px solid #f59e0b;border-radius:8px;padding:14px;background:rgba(245,158,11,0.05);">
-                <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#f59e0b;">⭐ Pro</div>
+                <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#f59e0b;" data-i18n="upgrade.proPlan">⭐ Pro</div>
                 <ul style="margin:0;padding:0 0 0 16px;font-size:12px;line-height:2;">
-                  <li>Неограниченно портфелей</li>
-                  <li>Неограниченно бумаг</li>
-                  <li>✓ AI-комментарии</li>
-                  <li>✓ PDF-отчёт</li>
-                  <li>✓ Telegram-уведомления</li>
-                  <li>✓ Шеринг портфеля</li>
+                  <li data-i18n="upgrade.feat.portfoliosUnlim">Неограниченно портфелей</li>
+                  <li data-i18n="upgrade.feat.instrumentsUnlim">Неограниченно бумаг</li>
+                  <li data-i18n="upgrade.feat.aiYes">✓ AI-комментарии</li>
+                  <li data-i18n="upgrade.feat.pdfYes">✓ PDF-отчёт</li>
+                  <li data-i18n="upgrade.feat.notifYes">✓ Telegram-уведомления</li>
+                  <li data-i18n="upgrade.feat.shareYes">✓ Шеринг портфеля</li>
                 </ul>
               </div>
             </div>
             <div style="text-align:center;margin-bottom:12px;">
               <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
-                <b style="font-size:20px;color:var(--text-primary);">299 ₽</b>/мес &nbsp;·&nbsp;
-                <b style="font-size:16px;color:#16a34a;">2 490 ₽</b>/год <span style="font-size:11px;background:#dcfce7;color:#166534;border-radius:4px;padding:2px 6px;">−30%</span>
+                <b style="font-size:20px;color:var(--text-primary);" data-i18n="upgrade.pricingMonth">299 ₽/мес</b> &nbsp;·&nbsp;
+                <b style="font-size:16px;color:#16a34a;" data-i18n="upgrade.pricingYear">2 490 ₽/год</b> <span style="font-size:11px;background:#dcfce7;color:#166534;border-radius:4px;padding:2px 6px;" data-i18n="upgrade.discount">−30%</span>
               </div>
-              <button id="upgrade-pay-btn" class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:10px 32px;font-size:14px;font-weight:600;" onclick="doCheckout()">
+              <button id="upgrade-pay-btn" class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:10px 32px;font-size:14px;font-weight:600;" onclick="doCheckout()" data-i18n="upgrade.cta">
                 Подключить Pro →
               </button>
             </div>
-            <div id="upgrade-msg" style="text-align:center;font-size:12px;color:var(--text-muted);min-height:16px;"></div>
+            <div id="upgrade-msg" role="status" style="text-align:center;font-size:12px;color:var(--text-muted);min-height:16px;"></div>
           </div>
         </div>
       </div>
 
       <!-- Change password modal -->
-      <div id="adm-pwd-modal" class="modal-overlay" style="display:none;">
+      <div id="adm-pwd-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;">
         <div class="modal" style="max-width:360px;">
           <div class="modal-header"><h2 class="modal-title">Сменить пароль</h2></div>
           <div class="modal-body">
             <div class="modal-field">
               <label>Новый пароль</label>
-              <input type="password" id="adm-pwd-input" class="input" placeholder="Минимум 6 символов">
+              <input type="password" id="adm-pwd-input" class="input" placeholder="Минимум 8 символов">
             </div>
-            <p id="adm-pwd-status" class="status error" style="min-height:18px;margin:4px 0 0;"></p>
+            <p id="adm-pwd-status" class="status error" role="alert" style="min-height:18px;margin:4px 0 0;"></p>
           </div>
           <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('adm-pwd-modal').style.display='none'">Отмена</button>
@@ -1557,7 +1557,7 @@
     </footer>
 
     <!-- Share Portfolio Modal -->
-    <div id="share-modal-overlay" class="modal-overlay">
+    <div id="share-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true">
       <div class="modal">
         <div class="modal-header">
           <h2 class="modal-title" data-i18n="share.title">Поделиться портфелем</h2>
@@ -1585,7 +1585,7 @@
     </div>
 
     <!-- ── ADD INSTRUMENT MODAL ──────────────────────────────────── -->
-    <div id="add-instrument-modal" class="modal-overlay" style="display:none;">
+    <div id="add-instrument-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;">
       <div class="modal" style="max-width:460px;">
         <div class="modal-header">
           <h2 class="modal-title">Добавить бумагу</h2>
@@ -1607,7 +1607,7 @@
               <input type="number" id="add-modal-price" class="input" placeholder="100" step="0.01">
             </div>
           </div>
-          <div id="add-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
+          <div id="add-modal-status" class="status error" role="alert" style="min-height:18px;margin-top:4px;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closeAddInstrumentModal()">Отмена</button>
@@ -1617,7 +1617,7 @@
     </div>
 
     <!-- Universal Confirm Modal -->
-    <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;">
+    <div id="confirm-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;">
       <div class="modal" style="max-width:360px;">
         <div class="modal-header">
           <h2 class="modal-title" id="confirm-modal-title"></h2>
@@ -1633,7 +1633,7 @@
     </div>
 
     <!-- Password Entry Modal for Shared View -->
-    <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="password-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" style="display: none;">
       <div class="modal" style="max-width: 320px;">
         <div class="modal-header">
           <h2 class="modal-title" data-i18n="shareView.pwTitle">Защищённый портфель</h2>
@@ -1641,7 +1641,7 @@
         <div class="modal-body">
           <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--text-secondary);" data-i18n="shareView.pwDesc">Для просмотра этого портфеля необходим пароль:</p>
           <input type="password" id="password-modal-input" class="input" placeholder="Введите пароль" data-i18n-placeholder="shareView.pwInput">
-          <div id="password-modal-status" class="status error" style="min-height:18px;margin-top:6px;"></div>
+          <div id="password-modal-status" class="status error" role="alert" style="min-height:18px;margin-top:6px;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" onclick="closePasswordModal();" data-i18n="share.closeBtn">Закрыть</button>
@@ -1651,7 +1651,7 @@
     </div>
 
     <!-- Create Portfolio Modal -->
-    <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="create-portfolio-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" style="display: none;">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
           <h2 class="modal-title" data-i18n="modal.createPortfolio.title">Новый портфель</h2>
@@ -1660,7 +1660,7 @@
           <div class="modal-field">
             <label data-i18n="modal.createPortfolio.nameLabel">Название</label>
             <input type="text" id="create-portfolio-name" class="input" placeholder="Например: Мои облигации" data-i18n-placeholder="modal.createPortfolio.namePlaceholder">
-            <div id="create-portfolio-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
+            <div id="create-portfolio-status" class="status error" role="alert" style="min-height:18px;margin-top:4px;"></div>
           </div>
         </div>
         <div class="modal-actions">
@@ -1671,7 +1671,7 @@
     </div>
 
     <!-- Delete Portfolio Modal -->
-    <div id="delete-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="delete-portfolio-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" style="display: none;">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
           <h2 class="modal-title" data-i18n="modal.deletePortfolio.title">Удалить портфель</h2>
@@ -1701,7 +1701,7 @@
     </div>
 
     <!-- ── GUIDE MODAL ───────────────────────────────────────────── -->
-    <div id="guide-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeGuideModal()">
+    <div id="guide-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;" onclick="if(event.target===this)closeGuideModal()">
       <div class="modal" style="max-width:680px;width:95%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
         <!-- Header -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -1810,7 +1810,7 @@
     </style>
 
     <!-- ── PRICE ALERT MODAL ─────────────────────────────────────── -->
-    <div id="price-alert-modal" class="modal-overlay" style="display:none;">
+    <div id="price-alert-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display:none;">
       <div class="modal" style="max-width:400px;">
         <div class="modal-header">
           <h2 class="modal-title">Ценовые алерты</h2>
@@ -2049,6 +2049,12 @@
         return !!shareToken;
       }
 
+      // ── HTML ESCAPE ──────────────────────────────────────────────
+      function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      }
+
       // ── API HELPER ───────────────────────────────────────────────
       async function apiFetch(url, opts = {}) {
         const headers = { ...(opts.headers || {}) };
@@ -2057,25 +2063,17 @@
         if (isReadOnly && shareToken) {
           if (sharePassword) {
             headers['X-Share-Password'] = sharePassword;
-            console.log('apiFetch - Sending share password for', url);
-          } else {
-            console.log('apiFetch - No password for shared view', url);
           }
         } else {
           // For authenticated views, send auth token
           const token = localStorage.getItem('mvp_auth_token');
           if (token) {
             headers['Authorization'] = `Bearer ${token}`;
-            console.log('apiFetch - Sending auth token for', url);
-          } else {
-            console.log('apiFetch - NO TOKEN FOUND for', url);
           }
         }
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
-        console.log(`apiFetch ${url}:`, response.status);
         if (response.status === 401 && !isReadOnly) {
-          console.log('Got 401, clearing auth');
           localStorage.removeItem('mvp_auth_token');
           localStorage.removeItem('mvp_username');
           showLoginScreen();
@@ -2891,7 +2889,7 @@
           let rows_html = sorted.map(b => {
             const shortName = b.name.length > 22 ? b.name.substring(0, 21) + '…' : b.name;
             return `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--border,rgba(148,163,184,.08));">
-              <span style="color:var(--text-secondary,#94a3b8);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${b.name}">${shortName}</span>
+              <span style="color:var(--text-secondary,#94a3b8);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(b.name)}">${esc(shortName)}</span>
               <span style="font-weight:600;white-space:nowrap;color:var(--green-400,#4ade80);">+${Math.round(b.amount).toLocaleString('ru')} ₽</span>
             </div>`;
           }).join('');
@@ -3140,15 +3138,15 @@
           filtered.slice(0, 12).forEach(b => {
             const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
             const offerNote = b.offer_date ? ` · ${window._lang === 'en' ? 'offer' : 'оферта'} ${b.offer_date.substring(0,7)}` : '';
-            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg-elevated);color:var(--text-muted);margin-right:6px;">${b.rating}</span>` : '';
+            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg-elevated);color:var(--text-muted);margin-right:6px;">${esc(b.rating)}</span>` : '';
             const card = document.createElement('div');
             card.className = 'suggest-card';
             card.innerHTML = `
               <div class="suggest-card-body">
-                <div class="suggest-card-name">${ratingHtml}${b.name}</div>
-                <div class="suggest-card-meta">${b.ticker} · ${window._lang === 'en' ? 'maturity' : 'погашение'} ${maturity}${offerNote}</div>
+                <div class="suggest-card-name">${ratingHtml}${esc(b.name)}</div>
+                <div class="suggest-card-meta">${esc(b.ticker)} · ${window._lang === 'en' ? 'maturity' : 'погашение'} ${esc(maturity)}${offerNote}</div>
               </div>
-              <div class="suggest-card-yield">${b.coupon_percent}%</div>
+              <div class="suggest-card-yield">${esc(String(b.coupon_percent))}%</div>
               <button class="suggest-card-add" title="${t('add.btn')}">+</button>
             `;
             const addBtn = card.querySelector('.suggest-card-add');
@@ -4203,22 +4201,22 @@
           let expStr = '';
           if (exp) {
             const d = new Date(exp * 1000);
-            expStr = ' · до ' + d.toLocaleDateString('ru-RU');
+            expStr = ' · ' + t('plan.card.expiry') + ' ' + d.toLocaleDateString(window._lang === 'en' ? 'en-GB' : 'ru-RU');
           } else {
-            expStr = ' · Бессрочно';
+            expStr = ' · ' + t('plan.card.unlimited');
           }
           el.innerHTML = `
             <div>
-              <div style="font-size:15px;font-weight:700;color:#f59e0b;">⭐ Pro-подписка${expStr}</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Все возможности разблокированы</div>
+              <div style="font-size:15px;font-weight:700;color:#f59e0b;">⭐ ${t('plan.pro')}${expStr}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${t('plan.card.proUnlocked')}</div>
             </div>`;
         } else {
           el.innerHTML = `
             <div>
-              <div style="font-size:14px;font-weight:600;color:var(--text-secondary);">📦 Бесплатный тариф</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">1 портфель · 10 бумаг · без AI/PDF/уведомлений</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text-secondary);">${t('upgrade.freePlan')} ${t('plan.free')}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${t('plan.card.freeDesc')}</div>
             </div>
-            <button class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:8px 18px;font-size:13px;white-space:nowrap;" onclick="openUpgradeModal()">⭐ Получить Pro →</button>`;
+            <button class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:8px 18px;font-size:13px;white-space:nowrap;" onclick="openUpgradeModal()">${t('plan.card.getCta')}</button>`;
         }
       }
 
@@ -4236,7 +4234,7 @@
         const banner = document.createElement('div');
         banner.id = bannerId;
         banner.style.cssText = 'padding:10px 14px;border-radius:8px;background:var(--bg-elevated);border:1px solid var(--border);font-size:12px;color:var(--text-muted);display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;';
-        banner.innerHTML = `<span>🔒 Telegram-уведомления доступны в Pro-тарифе</span><button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 10px;font-size:11px;" onclick="openUpgradeModal()">Получить Pro</button>`;
+        banner.innerHTML = `<span>${t('notif.proBanner')}</span><button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 10px;font-size:11px;" onclick="openUpgradeModal()">${t('notif.getProBtn')}</button>`;
         couponField.parentNode.insertBefore(banner, couponField);
       }
 
@@ -4259,12 +4257,12 @@
           if (r) {
             const d = await r.json();
             if (msg) {
-              msg.textContent = d.message || 'Обратитесь к администратору.';
+              msg.textContent = d.message || t('upgrade.stubMsg');
               msg.style.color = 'var(--text-secondary)';
             }
           }
         } catch(e) {
-          if (msg) { msg.textContent = 'Ошибка запроса.'; msg.style.color = 'var(--red-600)'; }
+          if (msg) { msg.textContent = t('err.requestError'); msg.style.color = 'var(--red-600)'; }
         }
         if (btn) btn.disabled = false;
       }
@@ -4336,7 +4334,7 @@
             const regBtn = document.getElementById('btn-register');
             if (!username || !password) { shakeCard(); setAuthMsg(t('auth.enterCreds'), 'error'); return; }
             if (username.length < 3) { shakeCard(); setAuthMsg(t('auth.minLogin'), 'error'); return; }
-            if (password.length < 6) { shakeCard(); setAuthMsg(t('auth.minPassword'), 'error'); return; }
+            if (password.length < 8) { shakeCard(); setAuthMsg(t('auth.minPassword'), 'error'); return; }
             regBtn.disabled = true;
             regBtn.textContent = t('auth.registering');
             setAuthMsg('', '');
@@ -4745,7 +4743,7 @@
               const pw = document.getElementById('forgot-newpw').value;
               const msg = document.getElementById('forgot-message');
               if (code.length !== 6 || !/^\d+$/.test(code)) { msg.textContent = t('auth.codeDigits'); msg.className = 'auth-msg error'; return; }
-              if (pw.length < 6) { msg.textContent = t('auth.minPassword'); msg.className = 'auth-msg error'; return; }
+              if (pw.length < 8) { msg.textContent = t('auth.minPassword'); msg.className = 'auth-msg error'; return; }
               btnDoReset.disabled = true;
               try {
                 const r = await fetch('/auth/reset-password', {
@@ -5624,7 +5622,7 @@
           // Revert checkbox on error
           const cb = document.getElementById(`src-toggle-${name}`);
           if (cb) cb.checked = !enabled;
-          alert('Ошибка изменения настройки');
+          alert(t('err.settingsToggle'));
         }
       }
 
@@ -5694,11 +5692,14 @@
 
             const tdRole = document.createElement('td');
             const roleSpan = document.createElement('span');
-            if (u.is_admin) {
-              roleSpan.textContent = 'Администратор';
+            if (isPrimary) {
+              roleSpan.textContent = t('adm.roleSuperAdmin');
+              roleSpan.style.cssText = 'color:#a78bfa;font-weight:600;';
+            } else if (u.is_admin) {
+              roleSpan.textContent = t('adm.roleAdmin');
               roleSpan.style.cssText = 'color:#f59e0b;font-weight:600;';
             } else {
-              roleSpan.textContent = 'Пользователь';
+              roleSpan.textContent = t('adm.roleUser');
               roleSpan.style.color = 'var(--slate-400)';
             }
             tdRole.appendChild(roleSpan);
@@ -5714,18 +5715,18 @@
               : 'color:var(--text-muted);font-size:12px;';
             if (isPro && u.plan_expires_at) {
               const d = new Date(u.plan_expires_at * 1000);
-              planBadge.title = 'до ' + d.toLocaleDateString('ru-RU');
+              planBadge.title = t('plan.card.expiry') + ' ' + d.toLocaleDateString('ru-RU');
             }
             tdPlan.appendChild(planBadge);
             const planBtns = document.createElement('div');
             planBtns.style.cssText = 'display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;';
             if (!isPro) {
-              const b1 = _mkBtn('Pro ∞', 'background:#f59e0b;color:#fff', () => adminSetPlan(u.id, 'pro', null, tr));
-              const b2 = _mkBtn('Pro 30д', 'background:#d97706;color:#fff', () => adminSetPlan(u.id, 'pro', Math.floor(Date.now()/1000)+30*86400, tr));
+              const b1 = _mkBtn(t('adm.planSetProUnlim'), 'background:#f59e0b;color:#fff', () => adminSetPlan(u.id, 'pro', null, tr));
+              const b2 = _mkBtn(t('adm.planSetPro30d'), 'background:#d97706;color:#fff', () => adminSetPlan(u.id, 'pro', Math.floor(Date.now()/1000)+30*86400, tr));
               planBtns.append(b1, b2);
             } else {
-              const b1 = _mkBtn('Free', 'background:var(--slate-600);color:#fff', () => adminSetPlan(u.id, 'free', null, tr));
-              const b2 = _mkBtn('+30д', 'background:#d97706;color:#fff', () => {
+              const b1 = _mkBtn(t('adm.planSetFree'), 'background:var(--slate-600);color:#fff', () => adminSetPlan(u.id, 'free', null, tr));
+              const b2 = _mkBtn(t('adm.planExtend30d'), 'background:#d97706;color:#fff', () => {
                 const exp = (u.plan_expires_at && u.plan_expires_at > Date.now()/1000) ? u.plan_expires_at : Math.floor(Date.now()/1000);
                 adminSetPlan(u.id, 'pro', exp+30*86400, tr);
               });
@@ -5737,19 +5738,19 @@
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
 
-            const pwdBtn = _mkBtn('Пароль', 'background:var(--blue-600);color:#fff',
+            const pwdBtn = _mkBtn(t('adm.actionPwd'), 'background:var(--blue-600);color:#fff',
               () => adminOpenPwdModal(u.id, u.username));
             div.appendChild(pwdBtn);
 
             if (u.is_admin && !isPrimary) {
-              const demoteBtn = _mkBtn('Снять администратора', 'background:#92400e;color:#fff',
+              const demoteBtn = _mkBtn(t('adm.actionDemote'), 'background:#92400e;color:#fff',
                 function() { adminSetRole(u.id, false, this); });
               div.appendChild(demoteBtn);
             } else if (!u.is_admin) {
-              const promoteBtn = _mkBtn('Сделать администратором', 'background:#d97706;color:#fff',
+              const promoteBtn = _mkBtn(t('adm.actionPromote'), 'background:#d97706;color:#fff',
                 function() { adminSetRole(u.id, true, this); });
               div.appendChild(promoteBtn);
-              const delBtn = _mkBtn('Удалить', 'background:var(--red-600);color:#fff',
+              const delBtn = _mkBtn(t('adm.actionDelete'), 'background:var(--red-600);color:#fff',
                 () => adminDeleteUser(u.id, u.username));
               div.appendChild(delBtn);
             }
@@ -5759,7 +5760,7 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red-600);text-align:center;">${t('err.requestError')}</td></tr>`;
         }
       }
 
@@ -5782,7 +5783,7 @@
           const shopEl = document.getElementById('adm-yk-shop-id');
           if (shopEl) shopEl.value = d.shop_id || '';
           const statusEl = document.getElementById('adm-yk-status');
-          if (statusEl && d.has_secret) statusEl.textContent = '(ключ сохранён)';
+          if (statusEl && d.has_secret) statusEl.textContent = t('adm.yookassaKeyStored');
         } catch(e) {}
       }
 
@@ -5797,17 +5798,17 @@
             body: JSON.stringify({ shop_id: shopId, secret_key: secret }),
           });
           if (r && r.ok) {
-            msgEl.textContent = 'Сохранено';
+            msgEl.textContent = t('adm.yookassaSaved');
             msgEl.className = 'status ok';
-            if (secret) document.getElementById('adm-yk-secret').value = '';
+            if (secret) { document.getElementById('adm-yk-secret').value = ''; }
             const statusEl = document.getElementById('adm-yk-status');
-            if (statusEl && shopId) statusEl.textContent = '(настроено)';
+            if (statusEl && shopId) statusEl.textContent = t('adm.yookassaConfigured');
           } else {
-            msgEl.textContent = 'Ошибка сохранения';
+            msgEl.textContent = t('adm.yookassaError');
             msgEl.className = 'status error';
           }
         } catch(e) {
-          msgEl.textContent = 'Ошибка: ' + e.message;
+          msgEl.textContent = t('err.requestError') + ': ' + e.message;
           msgEl.className = 'status error';
         }
         setTimeout(() => { if(msgEl) { msgEl.textContent=''; msgEl.className='status'; } }, 4000);
@@ -5884,7 +5885,7 @@
       async function adminSubmitPassword() {
         const pwd = document.getElementById('adm-pwd-input').value.trim();
         const status = document.getElementById('adm-pwd-status');
-        if (pwd.length < 6) { status.textContent = 'Минимум 6 символов'; return; }
+        if (pwd.length < 8) { status.textContent = t('auth.minPassword'); return; }
         try {
           const r = await apiFetch(`/admin/users/${_admPwdUserId}/password`, {
             method: 'PATCH',
@@ -5916,10 +5917,10 @@
             await adminLoadUsers();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            alert(e.detail || t('err.requestError'));
             btn.disabled = false;
           }
-        } catch(e) { alert('Ошибка сети'); btn.disabled = false; }
+        } catch(e) { alert(t('err.networkError')); btn.disabled = false; }
       }
 
       async function adminDeleteUser(userId, username) {
@@ -5932,9 +5933,9 @@
             await adminLoadStats();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            alert(e.detail || t('err.requestError'));
           }
-        } catch(e) { alert('Ошибка сети'); }
+        } catch(e) { alert(t('err.networkError')); }
       }
 
       async function adminDeletePortfolio(portfolioId, name) {
@@ -5946,9 +5947,9 @@
             await adminLoadStats();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            alert(e.detail || t('err.requestError'));
           }
-        } catch(e) { alert('Ошибка сети'); }
+        } catch(e) { alert(t('err.networkError')); }
       }
 
       // Show admin panel tab if user is admin
@@ -6171,7 +6172,7 @@
         if (!newName) return;
         try {
           const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName }) });
-          if (!r.ok) { alert('Ошибка сохранения'); return; }
+          if (!r.ok) { alert(t('err.saveFailed')); return; }
           document.getElementById(`sp-name-${id}`).textContent = newName;
           document.getElementById(`sp-name-${id}`).style.display = '';
           document.getElementById(`sp-input-${id}`).style.display = 'none';
@@ -6180,7 +6181,7 @@
           // Update portfolio selector
           await loadPortfolios();
           updatePortfolioSelector();
-        } catch(e) { alert('Ошибка сохранения'); }
+        } catch(e) { alert(t('err.saveFailed')); }
       }
 
       async function settingsDeletePortfolio(id, name) {
@@ -6226,7 +6227,7 @@
         const newPw2 = document.getElementById('acc-new-pw2').value;
         const status = document.getElementById('acc-pw-status');
         if (newPw !== newPw2) { status.textContent = t('settings.account.pwMismatch'); status.className = 'status error'; return; }
-        if (newPw.length < 6) { status.textContent = t('settings.account.pwMinLength'); status.className = 'status error'; return; }
+        if (newPw.length < 8) { status.textContent = t('settings.account.pwMinLength'); status.className = 'status error'; return; }
         try {
           const r = await apiFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
           if (r.status === 204) {
@@ -6682,11 +6683,11 @@
             row.onmouseover = () => { drop.querySelectorAll('[data-ac-item]').forEach(r => r.classList.remove('ac-active')); row.classList.add('ac-active'); };
             const coupon = b.coupon_percent != null ? `${Number(b.coupon_percent).toFixed(1)}%` : '';
             const mat = b.maturity ? b.maturity.substring(0,7) : '';
-            const rating = b.rating ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);">${b.rating}</span>` : '';
+            const rating = b.rating ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);">${esc(b.rating)}</span>` : '';
             row.innerHTML = `
               <div style="min-width:0;flex:1;">
-                <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
-                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${b.ticker}${mat ? ' · ' + mat : ''}${coupon ? ' · ' + coupon : ''}</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(b.name)}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${esc(b.ticker)}${mat ? ' · ' + esc(mat) : ''}${coupon ? ' · ' + esc(coupon) : ''}</div>
               </div>
               ${rating}`;
             row.addEventListener('click', () => {
@@ -6730,7 +6731,7 @@
             btn.onmouseout  = () => btn.style.borderColor = 'var(--border)';
             const coupon = s.coupon_percent != null ? Number(s.coupon_percent).toFixed(1)+'%' : '';
             const shortName = (s.name || s.ticker || '').substring(0, 22);
-            btn.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shortName}</div><div style="font-size:10px;color:var(--text-muted);">${s.ticker}${coupon ? ' · ' + coupon : ''}</div>`;
+            btn.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(shortName)}</div><div style="font-size:10px;color:var(--text-muted);">${esc(s.ticker)}${coupon ? ' · ' + esc(coupon) : ''}</div>`;
             btn.onclick = () => {
               const inp = document.getElementById('add-modal-ticker');
               inp.value = s.ticker;
@@ -6811,7 +6812,7 @@
           'auth.createAccountHint': 'Введите логин и пароль, затем нажмите «Зарегистрироваться»',
           'auth.registerError': 'Ошибка регистрации',
           'auth.minLogin': 'Логин минимум 3 символа',
-          'auth.minPassword': 'Пароль минимум 6 символов',
+          'auth.minPassword': 'Пароль минимум 8 символов',
           'auth.enterUsername': 'Введите имя пользователя',
           'auth.sending': 'Отправка...',
           'auth.codeDigits': 'Код должен быть 6 цифр',
@@ -6986,7 +6987,7 @@
           'settings.account.tgTokenWarning': '⚠️ Для работы восстановления пароля не забудьте указать токен бота в разделе «Уведомления».',
           'settings.account.usernameNewPlaceholder': 'Минимум 3 символа',
           'settings.account.oldPwPlaceholder': 'Текущий пароль',
-          'settings.account.newPwPlaceholder': 'Минимум 6 символов',
+          'settings.account.newPwPlaceholder': 'Минимум 8 символов',
           'settings.account.newPw2Placeholder': 'Повторите новый пароль',
           'io.exportDesc': 'Скачайте все позиции текущего портфеля в формате CSV.<br>Файл содержит: тикер, тип, количество, цену покупки.',
           'io.importDesc': 'Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>',
@@ -7040,7 +7041,7 @@
           'settings.account.usernameChanged': 'Логин изменён',
           'settings.account.usernameTaken': 'Логин уже занят',
           'settings.account.pwMismatch': 'Новые пароли не совпадают',
-          'settings.account.pwMinLength': 'Минимум 6 символов',
+          'settings.account.pwMinLength': 'Минимум 8 символов',
           'settings.account.pwChanged': 'Пароль изменён',
           'settings.account.pwError': 'Ошибка',
           'settings.account.pwConnError': 'Ошибка соединения',
@@ -7095,6 +7096,64 @@
           'watchlist.empty': 'Список наблюдения пуст',
           'instrument.bond': 'Облигация',
           'instrument.stock': 'Акция',
+          'adm.colPlan': 'Тариф',
+          'adm.roleSuperAdmin': 'Суперадмин',
+          'adm.roleAdmin': 'Администратор',
+          'adm.roleUser': 'Пользователь',
+          'adm.planSetProUnlim': 'Pro ∞',
+          'adm.planSetPro30d': 'Pro 30д',
+          'adm.planSetFree': 'Free',
+          'adm.planExtend30d': '+30д',
+          'adm.actionPwd': 'Пароль',
+          'adm.actionDemote': 'Снять администратора',
+          'adm.actionPromote': 'Сделать администратором',
+          'adm.actionDelete': 'Удалить',
+          'adm.sourcesTitle': 'Источники данных',
+          'adm.clearRatingsCache': 'Очистить кэш рейтингов',
+          'adm.yookassaTitle': 'YooKassa',
+          'adm.yookassaStub': 'Оплата не настроена',
+          'adm.yookassaConfigured': 'Настроено',
+          'adm.yookassaSave': 'Сохранить',
+          'adm.yookassaSaved': 'Сохранено',
+          'adm.yookassaError': 'Ошибка сохранения',
+          'adm.yookassaKeyStored': 'Секретный ключ сохранён',
+          'plan.free': 'Бесплатный',
+          'plan.pro': 'Pro',
+          'plan.card.freeDesc': '1 портфель · 10 бумаг · без AI/PDF/уведомлений',
+          'plan.card.proUnlocked': 'Все возможности разблокированы',
+          'plan.card.getCta': '⭐ Получить Pro →',
+          'plan.card.expiry': 'до',
+          'plan.card.unlimited': 'Бессрочно',
+          'upgrade.title': '⭐ Получить Pro-доступ',
+          'upgrade.subtitle': 'Разблокируйте все возможности Bond AI',
+          'upgrade.freePlan': '📦 Бесплатный',
+          'upgrade.proPlan': '⭐ Pro',
+          'upgrade.feat.portfoliosFree': '1 портфель',
+          'upgrade.feat.instrumentsFree': '10 бумаг',
+          'upgrade.feat.aiNo': '✗ AI-комментарии',
+          'upgrade.feat.pdfNo': '✗ PDF-отчёт',
+          'upgrade.feat.notifNo': '✗ Уведомления',
+          'upgrade.feat.shareNo': '✗ Шеринг портфеля',
+          'upgrade.feat.portfoliosUnlim': 'Неограниченно портфелей',
+          'upgrade.feat.instrumentsUnlim': 'Неограниченно бумаг',
+          'upgrade.feat.aiYes': '✓ AI-комментарии',
+          'upgrade.feat.pdfYes': '✓ PDF-отчёт',
+          'upgrade.feat.notifYes': '✓ Telegram-уведомления',
+          'upgrade.feat.shareYes': '✓ Шеринг портфеля',
+          'upgrade.pricingMonth': '299 ₽/мес',
+          'upgrade.pricingYear': '2 490 ₽/год',
+          'upgrade.discount': '−30%',
+          'upgrade.cta': 'Подключить Pro →',
+          'upgrade.stubMsg': 'Оплата временно недоступна. Обратитесь к администратору.',
+          'notif.proBanner': '🔒 Telegram-уведомления доступны в Pro-тарифе',
+          'notif.getProBtn': 'Получить Pro',
+          'auth.sessionExpired': 'Сессия истекла. Пожалуйста, войдите заново.',
+          'err.networkError': 'Ошибка сети',
+          'err.requestError': 'Ошибка запроса',
+          'err.saveFailed': 'Ошибка сохранения',
+          'err.addFailed': 'Ошибка добавления. Попробуйте ещё раз.',
+          'err.settingsToggle': 'Ошибка изменения настройки',
+          'err.minAmount': 'Минимальная сумма 10 000 ₽',
         },
         en: {
           'nav.analytics': 'Analytics',
@@ -7132,7 +7191,7 @@
           'auth.createAccountHint': 'Enter a username and password, then click «Create Account»',
           'auth.registerError': 'Registration failed',
           'auth.minLogin': 'Username must be at least 3 characters',
-          'auth.minPassword': 'Password must be at least 6 characters',
+          'auth.minPassword': 'Password must be at least 8 characters',
           'auth.enterUsername': 'Enter username',
           'auth.sending': 'Sending...',
           'auth.codeDigits': 'Code must be 6 digits',
@@ -7307,7 +7366,7 @@
           'settings.account.tgTokenWarning': '⚠️ For password recovery to work, make sure to set the bot token in the Notifications section.',
           'settings.account.usernameNewPlaceholder': 'Minimum 3 characters',
           'settings.account.oldPwPlaceholder': 'Current password',
-          'settings.account.newPwPlaceholder': 'Minimum 6 characters',
+          'settings.account.newPwPlaceholder': 'Minimum 8 characters',
           'settings.account.newPw2Placeholder': 'Repeat new password',
           'io.exportDesc': 'Download all positions of the current portfolio as CSV.<br>File contains: ticker, type, quantity, purchase price.',
           'io.importDesc': 'CSV format — columns: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>',
@@ -7361,7 +7420,7 @@
           'settings.account.usernameChanged': 'Username changed',
           'settings.account.usernameTaken': 'Username already taken',
           'settings.account.pwMismatch': 'Passwords do not match',
-          'settings.account.pwMinLength': 'Minimum 6 characters',
+          'settings.account.pwMinLength': 'Minimum 8 characters',
           'settings.account.pwChanged': 'Password changed',
           'settings.account.pwError': 'Error',
           'settings.account.pwConnError': 'Connection error',
@@ -7416,6 +7475,64 @@
           'watchlist.empty': 'Watchlist is empty',
           'instrument.bond': 'Bond',
           'instrument.stock': 'Stock',
+          'adm.colPlan': 'Plan',
+          'adm.roleSuperAdmin': 'Super Admin',
+          'adm.roleAdmin': 'Admin',
+          'adm.roleUser': 'User',
+          'adm.planSetProUnlim': 'Pro ∞',
+          'adm.planSetPro30d': 'Pro 30d',
+          'adm.planSetFree': 'Free',
+          'adm.planExtend30d': '+30d',
+          'adm.actionPwd': 'Password',
+          'adm.actionDemote': 'Remove admin',
+          'adm.actionPromote': 'Make admin',
+          'adm.actionDelete': 'Delete',
+          'adm.sourcesTitle': 'Data Sources',
+          'adm.clearRatingsCache': 'Clear ratings cache',
+          'adm.yookassaTitle': 'YooKassa',
+          'adm.yookassaStub': 'Payment not configured',
+          'adm.yookassaConfigured': 'Configured',
+          'adm.yookassaSave': 'Save',
+          'adm.yookassaSaved': 'Saved',
+          'adm.yookassaError': 'Save failed',
+          'adm.yookassaKeyStored': 'Secret key stored',
+          'plan.free': 'Free',
+          'plan.pro': 'Pro',
+          'plan.card.freeDesc': '1 portfolio · 10 instruments · no AI/PDF/notifications',
+          'plan.card.proUnlocked': 'All features unlocked',
+          'plan.card.getCta': '⭐ Get Pro →',
+          'plan.card.expiry': 'until',
+          'plan.card.unlimited': 'Unlimited',
+          'upgrade.title': '⭐ Get Pro Access',
+          'upgrade.subtitle': 'Unlock all Bond AI features',
+          'upgrade.freePlan': '📦 Free',
+          'upgrade.proPlan': '⭐ Pro',
+          'upgrade.feat.portfoliosFree': '1 portfolio',
+          'upgrade.feat.instrumentsFree': '10 instruments',
+          'upgrade.feat.aiNo': '✗ AI comments',
+          'upgrade.feat.pdfNo': '✗ PDF report',
+          'upgrade.feat.notifNo': '✗ Notifications',
+          'upgrade.feat.shareNo': '✗ Portfolio sharing',
+          'upgrade.feat.portfoliosUnlim': 'Unlimited portfolios',
+          'upgrade.feat.instrumentsUnlim': 'Unlimited instruments',
+          'upgrade.feat.aiYes': '✓ AI comments',
+          'upgrade.feat.pdfYes': '✓ PDF report',
+          'upgrade.feat.notifYes': '✓ Telegram notifications',
+          'upgrade.feat.shareYes': '✓ Portfolio sharing',
+          'upgrade.pricingMonth': '299 ₽/mo',
+          'upgrade.pricingYear': '2 490 ₽/yr',
+          'upgrade.discount': '−30%',
+          'upgrade.cta': 'Subscribe Pro →',
+          'upgrade.stubMsg': 'Payment temporarily unavailable. Contact the administrator.',
+          'notif.proBanner': '🔒 Telegram notifications available in Pro',
+          'notif.getProBtn': 'Get Pro',
+          'auth.sessionExpired': 'Session expired. Please log in again.',
+          'err.networkError': 'Network error',
+          'err.requestError': 'Request error',
+          'err.saveFailed': 'Save failed',
+          'err.addFailed': 'Add failed. Please try again.',
+          'err.settingsToggle': 'Settings change failed',
+          'err.minAmount': 'Minimum amount is 10,000 ₽',
         },
       };
 
@@ -7469,7 +7586,7 @@
 
       async function obGoStep3() {
         const amount = parseInt(document.getElementById('ob-amount').value) || 100000;
-        if (amount < 10000) { alert('Минимальная сумма 10 000 ₽'); return; }
+        if (amount < 10000) { alert(t('err.minAmount')); return; }
         _obAmount = amount;
         document.getElementById('ob-step-2').style.display = 'none';
         document.getElementById('ob-step-3').style.display = '';
@@ -7587,7 +7704,7 @@
         } catch(e) {
           btn.disabled = false;
           btn.textContent = '✓ Добавить всё в портфель';
-          alert('Ошибка добавления. Попробуйте ещё раз.');
+          alert(t('err.addFailed'));
         }
       }
 

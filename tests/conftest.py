@@ -17,7 +17,7 @@ from app.services.portfolio_service import PortfolioService
 from app.services.moex_service import MOEXService
 from app.services.llm_service import LLMService
 
-TEST_JWT_SECRET = "test_jwt_secret_for_tests"
+TEST_JWT_SECRET = "test_jwt_secret_for_tests_32chars_long"
 
 
 @pytest.fixture(scope="session")

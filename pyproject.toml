@@ -12,6 +12,9 @@ testpaths = [
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+env = [
+    "MVP_JWT_SECRET=test_jwt_secret_for_tests_32chars_long",
+]
 
 [tool.coverage.run]
 source = ["app"]
