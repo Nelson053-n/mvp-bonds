@@ -843,6 +843,7 @@
       body.mobile-mode #btn-theme-toggle,
       body.mobile-mode .lang-btn { display: none !important; }
       body.read-only-mode #mobile-btn-logout { display: none !important; }
+      body.read-only-mode .btn-add-instrument { display: none !important; }
       body.read-only-mode #mobile-portfolio-wrap { display: none !important; }
       body.read-only-mode #mobile-nav [data-panel="panel-table"] { display: none !important; }
 
@@ -970,7 +971,7 @@
         <div class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
             <h2 class="card-title">Портфель</h2>
-            <button class="btn" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить</button>
+            <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить</button>
           </div>
           <div class="table-wrap">
             <table>
