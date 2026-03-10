@@ -828,7 +828,7 @@
       /* Mobile layout */
       body.mobile-mode .topbar-nav { display: none !important; }
       body.mobile-mode .topbar-inner { flex-wrap: wrap; }
-      body.mobile-mode .container { padding: 8px; }
+      body.mobile-mode .container { padding: 8px; padding-top: var(--topbar-h, 76px); }
       body.mobile-mode .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
       body.mobile-mode .stat-card { padding: 10px 12px; }
       body.mobile-mode .panel-cols { grid-template-columns: 1fr !important; }
@@ -7447,7 +7447,20 @@
         const mb = document.getElementById('mobile-btn-mobile');
         if (db) db.classList.toggle('active', !on);
         if (mb) mb.classList.toggle('active', on);
+        // Recalculate topbar height after DOM settles
+        requestAnimationFrame(updateTopbarHeight);
       }
+
+      function updateTopbarHeight() {
+        const topbar = document.querySelector('.topbar');
+        if (!topbar) return;
+        const h = topbar.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--topbar-h', (h + 8) + 'px');
+      }
+
+      // Keep topbar offset accurate on resize
+      window.addEventListener('resize', updateTopbarHeight);
+      window.addEventListener('load', updateTopbarHeight);
 
       // Apply saved language on load (before login so translations are ready)
       applyLang(window._lang);
