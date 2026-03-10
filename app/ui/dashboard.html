@@ -828,7 +828,7 @@
       /* Mobile layout */
       body.mobile-mode .topbar-nav { display: none !important; }
       body.mobile-mode .topbar-inner { flex-wrap: wrap; }
-      body.mobile-mode .container { padding: 8px; padding-top: var(--topbar-h, 76px); }
+      body.mobile-mode .container { padding: 8px; padding-top: var(--topbar-h, 100px); }
       body.mobile-mode .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
       body.mobile-mode .stat-card { padding: 10px 12px; }
       body.mobile-mode .panel-cols { grid-template-columns: 1fr !important; }
@@ -836,6 +836,12 @@
       body.mobile-mode th, body.mobile-mode td { padding: 5px 6px; }
       body.mobile-mode .mobile-toggle-bar { display: flex; }
       body.mobile-mode .brand-badge { display: none; }
+      /* В мобильном режиме скрываем кнопку выхода и лишние кнопки из topbar-right */
+      body.mobile-mode #btn-logout,
+      body.mobile-mode #btn-guide,
+      body.mobile-mode #btn-theme-toggle,
+      body.mobile-mode .lang-btn { display: none !important; }
+      body.read-only-mode #mobile-btn-logout { display: none !important; }
 
       /* Mobile nav drawer */
       body.mobile-mode .mobile-nav {
@@ -911,6 +917,7 @@
         </div>
         <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
         <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
+        <button class="nav-btn" id="mobile-btn-logout" style="color:#f87171;" onclick="localStorage.removeItem('mvp_auth_token');localStorage.removeItem('mvp_username');location.reload();" data-i18n="nav.logout">Выйти</button>
       </div>
     </nav>
 
@@ -7451,10 +7458,13 @@
       }
 
       function updateTopbarHeight() {
-        const topbar = document.querySelector('.topbar');
-        if (!topbar) return;
-        const h = topbar.getBoundingClientRect().height;
-        document.documentElement.style.setProperty('--topbar-h', (h + 8) + 'px');
+        // Double rAF ensures layout is fully painted before measuring
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const topbar = document.querySelector('.topbar');
+          if (!topbar) return;
+          const h = topbar.getBoundingClientRect().height;
+          document.documentElement.style.setProperty('--topbar-h', (h + 12) + 'px');
+        }));
       }
 
       // Keep topbar offset accurate on resize
