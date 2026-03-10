@@ -136,15 +136,7 @@ class AuthService:
 
     # ── Password Reset ────────────────────────────────────────────
 
-    # In-memory store: code -> {user_id, expires}
-    _reset_codes: dict[str, dict] = {}
     RESET_TTL = 900  # 15 minutes
-
-    def _cleanup_reset_codes(self) -> None:
-        now = time.time()
-        expired = [k for k, v in self._reset_codes.items() if v["expires"] < now]
-        for k in expired:
-            del self._reset_codes[k]
 
     def _check_reset_rate_limit(self, username: str) -> bool:
         key = f"reset:{username}"
@@ -159,14 +151,14 @@ class AuthService:
             logger.warning("Reset rate limit exceeded for username=%s", username)
             return "rate_limited"
 
-        self._cleanup_reset_codes()
         user = storage_service.get_user_by_username_for_reset(username)
         if not user:
             # Don't reveal whether user exists — return 'none' silently
             return "none"
 
         code = str(secrets.randbelow(900000) + 100000)  # 6-digit
-        self._reset_codes[code] = {"user_id": user["id"], "expires": time.time() + self.RESET_TTL}
+        storage_service.cleanup_reset_codes()
+        storage_service.save_reset_code(code, user["id"], int(time.time()) + self.RESET_TTL)
 
         sent_via = []
         has_email_but_no_smtp = False
@@ -261,13 +253,12 @@ class AuthService:
 
     def confirm_password_reset(self, code: str, new_password: str) -> bool:
         """Apply reset code and set new password. Returns True on success."""
-        self._cleanup_reset_codes()
-        entry = self._reset_codes.get(code)
-        if not entry or entry["expires"] < time.time():
+        entry = storage_service.get_reset_code(code)
+        if not entry or entry["expires_at"] < int(time.time()):
             return False
         new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
         storage_service.update_user_password(entry["user_id"], new_hash)
-        del self._reset_codes[code]
+        storage_service.delete_reset_code(code)
         logger.info("Password reset for user_id=%d", entry["user_id"])
         return True
 

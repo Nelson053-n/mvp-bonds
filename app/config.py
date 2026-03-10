@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     log_level: str = "INFO"
     log_format: str = "json"  # json | text
-    jwt_secret: str  # Required, no default — fail fast if not set
+    jwt_secret: str = Field(..., min_length=32)  # Required, min 32 chars
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 72
     # SMTP for password reset emails (optional)

@@ -1,378 +1,306 @@
-# Plan: UI/UX Polish + Rating Schedule + Recommendations Fix
+# Plan: Senior Full-Stack Audit & Improvement Sprint
 
 ## Context
 
-Серия точечных исправлений и улучшений UX по итогам ревью:
-- Рейтинги обновлять раз в сутки (сейчас — один раз при старте сервиса, повторно не запрашиваются)
-- Рекомендации: не предлагать выпуски одного эмитента (один эмитент — 10 серий → нет диверсификации)
-- История стоимости: нулевые данные — рисовать нулевую линию, подпись "данные накапливаются" снизу по центру
-- Пироги в тёмной теме: donut hole = белый (#fff захардкожен) → заменить на `--bg-card`
-- SWOT: выводить по 2 пункта из разных областей, не дублировать
-- Плашки KPI: `stat-sub` (`--text-muted: #475569`) плохо читается → светлее (`#64748b`)
-- Плашка «Следующий купон» → добавить в sub: эмитент + сумма купона
-- «Обновлено ЧЧ:ММ» и «↺ Обновить» → перенести в topbar после nav-кнопок; добавить имя портфеля
-- Настройки → Аккаунт: желтый info-box с хардкодными светлыми цветами → theme-aware стиль
-- Настройки → Портфели: кнопки «Переименовать», «Поделиться» → тёмный стиль для тёмной темы
-- Лучшие/слабые позиции: `border-bottom:var(--slate-100)` = белые полоски → `var(--table-border)`
-- Купонные уведомления: переместить из отдельной карточки в «Настройки бота» после порога просадки
-- UX: empty state для пустого портфеля, горячая клавиша R, copy тикера по клику
+Комплексное улучшение проекта Bond AI (mvp-bonds) после внедрения v3pay ветки.
+Задача — привести проект к production-ready состоянию по четырём направлениям:
+безопасность, i18n, тесты, UX.
+
+Приоритеты (по ответам пользователя):
+1. Безопасность — критические уязвимости
+2. i18n — все тексты через систему переводов (RU/EN)
+3. Тесты — покрытие v3pay + security
+4. UX — ARIA, toast вместо alert(), retry кнопки
 
 ---
 
 ## Critical Files
 
-| Файл | Что меняем |
+| Файл | Изменения |
 |------|-----------|
-| `app/main.py` | Добавить `_rating_refresh_loop()` background task |
-| `app/services/storage_service.py` | Добавить `get_all_portfolio_items_for_rating()` |
-| `app/services/moex_service.py` | Добавить метод `refresh_rating(secid)` |
-| `app/ui/dashboard.html` | Все визуальные + логические правки (CSS + JS + HTML) |
+| `app/config.py` | min_length=32 для jwt_secret |
+| `app/api/auth.py` | password min_length=8, email pattern |
+| `app/services/auth_service.py` | reset codes → SQLite |
+| `app/services/storage_service.py` | таблица reset codes, 4 индекса, методы |
+| `app/main.py` | CSP+HSTS headers, global 500 handler, rate limit share |
+| `app/ui/dashboard.html` | i18n Pro-modal + admin strings, ARIA, toast |
+| `tests/test_api.py` | 8 новых тест-кейсов |
 
 ---
 
-## Phase 1 — Ежесуточное обновление рейтингов
+## Phase 1 — Безопасность
 
-### 1.1 `storage_service.py` — `get_all_portfolio_items_for_rating()`
-Возвращает один item на уникальный тикер (для избежания дублей):
+### 1.1 JWT Secret — минимальная длина 32 символа
+`app/config.py:13`
 ```python
-def get_all_portfolio_items_for_rating(self) -> list[dict]:
-    with self._connect() as conn:
-        rows = conn.execute("""
-            SELECT MIN(id) as id, MIN(portfolio_id) as portfolio_id, ticker, instrument_type
-            FROM portfolio_items
-            GROUP BY ticker
-            ORDER BY ticker
-        """).fetchall()
-    return [{"id": r[0], "portfolio_id": r[1], "ticker": r[2], "instrument_type": r[3]} for r in rows]
+jwt_secret: str = Field(..., min_length=32)
 ```
 
-### 1.2 `moex_service.py` — `refresh_rating(secid)`
-Сбрасывает кэш и принудительно перезапрашивает:
+### 1.2 Пароль — мягкая политика (8+ символов)
+`app/api/auth.py:20` — изменить с 6 на 8:
 ```python
-async def refresh_rating(self, secid: str) -> str | None:
-    """Force re-fetch rating, bypassing in-memory cache."""
-    self._credit_rating_cache.pop(secid, None)
-    self._credit_rating_cache.pop(f"smartlab:{secid}", None)
-    rating = await self._get_smartlab_credit_rating(secid)
-    if rating is None:
-        rating = await self._get_credit_rating(secid)
-    return rating
+password: str = Field(..., min_length=8)
 ```
 
-### 1.3 `main.py` — `_rating_refresh_loop()`
-Запускать в 03:00 UTC ежесуточно (offset от текущего времени):
+### 1.3 Email валидация
+`app/api/auth.py` в `ChangeEmailInput`:
 ```python
-async def _rating_refresh_loop():
-    from datetime import datetime, timezone
-    from app.services.moex_service import moex_service
-    while True:
-        now = datetime.now(timezone.utc)
-        secs_to_3am = ((3 - now.hour) % 24) * 3600 - now.minute * 60 - now.second
-        if secs_to_3am <= 0:
-            secs_to_3am += 86400
-        await asyncio.sleep(secs_to_3am)
-        try:
-            items = storage_service.get_all_portfolio_items_for_rating()
-            sem = asyncio.Semaphore(3)
-            async def _one(item):
-                async with sem:
-                    try:
-                        rating = await moex_service.refresh_rating(item["ticker"])
-                        if rating is not None:
-                            storage_service.update_rating(item["id"], item["portfolio_id"], rating)
-                    except Exception:
-                        pass
-            await asyncio.gather(*(_one(i) for i in items))
-            logger.info("Daily rating refresh: %d tickers", len(items))
-        except Exception:
-            logger.exception("Daily rating refresh failed")
-```
-Добавить `asyncio.create_task(_rating_refresh_loop())` в lifespan.
-
----
-
-## Phase 2 — Рекомендации: один эмитент — одна карточка
-
-### `loadPortfolioRecommendations()` в dashboard.html
-
-Добавить функцию `_issuerKey(bond)` и фильтрацию по уже показанным эмитентам:
-
-```js
-function _issuerKey(bond) {
-  const t = (bond.ticker || '').toUpperCase();
-  // Для ISIN-формата (RU000A...) — берём первые 2 слова имени
-  if (/^RU\d{9,}/.test(t)) {
-    return (bond.name || bond.short_name || t).split(' ').slice(0, 2).join(' ').toUpperCase().substring(0, 16);
-  }
-  // Для именных тикеров (POLYP-1, POLYP-2) — убираем суффикс-серию
-  return t.replace(/[-_]?\d+[A-Z]*$/, '').substring(0, 8);
-}
-
-// При сборке cards:
-const shownIssuers = new Set();
-results.forEach((res, i) => {
-  if (res.status !== 'fulfilled') return;
-  const items = (res.value.bonds || res.value.suggestions || [])
-    .filter(s => !existingTickers.has(s.ticker));
-  // Найти первый bond от нового эмитента
-  const item = items.find(s => !shownIssuers.has(_issuerKey(s)));
-  if (!item) return;
-  shownIssuers.add(_issuerKey(item));
-  cards.push({ ...item, rationale: top4[i].rationale, risk: top4[i].risk });
-});
+email: str = Field(..., max_length=254, pattern=r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 ```
 
----
+### 1.4 Security Headers — CSP + HSTS
+`app/main.py:41-47` — добавить в `_SECURITY_HEADERS`:
+```python
+"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+"Content-Security-Policy": (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none';"
+),
+```
 
-## Phase 3 — История стоимости: нулевые данные
+### 1.5 Global 500 Exception Handler
+`app/main.py` — после `app = FastAPI(...)`:
+```python
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled: %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+```
 
-### `drawHistoryChartEmpty()` — фикс центровки + нулевая линия
+### 1.6 Rate Limiting на публичных share endpoints
+`app/main.py` — в `/share/{share_token}/table` и `/share/{share_token}/snapshots`:
+```python
+rate_key = f"share:{share_token}:{request.client.host if request.client else 'unknown'}"
+if not storage_service.check_rate_limit(rate_key, 60, 30):  # 30 req/min per token per IP
+    raise HTTPException(status_code=429, detail="Too many requests")
+```
 
-Проблема: `canvas.offsetWidth` возвращает 0 до рендера, текст смещается. Решение — использовать `canvas.parentElement.clientWidth`.
+### 1.7 Reset Codes → SQLite
+`app/services/storage_service.py` — добавить в `_migrate()`:
+```sql
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    code TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_reset_codes_expires ON password_reset_codes(expires_at);
+```
 
-```js
-function drawHistoryChartEmpty(canvas) {
-  if (!canvas) return;
-  const parent = canvas.parentElement;
-  const W = (parent ? parent.clientWidth : 0) || 600;
-  const H = 200;
-  canvas.width = W;
-  canvas.height = H;
-  canvas.style.width = '100%';
-  // ... grid + dashed line
-  const ctx = canvas.getContext('2d');
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = labelClr;
-  ctx.font = '600 12px Inter,sans-serif';
-  ctx.fillText('История накапливается', W / 2, H - pad.b - 8);  // ← снизу
-  ctx.font = '11px Inter,sans-serif';
-  ctx.fillStyle = mutedClr;
-  ctx.fillText('Данные появятся через сутки после первого запуска', W / 2, H - pad.b + 8);
-  // Нулевая Y-метка
-  ctx.textAlign = 'right';
-  ctx.font = '10px Inter,sans-serif';
-  ctx.fillStyle = labelClr;
-  ctx.fillText('0', pad.l - 4, pad.t + chartH + 3);
-  ctx.restore();
-}
+Новые методы в `StorageService`:
+```python
+def save_reset_code(self, code: str, user_id: int, expires_at: int) -> None
+def get_reset_code(self, code: str) -> dict | None   # {user_id, expires_at}
+def delete_reset_code(self, code: str) -> None
+def cleanup_reset_codes(self) -> None  # DELETE WHERE expires_at < now()
+```
+
+`app/services/auth_service.py` — убрать `_reset_codes: dict`, `RESET_TTL`, `_cleanup_reset_codes()`.
+Переписать `request_password_reset()` и `confirm_password_reset()` через storage_service методы.
+
+### 1.8 Admin Password — не в логи
+`app/services/storage_service.py:~290`:
+```python
+import sys
+print(f"\n{'='*60}\nAdmin credentials (first startup only):\n  Username: admin\n  Password: {admin_password}\n{'='*60}\n",
+      file=sys.stderr, flush=True)
+logger.info("Admin user created — credentials printed to stderr")
+```
+
+### 1.9 DB Indices
+`app/services/storage_service.py` в `_migrate()`:
+```sql
+CREATE INDEX IF NOT EXISTS idx_coupon_notif_item ON coupon_notifications(item_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_item_id ON price_alerts(item_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_user_triggered ON price_alerts(user_id, triggered);
+CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
 ```
 
 ---
 
-## Phase 4 — CSS / Visual Fixes (dashboard.html)
+## Phase 2 — i18n
 
-### 4.1 Donut hole — динамический цвет
-В `drawPieChart`:
-```js
-ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#0d1829';
+### 2.1 Новые ключи переводов
+
+Добавить в обе секции (ru/en) в `dashboard.html`:
+
+**Pro/Upgrade Modal:**
+```
+upgrade.title       / upgrade modal header
+upgrade.subtitle    / subtitle
+upgrade.freePlan    / "📦 Бесплатный" / "📦 Free"
+upgrade.proPlan     / "⭐ Pro"
+upgrade.feat.portfoliosFree   "1 портфель" / "1 portfolio"
+upgrade.feat.instrumentsFree  "10 бумаг" / "10 instruments"
+upgrade.feat.aiNo / pdfNo / notifNo / shareNo
+upgrade.feat.portfoliosUnlim  "∞ Портфелей" / "∞ Portfolios"
+upgrade.feat.instrumentsUnlim "∞ Бумаг" / "∞ Instruments"
+upgrade.feat.aiYes / pdfYes / notifYes / shareYes
+upgrade.pricingMonth "299 ₽/мес" / "299 ₽/mo"
+upgrade.pricingYear  "2 490 ₽/год" / "2 490 ₽/yr"
+upgrade.discount     "−30%"
+upgrade.cta          "Подключить Pro →" / "Subscribe Pro →"
+upgrade.stubMsg      "Оплата временно недоступна..." / "Payment temporarily unavailable..."
 ```
 
-### 4.2 stat-sub светлее
-```css
-/* В :root (тёмная тема) */
---text-muted: #64748b;  /* было #475569 */
+**Plan Card:**
+```
+plan.free / plan.pro
+plan.card.freeDesc    "1 портфель · 10 бумаг · без AI/PDF/уведомлений"
+plan.card.proUnlocked "Все возможности разблокированы" / "All features unlocked"
+plan.card.getCta      "⭐ Получить Pro →" / "⭐ Get Pro →"
+plan.card.expiry      "до" / "until"
+plan.card.unlimited   "Бессрочно" / "Unlimited"
 ```
 
-### 4.3 info-box-warning theme-aware
-Добавить CSS класс `.info-box-warning`:
-```css
-.info-box-warning {
-  background: rgba(251,191,36,.08);
-  border-color: rgba(251,191,36,.25);
-  color: var(--amber-400);
-}
-[data-theme="light"] .info-box-warning {
-  background: #fefce8;
-  border-color: #fde047;
-  color: #854d0e;
-}
+**Admin:**
 ```
-В HTML строка ~1149: заменить inline стили на `class="info-box info-box-warning"`.
-
-### 4.4 Кнопки портфелей — тёмный стиль
-В `settingsLoadPortfolios()` JS (строки ~5527-5561):
-```js
-// editBtn и shareBtn:
-btn.style.cssText = '...color:var(--text-secondary);background:var(--bg-elevated);border:1px solid var(--border);...';
-// delBtn:
-delBtn.style.cssText = '...color:var(--red-400);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);...';
+adm.colPlan / adm.sourcesTitle / adm.clearRatingsCache
+adm.roleSuperAdmin / adm.roleUser
+adm.yookassaTitle / adm.yookassaStub / adm.yookassaConfigured
+adm.yookassaSave / adm.yookassaSaved / adm.yookassaError / adm.yookassaKeyStored
+adm.planSetProUnlim / adm.planSetPro30d / adm.planSetFree / adm.planExtend30d
 ```
 
-### 4.5 Лучшие/слабые позиции — стиль строк
-В `renderPerformers()`:
-```js
-row.style.cssText = '...border-bottom:1px solid var(--table-border);...';
-name.style.cssText = '...color:var(--text-primary);';
-ticker.style.cssText = '...color:var(--text-muted);';
-right.style.cssText = `...color:${r.profit >= 0 ? 'var(--green-400)' : 'var(--red-400)'};`;
+**Notifications:**
 ```
+notif.proBanner "🔒 Telegram-уведомления доступны в Pro-тарифе" / "🔒 Telegram notifications available in Pro"
+notif.getProBtn "Получить Pro" / "Get Pro"
+```
+
+**Misc:**
+```
+auth.sessionExpired  "Сессия истекла. Пожалуйста, войдите заново." / "Session expired. Please log in again."
+err.networkError     "Ошибка сети" / "Network error"
+err.requestError     "Ошибка запроса" / "Request error"
+err.saveFailed       "Ошибка сохранения" / "Save failed"
+```
+
+### 2.2 HTML изменения
+
+Заменить hardcoded Russian в upgrade-modal — добавить `data-i18n=` атрибуты.
+Заменить в admin panel `<th>Тариф</th>` → `<th data-i18n="adm.colPlan">Тариф</th>`.
+Заменить hardcoded `"Источники данных"` и другие admin заголовки.
+
+### 2.3 JS изменения
+
+В `renderPlanCard()` — использовать `t('plan.card.*')`.
+В `renderNotifProBanner()` — использовать `t('notif.proBanner')`, `t('notif.getProBtn')`.
+В `adminLoadUsers()` — использовать `t('adm.roleSuperAdmin')`, `t('adm.roleUser')`, `t('adm.planSetProUnlim')` и т.д.
+В `adminSaveYooKassa()` — использовать `t('adm.yookassaSaved')`, `t('adm.yookassaError')`.
+В `doCheckout()` — использовать `t('upgrade.stubMsg')`.
+При ошибке в `apiFetch` — использовать `t('auth.sessionExpired')`.
+
+После вызова `setLang()` — убедиться что `applyI18n()` обновляет атрибуты в upgrade-modal (modal уже в DOM).
 
 ---
 
-## Phase 5 — Topbar: имя портфеля + Обновлено + Обновить
+## Phase 3 — Тесты
 
-### Структура изменений
+**Файл:** `tests/test_api.py`
 
-**Удалить из HTML** блок строки 949-958 (контейнер с `last-update-time` и `btn-refresh`).
+### Новые тест-кейсы (8 штук):
 
-**В `setupPortfolioSelector()`** после создания селектора добавить в `topbar-right`:
-```js
-// Имя портфеля
-const nameSpan = document.createElement('span');
-nameSpan.id = 'topbar-portfolio-name';
-nameSpan.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:1px solid var(--border);padding-right:10px;';
+```python
+# 1. Free plan: 11th instrument → 403
+async def test_free_plan_instrument_limit(client, test_auth_token)
 
-// Обновлено
-const timeSpan = document.createElement('span');
-timeSpan.id = 'last-update-time';
-timeSpan.style.cssText = 'font-size:11px;color:var(--text-muted);';
+# 2. Free plan: 2nd portfolio → 403
+async def test_free_plan_portfolio_limit(client, test_auth_token)
 
-// Кнопка Обновить
-// Переместить существующий #btn-refresh или воссоздать
+# 3. Free plan: PDF → 403
+async def test_free_plan_pdf_blocked(client, test_auth_token)
+
+# 4. Admin sets plan, returns 200
+async def test_admin_set_plan(client, admin_token)
+
+# 5. Pro plan: PDF accessible after admin upgrade
+async def test_pro_plan_pdf_accessible(client, test_auth_token, admin_token)
+
+# 6. Plan expiry: expired Pro → 403 on PDF
+async def test_expired_pro_plan_reverts_to_free(client, test_auth_token, admin_token)
+
+# 7. Payment stub: returns stub response
+async def test_payment_checkout_stub(client, test_auth_token)
+
+# 8. IDOR: user cannot access another user's portfolio
+async def test_idor_portfolio_access(client)
 ```
 
-**В `updatePortfolioSelector()`** обновлять имя:
-```js
-const nameEl = document.getElementById('topbar-portfolio-name');
-if (nameEl) nameEl.textContent = portfolios.find(p => p.id === portfolioId)?.name || '';
-```
-
-**Убрать** блок `justify-content:space-between` обёртки над таблицей, оставить только `<div id="table-status">`.
+Вспомогательные фикстуры в `tests/conftest.py`:
+- `admin_token` — JWT токен для пользователя-администратора (он уже создаётся — использовать существующий `test_auth_token` который уже admin)
+- `second_user_token` — новый пользователь для IDOR теста
 
 ---
 
-## Phase 6 — «Следующий купон»: эмитент + сумма
+## Phase 4 — UX
 
-В функции `renderTable()` или `updateStatCards()` (где заполняется `stat-next-coupon`):
+### 4.1 ARIA — минимальный набор
+`app/ui/dashboard.html`:
+- `.modal-overlay` → добавить `role="dialog"` и `aria-modal="true"`
+- `#_toast_notification` или аналогичный toast → `role="status"` + `aria-live="polite"`
+- Кнопки-иконки без текста → `aria-label=`
+- `.status.error` → `role="alert"`
 
-```js
-const nextRow = [...tableRows]
-  .filter(r => r.next_coupon_date)
-  .sort((a, b) => new Date(a.next_coupon_date) - new Date(b.next_coupon_date))[0];
-if (nextRow) {
-  const amount = nextRow.coupon != null ? Math.round(nextRow.coupon * nextRow.quantity) : null;
-  const emitter = (nextRow.name || nextRow.ticker || '').substring(0, 20);
-  const sub = document.getElementById('stat-next-coupon-sub');
-  if (sub) sub.textContent = amount ? `${emitter} · ${amount.toLocaleString('ru')} ₽` : emitter;
-}
-```
+### 4.2 Toast вместо alert()
+Найти все `alert(...)` (~10 мест) и заменить на `toast(msg, 'error')`.
+Проверить что функция `toast()` существует и работает с двумя аргументами (цвет/тип).
 
----
-
-## Phase 7 — SWOT: 2 из разных областей, без дублей
-
-В `renderSwotAnalysis(rows)` добавить тег категории, выбирать `pickDiversified(items, 2)`:
-
-```js
-// Категории: 'ytm', 'coupon', 'ofz', 'concentration_ticker', 'concentration_issuer',
-//            'maturity_cluster', 'maturity_short', 'maturity_long', 'offer', 'losses', 'pl', 'size', 'rating'
-function pickDiversified(tagged, maxCount) {
-  const result = [], used = new Set();
-  for (const item of tagged) {
-    if (result.length >= maxCount) break;
-    if (!used.has(item.category)) { result.push(item.text); used.add(item.category); }
-  }
-  // Добрать если не хватает уникальных
-  for (const item of tagged) {
-    if (result.length >= maxCount) break;
-    if (!result.includes(item.text)) result.push(item.text);
-  }
-  return result;
-}
-```
+### 4.3 i18n при смене языка для modal
+Убедиться что после вызова `setLang()` → `applyI18n()` проходит по всем элементам в DOM включая upgrade-modal (который уже вставлен в DOM статически).
 
 ---
 
-## Phase 8 — Купонные уведомления: встроить в карточку бота
+## Implementation Order
 
-**HTML:** Убрать отдельную карточку `#settings-notifications-personal`. Добавить поля купона прямо в `card-body` карточки «Настройки бота» — после поля `tg-threshold`, перед кнопками сохранения:
-
-```html
-<!-- После tg-threshold field, перед notif-actions -->
-<div class="field">
-  <label data-i18n="settings.coupon_notif_title">Уведомления о купонах</label>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
-    <input type="checkbox" id="coupon-notif-enabled">
-    <span style="font-size:13px;" data-i18n="settings.coupon_notif_enable">Включить</span>
-  </label>
-  <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:12px;color:var(--text-muted);" data-i18n="settings.coupon_notif_days">За дней:</span>
-    <input type="number" id="coupon-notif-days" min="1" max="30" value="3" class="input" style="width:56px;" />
-    <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
-  </div>
-  <p id="coupon-notif-hint-tg" class="settings-hint" style="display:none;color:var(--amber-400);" data-i18n="settings.coupon_notif_no_tg">Нужен Chat ID в разделе «Аккаунт»</p>
-  <div id="coupon-notif-status" class="status"></div>
-</div>
-```
-
----
-
-## Phase 9 — UX улучшения
-
-### 9.1 Empty state для пустого портфеля
-После таблицы (внутри `.table-wrap` или снаружи) добавить hidden div:
-```html
-<div id="empty-portfolio-state" style="display:none;text-align:center;padding:60px 20px;">
-  <svg .../>  <!-- иконка портфеля -->
-  <div style="font-size:16px;font-weight:600;...">Портфель пуст</div>
-  <div style="font-size:13px;color:var(--text-muted);margin:6px 0 20px;">
-    Добавьте первую бумагу для отслеживания доходности
-  </div>
-  <button class="btn" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
-</div>
-```
-В `renderTable()`: `emptyState.style.display = tableRows.length ? 'none' : 'block'`.
-
-### 9.2 Копирование тикера по клику
-В ячейке тикера таблицы добавить `cursor:pointer; title="Нажмите чтобы скопировать"` и onclick:
-```js
-tickerEl.style.cursor = 'pointer';
-tickerEl.title = 'Скопировать тикер';
-tickerEl.onclick = () => {
-  navigator.clipboard.writeText(row.ticker).then(() => showToast(`Скопировано: ${row.ticker}`));
-};
-```
-Добавить функцию `showToast(msg)` — небольшой popup снизу экрана (1.5с).
-
-### 9.3 Горячая клавиша R
-```js
-document.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey
-    && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
-    manualRefresh();
-  }
-});
-```
-
----
-
-## Implementation Priority Order
-
-1. Phase 4 (CSS fixes: donut, stat-sub, кнопки, полосы) — самые видимые баги
-2. Phase 7 (SWOT лимит + категории)
-3. Phase 6 (Следующий купон: эмитент + сумма)
-4. Phase 5 (Topbar: имя + Обновлено + кнопка)
-5. Phase 3 (History chart: центровка + нулевая линия)
-6. Phase 8 (Купонные уведомления в карточку бота)
-7. Phase 4.3 (info-box-warning theme-aware)
-8. Phase 2 (Рекомендации: один эмитент)
-9. Phase 1 (Rating daily refresh — backend)
-10. Phase 9 (Empty state, copy ticker, hotkey R)
+1. Phase 1.1–1.6 (config, auth, headers, global handler, share rate limit) — ~30 мин
+2. Phase 1.7 (reset codes в SQLite) — ~45 мин
+3. Phase 1.8–1.9 (admin password stderr, DB indices) — ~15 мин
+4. Phase 3 (тесты) — ~60 мин, пишем сразу после реализации
+5. Phase 2 (i18n — dashboard.html) — ~90 мин
+6. Phase 4 (UX — ARIA, toast) — ~30 мин
 
 ---
 
 ## Verification
 
-1. Тёмная тема: пироги без белого кольца
-2. stat-sub текст читаем
-3. Кнопки портфелей (Переименовать, Поделиться) — тёмные
-4. Лучшие/слабые: полосы `var(--table-border)`, не белые
-5. SWOT: ровно 2 сильных + 2 риска, разные категории
-6. «Обновлено ЧЧ:ММ» и «↺ Обновить» в topbar, рядом имя портфеля
-7. «Следующий купон» sub → «ИмяЭмитента · 1 500 ₽»
-8. История: нулевая линия + подпись по центру снизу (не слева)
-9. Купонные уведомления внутри карточки бота
-10. Рекомендации: 4 разных эмитента
-11. Rating refresh loop в логах в 03:00 UTC
+```bash
+# 1. Все тесты
+MVP_JWT_SECRET=dev_secret_key_12345_dev_secret_key_12345 .venv/bin/python -m pytest tests/ -v
+
+# 2. Короткий JWT секрет → ошибка валидации
+MVP_JWT_SECRET=short .venv/bin/uvicorn app.main:app --reload
+# Ожидается: ValidationError при запуске
+
+# 3. Security headers
+curl -I http://localhost:8000/app | grep -E "Content-Security|Strict-Transport"
+
+# 4. Share rate limit
+for i in $(seq 1 35); do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/share/test/table; done
+# Ожидается: 429 после 30 запросов
+
+# 5. i18n переключение
+# Открыть /app, открыть Settings→Account, сменить язык EN→RU
+# Проверить что Pro card переводится
+
+# 6. Добавить 11й инструмент на Free аккаунте → 403 → upgrade modal
+
+# 7. Reset code в SQLite
+sqlite3 data/portfolio.db "SELECT * FROM password_reset_codes;"
+```
+
+---
+
+## Что НЕ делаем (вне скоупа MVP)
+
+- Token revocation blacklist — для MVP JWT expiry достаточно
+- CSRF tokens — Bearer JWT не уязвим к CSRF
+- Шифрование Telegram/YooKassa токенов в БД — env vars достаточно для MVP
+- Pagination/virtualization таблицы — отдельный тикет
+- Полное ARIA покрытие — только критичный минимум
+- Password complexity rules — пользователь выбрал мягкую политику

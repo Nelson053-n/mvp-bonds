@@ -7,7 +7,7 @@ import time
 
 import bcrypt
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.api.auth import router as auth_router
 from app.api.bonds import router as bonds_router
@@ -44,6 +44,16 @@ _SECURITY_HEADERS = {
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    ),
 }
 
 
@@ -137,6 +147,12 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled: %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.middleware("http")
@@ -236,9 +252,13 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
 @app.get("/share/{share_token}/table")
 async def get_shared_portfolio_table(
     share_token: str,
+    request: Request,
     x_share_password: str | None = Header(None),
 ) -> dict:
     """View a shared portfolio (public endpoint, no auth required)."""
+    rate_key = f"share:{share_token}:{request.client.host if request.client else 'unknown'}"
+    if not storage_service.check_rate_limit(rate_key, 60, 30):
+        raise HTTPException(status_code=429, detail="Too many requests")
     portfolio = storage_service.get_portfolio_by_share_token(share_token)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
@@ -259,10 +279,14 @@ async def get_shared_portfolio_table(
 @app.get("/share/{share_token}/snapshots")
 async def get_shared_portfolio_snapshots(
     share_token: str,
+    request: Request,
     days: int = 90,
     x_share_password: str | None = Header(None),
 ) -> list[dict]:
     """Portfolio value history for shared view (public, no auth required)."""
+    rate_key = f"share:{share_token}:{request.client.host if request.client else 'unknown'}"
+    if not storage_service.check_rate_limit(rate_key, 60, 30):
+        raise HTTPException(status_code=429, detail="Too many requests")
     portfolio = storage_service.get_portfolio_by_share_token(share_token)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")

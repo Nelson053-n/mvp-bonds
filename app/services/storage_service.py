@@ -21,6 +21,7 @@ class StorageService:
 
     def _ensure_db(self) -> None:
         import logging
+        import sys
         import uuid
         import secrets
         from datetime import datetime, timezone
@@ -223,6 +224,15 @@ class StorageService:
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_codes (
+                    code TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+                )
+            """)
+
             # Create indices
             try:
                 conn.execute(
@@ -252,6 +262,54 @@ class StorageService:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio_date "
                     "ON portfolio_snapshots(portfolio_id, snapshot_date)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_coupon_notif_item "
+                    "ON coupon_notifications(item_id)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_alerts_item_id "
+                    "ON price_alerts(item_id)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_alerts_user_triggered "
+                    "ON price_alerts(user_id, triggered)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_watchlist_user "
+                    "ON watchlist(user_id)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_reset_codes_expires "
+                    "ON password_reset_codes(expires_at)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_rate_limits_window "
+                    "ON rate_limits(window_start)"
                 )
             except sqlite3.OperationalError:
                 pass
@@ -288,10 +346,16 @@ class StorageService:
                 )
 
                 conn.commit()
-                logger.warning(
-                    "Admin user created. Username: admin  Password: %s",
-                    admin_password,
+                print(
+                    f"\n{'='*60}\n"
+                    f"Admin credentials (first startup only):\n"
+                    f"  Username: admin\n"
+                    f"  Password: {admin_password}\n"
+                    f"{'='*60}\n",
+                    file=sys.stderr,
+                    flush=True,
                 )
+                logger.info("Admin user created — credentials printed to stderr")
             else:
                 conn.commit()
 
@@ -768,20 +832,51 @@ class StorageService:
             ).fetchone()
             if row is None:
                 conn.execute(
-                    "INSERT INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)",
+                    "INSERT OR IGNORE INTO rate_limits (key, window_start, count) VALUES (?, ?, 1)",
                     (key, window_start)
                 )
                 conn.commit()
                 return True
             if row[0] >= max_count:
-                conn.commit()
                 return False
             conn.execute(
-                "UPDATE rate_limits SET count = count + 1 WHERE key = ? AND window_start = ?",
-                (key, window_start)
+                "UPDATE rate_limits SET count = count + 1 WHERE key = ? AND window_start = ? AND count < ?",
+                (key, window_start, max_count)
             )
             conn.commit()
             return True
+
+    # ── Password reset codes ─────────────────────────────────────────────────
+
+    def save_reset_code(self, code: str, user_id: int, expires_at: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO password_reset_codes (code, user_id, expires_at) VALUES (?, ?, ?)",
+                (code, user_id, expires_at),
+            )
+            conn.commit()
+
+    def get_reset_code(self, code: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT user_id, expires_at FROM password_reset_codes WHERE code = ?",
+                (code,),
+            ).fetchone()
+        return {"user_id": row[0], "expires_at": row[1]} if row else None
+
+    def delete_reset_code(self, code: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM password_reset_codes WHERE code = ?", (code,))
+            conn.commit()
+
+    def cleanup_reset_codes(self) -> None:
+        import time
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM password_reset_codes WHERE expires_at < ?",
+                (int(time.time()),),
+            )
+            conn.commit()
 
     # ── Admin ───────────────────────────────────────────────────────────────
 

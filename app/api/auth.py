@@ -17,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 class RegisterInput(BaseModel):
     username: str = Field(..., min_length=3, max_length=32)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=8)
 
 
 class LoginInput(BaseModel):
@@ -83,11 +83,11 @@ async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
 
 class ChangePasswordInput(BaseModel):
     old_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=8)
 
 
 class ChangeEmailInput(BaseModel):
-    email: str = Field(..., max_length=254)
+    email: str = Field(..., max_length=254, pattern=r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -172,7 +172,7 @@ class ForgotPasswordInput(BaseModel):
 
 class ResetPasswordInput(BaseModel):
     code: str = Field(..., min_length=6, max_length=6)
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=8)
 
 
 @router.post("/forgot-password")

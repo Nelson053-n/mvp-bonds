@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Run application:**
 ```bash
-MVP_JWT_SECRET=dev_secret_key_12345 .venv/bin/uvicorn app.main:app --reload
+MVP_JWT_SECRET=dev_secret_key_12345_abcdefghijklmn .venv/bin/uvicorn app.main:app --reload
 ```
 
 **Run tests:**
 ```bash
 .venv/bin/python -m pytest                        # All tests with coverage
 .venv/bin/python -m pytest tests/test_api.py      # Single file
-.venv/bin/python -m pytest tests/test_api.py::test_health  # Single test
+.venv/bin/python -m pytest tests/test_api.py::TestPortfolioAPI::test_health_endpoint  # Single test
 .venv/bin/python -m pytest -v                     # Verbose
 ```
 
