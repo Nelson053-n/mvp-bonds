@@ -17,6 +17,7 @@ from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
 from app.api.admin import router as admin_router
 from app.api.watchlist import router as watchlist_router
+from app.api.payments import router as payments_router
 from app.services.cache_service import cache_service
 from app.services.storage_service import storage_service
 from app.services.portfolio_service import portfolio_service
@@ -154,6 +155,7 @@ app.include_router(portfolio_router)
 app.include_router(settings_router)
 app.include_router(admin_router)
 app.include_router(watchlist_router)
+app.include_router(payments_router)
 
 
 @app.get("/manifest.json")

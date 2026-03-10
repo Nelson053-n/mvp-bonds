@@ -52,11 +52,14 @@ class AuthService:
             raise AuthError(str(e)) from e
 
         logger.info("User registered: %s (id=%d)", username, user_id)
+        plan_info = storage_service.get_user_plan(user_id)
         return {
             "user_id": user_id,
             "username": username,
             "is_admin": False,
             "access_token": self.create_token(user_id, username, False),
+            "plan": plan_info["plan"],
+            "plan_expires_at": plan_info["plan_expires_at"],
         }
 
     def login(self, username: str, password: str, client_ip: str = "") -> dict | None:
@@ -80,11 +83,14 @@ class AuthService:
         logger.info("User logged in: %s (id=%d)", username, user["id"])
         is_admin = bool(user.get("is_admin", False))
         token = self.create_token(user["id"], user["username"], is_admin)
+        plan_info = storage_service.get_user_plan(user["id"])
         return {
             "user_id": user["id"],
             "username": user["username"],
             "is_admin": is_admin,
             "access_token": token,
+            "plan": plan_info["plan"],
+            "plan_expires_at": plan_info["plan_expires_at"],
         }
 
     def create_token(self, user_id: int, username: str, is_admin: bool = False) -> str:

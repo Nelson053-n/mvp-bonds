@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_current_user, get_portfolio_or_403
+from app.api.deps import get_current_user, get_portfolio_or_403, get_user_plan
 from app.config import settings as app_settings
 from app.exceptions import AppError, InstrumentNotFoundError
 from app.models import (
@@ -51,6 +51,8 @@ async def add_instrument(
     """Add instrument to portfolio."""
     await get_portfolio_or_403(portfolio_id, current_user)
     item_count = storage_service.count_items(portfolio_id)
+    if get_user_plan(current_user["sub"]) == "free" and item_count >= 10:
+        raise HTTPException(status_code=403, detail="FREE_LIMIT_INSTRUMENTS")
     if item_count >= app_settings.max_items_per_portfolio:
         raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
     logger.info("Add instrument request: portfolio_id=%s payload=%s", portfolio_id, getattr(payload, 'model_dump', lambda: payload)())
@@ -86,6 +88,10 @@ async def add_instruments_bulk(
 ) -> dict:
     """Add multiple instruments at once, with a single cache refresh."""
     await get_portfolio_or_403(portfolio_id, current_user)
+    if get_user_plan(current_user["sub"]) == "free":
+        current_count = storage_service.count_items(portfolio_id)
+        if current_count + len(payloads) > 10:
+            raise HTTPException(status_code=403, detail="FREE_LIMIT_INSTRUMENTS")
     try:
         result = await portfolio_service.add_instruments_bulk(portfolio_id, payloads)
     except AppError as exc:

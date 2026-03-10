@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, get_admin_user
+from fastapi import HTTPException
+from app.api.deps import get_current_user, get_admin_user, get_user_plan
 from app.services.storage_service import storage_service
 from app.services.notification_service import notification_service
 
@@ -73,6 +74,8 @@ async def update_personal_notifications(
     payload: PersonalNotificationsInput,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
+    if get_user_plan(current_user["sub"]) == "free":
+        raise HTTPException(status_code=403, detail="FREE_LIMIT_NOTIFICATIONS")
     storage_service.update_user_notification_settings(
         current_user["sub"], payload.coupon_notif_enabled, payload.coupon_notif_days
     )

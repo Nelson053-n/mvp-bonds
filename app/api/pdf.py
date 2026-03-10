@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_current_user, get_portfolio_or_403
+from app.api.deps import get_current_user, get_portfolio_or_403, get_user_plan
 from app.services.portfolio_service import portfolio_service
 
 router = APIRouter(tags=["reports"])
@@ -119,6 +119,9 @@ async def export_portfolio_pdf(
     current_user: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """Export portfolio as PDF report."""
+    from fastapi import HTTPException
+    if get_user_plan(current_user["sub"]) == "free":
+        raise HTTPException(status_code=403, detail="FREE_LIMIT_PDF")
     portfolio = await get_portfolio_or_403(portfolio_id, current_user)
     rows = await portfolio_service.get_table(portfolio_id)
 

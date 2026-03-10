@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, get_portfolio_or_403
+from app.api.deps import get_current_user, get_portfolio_or_403, get_user_plan
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.storage_service import storage_service
@@ -80,6 +80,8 @@ async def create_portfolio(
     """Create a new portfolio for current user."""
     user_id = current_user["sub"]
     count = storage_service.count_portfolios(user_id)
+    if get_user_plan(user_id) == "free" and count >= 1:
+        raise HTTPException(status_code=403, detail="FREE_LIMIT_PORTFOLIOS")
     if count >= app_settings.max_portfolios_per_user:
         raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_portfolios_per_user} портфелей на аккаунт")
     portfolio_id = storage_service.create_portfolio(user_id, payload.name)
@@ -274,6 +276,9 @@ async def create_share_link(
 ) -> dict:
     """Create a public share link for a portfolio."""
     portfolio = await get_portfolio_or_403(portfolio_id, current_user)
+
+    if get_user_plan(current_user["sub"]) == "free":
+        raise HTTPException(status_code=403, detail="FREE_LIMIT_SHARING")
 
     # Generate unique share token
     share_token = str(uuid.uuid4())
