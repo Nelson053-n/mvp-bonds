@@ -30,12 +30,16 @@ class AuthResponse(BaseModel):
     user_id: int
     username: str
     is_admin: bool = False
+    plan: str = "free"
+    plan_expires_at: int | None = None
 
 
 class UserResponse(BaseModel):
     user_id: int
     username: str
     is_admin: bool = False
+    plan: str = "free"
+    plan_expires_at: int | None = None
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -67,10 +71,13 @@ async def login(payload: LoginInput, request: Request) -> dict:
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
     """Get current authenticated user."""
+    plan_info = storage_service.get_user_plan(current_user["sub"])
     return {
         "user_id": current_user["sub"],
         "username": current_user["username"],
         "is_admin": current_user.get("is_admin", False),
+        "plan": plan_info["plan"],
+        "plan_expires_at": plan_info["plan_expires_at"],
     }
 
 

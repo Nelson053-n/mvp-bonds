@@ -1103,6 +1103,7 @@
 
         <!-- ── TAB: Account ── -->
         <div id="stab-account" class="stab-content">
+          <div id="plan-card" style="margin-bottom:16px;padding:16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"></div>
           <div class="panel-cols panel-cols-2">
             <div class="card">
               <div class="card-header">
@@ -1391,6 +1392,7 @@
                     <th data-i18n="adm.colPortfolios">Портфелей</th>
                     <th data-i18n="adm.colCreated">Дата регистрации</th>
                     <th data-i18n="adm.colRole">Роль</th>
+                    <th class="no-sort">Тариф</th>
                     <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
@@ -1439,9 +1441,76 @@
           <div id="adm-sources-info" style="padding:0 16px 12px;font-size:11px;color:var(--text-muted);line-height:1.5;">
             Статистика накапливается с момента последнего запуска сервера. Рейтинги кэшируются в памяти до перезапуска или ручного сброса — при следующем обновлении портфеля будут запрошены повторно.
           </div>
+          <!-- YooKassa settings -->
+          <div style="padding:12px 16px 16px;border-top:1px solid var(--border);">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
+              💳 ЮKassa <span id="adm-yk-status" style="color:var(--text-muted);font-size:11px;font-weight:400;">(заглушка)</span>
+            </h4>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+              <div class="field" style="margin:0;min-width:160px;">
+                <label style="font-size:11px;">Shop ID</label>
+                <input id="adm-yk-shop-id" class="input" style="max-width:180px;height:30px;font-size:12px;" placeholder="12345">
+              </div>
+              <div class="field" style="margin:0;min-width:220px;">
+                <label style="font-size:11px;">Secret Key</label>
+                <input id="adm-yk-secret" type="password" class="input" style="max-width:260px;height:30px;font-size:12px;" placeholder="••••••••">
+              </div>
+              <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;" onclick="adminSaveYooKassa()">Сохранить</button>
+            </div>
+            <div id="adm-yk-msg" class="status" style="min-height:16px;font-size:12px;margin-top:8px;"></div>
+          </div>
         </div>
 
         <div id="adm-status" class="status" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- ── Upgrade to Pro modal ── -->
+      <div id="upgrade-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeUpgradeModal()">
+        <div class="modal" style="max-width:540px;">
+          <div class="modal-header">
+            <h2 class="modal-title">⭐ Получить Pro-доступ</h2>
+            <button class="modal-close" onclick="closeUpgradeModal()">✕</button>
+          </div>
+          <div class="modal-body" style="padding:16px 20px;">
+            <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;">Разблокируйте все возможности Bond AI</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+              <!-- Free card -->
+              <div style="border:1px solid var(--border);border-radius:8px;padding:14px;">
+                <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text-secondary);">📦 Бесплатный</div>
+                <ul style="margin:0;padding:0 0 0 16px;font-size:12px;color:var(--text-secondary);line-height:2;">
+                  <li>1 портфель</li>
+                  <li>10 бумаг</li>
+                  <li style="color:var(--red-600);">✗ AI-комментарии</li>
+                  <li style="color:var(--red-600);">✗ PDF-отчёт</li>
+                  <li style="color:var(--red-600);">✗ Уведомления</li>
+                  <li style="color:var(--red-600);">✗ Шеринг портфеля</li>
+                </ul>
+              </div>
+              <!-- Pro card -->
+              <div style="border:2px solid #f59e0b;border-radius:8px;padding:14px;background:rgba(245,158,11,0.05);">
+                <div style="font-weight:700;font-size:13px;margin-bottom:10px;color:#f59e0b;">⭐ Pro</div>
+                <ul style="margin:0;padding:0 0 0 16px;font-size:12px;line-height:2;">
+                  <li>Неограниченно портфелей</li>
+                  <li>Неограниченно бумаг</li>
+                  <li>✓ AI-комментарии</li>
+                  <li>✓ PDF-отчёт</li>
+                  <li>✓ Telegram-уведомления</li>
+                  <li>✓ Шеринг портфеля</li>
+                </ul>
+              </div>
+            </div>
+            <div style="text-align:center;margin-bottom:12px;">
+              <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+                <b style="font-size:20px;color:var(--text-primary);">299 ₽</b>/мес &nbsp;·&nbsp;
+                <b style="font-size:16px;color:#16a34a;">2 490 ₽</b>/год <span style="font-size:11px;background:#dcfce7;color:#166534;border-radius:4px;padding:2px 6px;">−30%</span>
+              </div>
+              <button id="upgrade-pay-btn" class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:10px 32px;font-size:14px;font-weight:600;" onclick="doCheckout()">
+                Подключить Pro →
+              </button>
+            </div>
+            <div id="upgrade-msg" style="text-align:center;font-size:12px;color:var(--text-muted);min-height:16px;"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Change password modal -->
@@ -2011,6 +2080,16 @@
           localStorage.removeItem('mvp_username');
           showLoginScreen();
           throw new Error('Сессия истекла. Пожалуйста, повторно войдите.');
+        }
+        if (response.status === 403 && !isReadOnly) {
+          const cloned = response.clone();
+          try {
+            const d = await cloned.json();
+            if (d && typeof d.detail === 'string' && d.detail.startsWith('FREE_LIMIT_')) {
+              openUpgradeModal();
+              return null;
+            }
+          } catch(_) {}
         }
         return response;
       }
@@ -3341,6 +3420,7 @@
         updateAmount(); updateYieldDisplay(); syncRiskFromYield();
 
         submitBtn.addEventListener('click', async () => {
+          if ((window._userPlan || 'free') === 'free') { openUpgradeModal(); return; }
           const amount = sliderToAmount(+amountSlider.value);
           const yieldT = +yieldSlider.value;
           const riskKey = RISK_KEYS[+riskSlider.value];
@@ -3836,6 +3916,7 @@
           url = `/portfolios/${portfolioId}/table?ts=${Date.now()}`;
         }
         const resp = await apiFetch(url, { cache: 'no-store' });
+        if (!resp) return;  // intercepted (e.g. FREE_LIMIT upgrade modal shown)
         if (resp.status === 403) {
           // Password required - show modal instead of prompt
           return new Promise((resolve, reject) => {
@@ -3980,11 +4061,12 @@
 
       document.getElementById('export-pdf-btn').addEventListener('click', async () => {
         if (!portfolioId) { setStatus(ioExportStatusEl, 'Портфель не выбран.', true); return; }
+        if ((window._userPlan || 'free') === 'free') { openUpgradeModal(); return; }
         setStatus(ioExportStatusEl, 'Экспорт PDF...');
         try {
           const pdfLang = (window._lang === 'en') ? 'en' : 'ru';
           const resp = await apiFetch(`/portfolios/${portfolioId}/report.pdf?lang=${pdfLang}`);
-          if (!resp.ok) { setStatus(ioExportStatusEl, 'Ошибка экспорта PDF.', true); return; }
+          if (!resp || !resp.ok) { if (resp) setStatus(ioExportStatusEl, 'Ошибка экспорта PDF.', true); return; }
           const blob = await resp.blob();
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
@@ -4087,6 +4169,8 @@
             return;
           }
           const meData = await res.json();
+          window._userPlan = meData.plan || 'free';
+          window._planExpiresAt = meData.plan_expires_at || null;
           setupAdminNav(meData.is_admin || false);
           showDashboard();
           await loadPortfolios();
@@ -4106,6 +4190,83 @@
         } catch (err) {
           showLoginScreen();
         }
+      }
+
+      // ── PLAN / UPGRADE HELPERS ─────────────────────────────────────────────
+
+      function renderPlanCard() {
+        const el = document.getElementById('plan-card');
+        if (!el) return;
+        const plan = window._userPlan || 'free';
+        const exp = window._planExpiresAt;
+        if (plan === 'pro') {
+          let expStr = '';
+          if (exp) {
+            const d = new Date(exp * 1000);
+            expStr = ' · до ' + d.toLocaleDateString('ru-RU');
+          } else {
+            expStr = ' · Бессрочно';
+          }
+          el.innerHTML = `
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f59e0b;">⭐ Pro-подписка${expStr}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Все возможности разблокированы</div>
+            </div>`;
+        } else {
+          el.innerHTML = `
+            <div>
+              <div style="font-size:14px;font-weight:600;color:var(--text-secondary);">📦 Бесплатный тариф</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">1 портфель · 10 бумаг · без AI/PDF/уведомлений</div>
+            </div>
+            <button class="btn" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:8px 18px;font-size:13px;white-space:nowrap;" onclick="openUpgradeModal()">⭐ Получить Pro →</button>`;
+        }
+      }
+
+      function renderNotifProBanner() {
+        const plan = window._userPlan || 'free';
+        const couponField = document.querySelector('#coupon-notif-enabled')?.closest('.field');
+        if (!couponField) return;
+        const bannerId = 'notif-pro-banner';
+        let existing = document.getElementById(bannerId);
+        if (plan === 'pro') {
+          if (existing) existing.remove();
+          return;
+        }
+        if (existing) return;
+        const banner = document.createElement('div');
+        banner.id = bannerId;
+        banner.style.cssText = 'padding:10px 14px;border-radius:8px;background:var(--bg-elevated);border:1px solid var(--border);font-size:12px;color:var(--text-muted);display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;';
+        banner.innerHTML = `<span>🔒 Telegram-уведомления доступны в Pro-тарифе</span><button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 10px;font-size:11px;" onclick="openUpgradeModal()">Получить Pro</button>`;
+        couponField.parentNode.insertBefore(banner, couponField);
+      }
+
+      function openUpgradeModal() {
+        const m = document.getElementById('upgrade-modal');
+        if (m) m.style.display = 'flex';
+      }
+
+      function closeUpgradeModal() {
+        const m = document.getElementById('upgrade-modal');
+        if (m) m.style.display = 'none';
+      }
+
+      async function doCheckout() {
+        const btn = document.getElementById('upgrade-pay-btn');
+        const msg = document.getElementById('upgrade-msg');
+        if (btn) btn.disabled = true;
+        try {
+          const r = await apiFetch('/payments/checkout?plan=pro', { method: 'POST' });
+          if (r) {
+            const d = await r.json();
+            if (msg) {
+              msg.textContent = d.message || 'Обратитесь к администратору.';
+              msg.style.color = 'var(--text-secondary)';
+            }
+          }
+        } catch(e) {
+          if (msg) { msg.textContent = 'Ошибка запроса.'; msg.style.color = 'var(--red-600)'; }
+        }
+        if (btn) btn.disabled = false;
       }
 
       function showLoginScreen() {
@@ -4149,6 +4310,8 @@
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
+                window._userPlan = data.plan || 'free';
+                window._planExpiresAt = data.plan_expires_at || null;
                 loginBtn.innerHTML = '<span class="btn-check">✓</span>' + t('auth.signing');
                 loginBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
                 setAuthMsg(t('auth.success'), 'success');
@@ -4188,6 +4351,8 @@
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
                 localStorage.setItem('mvp_start_onboarding', '1');
+                window._userPlan = data.plan || 'free';
+                window._planExpiresAt = data.plan_expires_at || null;
                 regBtn.textContent = t('auth.registered');
                 setAuthMsg(t('auth.accountCreated'), 'success');
                 setTimeout(() => location.reload(), 700);
@@ -4888,6 +5053,7 @@
 
       // ── SHARE PORTFOLIO ──────────────────────────────────────────
       function openShareModal() {
+        if ((window._userPlan || 'free') === 'free') { openUpgradeModal(); return; }
         const overlay = document.getElementById('share-modal-overlay');
         if (overlay) overlay.classList.add('show');
         loadShareStatus();
@@ -5368,6 +5534,7 @@
         await adminLoadUsers();
         await adminLoadPortfolios();
         adminLoadSources().catch(() => {});
+        adminLoadYooKassa().catch(() => {});
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -5497,7 +5664,7 @@
 
       async function adminLoadUsers() {
         const tbody = document.getElementById('adm-users-body');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/admin/users');
           const users = await r.json();
@@ -5536,6 +5703,36 @@
             }
             tdRole.appendChild(roleSpan);
 
+            // ── Plan cell ──
+            const tdPlan = document.createElement('td');
+            tdPlan.style.cssText = 'white-space:nowrap;';
+            const planBadge = document.createElement('span');
+            const isPro = u.plan === 'pro';
+            planBadge.textContent = isPro ? '⭐ Pro' : 'Free';
+            planBadge.style.cssText = isPro
+              ? 'color:#f59e0b;font-weight:700;font-size:12px;'
+              : 'color:var(--text-muted);font-size:12px;';
+            if (isPro && u.plan_expires_at) {
+              const d = new Date(u.plan_expires_at * 1000);
+              planBadge.title = 'до ' + d.toLocaleDateString('ru-RU');
+            }
+            tdPlan.appendChild(planBadge);
+            const planBtns = document.createElement('div');
+            planBtns.style.cssText = 'display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;';
+            if (!isPro) {
+              const b1 = _mkBtn('Pro ∞', 'background:#f59e0b;color:#fff', () => adminSetPlan(u.id, 'pro', null, tr));
+              const b2 = _mkBtn('Pro 30д', 'background:#d97706;color:#fff', () => adminSetPlan(u.id, 'pro', Math.floor(Date.now()/1000)+30*86400, tr));
+              planBtns.append(b1, b2);
+            } else {
+              const b1 = _mkBtn('Free', 'background:var(--slate-600);color:#fff', () => adminSetPlan(u.id, 'free', null, tr));
+              const b2 = _mkBtn('+30д', 'background:#d97706;color:#fff', () => {
+                const exp = (u.plan_expires_at && u.plan_expires_at > Date.now()/1000) ? u.plan_expires_at : Math.floor(Date.now()/1000);
+                adminSetPlan(u.id, 'pro', exp+30*86400, tr);
+              });
+              planBtns.append(b1, b2);
+            }
+            tdPlan.appendChild(planBtns);
+
             const tdActions = document.createElement('td');
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
@@ -5558,12 +5755,62 @@
             }
 
             tdActions.appendChild(div);
-            tr.append(tdId, tdName, tdCount, tdDate, tdRole, tdActions);
+            tr.append(tdId, tdName, tdCount, tdDate, tdRole, tdPlan, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
         }
+      }
+
+      async function adminSetPlan(userId, plan, expiresAt, tr) {
+        try {
+          const r = await apiFetch(`/admin/users/${userId}/plan`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan, expires_at: expiresAt }),
+          });
+          if (r && r.ok) adminLoadUsers();
+        } catch(e) {}
+      }
+
+      async function adminLoadYooKassa() {
+        try {
+          const r = await apiFetch('/admin/settings/yookassa');
+          if (!r || !r.ok) return;
+          const d = await r.json();
+          const shopEl = document.getElementById('adm-yk-shop-id');
+          if (shopEl) shopEl.value = d.shop_id || '';
+          const statusEl = document.getElementById('adm-yk-status');
+          if (statusEl && d.has_secret) statusEl.textContent = '(ключ сохранён)';
+        } catch(e) {}
+      }
+
+      async function adminSaveYooKassa() {
+        const shopId = (document.getElementById('adm-yk-shop-id')?.value || '').trim();
+        const secret = (document.getElementById('adm-yk-secret')?.value || '').trim();
+        const msgEl = document.getElementById('adm-yk-msg');
+        try {
+          const r = await apiFetch('/admin/settings/yookassa', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shop_id: shopId, secret_key: secret }),
+          });
+          if (r && r.ok) {
+            msgEl.textContent = 'Сохранено';
+            msgEl.className = 'status ok';
+            if (secret) document.getElementById('adm-yk-secret').value = '';
+            const statusEl = document.getElementById('adm-yk-status');
+            if (statusEl && shopId) statusEl.textContent = '(настроено)';
+          } else {
+            msgEl.textContent = 'Ошибка сохранения';
+            msgEl.className = 'status error';
+          }
+        } catch(e) {
+          msgEl.textContent = 'Ошибка: ' + e.message;
+          msgEl.className = 'status error';
+        }
+        setTimeout(() => { if(msgEl) { msgEl.textContent=''; msgEl.className='status'; } }, 4000);
       }
 
       async function adminLoadPortfolios() {
@@ -5741,7 +5988,8 @@
           const target = document.getElementById(btn.dataset.stab);
           if (target) target.style.display = 'block';
           if (btn.dataset.stab === 'stab-portfolios') settingsLoadPortfolios();
-          if (btn.dataset.stab === 'stab-account') settingsLoadAccount();
+          if (btn.dataset.stab === 'stab-account') { settingsLoadAccount(); renderPlanCard(); }
+          if (btn.dataset.stab === 'stab-notifications') renderNotifProBanner();
         });
       });
 

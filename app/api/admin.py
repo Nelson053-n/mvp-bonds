@@ -155,3 +155,54 @@ async def delete_portfolio(portfolio_id: int, admin: dict = Depends(get_admin_us
     storage_service.delete_portfolio(portfolio_id)
     logger.info("Admin %s deleted portfolio %d", admin["username"], portfolio_id)
     return {"ok": True}
+
+
+# ── Plan management ───────────────────────────────────────────────────────────
+
+class SetPlanInput(BaseModel):
+    plan: str = Field(..., pattern="^(free|pro)$")
+    expires_at: int | None = None  # Unix timestamp; None = unlimited
+
+
+@router.patch("/users/{user_id}/plan")
+async def set_user_plan(
+    user_id: int,
+    payload: SetPlanInput,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """Set plan (free/pro) for a user. expires_at=None means unlimited."""
+    user = storage_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    storage_service.set_user_plan(user_id, payload.plan, payload.expires_at)
+    logger.info(
+        "Admin %s set plan=%s expires_at=%s for user %d (%s)",
+        admin["username"], payload.plan, payload.expires_at, user_id, user["username"],
+    )
+    return {"ok": True}
+
+
+# ── YooKassa settings ─────────────────────────────────────────────────────────
+
+class YooKassaInput(BaseModel):
+    shop_id: str = Field(default="", max_length=64)
+    secret_key: str = Field(default="", max_length=256)
+
+
+@router.get("/settings/yookassa")
+async def get_yookassa(admin: dict = Depends(get_admin_user)) -> dict:
+    """Get YooKassa configuration (stub)."""
+    return {
+        "shop_id": storage_service.get_setting("yookassa_shop_id") or "",
+        "has_secret": bool(storage_service.get_setting("yookassa_secret_key")),
+    }
+
+
+@router.patch("/settings/yookassa")
+async def save_yookassa(payload: YooKassaInput, admin: dict = Depends(get_admin_user)) -> dict:
+    """Save YooKassa shop_id and optionally secret_key."""
+    storage_service.set_setting("yookassa_shop_id", payload.shop_id)
+    if payload.secret_key:
+        storage_service.set_setting("yookassa_secret_key", payload.secret_key)
+    logger.info("Admin %s updated YooKassa settings (shop_id=%s)", admin["username"], payload.shop_id)
+    return {"ok": True}

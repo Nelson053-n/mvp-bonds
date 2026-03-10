@@ -47,6 +47,12 @@ async def get_optional_user(request: Request) -> dict | None:
     return auth_service.verify_token(token)
 
 
+def get_user_plan(user_id: int) -> str:
+    """Return current effective plan for user: 'free' or 'pro'."""
+    from app.services.storage_service import storage_service as _ss
+    return _ss.get_user_plan(user_id)["plan"]
+
+
 async def get_portfolio_or_403(portfolio_id: int, current_user: dict) -> dict:
     """
     Check if portfolio exists and belongs to current user.

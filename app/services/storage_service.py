@@ -124,6 +124,20 @@ class StorageService:
             except sqlite3.OperationalError:
                 pass
 
+            # Plan / subscription fields
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN plan_expires_at INTEGER")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN yookassa_customer_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS coupon_notifications (
@@ -546,7 +560,7 @@ class StorageService:
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, plan, plan_expires_at FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -560,7 +574,31 @@ class StorageService:
             "is_admin": bool(row[4]),
             "email": row[5],
             "tg_chat_id": row[6],
+            "plan": row[7] or "free",
+            "plan_expires_at": row[8],
         }
+
+    def get_user_plan(self, user_id: int) -> dict:
+        import time as _time
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT plan, plan_expires_at FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+        if not row:
+            return {"plan": "free", "plan_expires_at": None}
+        plan, expires = row[0] or "free", row[1]
+        if plan == "pro" and expires and expires < int(_time.time()):
+            return {"plan": "free", "plan_expires_at": None}
+        return {"plan": plan, "plan_expires_at": expires}
+
+    def set_user_plan(self, user_id: int, plan: str, expires_at: int | None) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET plan=?, plan_expires_at=? WHERE id=?",
+                (plan, expires_at, user_id),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
 
     # ── Portfolios ──────────────────────────────────────────────────────────
 
@@ -752,7 +790,8 @@ class StorageService:
             rows = conn.execute(
                 """
                 SELECT u.id, u.username, u.is_admin, u.created_at,
-                       COUNT(p.id) as portfolio_count
+                       COUNT(p.id) as portfolio_count,
+                       u.plan, u.plan_expires_at
                 FROM users u
                 LEFT JOIN portfolios p ON p.user_id = u.id
                 GROUP BY u.id
@@ -766,6 +805,8 @@ class StorageService:
                 "is_admin": bool(row[2]),
                 "created_at": row[3],
                 "portfolio_count": int(row[4]),
+                "plan": row[5] or "free",
+                "plan_expires_at": row[6],
             }
             for row in rows
         ]
