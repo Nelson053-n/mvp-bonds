@@ -1345,6 +1345,31 @@
               </div>
             </div>
           </div>
+          <div class="card" style="margin-top:16px;">
+            <div class="card-header">
+              <h2 class="card-title" data-i18n="io.tbankTitle">Импорт из Т-Банка</h2>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+              <div class="info-box" data-i18n-html="io.tbankDesc">
+                Введите read-only токен Т-Банк Инвестиции. Будет создан новый портфель с вашими облигациями и акциями.<br>Токен нигде не сохраняется.
+              </div>
+              <div class="field">
+                <label for="tbank-token" data-i18n="io.tbankToken">Токен Т-Банк (read-only)</label>
+                <input type="password" id="tbank-token" class="input" data-i18n-placeholder="io.tbankTokenPlaceholder" placeholder="Вставьте токен..." autocomplete="off" />
+              </div>
+              <div class="field" id="tbank-account-field" style="display:none;">
+                <label for="tbank-account-sel" data-i18n="io.tbankAccount">Счёт</label>
+                <select id="tbank-account-sel" class="select-input"></select>
+              </div>
+              <div id="tbank-preview-box" class="info-box info-box-warning" style="display:none;"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary" id="tbank-load-btn" data-i18n="io.tbankLoadBtn">Загрузить счета</button>
+                <button class="btn" id="tbank-bonds-btn" style="display:none;" data-i18n="io.tbankBondsBtn">⬆ Только облигации</button>
+                <button class="btn btn-secondary" id="tbank-all-btn" style="display:none;" data-i18n="io.tbankAllBtn">⬆ Все бумаги</button>
+              </div>
+              <div id="io-tbank-status" class="status"></div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -4254,6 +4279,127 @@
         } catch (err) { setStatus(ioImportAllStatusEl, err.message, true); }
       });
 
+      // ── T-BANK IMPORT ─────────────────────────────────────────────
+      (function() {
+        const tbankTokenInp = document.getElementById('tbank-token');
+        const tbankAccountField = document.getElementById('tbank-account-field');
+        const tbankAccountSel = document.getElementById('tbank-account-sel');
+        const tbankLoadBtn = document.getElementById('tbank-load-btn');
+        const tbankBondsBtn = document.getElementById('tbank-bonds-btn');
+        const tbankAllBtn = document.getElementById('tbank-all-btn');
+        const tbankPreviewBox = document.getElementById('tbank-preview-box');
+        const tbankStatusEl = document.getElementById('io-tbank-status');
+
+        function resetTbankUI() {
+          tbankTokenInp.value = '';
+          tbankAccountField.style.display = 'none';
+          tbankPreviewBox.style.display = 'none';
+          tbankBondsBtn.style.display = 'none';
+          tbankAllBtn.style.display = 'none';
+        }
+
+        tbankLoadBtn.addEventListener('click', async () => {
+          const token = tbankTokenInp.value.trim();
+          if (!token) { setStatus(tbankStatusEl, t('io.tbankEnterToken'), true); return; }
+          setStatus(tbankStatusEl, t('io.tbankLoadingAccounts'));
+          tbankLoadBtn.disabled = true;
+          tbankPreviewBox.style.display = 'none';
+          tbankBondsBtn.style.display = 'none';
+          tbankAllBtn.style.display = 'none';
+          try {
+            const r = await apiFetch('/tbank/accounts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token }),
+            });
+            const res = await r.json();
+            if (!r.ok) throw new Error(res.detail || t('io.tbankAccountsError'));
+            const accounts = res.accounts || [];
+            if (accounts.length === 0) { setStatus(tbankStatusEl, t('io.tbankNoAccounts'), true); return; }
+            tbankAccountSel.innerHTML = '';
+            accounts.forEach(a => {
+              const opt = document.createElement('option');
+              opt.value = a.id;
+              opt.textContent = a.name || a.id;
+              tbankAccountSel.appendChild(opt);
+            });
+            tbankAccountField.style.display = '';
+            setStatus(tbankStatusEl, t('io.tbankAccountsLoaded').replace('{n}', accounts.length));
+            // Auto-preview first account
+            await loadPreview();
+          } catch (err) {
+            setStatus(tbankStatusEl, err.message, true);
+          } finally {
+            tbankLoadBtn.disabled = false;
+          }
+        });
+
+        tbankAccountSel.addEventListener('change', () => { loadPreview(); });
+
+        async function loadPreview() {
+          const token = tbankTokenInp.value.trim();
+          const account_id = tbankAccountSel.value;
+          if (!token || !account_id) return;
+          setStatus(tbankStatusEl, t('io.tbankLoadingPreview'));
+          tbankPreviewBox.style.display = 'none';
+          tbankBondsBtn.style.display = 'none';
+          tbankAllBtn.style.display = 'none';
+          try {
+            const r = await apiFetch('/tbank/preview', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, account_id }),
+            });
+            const res = await r.json();
+            if (!r.ok) throw new Error(res.detail || t('io.tbankImportError'));
+            if (res.total === 0) { setStatus(tbankStatusEl, t('io.tbankNoPositions'), true); return; }
+            tbankPreviewBox.innerHTML = t('io.tbankPreview')
+              .replace('{total}', res.total)
+              .replace('{bonds}', res.bonds)
+              .replace('{stocks}', res.stocks);
+            tbankPreviewBox.style.display = '';
+            if (res.bonds > 0) tbankBondsBtn.style.display = '';
+            if (res.total > 0) tbankAllBtn.style.display = '';
+            setStatus(tbankStatusEl, '');
+          } catch (err) {
+            setStatus(tbankStatusEl, err.message, true);
+          }
+        }
+
+        async function doImport(bondsOnly) {
+          const token = tbankTokenInp.value.trim();
+          const account_id = tbankAccountSel.value;
+          if (!token || !account_id) return;
+          setStatus(tbankStatusEl, t('io.tbankImporting'));
+          tbankBondsBtn.disabled = true;
+          tbankAllBtn.disabled = true;
+          try {
+            const r = await apiFetch('/tbank/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, account_id, bonds_only: bondsOnly }),
+            });
+            const res = await r.json();
+            if (!r.ok) throw new Error(res.detail || t('io.tbankImportError'));
+            let msg = t('io.tbankImportSuccess').replace('{name}', res.portfolio_name).replace('{n}', res.added);
+            if (res.errors > 0) msg += ' ' + t('io.importErrors').replace('{n}', res.errors);
+            setStatus(tbankStatusEl, msg, res.errors > 0);
+            resetTbankUI();
+            await loadPortfolios();
+            updatePortfolioSelector();
+            settingsLoadPortfolios();
+          } catch (err) {
+            setStatus(tbankStatusEl, err.message, true);
+          } finally {
+            tbankBondsBtn.disabled = false;
+            tbankAllBtn.disabled = false;
+          }
+        }
+
+        tbankBondsBtn.addEventListener('click', () => doImport(true));
+        tbankAllBtn.addEventListener('click', () => doImport(false));
+      })();
+
       // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
 
       // Check authentication and render app
@@ -6902,6 +7048,25 @@
           'io.importAllTitle': 'Импорт всех портфелей',
           'io.importAllDesc': 'CSV с колонками: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.',
           'io.importAllBtn': '⬆ Импортировать все',
+          'io.tbankTitle': 'Импорт из Т-Банка',
+          'io.tbankDesc': 'Введите read-only токен Т-Банк Инвестиции. Будет создан новый портфель с вашими облигациями и акциями.<br>Токен нигде не сохраняется.',
+          'io.tbankToken': 'Токен Т-Банк (read-only)',
+          'io.tbankTokenPlaceholder': 'Вставьте токен...',
+          'io.tbankAccount': 'Счёт',
+          'io.tbankLoadBtn': 'Загрузить счета',
+          'io.tbankBondsBtn': '⬆ Только облигации',
+          'io.tbankAllBtn': '⬆ Все бумаги',
+          'io.tbankEnterToken': 'Введите токен Т-Банка.',
+          'io.tbankLoadingAccounts': 'Загружаем список счетов...',
+          'io.tbankAccountsError': 'Ошибка получения счетов.',
+          'io.tbankNoAccounts': 'Счета не найдены.',
+          'io.tbankAccountsLoaded': 'Найдено счетов: {n}.',
+          'io.tbankLoadingPreview': 'Загружаем состав портфеля...',
+          'io.tbankPreview': 'Найдено бумаг: <b>{total}</b> (облигаций: <b>{bonds}</b>, акций: <b>{stocks}</b>)',
+          'io.tbankNoPositions': 'В счёте нет облигаций или акций.',
+          'io.tbankImporting': 'Импорт портфеля...',
+          'io.tbankImportError': 'Ошибка импорта.',
+          'io.tbankImportSuccess': 'Создан портфель «{name}». Импортировано: {n} позиций.',
           'login.hero': 'Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ',
           'login.sub': 'Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.',
           'login.feat1': 'ИИ-подбор облигаций по доходности и уровню риска',
@@ -7280,6 +7445,25 @@
           'io.importAllTitle': 'Import All Portfolios',
           'io.importAllDesc': 'CSV columns: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Missing portfolios are created automatically.',
           'io.importAllBtn': '⬆ Import all',
+          'io.tbankTitle': 'Import from T-Bank',
+          'io.tbankDesc': 'Enter your T-Bank Invest read-only token. A new portfolio will be created with your bonds and stocks.<br>The token is never stored.',
+          'io.tbankToken': 'T-Bank token (read-only)',
+          'io.tbankTokenPlaceholder': 'Paste token...',
+          'io.tbankAccount': 'Account',
+          'io.tbankLoadBtn': 'Load accounts',
+          'io.tbankBondsBtn': '⬆ Bonds only',
+          'io.tbankAllBtn': '⬆ All instruments',
+          'io.tbankEnterToken': 'Enter your T-Bank token.',
+          'io.tbankLoadingAccounts': 'Loading accounts...',
+          'io.tbankAccountsError': 'Failed to load accounts.',
+          'io.tbankNoAccounts': 'No accounts found.',
+          'io.tbankAccountsLoaded': 'Found {n} account(s).',
+          'io.tbankLoadingPreview': 'Loading portfolio contents...',
+          'io.tbankPreview': 'Found instruments: <b>{total}</b> (bonds: <b>{bonds}</b>, stocks: <b>{stocks}</b>)',
+          'io.tbankNoPositions': 'No bonds or stocks in this account.',
+          'io.tbankImporting': 'Importing portfolio...',
+          'io.tbankImportError': 'Import failed.',
+          'io.tbankImportSuccess': 'Created portfolio "{name}". Imported: {n} positions.',
           'login.hero': 'Smart bond<br><span class="grad">selection</span><br>powered by AI',
           'login.sub': 'Track stocks and bonds in one place. AI will select bonds matching your risk profile and target yield.',
           'login.feat1': 'AI bond selection by yield and risk level',
