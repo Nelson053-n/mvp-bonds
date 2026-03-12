@@ -354,7 +354,9 @@ class PortfolioService:
                             current_value=round(current_value, 2),
                             profit=round(profit, 2),
                             weight=0.0,
-                            company_rating=snapshot.company_rating,
+                            company_rating=snapshot.company_rating or item.company_rating,
+                            is_qual=snapshot.is_qual,
+                            is_traded=snapshot.is_traded,
                             nominal=nominal,
                             coupon=(
                                 item.manual_coupon
@@ -375,6 +377,7 @@ class PortfolioService:
                             next_coupon_date=snapshot.next_coupon_date,
                             aci=snapshot.aci,
                             market_yield=snapshot.market_yield,
+                            face_unit=snapshot.face_unit,
                             ai_comment="",
                         )
                     else:
@@ -398,7 +401,7 @@ class PortfolioService:
                             current_value=round(current_value, 2),
                             profit=round(profit, 2),
                             weight=0.0,
-                            company_rating=snapshot.company_rating,
+                            company_rating=snapshot.company_rating or item.company_rating,
                             dividend_yield=snapshot.dividend_yield,
                             ai_comment="",
                         )
@@ -452,10 +455,12 @@ class PortfolioService:
             await asyncio.gather(*(_gen_comment(row) for row in raw_rows))
         )
 
-        # Persist ratings to DB so changes are detectable across restarts
+        # Persist ratings + coupon_rate to DB for risk calculation and restarts
         for row in finalized:
             if row.current_price > 0:
-                storage_service.update_rating(row.id, portfolio_id, row.company_rating)
+                storage_service.update_snapshot_data(
+                    row.id, portfolio_id, row.company_rating, row.coupon_rate
+                )
 
         return finalized
 

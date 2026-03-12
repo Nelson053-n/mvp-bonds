@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
   <title>Bond AI — Умный портфель облигаций с AI-аналитикой</title>
   <meta name="description" content="Подбирайте облигации под ваш риск-профиль, отслеживайте купонный доход и получайте уведомления в Telegram. Данные MOEX в реальном времени.">
   <link rel="manifest" href="/manifest.json">
@@ -1593,7 +1594,7 @@
             ticker: b.ticker,
             instrument_type: 'bond',
             quantity: b.quantity,
-            purchase_price: b.purchase_price || 100,
+            purchase_price: null,  // auto-fetch current market price so profit=0 at add time
           }));
           await fetch(`/portfolios/${portfolioId}/instruments/bulk`, {
             method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 import logging
 import re
@@ -77,12 +78,17 @@ class MOEXService:
         re.IGNORECASE,
     )
 
+    FX_RATE_TTL = 3600  # 1 hour cache for FX rates
+
     def __init__(self) -> None:
         self._credit_rating_cache: dict[str, str | None] = {}
+        self._is_qual_cache: dict[str, bool] = {}
+        self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
         self.sources: dict[str, SourceStats] = {
             "moex_price": SourceStats("moex_price", "MOEX ISS (цены)"),
             "moex_rating": SourceStats("moex_rating", "MOEX ISS (рейтинг)"),
             "smartlab": SourceStats("smartlab", "Smart-Lab (рейтинг)"),
+            "moex_fx": SourceStats("moex_fx", "MOEX ISS (валюты)"),
         }
 
     def get_sources_status(self) -> list[dict]:
@@ -102,6 +108,70 @@ class MOEXService:
         if rating is None:
             rating = await self._get_credit_rating(secid)
         return rating
+
+    async def refresh_rating_with_sources(self, secid: str) -> dict[str, str | None]:
+        """Force re-fetch rating from both SmartLab and MOEX separately.
+
+        Returns {"smartlab": rating_or_None, "moex": rating_or_None, "best": best_rating}.
+        """
+        self._credit_rating_cache.pop(secid, None)
+        self._credit_rating_cache.pop(f"smartlab:{secid}", None)
+        sl_rating, moex_rating = await asyncio.gather(
+            self._get_smartlab_credit_rating(secid),
+            self._get_credit_rating(secid),
+            return_exceptions=False,
+        )
+        best = sl_rating or moex_rating
+        return {"smartlab": sl_rating, "moex": moex_rating, "best": best}
+
+    async def _get_fx_rate(self, currency: str) -> float | None:
+        """Get FX rate for currency to RUB. Returns 1.0 for SUR/RUB."""
+        if currency in ("SUR", "RUB"):
+            return 1.0
+
+        now = time.time()
+        cached = self._fx_rate_cache.get(currency)
+        if cached and (now - cached[1]) < self.FX_RATE_TTL:
+            return cached[0]
+
+        src = self.sources["moex_fx"]
+        if not src.enabled:
+            return cached[0] if cached else None
+
+        url = (
+            f"{settings.moex_base_url}/statistics/engines/futures/markets/"
+            f"indicativerates/securities/{currency}/RUB.json"
+            f"?iss.meta=off&iss.only=securities.current"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+            current = data.get("securities.current", {})
+            cols = current.get("columns", [])
+            rows = current.get("data", [])
+            if rows:
+                row = dict(zip(cols, rows[-1]))
+                rate = row.get("rate")
+                if rate is not None:
+                    rate = float(rate)
+                    self._fx_rate_cache[currency] = (rate, now)
+                    src.record_hit()
+                    logger.info("FX rate %s/RUB = %.4f", currency, rate)
+                    return rate
+            src.record_miss()
+            logger.warning("FX rate not found for %s/RUB", currency)
+        except Exception as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            src.record_error(status, str(exc))
+            logger.warning("Failed to fetch FX rate %s/RUB: %s", currency, exc)
+
+        # Fallback to stale cache
+        if cached:
+            logger.warning("Using stale FX rate for %s/RUB: %.4f", currency, cached[0])
+            return cached[0]
+        return None
 
     async def get_stock_snapshot(self, ticker: str) -> StockSnapshot:
         secid = ticker.upper().strip()
@@ -165,13 +235,41 @@ class MOEXService:
         company_rating = await self._get_smartlab_credit_rating(secid)
         if company_rating is None:
             company_rating = await self._get_credit_rating(secid)
+        # Last resort: derive rating from MOEX listing level
+        if company_rating is None:
+            _listlevel_map = {1: "AA", 2: "BBB", 3: "BB"}
+            listlevel = sec_row.get("LISTLEVEL")
+            try:
+                company_rating = _listlevel_map.get(int(listlevel)) if listlevel is not None else None
+            except (TypeError, ValueError):
+                pass
+
+        is_qual, is_traded = await self._get_sec_meta(secid)
+
+        # FX conversion for non-RUB bonds
+        face_unit = sec_row.get("FACEUNIT") or "SUR"
+        fx_rate = 1.0
+        if face_unit != "SUR":
+            rate = await self._get_fx_rate(face_unit)
+            if rate is not None:
+                fx_rate = rate
+            else:
+                logger.error(
+                    "FX rate unavailable for %s, bond %s prices will be unconverted",
+                    face_unit, secid,
+                )
+
+        # Convert absolute values from native currency to RUB
+        nominal_rub = round(float(nominal) * fx_rate, 2) if nominal is not None else None
+        coupon_rub = round(float(coupon) * fx_rate, 4) if coupon is not None else None
+        aci_rub = round(float(aci) * fx_rate, 5) if aci is not None else None
 
         return BondSnapshot(
             ticker=secid,
             name=str(name),
             clean_price_percent=float(clean_price_percent),
-            nominal=float(nominal) if nominal is not None else None,
-            coupon=float(coupon) if coupon is not None else None,
+            nominal=nominal_rub,
+            coupon=coupon_rub,
             coupon_period=(
                 int(coupon_period)
                 if coupon_period is not None
@@ -186,13 +284,17 @@ class MOEXService:
             buyback_date=buyback_date,
             offer_date=offer_date,
             next_coupon_date=next_coupon_date,
-            aci=float(aci) if aci is not None else None,
+            aci=aci_rub,
             market_yield=(
                 float(market_yield)
                 if market_yield is not None
                 else None
             ),
             company_rating=company_rating,
+            is_qual=is_qual,
+            is_traded=is_traded,
+            face_unit=face_unit,
+            fx_rate=fx_rate,
         )
 
     async def _fetch(self, url: str) -> dict[str, Any]:
@@ -359,6 +461,55 @@ class MOEXService:
             src.record_miss()
         self._credit_rating_cache[secid] = fallback
         return fallback
+
+    async def _get_sec_meta(self, secid: str) -> tuple[bool, bool]:
+        """Return (is_qual, is_traded) for a bond via MOEX securities API.
+
+        Uses description.json (ISQUALIFIEDINVESTORS) and boards (is_traded on primary board).
+        Results are cached in-memory.
+        """
+        if secid in self._is_qual_cache:
+            return self._is_qual_cache[secid]
+
+        url_desc = f"{settings.moex_base_url}/securities/{secid}/description.json?description.columns=name,value"
+        url_boards = f"{settings.moex_base_url}/securities/{secid}.json?iss.only=boards&boards.columns=boardid,is_traded,is_primary"
+
+        is_qual = False
+        is_traded = True
+
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                desc_resp, boards_resp = await asyncio.gather(
+                    client.get(url_desc),
+                    client.get(url_boards),
+                    return_exceptions=True,
+                )
+
+            if not isinstance(desc_resp, Exception):
+                desc_resp.raise_for_status()
+                desc = desc_resp.json().get("description", {})
+                cols = desc.get("columns", [])
+                for row in desc.get("data", []):
+                    r = dict(zip(cols, row))
+                    if r.get("name") == "ISQUALIFIEDINVESTORS":
+                        is_qual = str(r.get("value", "0")) == "1"
+                        break
+
+            if not isinstance(boards_resp, Exception):
+                boards_resp.raise_for_status()
+                boards = boards_resp.json().get("boards", {})
+                cols = boards.get("columns", [])
+                for row in boards.get("data", []):
+                    r = dict(zip(cols, row))
+                    if r.get("is_primary") == 1:
+                        is_traded = r.get("is_traded") == 1
+                        break
+
+        except Exception:
+            pass  # default: not qual, is traded
+
+        self._is_qual_cache[secid] = (is_qual, is_traded)
+        return is_qual, is_traded
 
     async def _get_smartlab_credit_rating(
         self, secid: str

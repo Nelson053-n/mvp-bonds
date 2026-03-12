@@ -173,6 +173,7 @@ def _find_cyrillic_font_bold() -> tuple[str, str | None]:
 
 def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import cm
@@ -216,6 +217,10 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
     head_style  = ParagraphStyle("head",    fontName=font_bold, fontSize=12, spaceBefore=10, spaceAfter=4, textColor=C_DARK)
     disc_style  = ParagraphStyle("disc",    fontName=font_name, fontSize=7,  spaceAfter=2, textColor=C_MUTED)
     foot_style  = ParagraphStyle("footer",  fontName=font_name, fontSize=7,  textColor=C_MUTED)
+    # Styles for table cells — enables word wrap for long names
+    cell_style        = ParagraphStyle("cell",       fontName=font_name, fontSize=7,   leading=8.5,  textColor=C_DARK)
+    cell_style_r      = ParagraphStyle("cell_r",     fontName=font_name, fontSize=7,   leading=8.5,  textColor=C_DARK, alignment=2)  # RIGHT
+    header_cell_style = ParagraphStyle("header_cell",fontName=font_bold, fontSize=7.5, leading=9,    textColor=colors.white, alignment=TA_CENTER)
 
     # ── Document ───────────────────────────────────────────────────────────
     buf = io.BytesIO()
@@ -226,7 +231,7 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
 
     PAGE = landscape(A4)
     W, H = PAGE
-    MARGIN = 1.5 * cm
+    MARGIN = 0.8 * cm
 
     def _footer(canvas, doc):
         canvas.saveState()
@@ -364,18 +369,27 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
         t("col_weight"),
     ]
 
-    # Landscape A4 usable width ≈ 24.7 cm — allocate carefully
+    # Landscape A4 usable width ≈ 28.1 cm (297mm − 2×0.8cm margin)
+    # Total col widths: 27.1 cm — fits with ~1 cm spare
     col_w = [
-        0.6, 2.0, 5.8, 2.0,   # №, тикер, название, тип
-        1.4, 2.0, 2.0, 2.6,   # кол-во, цена покупки, тек. цена, стоимость
-        2.0, 1.4, 1.8,         # P&L, P&L%, рейтинг
-        1.8, 1.6, 2.0, 2.2,   # ставка купона, YTM, погашение, след.купон
-        1.5,                   # доля
+        0.5, 1.8, 3.8, 1.5,   # №, тикер, название, тип
+        1.2, 1.8, 1.8, 2.2,   # кол-во, цена покупки, тек. цена, стоимость
+        1.8, 1.2, 1.5,         # P&L, P&L%, рейтинг
+        1.5, 1.4, 1.8, 2.0,   # ставка купона, YTM, погашение, след.купон
+        1.3,                   # доля
     ]
     col_w = [w * cm for w in col_w]
 
-    table_data = [headers]
+    # Wrap headers in Paragraph for word wrap support
+    hdr_paragraphs = [Paragraph(h, header_cell_style) for h in headers]
+    table_data = [hdr_paragraphs]
     total_pnl = 0.0
+
+    def _cell(text: str) -> Paragraph:
+        return Paragraph(str(text), cell_style)
+
+    def _cell_r(text: str) -> Paragraph:
+        return Paragraph(str(text), cell_style_r)
 
     for i, row in enumerate(rows, 1):
         pnl_val = ((row.current_price or 0) - (row.purchase_price or 0)) * (row.quantity or 0)
@@ -389,74 +403,83 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
         ytm_str   = f"{row.market_yield:.1f}%" if getattr(row, "market_yield", None) else t("na")
         coupon_rate_str = f"{row.coupon_rate:.2f}%" if getattr(row, "coupon_rate", None) else t("na")
         rating_str = str(row.company_rating or t("na"))
+        pnl_sign = "+" if pnl_val >= 0 else ""
+        pct_sign = "+" if pnl_pct_row >= 0 else ""
+        pnl_hex = "#16a34a" if pnl_val >= 0 else "#dc2626"
 
+        # Name column uses word-wrap Paragraph; P&L cells use colour markup
+        name_text = str(row.name or "")
+        pnl_para = Paragraph(
+            f'<font color="{pnl_hex}">{pnl_sign}{_fmt(pnl_val)}</font>',
+            cell_style_r,
+        )
+        pct_para = Paragraph(
+            f'<font color="{pnl_hex}">{pct_sign}{pnl_pct_row:.1f}%</font>',
+            cell_style_r,
+        )
         table_data.append([
-            str(i),
-            str(row.ticker or ""),
-            str(row.name or "")[:40],
-            row_type,
-            str(int(row.quantity or 0)),
-            _fmt2(row.purchase_price or 0),
-            _fmt2(row.current_price or 0),
-            _fmt(row.current_value or 0),
-            f"{'+' if pnl_val >= 0 else ''}{_fmt(pnl_val)}",
-            f"{'+' if pnl_pct_row >= 0 else ''}{pnl_pct_row:.1f}%",
-            rating_str,
-            coupon_rate_str,
-            ytm_str,
-            maturity,
-            next_coup,
-            f"{weight:.1f}%",
+            _cell(str(i)),
+            _cell(str(row.ticker or "")),
+            Paragraph(name_text, cell_style),   # word-wrap for long names
+            _cell(row_type),
+            _cell_r(str(int(row.quantity or 0))),
+            _cell_r(_fmt2(row.purchase_price or 0)),
+            _cell_r(_fmt2(row.current_price or 0)),
+            _cell_r(_fmt(row.current_value or 0)),
+            pnl_para,
+            pct_para,
+            _cell(rating_str),
+            _cell_r(coupon_rate_str),
+            _cell_r(ytm_str),
+            _cell(maturity),
+            _cell(next_coup),
+            _cell_r(f"{weight:.1f}%"),
         ])
 
     # Total row
     total_pnl_pct = (total_pnl / total_cost * 100) if total_cost else 0
+    total_style = ParagraphStyle("total_cell", fontName=font_bold, fontSize=7.5, leading=9, textColor=colors.white)
+    total_style_r = ParagraphStyle("total_cell_r", fontName=font_bold, fontSize=7.5, leading=9, textColor=colors.white, alignment=2)
+    tot_pnl_sign = "+" if total_pnl >= 0 else ""
+    tot_pct_sign = "+" if total_pnl_pct >= 0 else ""
     table_data.append([
-        "", t("total_row"), "", "", "",
-        "", "",
-        _fmt(total_value),
-        f"{'+' if total_pnl >= 0 else ''}{_fmt(total_pnl)}",
-        f"{'+' if total_pnl_pct >= 0 else ''}{total_pnl_pct:.1f}%",
-        "", "", "", "", "", "100%",
+        Paragraph("", total_style),
+        Paragraph(t("total_row"), total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph(_fmt(total_value), total_style_r),
+        Paragraph(f"{tot_pnl_sign}{_fmt(total_pnl)}", total_style_r),
+        Paragraph(f"{tot_pct_sign}{total_pnl_pct:.1f}%", total_style_r),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("", total_style),
+        Paragraph("100%", total_style_r),
     ])
 
     inst_table = Table(table_data, colWidths=col_w, repeatRows=1)
 
     last = len(table_data) - 1
     inst_style = [
-        # Header
+        # Header — background only (text/align handled by Paragraph style)
         ("BACKGROUND",    (0, 0), (-1, 0), C_BLUE),
-        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
-        ("FONTNAME",      (0, 0), (-1, 0), font_bold),
-        ("FONTSIZE",      (0, 0), (-1, 0), 8),
-        ("ALIGN",         (0, 0), (-1, 0), "CENTER"),
         ("VALIGN",        (0, 0), (-1, 0), "MIDDLE"),
         # Body
-        ("FONTNAME",      (0, 1), (-1, last - 1), font_name),
-        ("FONTSIZE",      (0, 1), (-1, last - 1), 7.5),
         ("ROWBACKGROUNDS",(0, 1), (-1, last - 1), [colors.white, C_STRIPE]),
         ("GRID",          (0, 0), (-1, last - 1), 0.3, C_BORDER),
-        ("PADDING",       (0, 0), (-1, -1), 3),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
         ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
-        # Numeric cols: right align (col 4..15)
-        ("ALIGN",         (4, 1), (-1, -1), "RIGHT"),
-        # Total row
+        # Total row — background only (text handled by Paragraph)
         ("BACKGROUND",    (0, last), (-1, last), C_DARK),
-        ("TEXTCOLOR",     (0, last), (-1, last), colors.white),
-        ("FONTNAME",      (0, last), (-1, last), font_bold),
-        ("FONTSIZE",      (0, last), (-1, last), 8),
         ("LINEABOVE",     (0, last), (-1, last), 1, C_BLUE2),
     ]
-
-    # Colour individual P&L cells
-    for i, row in enumerate(rows, 1):
-        pnl_val = ((row.current_price or 0) - (row.purchase_price or 0)) * (row.quantity or 0)
-        clr = C_GREEN if pnl_val >= 0 else C_RED
-        inst_style.append(("TEXTCOLOR", (8, i), (9, i), clr))
-
-    # Total P&L colour
-    clr = C_GREEN if total_pnl >= 0 else C_RED
-    inst_style.append(("TEXTCOLOR", (8, last), (9, last), clr))
 
     inst_table.setStyle(TableStyle(inst_style))
     elements.append(inst_table)

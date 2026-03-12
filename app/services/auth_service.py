@@ -184,7 +184,7 @@ class AuthService:
                     sent_via.append("email")
 
         if not sent_via:
-            logger.warning("Reset code for user %s (id=%d): %s [no delivery channel]", username, user["id"], code)
+            logger.warning("Reset code generated for user %s (id=%d): no delivery channel configured", username, user["id"])
             if has_email_but_no_smtp:
                 return "email_no_smtp"
             return "none"

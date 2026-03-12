@@ -27,7 +27,7 @@ class CacheService:
     def __init__(self) -> None:
         self._caches: dict[int, PortfolioCache] = {}  # portfolio_id -> cache
         self._refresh_task: asyncio.Task[None] | None = None
-        self.refresh_interval: int = 120  # seconds
+        self.refresh_interval: int = 900  # seconds
 
     def get_cache(self, portfolio_id: int) -> PortfolioCache:
         """Get or create cache for a portfolio."""
@@ -77,6 +77,15 @@ class CacheService:
                     ok_count,
                     len(merged),
                 )
+                # Save daily snapshot if there is real data
+                if ok_count > 0:
+                    try:
+                        from app.services.storage_service import storage_service
+                        total_value = sum(r.current_value or 0 for r in merged)
+                        total_cost = sum((r.purchase_price or 0) * (r.quantity or 0) for r in merged)
+                        storage_service.save_portfolio_snapshot(portfolio_id, total_value, total_cost)
+                    except Exception:
+                        logger.exception("Failed to save portfolio snapshot for portfolio_id=%d", portfolio_id)
                 # Check for rating/price changes and notify
                 if old_rows:
                     try:

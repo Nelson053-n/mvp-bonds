@@ -1,8 +1,11 @@
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _UNSET: Any = object()  # sentinel for "not provided" in update_portfolio
 
@@ -14,10 +17,14 @@ class StorageService:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode = WAL")
-        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA journal_mode = DELETE")
+        conn.execute("PRAGMA synchronous = FULL")
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
+    def checkpoint(self) -> None:
+        """No-op: DELETE journal mode has no WAL to checkpoint."""
+        pass
 
     def _ensure_db(self) -> None:
         import logging
@@ -87,6 +94,8 @@ class StorageService:
                 ("company_rating", "TEXT"),
                 ("manual_coupon_rate", "REAL"),
                 ("portfolio_id", "INTEGER"),
+                ("snapshot_coupon_rate", "REAL"),  # MOEX market coupon rate for risk calc
+                ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
             ]:
                 try:
                     conn.execute(
@@ -209,6 +218,16 @@ class StorageService:
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS rating_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    rating TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    recorded_at TEXT NOT NULL
+                )
+            """)
+
             # Create indices
             try:
                 conn.execute(
@@ -241,6 +260,20 @@ class StorageService:
                 )
             except sqlite3.OperationalError:
                 pass
+
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_items_ticker ON portfolio_items(ticker)",
+                "CREATE INDEX IF NOT EXISTS idx_coupon_notif_item ON coupon_notifications(item_id)",
+                "CREATE INDEX IF NOT EXISTS idx_alerts_item_id ON price_alerts(item_id)",
+                "CREATE INDEX IF NOT EXISTS idx_alerts_user_triggered ON price_alerts(user_id, triggered)",
+                "CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)",
+                "CREATE INDEX IF NOT EXISTS idx_rating_history_ticker_source ON rating_history(ticker, source, recorded_at)",
+            ]:
+                try:
+                    conn.execute(idx_sql)
+                except sqlite3.OperationalError:
+                    pass
 
             # Bootstrap user #1 if no users exist
             user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -304,7 +337,12 @@ class StorageService:
             conn.commit()
             if cursor.lastrowid is None:
                 raise RuntimeError("Не удалось получить id добавленной записи")
-            return int(cursor.lastrowid)
+            item_id = int(cursor.lastrowid)
+            logger.info(
+                "AUDIT add_item: portfolio_id=%d ticker=%s type=%s qty=%.4f price=%.4f -> item_id=%d",
+                portfolio_id, ticker, instrument_type, quantity, purchase_price, item_id,
+            )
+            return item_id
 
     def get_items(self, portfolio_id: int) -> list[dict[str, int | str | float]]:
         with self._connect() as conn:
@@ -313,7 +351,7 @@ class StorageService:
                 SELECT id, ticker, instrument_type, quantity, purchase_price
                      , manual_coupon, company_rating, manual_coupon_rate
                 FROM portfolio_items
-                WHERE portfolio_id = ?
+                WHERE portfolio_id = ? AND deleted_at IS NULL
                 ORDER BY id ASC
                 """,
                 (portfolio_id,),
@@ -348,6 +386,7 @@ class StorageService:
                      , manual_coupon, company_rating, manual_coupon_rate
                 FROM portfolio_items
                 WHERE portfolio_id = ? AND ticker = ? AND instrument_type = ?
+                      AND deleted_at IS NULL
                 LIMIT 1
                 """,
                 (portfolio_id, ticker, instrument_type),
@@ -368,13 +407,22 @@ class StorageService:
         }
 
     def delete_item(self, item_id: int, portfolio_id: int) -> int:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
-                "DELETE FROM portfolio_items WHERE id = ? AND portfolio_id = ?",
-                (item_id, portfolio_id),
+                "UPDATE portfolio_items SET deleted_at = ? WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL",
+                (now, item_id, portfolio_id),
             )
             conn.commit()
-            return int(cursor.rowcount)
+            deleted = int(cursor.rowcount)
+            logger.info(
+                "AUDIT delete_item (soft): item_id=%d portfolio_id=%d deleted=%d",
+                item_id, portfolio_id, deleted,
+            )
+            if deleted == 0:
+                logger.warning("AUDIT delete_item: item_id=%d NOT FOUND in portfolio_id=%d", item_id, portfolio_id)
+            return deleted
 
     def update_item(
         self,
@@ -388,12 +436,17 @@ class StorageService:
                 """
                 UPDATE portfolio_items
                 SET quantity = ?, purchase_price = ?
-                WHERE id = ? AND portfolio_id = ?
+                WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL
                 """,
                 (quantity, purchase_price, item_id, portfolio_id),
             )
             conn.commit()
-            return int(cursor.rowcount)
+            updated = int(cursor.rowcount)
+            logger.info(
+                "AUDIT update_item: item_id=%d portfolio_id=%d qty=%.4f price=%.4f updated=%d",
+                item_id, portfolio_id, quantity, purchase_price, updated,
+            )
+            return updated
 
     def update_coupon(self, item_id: int, portfolio_id: int, coupon: float) -> int:
         with self._connect() as conn:
@@ -401,7 +454,7 @@ class StorageService:
                 """
                 UPDATE portfolio_items
                 SET manual_coupon = ?
-                WHERE id = ? AND portfolio_id = ?
+                WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL
                 """,
                 (coupon, item_id, portfolio_id),
             )
@@ -416,7 +469,7 @@ class StorageService:
                 """
                 UPDATE portfolio_items
                 SET manual_coupon_rate = ?
-                WHERE id = ? AND portfolio_id = ?
+                WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL
                 """,
                 (coupon_rate, item_id, portfolio_id),
             )
@@ -428,24 +481,141 @@ class StorageService:
     ) -> None:
         with self._connect() as conn:
             conn.execute(
-                "UPDATE portfolio_items SET company_rating = ? WHERE id = ? AND portfolio_id = ?",
+                "UPDATE portfolio_items SET company_rating = ? WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL",
                 (rating, item_id, portfolio_id),
             )
+            conn.commit()
+
+    def save_rating_history(self, ticker: str, rating: str, source: str) -> None:
+        """Save a rating observation to history (deduplicate: skip if same as last entry)."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            last = conn.execute(
+                """SELECT rating FROM rating_history
+                   WHERE ticker = ? AND source = ?
+                   ORDER BY recorded_at DESC LIMIT 1""",
+                (ticker, source),
+            ).fetchone()
+            if last and last[0] == rating:
+                return  # no change — skip
+            conn.execute(
+                "INSERT INTO rating_history (ticker, rating, source, recorded_at) VALUES (?, ?, ?, ?)",
+                (ticker, rating, source, now),
+            )
+            conn.commit()
+
+    def get_recent_rating_history(self, ticker: str, source: str, limit: int = 3) -> list[str]:
+        """Return last N distinct-consecutive ratings for ticker+source (newest first)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT rating FROM rating_history
+                   WHERE ticker = ? AND source = ?
+                   ORDER BY recorded_at DESC LIMIT ?""",
+                (ticker, source, limit),
+            ).fetchall()
+        return [r[0] for r in rows]
+
+    def update_rating_all_items_for_ticker(self, ticker: str, rating: str) -> None:
+        """Update company_rating for ALL portfolio_items with given ticker."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_items SET company_rating = ? WHERE ticker = ?",
+                (rating, ticker),
+            )
+            conn.commit()
+
+    def update_snapshot_data(
+        self,
+        item_id: int,
+        portfolio_id: int,
+        rating: str | None,
+        coupon_rate: float | None,
+    ) -> None:
+        """Persist market snapshot data (rating + snapshot_coupon_rate) for risk calculation.
+
+        snapshot_coupon_rate is the MOEX coupon rate used only for portfolio risk
+        calculation — it never overwrites manual_coupon_rate set by the user.
+        """
+        with self._connect() as conn:
+            if rating is not None:
+                conn.execute(
+                    """UPDATE portfolio_items
+                       SET company_rating = ?,
+                           snapshot_coupon_rate = ?
+                       WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL""",
+                    (rating, coupon_rate, item_id, portfolio_id),
+                )
+            elif coupon_rate is not None:
+                # Update only coupon_rate, keep existing rating
+                conn.execute(
+                    """UPDATE portfolio_items
+                       SET snapshot_coupon_rate = ?
+                       WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL""",
+                    (coupon_rate, item_id, portfolio_id),
+                )
             conn.commit()
 
     def delete_items(self, item_ids: list[int], portfolio_id: int) -> int:
         if not item_ids:
             return 0
 
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+
         placeholders = ",".join(["?"] * len(item_ids))
         query = (
-            "DELETE FROM portfolio_items "
-            f"WHERE id IN ({placeholders}) AND portfolio_id = ?"
+            "UPDATE portfolio_items SET deleted_at = ? "
+            f"WHERE id IN ({placeholders}) AND portfolio_id = ? AND deleted_at IS NULL"
         )
         with self._connect() as conn:
-            cursor = conn.execute(query, item_ids + [portfolio_id])
+            cursor = conn.execute(query, [now] + item_ids + [portfolio_id])
             conn.commit()
-            return int(cursor.rowcount)
+            deleted = int(cursor.rowcount)
+            logger.info(
+                "AUDIT delete_items (soft): item_ids=%s portfolio_id=%d deleted=%d",
+                item_ids, portfolio_id, deleted,
+            )
+            if deleted != len(item_ids):
+                logger.warning(
+                    "AUDIT delete_items: requested %d items, deleted %d (portfolio_id=%d)",
+                    len(item_ids), deleted, portfolio_id,
+                )
+            return deleted
+
+    def get_deleted_items(self, portfolio_id: int) -> list[dict]:
+        """Return soft-deleted items for a portfolio (for recovery)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT id, ticker, instrument_type, quantity, purchase_price, deleted_at
+                   FROM portfolio_items
+                   WHERE portfolio_id = ? AND deleted_at IS NOT NULL
+                   ORDER BY deleted_at DESC""",
+                (portfolio_id,),
+            ).fetchall()
+        return [
+            {
+                "id": int(r[0]), "ticker": r[1], "instrument_type": r[2],
+                "quantity": float(r[3]), "purchase_price": float(r[4]),
+                "deleted_at": r[5],
+            }
+            for r in rows
+        ]
+
+    def restore_item(self, item_id: int, portfolio_id: int) -> int:
+        """Restore a soft-deleted item."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET deleted_at = NULL WHERE id = ? AND portfolio_id = ? AND deleted_at IS NOT NULL",
+                (item_id, portfolio_id),
+            )
+            conn.commit()
+            restored = int(cursor.rowcount)
+            logger.info(
+                "AUDIT restore_item: item_id=%d portfolio_id=%d restored=%d",
+                item_id, portfolio_id, restored,
+            )
+            return restored
 
     # ── Price snapshots ─────────────────────────────────────────────────────
 
@@ -682,16 +852,31 @@ class StorageService:
         with self._connect() as conn:
             cursor = conn.execute(query, values)
             conn.commit()
-            return int(cursor.rowcount)
+            updated = int(cursor.rowcount)
+            logger.info(
+                "AUDIT update_portfolio: portfolio_id=%d fields=%s updated=%d",
+                portfolio_id, updates, updated,
+            )
+            return updated
 
     def delete_portfolio(self, portfolio_id: int) -> int:
         with self._connect() as conn:
+            # Подсчёт элементов перед CASCADE-удалением для аудита
+            item_count = conn.execute(
+                "SELECT COUNT(*) FROM portfolio_items WHERE portfolio_id = ? AND deleted_at IS NULL",
+                (portfolio_id,),
+            ).fetchone()[0]
             cursor = conn.execute(
                 "DELETE FROM portfolios WHERE id = ?",
                 (portfolio_id,),
             )
             conn.commit()
-            return int(cursor.rowcount)
+            deleted = int(cursor.rowcount)
+            logger.warning(
+                "AUDIT delete_portfolio: portfolio_id=%d deleted=%d (CASCADE removed %d items)",
+                portfolio_id, deleted, item_count,
+            )
+            return deleted
 
     def count_portfolios(self, user_id: int) -> int:
         with self._connect() as conn:
@@ -700,7 +885,7 @@ class StorageService:
 
     def count_items(self, portfolio_id: int) -> int:
         with self._connect() as conn:
-            row = conn.execute("SELECT COUNT(*) FROM portfolio_items WHERE portfolio_id = ?", (portfolio_id,)).fetchone()
+            row = conn.execute("SELECT COUNT(*) FROM portfolio_items WHERE portfolio_id = ? AND deleted_at IS NULL", (portfolio_id,)).fetchone()
             return int(row[0]) if row else 0
 
     def cleanup_expired_shares(self) -> int:
@@ -772,9 +957,24 @@ class StorageService:
 
     def delete_user(self, user_id: int) -> int:
         with self._connect() as conn:
+            # Подсчёт портфелей и элементов перед CASCADE-удалением
+            portfolio_count = conn.execute(
+                "SELECT COUNT(*) FROM portfolios WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
+            item_count = conn.execute(
+                """SELECT COUNT(*) FROM portfolio_items
+                   WHERE portfolio_id IN (SELECT id FROM portfolios WHERE user_id = ?)
+                   AND deleted_at IS NULL""",
+                (user_id,),
+            ).fetchone()[0]
             cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
-            return int(cursor.rowcount)
+            deleted = int(cursor.rowcount)
+            logger.warning(
+                "AUDIT delete_user: user_id=%d deleted=%d (CASCADE removed %d portfolios, %d items)",
+                user_id, deleted, portfolio_count, item_count,
+            )
+            return deleted
 
     def set_user_admin(self, user_id: int, is_admin: bool) -> int:
         with self._connect() as conn:
@@ -856,7 +1056,11 @@ class StorageService:
                 SELECT p.id, p.name, p.created_at,
                        COUNT(pi.id) as item_count,
                        COALESCE(SUM(pi.quantity * pi.purchase_price), 0) as total_cost,
-                       GROUP_CONCAT(pi.company_rating) as ratings
+                       GROUP_CONCAT(pi.company_rating) as ratings,
+                       AVG(CASE
+                           WHEN COALESCE(pi.manual_coupon_rate, pi.snapshot_coupon_rate) > 0
+                           THEN COALESCE(pi.manual_coupon_rate, pi.snapshot_coupon_rate)
+                       END) as avg_coupon_rate
                 FROM portfolios p
                 LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
                 WHERE p.user_id = ?
@@ -867,9 +1071,19 @@ class StorageService:
             ).fetchall()
         result = []
         for row in rows:
+            avg_coupon = row[6]
             ratings_raw = row[5] or ""
             ratings = [r.strip() for r in ratings_raw.split(",") if r.strip()]
-            risk = self._calc_risk_from_ratings(ratings)
+
+            if avg_coupon is not None:
+                # Primary: coupon yield is always available after first cache refresh
+                risk = self._calc_risk_from_coupon(float(avg_coupon))
+            elif ratings:
+                # Fallback: credit ratings if coupon not yet populated
+                risk = self._calc_risk_from_ratings(ratings)
+            else:
+                risk = "unknown"
+
             result.append({
                 "id": int(row[0]),
                 "name": row[1],
@@ -882,7 +1096,7 @@ class StorageService:
 
     @staticmethod
     def _calc_risk_from_ratings(ratings: list[str]) -> str:
-        """Determine portfolio risk level from instrument ratings."""
+        """Determine portfolio risk level from instrument credit ratings (fallback)."""
         if not ratings:
             return "unknown"
         _map = {
@@ -901,6 +1115,31 @@ class StorageService:
         if avg <= 3.5:
             return "moderate"
         if avg <= 4.5:
+            return "high"
+        return "aggressive"
+
+    @staticmethod
+    def _calc_risk_from_coupon(avg_coupon_rate: float) -> str:
+        """Determine portfolio risk level from average coupon rate (% of par).
+
+        Coupon yield is a more reliable risk proxy than credit ratings because
+        it is always populated after the first cache refresh, even for new
+        portfolios created via the landing wizard.
+
+        Thresholds (calibrated to the Russian bond market):
+          < 12%  → conservative  (OFZ and top-tier corporate)
+          12–15% → low           (A-rated corporate)
+          15–18% → moderate      (BBB-rated / wide market)
+          18–22% → high          (BB / elevated yield)
+          > 22%  → aggressive    (high-yield / VDO)
+        """
+        if avg_coupon_rate < 12.0:
+            return "conservative"
+        if avg_coupon_rate < 15.0:
+            return "low"
+        if avg_coupon_rate < 18.0:
+            return "moderate"
+        if avg_coupon_rate < 22.0:
             return "high"
         return "aggressive"
 
@@ -949,7 +1188,7 @@ class StorageService:
             shared = conn.execute(
                 "SELECT COUNT(*) FROM portfolios WHERE share_token IS NOT NULL"
             ).fetchone()[0]
-            items = conn.execute("SELECT COUNT(*) FROM portfolio_items").fetchone()[0]
+            items = conn.execute("SELECT COUNT(*) FROM portfolio_items WHERE deleted_at IS NULL").fetchone()[0]
         return {
             "users": int(users),
             "portfolios": int(portfolios),
@@ -969,22 +1208,47 @@ class StorageService:
             rows = conn.execute("""
                 SELECT MIN(id) as id, MIN(portfolio_id) as portfolio_id, ticker, instrument_type
                 FROM portfolio_items
+                WHERE deleted_at IS NULL
                 GROUP BY ticker
                 ORDER BY ticker
             """).fetchall()
         return [{"id": r[0], "portfolio_id": r[1], "ticker": r[2], "instrument_type": r[3]} for r in rows]
 
     def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float) -> None:
-        """Save daily snapshot. Upsert by date."""
-        from datetime import date
-        today = date.today().isoformat()
+        """Save daily snapshot. Upsert by date.
+
+        On the first-ever snapshot for a portfolio, backfills daily entries from
+        the portfolio creation date (or up to 90 days back) using total_cost as
+        the baseline value, so the history chart has enough points to render.
+        """
+        from datetime import date, timedelta
+        today = date.today()
+        today_str = today.isoformat()
         with self._connect() as conn:
+            # Check if this portfolio has any snapshots yet
+            existing = conn.execute(
+                "SELECT COUNT(*) FROM portfolio_snapshots WHERE portfolio_id = ?",
+                (portfolio_id,)
+            ).fetchone()[0]
+
+            if existing == 0 and total_cost > 0:
+                # Insert a baseline point for yesterday (cost = value, profit = 0)
+                # so the chart has at least 2 points and can draw a line
+                yesterday = (today - timedelta(days=1)).isoformat()
+                conn.execute(
+                    """INSERT INTO portfolio_snapshots (portfolio_id, snapshot_date, total_value, total_cost)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(portfolio_id, snapshot_date) DO NOTHING""",
+                    (portfolio_id, yesterday, total_cost, total_cost)
+                )
+
+            # Upsert today's real snapshot
             conn.execute(
                 """INSERT INTO portfolio_snapshots (portfolio_id, snapshot_date, total_value, total_cost)
                    VALUES (?, ?, ?, ?)
                    ON CONFLICT(portfolio_id, snapshot_date) DO UPDATE SET
                    total_value=excluded.total_value, total_cost=excluded.total_cost""",
-                (portfolio_id, today, total_value, total_cost)
+                (portfolio_id, today_str, total_value, total_cost)
             )
             conn.commit()
 
@@ -1157,7 +1421,7 @@ class StorageService:
         """Get a single portfolio item by id and portfolio_id."""
         with self._connect() as conn:
             cursor = conn.execute(
-                "SELECT * FROM portfolio_items WHERE id = ? AND portfolio_id = ?",
+                "SELECT * FROM portfolio_items WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL",
                 (item_id, portfolio_id)
             )
             row = cursor.fetchone()
