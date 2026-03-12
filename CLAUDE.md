@@ -48,7 +48,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 - Credit rating refresh (daily 03:00 UTC, with Telegram alerts on double downgrade)
 - Cache refresh (periodic MOEX data refresh)
 
-**Database:** SQLite at `data/portfolio.db` (configurable via `MVP_SQLITE_DB_PATH`). Schema auto-created; migrations run on startup. PRAGMA: `journal_mode=DELETE`, `synchronous=FULL`, `foreign_keys=ON`.
+**Database:** SQLite at `data/portfolio.db` (configurable via `MVP_SQLITE_DB_PATH`). Schema auto-created; migrations run on startup. PRAGMA: `journal_mode=DELETE`, `synchronous=FULL`, `foreign_keys=ON`. Tables: `users`, `portfolios`, `portfolio_items`, `price_snapshots`, `coupon_notifications`, `price_alerts`, `portfolio_snapshots`, `app_settings`, `rate_limits`, `watchlist`, `rating_history`.
 
 **Auth:** JWT tokens (PyJWT, HS256, 72h expiry) + bcrypt passwords. First startup bootstraps an admin user with an auto-generated password printed to logs.
 
@@ -59,6 +59,8 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 ## Key patterns
 
+**Services are singletons:** Imported directly from their modules (e.g., `from app.services.storage_service import storage_service`).
+
 **MOEX bond endpoint:** Universal endpoint for all bond types (TQCB + TQOB):
 ```
 /engines/stock/markets/bonds/securities/{secid}.json
@@ -68,15 +70,21 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 **Coupon date logic:** Uses `NEXTCOUPON` anchor from MOEX; holiday-aware; `seenMonths` Set prevents duplicate payments in the same calendar month.
 
+**FX conversion:** Non-RUB bonds (USD, EUR, CNY, etc.) auto-converted to RUB via MOEX futures indicative rates API. FX rates cached in-memory with 1h TTL; stale cache used as fallback. `BondSnapshot.face_unit` carries original currency, `fx_rate` the conversion rate.
+
+**Soft-delete:** `portfolio_items.deleted_at` (ISO 8601 timestamp). All queries filter `WHERE deleted_at IS NULL`. Recovery via `POST /portfolios/{id}/instruments/{item_id}/restore`.
+
+**Audit logging:** All data mutations logged at INFO level with `AUDIT` prefix: `AUDIT add_item`, `AUDIT delete_item`, `AUDIT update_item`, `AUDIT restore_item`, etc. Includes affected IDs, field changes, and result counts.
+
+**Schema migrations:** Inline in `storage_service._ensure_db()` — no migration files. Pattern: `ALTER TABLE ... ADD COLUMN` wrapped in `try/except OperationalError: pass`. New tables created with `IF NOT EXISTS`.
+
 **LLM mode:** Controlled by `MVP_LLM_MODE` env var (`stub` or `openai`). Tests always use `stub`.
 
-**Portfolio sharing:** Via one-time tokens stored in SQLite; optional password protection + expiry.
+**Portfolio sharing:** Via tokens stored in SQLite; optional password protection + expiry.
 
-**Rating sources (priority):** SmartLab → MOEX → None. Double-downgrade detection triggers Telegram alert.
+**Rating sources (priority):** SmartLab → MOEX → LISTLEVEL proxy → None. Double-downgrade detection triggers Telegram alert.
 
-**Services are singletons:** Imported directly from their modules (e.g., `from app.services.storage_service import storage_service`).
-
-**Error hierarchy** (`app/exceptions.py`): `ValidationError`, `MOEXError`, `PriceNotFoundError`, `AuthError`, etc. — mapped to HTTP responses with Russian error messages.
+**Error hierarchy** (`app/exceptions.py`): `AppError` base → `ValidationError`, `NotFoundError`, `MOEXError` (→ `PriceNotFoundError`, `DataFetchError`), `SmartLabError` (→ `RatingNotFoundError`), `PortfolioError` (→ `InstrumentNotFoundError`), `CacheError`, `AuthError`. Mapped to HTTP responses with Russian error messages.
 
 ## API routers
 
@@ -89,7 +97,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 | `pdf.py` | `/pdf` | export portfolio to PDF |
 | `settings.py` | `/settings` | user settings (Telegram, price alerts) |
 | `admin.py` | `/admin` | stats, data sources, user management |
-| `watchlist.py` | `/watchlist` | watchlist CRUD |
+| `watchlist.py` | `/watchlist` | watchlist CRUD (track bonds/stocks without adding to portfolio) |
 
 Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/{token}/snapshots`
 
