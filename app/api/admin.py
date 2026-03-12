@@ -155,3 +155,34 @@ async def delete_portfolio(portfolio_id: int, admin: dict = Depends(get_admin_us
     storage_service.delete_portfolio(portfolio_id)
     logger.info("Admin %s deleted portfolio %d", admin["username"], portfolio_id)
     return {"ok": True}
+
+
+class BulkInstrumentItem(BaseModel):
+    ticker: str
+    instrument_type: str
+    quantity: float
+    purchase_price: float
+
+
+@router.post("/portfolios/{portfolio_id}/restore-instruments")
+async def restore_instruments(
+    portfolio_id: int,
+    items: list[BulkInstrumentItem],
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """Insert instruments directly into a portfolio (admin recovery tool)."""
+    portfolio = storage_service.get_portfolio(portfolio_id)
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Портфель не найден")
+    added = []
+    for item in items:
+        new_id = storage_service.add_item(
+            ticker=item.ticker.upper().strip(),
+            instrument_type=item.instrument_type,
+            quantity=item.quantity,
+            purchase_price=item.purchase_price,
+            portfolio_id=portfolio_id,
+        )
+        added.append({"id": new_id, "ticker": item.ticker})
+        logger.info("Admin %s restored %s to portfolio %d", admin["username"], item.ticker, portfolio_id)
+    return {"added": len(added), "items": added}

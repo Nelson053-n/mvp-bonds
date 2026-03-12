@@ -1,5 +1,9 @@
 """
 Test fixtures for the MVP LLM Portfolio application.
+
+CRITICAL: Tests MUST be fully isolated from the production database.
+The global storage_service singleton is redirected to a temporary DB
+for the entire test session so that no test can ever touch production data.
 """
 
 from pathlib import Path
@@ -11,7 +15,7 @@ import pytest_asyncio
 
 from app.config import Settings
 from app.main import app
-from app.services.storage_service import StorageService
+from app.services.storage_service import StorageService, storage_service as _global_storage
 from app.services.cache_service import CacheService
 from app.services.portfolio_service import PortfolioService
 from app.services.moex_service import MOEXService
@@ -28,12 +32,19 @@ def test_db_path() -> Generator[str, None, None]:
         yield str(db_path)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
-    """Override settings for testing."""
+    """Override settings AND redirect global storage_service to test DB.
+
+    This is autouse=True to guarantee that EVERY test uses the test database,
+    even if the test only requests 'client' without explicitly requesting
+    'settings_override'. This prevents accidental writes to production DB.
+    """
     from app import config
 
     original_settings = config.settings
+    original_db_path = _global_storage.db_path
+
     test_settings = Settings(
         moex_base_url="https://iss.moex.com/iss",
         sqlite_db_path=test_db_path,
@@ -46,17 +57,26 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
         jwt_secret=TEST_JWT_SECRET,
     )
     config.settings = test_settings
+
+    # CRITICAL: redirect the global singleton to the test database.
+    # All modules that imported `storage_service` hold a reference to this
+    # same object, so changing db_path on it affects all of them.
+    _global_storage.db_path = Path(test_db_path)
+    _global_storage._ensure_db()
+
     yield test_settings
+
+    # Restore production settings and DB path
     config.settings = original_settings
+    _global_storage.db_path = original_db_path
 
 
 @pytest.fixture
 def storage_service(settings_override: Settings) -> Generator[StorageService, None, None]:
-    """Create a fresh storage service for testing."""
-    service = StorageService()
-    yield service
-    # Cleanup: delete all items
-    with service._connect() as conn:
+    """Provide the global storage service (already redirected to test DB)."""
+    yield _global_storage
+    # Cleanup: delete all items added during the test
+    with _global_storage._connect() as conn:
         conn.execute("DELETE FROM portfolio_items")
         conn.commit()
 
@@ -108,7 +128,11 @@ def auth_headers(test_auth_token: str) -> dict:
 
 @pytest_asyncio.fixture
 async def client(settings_override: Settings) -> AsyncGenerator:
-    """Create async test client with settings override applied."""
+    """Create async test client with settings override applied.
+
+    settings_override is autouse, but we keep the explicit dependency
+    to make the relationship clear and ensure proper fixture ordering.
+    """
     from httpx import AsyncClient, ASGITransport
 
     transport = ASGITransport(app=app)

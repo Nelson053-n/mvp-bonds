@@ -43,6 +43,16 @@ _SECURITY_HEADERS = {
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    ),
 }
 
 
@@ -88,9 +98,38 @@ async def _notification_loop():
             pass
 
 
+_RATING_ORDER = [
+    "AAA", "AA+", "AA", "AA-", "A+", "A", "A-",
+    "BBB+", "BBB", "BBB-", "BB+", "BB", "BB-",
+    "B+", "B", "B-", "CCC+", "CCC", "CCC-", "CC", "C", "D",
+]
+
+
+def _rating_rank(r: str | None) -> int:
+    """Lower rank = better rating. None → 999 (unknown)."""
+    if r is None:
+        return 999
+    return _RATING_ORDER.index(r) if r in _RATING_ORDER else 998
+
+
+def _rating_worsened(prev: str | None, curr: str | None) -> bool:
+    """Return True if curr is strictly worse than prev."""
+    return _rating_rank(curr) > _rating_rank(prev)
+
+
 async def _rating_refresh_loop():
-    """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC."""
+    """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC.
+
+    Logic per ticker:
+    - Fetch SmartLab and MOEX ratings independently.
+    - If SmartLab rating differs from MOEX → use SmartLab (more up-to-date), save to history.
+    - If SmartLab rating worsened twice in a row → send Telegram alert.
+    - Update portfolio_items with the best available rating.
+    """
     from datetime import datetime, timezone
+    from app.services.moex_service import moex_service
+    from app.services.notification_service import notification_service
+
     while True:
         now = datetime.now(timezone.utc)
         secs_to_3am = ((3 - now.hour) % 24) * 3600 - now.minute * 60 - now.second
@@ -101,14 +140,49 @@ async def _rating_refresh_loop():
             items = storage_service.get_all_portfolio_items_for_rating()
             sem = asyncio.Semaphore(3)
 
+            # Load TG settings once
+            s = storage_service.get_all_settings()
+            tg_token = s.get("tg_bot_token", "")
+            tg_chat_id = s.get("tg_chat_id", "")
+
             async def _refresh_one(item):
+                ticker = item["ticker"]
                 async with sem:
                     try:
-                        rating = await moex_service.refresh_rating(item["ticker"])
-                        if rating is not None:
-                            storage_service.update_rating(item["id"], item["portfolio_id"], rating)
-                    except Exception:
-                        pass
+                        result = await moex_service.refresh_rating_with_sources(ticker)
+                    except Exception as exc:
+                        logger.warning("Rating refresh failed for %s: %s", ticker, exc)
+                        return
+
+                sl_rating = result["smartlab"]
+                moex_rating = result["moex"]
+                best_rating = result["best"]
+
+                # Save SmartLab rating to history if available
+                if sl_rating is not None:
+                    storage_service.save_rating_history(ticker, sl_rating, "smartlab")
+
+                    # Check double downgrade on SmartLab
+                    history = storage_service.get_recent_rating_history(ticker, "smartlab", limit=3)
+                    # history[0] = newest (current), history[1] = previous, history[2] = one before
+                    if (
+                        len(history) >= 3
+                        and _rating_worsened(history[2], history[1])
+                        and _rating_worsened(history[1], history[0])
+                        and tg_token and tg_chat_id
+                    ):
+                        msg = (
+                            f"\U0001f534 <b>Двойное ухудшение рейтинга</b>\n\n"
+                            f"Бумага: <b>{ticker}</b>\n"
+                            f"SmartLab: {history[2]} \u2192 {history[1]} \u2192 {history[0]}\n"
+                            f"Рейтинг последовательно снижался дважды — возможный риск!"
+                        )
+                        await notification_service.send_telegram(tg_token, tg_chat_id, msg)
+                        logger.warning("Double downgrade alert sent for %s", ticker)
+
+                # Update DB if we got a best rating
+                if best_rating is not None:
+                    storage_service.update_rating_all_items_for_ticker(ticker, best_rating)
 
             await asyncio.gather(*(_refresh_one(i) for i in items))
             logger.info("Daily rating refresh: %d tickers processed", len(items))
@@ -116,10 +190,38 @@ async def _rating_refresh_loop():
             logger.exception("Daily rating refresh failed")
 
 
+def _backup_db_on_startup() -> None:
+    """Create a rolling backup of the SQLite database on startup.
+
+    Keeps up to 3 dated backups in data/backups/.
+    """
+    import shutil
+    from datetime import datetime, timezone
+
+    db_path = Path(storage_service.db_path)
+    if not db_path.exists() or db_path.stat().st_size == 0:
+        return
+    backup_dir = db_path.parent / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    dst = backup_dir / f"portfolio_{stamp}.db"
+    try:
+        shutil.copy2(db_path, dst)
+        logger.info("DB backup created: %s", dst)
+        # Keep only the 3 most recent backups
+        backups = sorted(backup_dir.glob("portfolio_*.db"))
+        for old in backups[:-3]:
+            old.unlink()
+            logger.info("Old backup removed: %s", old)
+    except Exception:
+        logger.exception("Failed to create DB backup")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: start background refresh (portfolios are lazy-loaded)
+    # Startup: create DB backup, then start background tasks
     logger.info("Starting up application")
+    _backup_db_on_startup()
     cache_service.start_background()
     asyncio.create_task(_cleanup_shares_loop())
     asyncio.create_task(_snapshot_loop())
@@ -129,6 +231,11 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down application")
     cache_service.stop_background()
+    try:
+        storage_service.checkpoint()
+        logger.info("WAL checkpoint completed")
+    except Exception:
+        logger.exception("WAL checkpoint failed")
 
 
 app = FastAPI(
@@ -136,6 +243,13 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=exc)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.middleware("http")

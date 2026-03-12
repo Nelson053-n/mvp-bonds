@@ -128,7 +128,7 @@ async def _fetch_board(
         f"/boards/{board}/securities.json"
         f"?iss.meta=off&iss.only=securities,marketdata"
         f"&securities.columns=SECID,SHORTNAME,PREVLEGALCLOSEPRICE,"
-        f"COUPONPERCENT,COUPONPERIOD,FACEVALUE,MATDATE,OFFERDATE,LOTSIZE,LISTLEVEL"
+        f"COUPONPERCENT,COUPONPERIOD,FACEVALUE,FACEUNIT,MATDATE,OFFERDATE,LOTSIZE,LISTLEVEL"
         f"&marketdata.columns=SECID,YIELD,VALTODAY"
         f"&limit=1000"
     )
@@ -195,12 +195,15 @@ async def _fetch_board(
         # Pre-fill rating from static dict or listlevel proxy
         pre_rating = _static_rating(secid) or _rating_from_listlevel(listlevel)
 
+        face_unit = bond.get("FACEUNIT") or "SUR"
+
         results.append({
             "ticker": secid,
             "name": bond.get("SHORTNAME", secid),
             "price": float(price),
             "coupon_percent": float(coupon),
             "face_value": float(face),
+            "face_unit": face_unit,
             "lot_size": int(lotsize),
             "maturity": bond.get("MATDATE") or None,
             "offer_date": bond.get("OFFERDATE") or None,
@@ -210,6 +213,7 @@ async def _fetch_board(
             "board": board,
             "listlevel": int(listlevel) if listlevel else None,
             "rating": pre_rating,
+            "is_qual": False,  # determined per-bond via description API, not available in batch
         })
 
     return results
@@ -221,7 +225,22 @@ async def _fetch_all_bonds() -> list[dict[str, Any]]:
             _fetch_board(client, "TQOB"),
             _fetch_board(client, "TQCB"),
         )
-    return ofz + corp
+    all_bonds = ofz + corp
+
+    # Convert face_value from native currency to RUB for non-RUB bonds
+    currencies_needed = {b.get("face_unit", "SUR") for b in all_bonds} - {"SUR"}
+    if currencies_needed:
+        fx_rates: dict[str, float] = {}
+        for ccy in currencies_needed:
+            rate = await moex_service._get_fx_rate(ccy)
+            if rate:
+                fx_rates[ccy] = rate
+        for bond in all_bonds:
+            fu = bond.get("face_unit", "SUR")
+            if fu != "SUR" and fu in fx_rates:
+                bond["face_value"] = round(bond["face_value"] * fx_rates[fu], 2)
+
+    return all_bonds
 
 
 async def _get_bonds_cached() -> list[dict[str, Any]]:
@@ -300,6 +319,7 @@ async def search_bonds(
                 "maturity":      b.get("maturity"),
                 "rating":        b.get("rating"),
                 "price":         round(b["price"], 2),
+                "is_qual":       b.get("is_qual", False),
             })
         if len(results) >= limit:
             break
@@ -327,6 +347,9 @@ async def suggest_portfolio(
 
     if not pool:
         pool = all_bonds
+
+    # Step 1b: exclude qualified-investor-only bonds (beginners can't buy them)
+    pool = [b for b in pool if not b.get("is_qual")]
 
     # Step 2: yield proximity filter [target-5, target+8]
     y_min = max(0.0, yield_target - 5)

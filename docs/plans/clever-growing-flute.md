@@ -1,21 +1,17 @@
-# Plan: UI/UX Polish + Rating Schedule + Recommendations Fix
+# Plan: PDF Fix + Portfolio Risk by Coupon Yield
 
 ## Context
 
-Серия точечных исправлений и улучшений UX по итогам ревью:
-- Рейтинги обновлять раз в сутки (сейчас — один раз при старте сервиса, повторно не запрашиваются)
-- Рекомендации: не предлагать выпуски одного эмитента (один эмитент — 10 серий → нет диверсификации)
-- История стоимости: нулевые данные — рисовать нулевую линию, подпись "данные накапливаются" снизу по центру
-- Пироги в тёмной теме: donut hole = белый (#fff захардкожен) → заменить на `--bg-card`
-- SWOT: выводить по 2 пункта из разных областей, не дублировать
-- Плашки KPI: `stat-sub` (`--text-muted: #475569`) плохо читается → светлее (`#64748b`)
-- Плашка «Следующий купон» → добавить в sub: эмитент + сумма купона
-- «Обновлено ЧЧ:ММ» и «↺ Обновить» → перенести в topbar после nav-кнопок; добавить имя портфеля
-- Настройки → Аккаунт: желтый info-box с хардкодными светлыми цветами → theme-aware стиль
-- Настройки → Портфели: кнопки «Переименовать», «Поделиться» → тёмный стиль для тёмной темы
-- Лучшие/слабые позиции: `border-bottom:var(--slate-100)` = белые полоски → `var(--table-border)`
-- Купонные уведомления: переместить из отдельной карточки в «Настройки бота» после порога просадки
-- UX: empty state для пустого портфеля, горячая клавиша R, copy тикера по клику
+Два независимых исправления:
+
+**1. PDF переполнение таблицы**
+Сумма ширин 16 колонок = 32.7 cm при доступной ширине A4 landscape ≈ 26.7 cm (297mm − 2×1.5cm margin).
+Overflow = 6.0 cm — таблица не влезает, данные наезжают. Колонка «Название» шириной 5.8 cm — главный виновник.
+
+**2. Риск портфеля = «не определён»**
+Текущая логика риска (`_calc_risk_from_ratings`) работает только если у инструментов заполнено `company_rating`.
+После wizard/лендинга: rating не попадает в `portfolio_items.company_rating` немедленно, поэтому `GROUP_CONCAT` возвращает NULL → риск = `"unknown"`.
+Новая логика: риск по средней купонной доходности портфеля (более надёжный источник данных).
 
 ---
 
@@ -23,356 +19,132 @@
 
 | Файл | Что меняем |
 |------|-----------|
-| `app/main.py` | Добавить `_rating_refresh_loop()` background task |
-| `app/services/storage_service.py` | Добавить `get_all_portfolio_items_for_rating()` |
-| `app/services/moex_service.py` | Добавить метод `refresh_rating(secid)` |
-| `app/ui/dashboard.html` | Все визуальные + логические правки (CSS + JS + HTML) |
+| `app/api/pdf.py` | Уменьшить MARGIN, пересчитать col_w, Paragraph-обёртка для ячеек |
+| `app/services/storage_service.py` | Новый `_calc_risk_from_coupon()` + обновить SQL в `get_portfolios_with_item_counts()` |
 
 ---
 
-## Phase 1 — Ежесуточное обновление рейтингов
+## Phase 1 — PDF Fix (`app/api/pdf.py`)
 
-### 1.1 `storage_service.py` — `get_all_portfolio_items_for_rating()`
-Возвращает один item на уникальный тикер (для избежания дублей):
+### Причина переполнения
+- Текущие col_w суммируют 32.7 cm, доступно ~26.7 cm → overflow 6 cm
+- Главный виновник — колонка «Название» (5.8 cm) + слишком большие margins (1.5 cm)
+
+### Изменения
+
+**1. Уменьшить MARGIN с 1.5 cm до 0.8 cm:**
 ```python
-def get_all_portfolio_items_for_rating(self) -> list[dict]:
-    with self._connect() as conn:
-        rows = conn.execute("""
-            SELECT MIN(id) as id, MIN(portfolio_id) as portfolio_id, ticker, instrument_type
-            FROM portfolio_items
-            GROUP BY ticker
-            ORDER BY ticker
-        """).fetchall()
-    return [{"id": r[0], "portfolio_id": r[1], "ticker": r[2], "instrument_type": r[3]} for r in rows]
+MARGIN = 0.8 * cm
 ```
 
-### 1.2 `moex_service.py` — `refresh_rating(secid)`
-Сбрасывает кэш и принудительно перезапрашивает:
+**2. Пересчитать col_w** (сумма = 27.1 cm, доступно 28.1 cm — запас 1 cm):
 ```python
-async def refresh_rating(self, secid: str) -> str | None:
-    """Force re-fetch rating, bypassing in-memory cache."""
-    self._credit_rating_cache.pop(secid, None)
-    self._credit_rating_cache.pop(f"smartlab:{secid}", None)
-    rating = await self._get_smartlab_credit_rating(secid)
-    if rating is None:
-        rating = await self._get_credit_rating(secid)
-    return rating
+col_w = [
+    0.5, 1.8, 3.8, 1.5,   # №, тикер, название, тип
+    1.2, 1.8, 1.8, 2.2,   # кол-во, цена покупки, тек. цена, стоимость
+    1.8, 1.2, 1.5,         # P&L, P&L%, рейтинг
+    1.5, 1.4, 1.8, 2.0,   # ставка купона, YTM, погашение, след.купон
+    1.3,                   # доля
+]
 ```
 
-### 1.3 `main.py` — `_rating_refresh_loop()`
-Запускать в 03:00 UTC ежесуточно (offset от текущего времени):
+**3. Добавить ParagraphStyle для ячеек и обернуть название:**
 ```python
-async def _rating_refresh_loop():
-    from datetime import datetime, timezone
-    from app.services.moex_service import moex_service
-    while True:
-        now = datetime.now(timezone.utc)
-        secs_to_3am = ((3 - now.hour) % 24) * 3600 - now.minute * 60 - now.second
-        if secs_to_3am <= 0:
-            secs_to_3am += 86400
-        await asyncio.sleep(secs_to_3am)
-        try:
-            items = storage_service.get_all_portfolio_items_for_rating()
-            sem = asyncio.Semaphore(3)
-            async def _one(item):
-                async with sem:
-                    try:
-                        rating = await moex_service.refresh_rating(item["ticker"])
-                        if rating is not None:
-                            storage_service.update_rating(item["id"], item["portfolio_id"], rating)
-                    except Exception:
-                        pass
-            await asyncio.gather(*(_one(i) for i in items))
-            logger.info("Daily rating refresh: %d tickers", len(items))
-        except Exception:
-            logger.exception("Daily rating refresh failed")
+cell_style = ParagraphStyle(
+    'Cell', fontSize=7, leading=8.5, fontName=font_name, wordWrap='CJK'
+)
+header_cell_style = ParagraphStyle(
+    'HeaderCell', fontSize=7.5, leading=9, fontName=font_bold,
+    textColor=colors.white, alignment=TA_CENTER, wordWrap='CJK'
+)
 ```
-Добавить `asyncio.create_task(_rating_refresh_loop())` в lifespan.
+
+Обернуть:
+- headers в `Paragraph(h, header_cell_style)`
+- название в строках данных: `Paragraph(str(row.name or '')[:50], cell_style)` (убрать `[:40]`)
+- обновить `inst_style`: добавить `("WORDWRAP", (0,0), (-1,-1), 1)` и уменьшить PADDING до `2`
+
+**4. Уменьшить font body с 7.5pt до 7pt** для плотных колонок, header оставить 7.5pt.
 
 ---
 
-## Phase 2 — Рекомендации: один эмитент — одна карточка
+## Phase 2 — Portfolio Risk by Coupon Yield (`app/services/storage_service.py`)
 
-### `loadPortfolioRecommendations()` в dashboard.html
+### Почему текущий риск = «unknown»
+После wizard: `portfolio_items.company_rating` = NULL (рейтинг заполняется только при обновлении кэша и вызове `update_rating()`). `GROUP_CONCAT(NULL)` = пустая строка → `_calc_risk_from_ratings([])` → `"unknown"`.
 
-Добавить функцию `_issuerKey(bond)` и фильтрацию по уже показанным эмитентам:
+`manual_coupon_rate` заполняется сразу при refresh кэша после добавления инструментов — это надёжный источник.
 
-```js
-function _issuerKey(bond) {
-  const t = (bond.ticker || '').toUpperCase();
-  // Для ISIN-формата (RU000A...) — берём первые 2 слова имени
-  if (/^RU\d{9,}/.test(t)) {
-    return (bond.name || bond.short_name || t).split(' ').slice(0, 2).join(' ').toUpperCase().substring(0, 16);
-  }
-  // Для именных тикеров (POLYP-1, POLYP-2) — убираем суффикс-серию
-  return t.replace(/[-_]?\d+[A-Z]*$/, '').substring(0, 8);
-}
-
-// При сборке cards:
-const shownIssuers = new Set();
-results.forEach((res, i) => {
-  if (res.status !== 'fulfilled') return;
-  const items = (res.value.bonds || res.value.suggestions || [])
-    .filter(s => !existingTickers.has(s.ticker));
-  // Найти первый bond от нового эмитента
-  const item = items.find(s => !shownIssuers.has(_issuerKey(s)));
-  if (!item) return;
-  shownIssuers.add(_issuerKey(item));
-  cards.push({ ...item, rationale: top4[i].rationale, risk: top4[i].risk });
-});
+### Новый метод `_calc_risk_from_coupon(avg_coupon_rate)`
+```python
+@staticmethod
+def _calc_risk_from_coupon(avg_coupon_rate: float) -> str:
+    """Determine portfolio risk from average coupon rate (% of par)."""
+    if avg_coupon_rate < 12.0:
+        return "conservative"
+    if avg_coupon_rate < 15.0:
+        return "low"
+    if avg_coupon_rate < 18.0:
+        return "moderate"
+    if avg_coupon_rate < 22.0:
+        return "high"
+    return "aggressive"
 ```
+
+### Обновить SQL в `get_portfolios_with_item_counts()`
+
+Добавить `AVG(CASE WHEN pi.manual_coupon_rate > 0 THEN pi.manual_coupon_rate END) as avg_coupon_rate`:
+
+```sql
+SELECT p.id, p.name, p.created_at,
+       COUNT(pi.id) as item_count,
+       COALESCE(SUM(pi.quantity * pi.purchase_price), 0) as total_cost,
+       GROUP_CONCAT(pi.company_rating) as ratings,
+       AVG(CASE WHEN pi.manual_coupon_rate > 0 THEN pi.manual_coupon_rate END) as avg_coupon_rate
+FROM portfolios p
+LEFT JOIN portfolio_items pi ON pi.portfolio_id = p.id
+WHERE p.user_id = ?
+GROUP BY p.id
+ORDER BY p.id ASC
+```
+
+### Логика приоритета в коде:
+```python
+for row in rows:
+    avg_coupon = row[6]   # новый столбец
+    ratings_raw = row[5] or ""
+    ratings = [r.strip() for r in ratings_raw.split(",") if r.strip()]
+
+    if avg_coupon:        # приоритет: купонная доходность
+        risk = self._calc_risk_from_coupon(float(avg_coupon))
+    elif ratings:         # fallback: кредитные рейтинги
+        risk = self._calc_risk_from_ratings(ratings)
+    else:
+        risk = "unknown"
+```
+
+### Меппинг для пользователя (проверить в dashboard.html)
+Риск отображается в настройках-портфели. Убедиться что маппинг в JS совпадает:
+- `conservative` → «Консервативный»
+- `low` → «Низкий»
+- `moderate` → «Умеренный»
+- `high` → «Высокий»
+- `aggressive` → «Агрессивный»
+- `unknown` → «Не определён»
 
 ---
 
-## Phase 3 — История стоимости: нулевые данные
+## Порядок реализации
 
-### `drawHistoryChartEmpty()` — фикс центровки + нулевая линия
-
-Проблема: `canvas.offsetWidth` возвращает 0 до рендера, текст смещается. Решение — использовать `canvas.parentElement.clientWidth`.
-
-```js
-function drawHistoryChartEmpty(canvas) {
-  if (!canvas) return;
-  const parent = canvas.parentElement;
-  const W = (parent ? parent.clientWidth : 0) || 600;
-  const H = 200;
-  canvas.width = W;
-  canvas.height = H;
-  canvas.style.width = '100%';
-  // ... grid + dashed line
-  const ctx = canvas.getContext('2d');
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = labelClr;
-  ctx.font = '600 12px Inter,sans-serif';
-  ctx.fillText('История накапливается', W / 2, H - pad.b - 8);  // ← снизу
-  ctx.font = '11px Inter,sans-serif';
-  ctx.fillStyle = mutedClr;
-  ctx.fillText('Данные появятся через сутки после первого запуска', W / 2, H - pad.b + 8);
-  // Нулевая Y-метка
-  ctx.textAlign = 'right';
-  ctx.font = '10px Inter,sans-serif';
-  ctx.fillStyle = labelClr;
-  ctx.fillText('0', pad.l - 4, pad.t + chartH + 3);
-  ctx.restore();
-}
-```
-
----
-
-## Phase 4 — CSS / Visual Fixes (dashboard.html)
-
-### 4.1 Donut hole — динамический цвет
-В `drawPieChart`:
-```js
-ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#0d1829';
-```
-
-### 4.2 stat-sub светлее
-```css
-/* В :root (тёмная тема) */
---text-muted: #64748b;  /* было #475569 */
-```
-
-### 4.3 info-box-warning theme-aware
-Добавить CSS класс `.info-box-warning`:
-```css
-.info-box-warning {
-  background: rgba(251,191,36,.08);
-  border-color: rgba(251,191,36,.25);
-  color: var(--amber-400);
-}
-[data-theme="light"] .info-box-warning {
-  background: #fefce8;
-  border-color: #fde047;
-  color: #854d0e;
-}
-```
-В HTML строка ~1149: заменить inline стили на `class="info-box info-box-warning"`.
-
-### 4.4 Кнопки портфелей — тёмный стиль
-В `settingsLoadPortfolios()` JS (строки ~5527-5561):
-```js
-// editBtn и shareBtn:
-btn.style.cssText = '...color:var(--text-secondary);background:var(--bg-elevated);border:1px solid var(--border);...';
-// delBtn:
-delBtn.style.cssText = '...color:var(--red-400);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);...';
-```
-
-### 4.5 Лучшие/слабые позиции — стиль строк
-В `renderPerformers()`:
-```js
-row.style.cssText = '...border-bottom:1px solid var(--table-border);...';
-name.style.cssText = '...color:var(--text-primary);';
-ticker.style.cssText = '...color:var(--text-muted);';
-right.style.cssText = `...color:${r.profit >= 0 ? 'var(--green-400)' : 'var(--red-400)'};`;
-```
-
----
-
-## Phase 5 — Topbar: имя портфеля + Обновлено + Обновить
-
-### Структура изменений
-
-**Удалить из HTML** блок строки 949-958 (контейнер с `last-update-time` и `btn-refresh`).
-
-**В `setupPortfolioSelector()`** после создания селектора добавить в `topbar-right`:
-```js
-// Имя портфеля
-const nameSpan = document.createElement('span');
-nameSpan.id = 'topbar-portfolio-name';
-nameSpan.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:1px solid var(--border);padding-right:10px;';
-
-// Обновлено
-const timeSpan = document.createElement('span');
-timeSpan.id = 'last-update-time';
-timeSpan.style.cssText = 'font-size:11px;color:var(--text-muted);';
-
-// Кнопка Обновить
-// Переместить существующий #btn-refresh или воссоздать
-```
-
-**В `updatePortfolioSelector()`** обновлять имя:
-```js
-const nameEl = document.getElementById('topbar-portfolio-name');
-if (nameEl) nameEl.textContent = portfolios.find(p => p.id === portfolioId)?.name || '';
-```
-
-**Убрать** блок `justify-content:space-between` обёртки над таблицей, оставить только `<div id="table-status">`.
-
----
-
-## Phase 6 — «Следующий купон»: эмитент + сумма
-
-В функции `renderTable()` или `updateStatCards()` (где заполняется `stat-next-coupon`):
-
-```js
-const nextRow = [...tableRows]
-  .filter(r => r.next_coupon_date)
-  .sort((a, b) => new Date(a.next_coupon_date) - new Date(b.next_coupon_date))[0];
-if (nextRow) {
-  const amount = nextRow.coupon != null ? Math.round(nextRow.coupon * nextRow.quantity) : null;
-  const emitter = (nextRow.name || nextRow.ticker || '').substring(0, 20);
-  const sub = document.getElementById('stat-next-coupon-sub');
-  if (sub) sub.textContent = amount ? `${emitter} · ${amount.toLocaleString('ru')} ₽` : emitter;
-}
-```
-
----
-
-## Phase 7 — SWOT: 2 из разных областей, без дублей
-
-В `renderSwotAnalysis(rows)` добавить тег категории, выбирать `pickDiversified(items, 2)`:
-
-```js
-// Категории: 'ytm', 'coupon', 'ofz', 'concentration_ticker', 'concentration_issuer',
-//            'maturity_cluster', 'maturity_short', 'maturity_long', 'offer', 'losses', 'pl', 'size', 'rating'
-function pickDiversified(tagged, maxCount) {
-  const result = [], used = new Set();
-  for (const item of tagged) {
-    if (result.length >= maxCount) break;
-    if (!used.has(item.category)) { result.push(item.text); used.add(item.category); }
-  }
-  // Добрать если не хватает уникальных
-  for (const item of tagged) {
-    if (result.length >= maxCount) break;
-    if (!result.includes(item.text)) result.push(item.text);
-  }
-  return result;
-}
-```
-
----
-
-## Phase 8 — Купонные уведомления: встроить в карточку бота
-
-**HTML:** Убрать отдельную карточку `#settings-notifications-personal`. Добавить поля купона прямо в `card-body` карточки «Настройки бота» — после поля `tg-threshold`, перед кнопками сохранения:
-
-```html
-<!-- После tg-threshold field, перед notif-actions -->
-<div class="field">
-  <label data-i18n="settings.coupon_notif_title">Уведомления о купонах</label>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
-    <input type="checkbox" id="coupon-notif-enabled">
-    <span style="font-size:13px;" data-i18n="settings.coupon_notif_enable">Включить</span>
-  </label>
-  <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:12px;color:var(--text-muted);" data-i18n="settings.coupon_notif_days">За дней:</span>
-    <input type="number" id="coupon-notif-days" min="1" max="30" value="3" class="input" style="width:56px;" />
-    <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
-  </div>
-  <p id="coupon-notif-hint-tg" class="settings-hint" style="display:none;color:var(--amber-400);" data-i18n="settings.coupon_notif_no_tg">Нужен Chat ID в разделе «Аккаунт»</p>
-  <div id="coupon-notif-status" class="status"></div>
-</div>
-```
-
----
-
-## Phase 9 — UX улучшения
-
-### 9.1 Empty state для пустого портфеля
-После таблицы (внутри `.table-wrap` или снаружи) добавить hidden div:
-```html
-<div id="empty-portfolio-state" style="display:none;text-align:center;padding:60px 20px;">
-  <svg .../>  <!-- иконка портфеля -->
-  <div style="font-size:16px;font-weight:600;...">Портфель пуст</div>
-  <div style="font-size:13px;color:var(--text-muted);margin:6px 0 20px;">
-    Добавьте первую бумагу для отслеживания доходности
-  </div>
-  <button class="btn" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
-</div>
-```
-В `renderTable()`: `emptyState.style.display = tableRows.length ? 'none' : 'block'`.
-
-### 9.2 Копирование тикера по клику
-В ячейке тикера таблицы добавить `cursor:pointer; title="Нажмите чтобы скопировать"` и onclick:
-```js
-tickerEl.style.cursor = 'pointer';
-tickerEl.title = 'Скопировать тикер';
-tickerEl.onclick = () => {
-  navigator.clipboard.writeText(row.ticker).then(() => showToast(`Скопировано: ${row.ticker}`));
-};
-```
-Добавить функцию `showToast(msg)` — небольшой popup снизу экрана (1.5с).
-
-### 9.3 Горячая клавиша R
-```js
-document.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey
-    && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
-    manualRefresh();
-  }
-});
-```
-
----
-
-## Implementation Priority Order
-
-1. Phase 4 (CSS fixes: donut, stat-sub, кнопки, полосы) — самые видимые баги
-2. Phase 7 (SWOT лимит + категории)
-3. Phase 6 (Следующий купон: эмитент + сумма)
-4. Phase 5 (Topbar: имя + Обновлено + кнопка)
-5. Phase 3 (History chart: центровка + нулевая линия)
-6. Phase 8 (Купонные уведомления в карточку бота)
-7. Phase 4.3 (info-box-warning theme-aware)
-8. Phase 2 (Рекомендации: один эмитент)
-9. Phase 1 (Rating daily refresh — backend)
-10. Phase 9 (Empty state, copy ticker, hotkey R)
+1. `app/api/pdf.py` — margin + col_w + Paragraph ячейки
+2. `app/services/storage_service.py` — новый метод + SQL + логика
 
 ---
 
 ## Verification
 
-1. Тёмная тема: пироги без белого кольца
-2. stat-sub текст читаем
-3. Кнопки портфелей (Переименовать, Поделиться) — тёмные
-4. Лучшие/слабые: полосы `var(--table-border)`, не белые
-5. SWOT: ровно 2 сильных + 2 риска, разные категории
-6. «Обновлено ЧЧ:ММ» и «↺ Обновить» в topbar, рядом имя портфеля
-7. «Следующий купон» sub → «ИмяЭмитента · 1 500 ₽»
-8. История: нулевая линия + подпись по центру снизу (не слева)
-9. Купонные уведомления внутри карточки бота
-10. Рекомендации: 4 разных эмитента
-11. Rating refresh loop в логах в 03:00 UTC
+1. Запустить: `MVP_JWT_SECRET=dev_secret_key_12345 .venv/bin/uvicorn app.main:app --reload`
+2. Скачать PDF портфеля → все 16 колонок влезают, нет наезда, длинные названия переносятся
+3. Создать портфель через лендинг-wizard → Настройки → Мои портфели → риск показывает значение (не «Не определён»)
+4. Добавить консервативную облигацию с купоном 8% → риск портфеля должен снизиться
+5. Тесты: `MVP_JWT_SECRET=dev_secret_key_12345_padding_ok .venv/bin/python -m pytest tests/ 2>&1 | tail -5`

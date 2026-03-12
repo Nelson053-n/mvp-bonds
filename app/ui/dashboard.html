@@ -1019,15 +1019,18 @@
         <!-- Portfolio history chart -->
         <div class="card" id="analytics-history-card">
           <div class="card-header">
-            <h2 class="card-title">Динамика стоимости</h2>
+            <div>
+              <h2 class="card-title">Динамика стоимости</h2>
+              <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
             <div style="display:flex;gap:6px;">
               <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
               <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
               <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
             </div>
           </div>
-          <div style="padding:12px 16px;">
-            <canvas id="analytics-history-chart" height="200"></canvas>
+          <div style="padding:12px 16px 16px;">
+            <canvas id="analytics-history-chart" height="220" style="display:block;width:100%;"></canvas>
           </div>
         </div>
 
@@ -1445,9 +1448,9 @@
       </div>
 
       <!-- Change password modal -->
-      <div id="adm-pwd-modal" class="modal-overlay" style="display:none;">
+      <div id="adm-pwd-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="adm-pwd-modal-title">
         <div class="modal" style="max-width:360px;">
-          <div class="modal-header"><h2 class="modal-title">Сменить пароль</h2></div>
+          <div class="modal-header"><h2 class="modal-title" id="adm-pwd-modal-title">Сменить пароль</h2></div>
           <div class="modal-body">
             <div class="modal-field">
               <label>Новый пароль</label>
@@ -1488,10 +1491,10 @@
     </footer>
 
     <!-- Share Portfolio Modal -->
-    <div id="share-modal-overlay" class="modal-overlay">
+    <div id="share-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
       <div class="modal">
         <div class="modal-header">
-          <h2 class="modal-title" data-i18n="share.title">Поделиться портфелем</h2>
+          <h2 class="modal-title" id="share-modal-title" data-i18n="share.title">Поделиться портфелем</h2>
         </div>
         <div class="modal-body">
           <div class="modal-field">
@@ -1516,17 +1519,17 @@
     </div>
 
     <!-- ── ADD INSTRUMENT MODAL ──────────────────────────────────── -->
-    <div id="add-instrument-modal" class="modal-overlay" style="display:none;">
+    <div id="add-instrument-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
       <div class="modal" style="max-width:460px;">
         <div class="modal-header">
-          <h2 class="modal-title">Добавить бумагу</h2>
+          <h2 class="modal-title" id="add-modal-title">Добавить бумагу</h2>
         </div>
         <div class="modal-body">
           <div id="add-suggest-list" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
           <div class="modal-field" style="position:relative;">
             <label>Тикер или название</label>
             <input type="text" id="add-modal-ticker" class="input" placeholder="Например: SU26238RMFS4 или Сбербанк" autocomplete="off">
-            <div id="add-modal-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.3);max-height:240px;overflow-y:auto;margin-top:2px;"></div>
+            <div id="add-modal-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--modal-bg);border:1px solid var(--border-strong);border-radius:var(--radius-sm);box-shadow:0 8px 32px rgba(0,0,0,.55);max-height:240px;overflow-y:auto;margin-top:2px;"></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="modal-field">
@@ -1534,8 +1537,8 @@
               <input type="number" id="add-modal-qty" class="input" placeholder="1" min="1" value="1">
             </div>
             <div class="modal-field">
-              <label>Цена покупки (%)</label>
-              <input type="number" id="add-modal-price" class="input" placeholder="100" step="0.01">
+              <label>Цена покупки (₽, необяз.)</label>
+              <input type="number" id="add-modal-price" class="input" placeholder="авто" step="0.01" min="0.01">
             </div>
           </div>
           <div id="add-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
@@ -1548,7 +1551,7 @@
     </div>
 
     <!-- Universal Confirm Modal -->
-    <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;">
+    <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
       <div class="modal" style="max-width:360px;">
         <div class="modal-header">
           <h2 class="modal-title" id="confirm-modal-title"></h2>
@@ -1564,10 +1567,10 @@
     </div>
 
     <!-- Password Entry Modal for Shared View -->
-    <div id="password-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="password-modal-overlay" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
       <div class="modal" style="max-width: 320px;">
         <div class="modal-header">
-          <h2 class="modal-title" data-i18n="shareView.pwTitle">Защищённый портфель</h2>
+          <h2 class="modal-title" id="password-modal-title" data-i18n="shareView.pwTitle">Защищённый портфель</h2>
         </div>
         <div class="modal-body">
           <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--text-secondary);" data-i18n="shareView.pwDesc">Для просмотра этого портфеля необходим пароль:</p>
@@ -1582,10 +1585,10 @@
     </div>
 
     <!-- Create Portfolio Modal -->
-    <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="create-portfolio-modal-overlay" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="create-portfolio-modal-title">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
-          <h2 class="modal-title" data-i18n="modal.createPortfolio.title">Новый портфель</h2>
+          <h2 class="modal-title" id="create-portfolio-modal-title" data-i18n="modal.createPortfolio.title">Новый портфель</h2>
         </div>
         <div class="modal-body">
           <div class="modal-field">
@@ -1602,10 +1605,10 @@
     </div>
 
     <!-- Delete Portfolio Modal -->
-    <div id="delete-portfolio-modal-overlay" class="modal-overlay" style="display: none;">
+    <div id="delete-portfolio-modal-overlay" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="delete-portfolio-modal-title">
       <div class="modal" style="max-width: 400px;">
         <div class="modal-header">
-          <h2 class="modal-title" data-i18n="modal.deletePortfolio.title">Удалить портфель</h2>
+          <h2 class="modal-title" id="delete-portfolio-modal-title" data-i18n="modal.deletePortfolio.title">Удалить портфель</h2>
         </div>
         <div class="modal-body">
           <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--text-secondary);"><span data-i18n="modal.deletePortfolio.confirmText">Вы уверены, что хотите удалить</span> <strong id="delete-portfolio-name"></strong>?</p>
@@ -1632,7 +1635,7 @@
     </div>
 
     <!-- ── GUIDE MODAL ───────────────────────────────────────────── -->
-    <div id="guide-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeGuideModal()">
+    <div id="guide-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Справочник инвестора" onclick="if(event.target===this)closeGuideModal()">
       <div class="modal" style="max-width:680px;width:95%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
         <!-- Header -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -1741,10 +1744,10 @@
     </style>
 
     <!-- ── PRICE ALERT MODAL ─────────────────────────────────────── -->
-    <div id="price-alert-modal" class="modal-overlay" style="display:none;">
+    <div id="price-alert-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="price-alert-modal-title">
       <div class="modal" style="max-width:400px;">
         <div class="modal-header">
-          <h2 class="modal-title">Ценовые алерты</h2>
+          <h2 class="modal-title" id="price-alert-modal-title">Ценовые алерты</h2>
         </div>
         <div class="modal-body">
           <div id="alert-list" style="margin-bottom:12px;min-height:24px;font-size:13px;color:var(--text-secondary);"></div>
@@ -1928,7 +1931,7 @@
       // ── CONSTANTS ────────────────────────────────────────────────
       const TABLE_CACHE_KEY    = 'mvp_portfolio_table_cache_v2';
       const TABLE_CACHE_TS_KEY = 'mvp_portfolio_table_cache_ts_v2';
-      const SYNC_INTERVAL_MS   = 120 * 1000;
+      const SYNC_INTERVAL_MS   = 900 * 1000;  // 15 min — matches server cache refresh interval
       const MONTH_NAMES_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
       const MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       function getMonthNames() { return window._lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_RU; }
@@ -1980,37 +1983,92 @@
         return !!shareToken;
       }
 
+      // ── HTML ESCAPE (XSS protection) ─────────────────────────────
+      function esc(s) {
+        if (s == null) return '';
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      // ── TOAST NOTIFICATIONS ──────────────────────────────────────
+      (function() {
+        const TOAST_STYLES = `
+          #_toast_container {
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+          }
+          .toast {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+            max-width: 360px; pointer-events: auto; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,0,0,.4);
+            animation: toastIn .2s ease; color: #fff;
+            backdrop-filter: blur(8px);
+          }
+          .toast.success { background: rgba(22,163,74,.92); }
+          .toast.error   { background: rgba(220,38,38,.92); }
+          .toast.info    { background: rgba(37,99,235,.92); }
+          .toast.warn    { background: rgba(202,138,4,.92); }
+          .toast-icon    { font-size: 16px; flex-shrink: 0; }
+          .toast-msg     { flex: 1; line-height: 1.4; }
+          .toast-close   { opacity: .7; font-size: 16px; padding: 0 2px; }
+          @keyframes toastIn { from { opacity:0; transform:translateY(8px) scale(.97); } to { opacity:1; transform:none; } }
+          @keyframes toastOut { to { opacity:0; transform:translateY(4px) scale(.97); } }
+        `;
+        const style = document.createElement('style');
+        style.textContent = TOAST_STYLES;
+        document.head.appendChild(style);
+        const container = document.createElement('div');
+        container.id = '_toast_container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'false');
+        document.body.appendChild(container);
+      })();
+
+      function toast(msg, type = 'info', duration = 4000) {
+        const container = document.getElementById('_toast_container');
+        if (!container) return;
+        const icons = { success: '✓', error: '✕', info: 'ℹ', warn: '⚠' };
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        el.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ'}</span><span class="toast-msg">${esc(msg)}</span><span class="toast-close">✕</span>`;
+        const close = () => {
+          el.style.animation = 'toastOut .2s ease forwards';
+          setTimeout(() => el.remove(), 200);
+        };
+        el.querySelector('.toast-close').onclick = close;
+        container.appendChild(el);
+        if (duration > 0) setTimeout(close, duration);
+        return el;
+      }
+
       // ── API HELPER ───────────────────────────────────────────────
       async function apiFetch(url, opts = {}) {
         const headers = { ...(opts.headers || {}) };
 
-        // For shared views, only send share password, not auth token
         if (isReadOnly && shareToken) {
           if (sharePassword) {
             headers['X-Share-Password'] = sharePassword;
-            console.log('apiFetch - Sending share password for', url);
-          } else {
-            console.log('apiFetch - No password for shared view', url);
           }
         } else {
-          // For authenticated views, send auth token
           const token = localStorage.getItem('mvp_auth_token');
           if (token) {
             headers['Authorization'] = `Bearer ${token}`;
-            console.log('apiFetch - Sending auth token for', url);
-          } else {
-            console.log('apiFetch - NO TOKEN FOUND for', url);
           }
         }
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
-        console.log(`apiFetch ${url}:`, response.status);
         if (response.status === 401 && !isReadOnly) {
-          console.log('Got 401, clearing auth');
           localStorage.removeItem('mvp_auth_token');
           localStorage.removeItem('mvp_username');
-          showLoginScreen();
-          throw new Error('Сессия истекла. Пожалуйста, повторно войдите.');
+          toast(t('auth.sessionExpired') || 'Сессия истекла, войдите заново', 'warn');
+          setTimeout(() => showLoginScreen(), 1200);
+          throw new Error('session_expired');
         }
         return response;
       }
@@ -2413,18 +2471,28 @@
           } else {
             return;
           }
+          const meta = document.getElementById('analytics-history-meta');
           if (!snapshots || snapshots.length < 2) {
-            if (canvas) { canvas._snapshots = null; drawHistoryChartEmpty(canvas); }
+            if (meta) meta.textContent = snapshots && snapshots.length === 1
+              ? `1 точка данных · ${snapshots[0].date}`
+              : 'Нет данных · обновляется каждые 15 мин';
+            if (canvas) { canvas._snapshots = null; const es = snapshots && snapshots.length === 1 ? snapshots[0] : null; canvas._emptySnap = es; drawHistoryChartEmpty(canvas, es); }
             return;
+          }
+          if (meta) {
+            const first = snapshots[0].date, last = snapshots[snapshots.length-1].date;
+            const lastVal = snapshots[snapshots.length-1].total_value;
+            const fmt = lastVal >= 1000 ? (lastVal/1000).toFixed(1) + ' тыс. ₽' : lastVal.toFixed(0) + ' ₽';
+            meta.textContent = `${snapshots.length} точек · ${first} — ${last} · последняя: ${fmt}`;
           }
           if (canvas) { canvas._snapshots = snapshots; }
           drawHistoryChart(canvas, snapshots);
         } catch(e) {
-          if (canvas) drawHistoryChartEmpty(canvas);
+          if (canvas) drawHistoryChartEmpty(canvas, null);
         }
       }
 
-      function drawHistoryChartEmpty(canvas) {
+      function drawHistoryChartEmpty(canvas, oneSnapshot) {
         if (!canvas) return;
         const parent = canvas.parentElement;
         const W = (parent ? parent.clientWidth : 0) || canvas.offsetWidth || 600;
@@ -2460,14 +2528,26 @@
         ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
         ctx.fillText('0', pad.l - 4, zeroY);
 
-        // Bottom caption centered
+        // Caption
         ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-        ctx.font = '600 12px Inter,sans-serif';
-        ctx.fillStyle = labelClr;
-        ctx.fillText('История накапливается', W / 2, H - 24);
-        ctx.font = '11px Inter,sans-serif';
-        ctx.fillStyle = lineClr;
-        ctx.fillText('Данные появятся через сутки после первого запуска', W / 2, H - 8);
+        if (oneSnapshot) {
+          // 1 точка есть — показываем стоимость и когда следующая точка появится
+          const val = oneSnapshot.total_value;
+          const fmt = val >= 1000 ? (val/1000).toFixed(1) + ' тыс. ₽' : val.toFixed(0) + ' ₽';
+          ctx.font = '600 12px Inter,sans-serif';
+          ctx.fillStyle = labelClr;
+          ctx.fillText('Первая точка: ' + fmt + ' на ' + oneSnapshot.date, W / 2, H - 26);
+          ctx.font = '11px Inter,sans-serif';
+          ctx.fillStyle = lineClr;
+          ctx.fillText('График появится после следующего обновления кэша (~15 мин)', W / 2, H - 10);
+        } else {
+          ctx.font = '600 12px Inter,sans-serif';
+          ctx.fillStyle = labelClr;
+          ctx.fillText('История ещё не накоплена', W / 2, H - 26);
+          ctx.font = '11px Inter,sans-serif';
+          ctx.fillStyle = lineClr;
+          ctx.fillText('Данные появятся после первого обновления кэша (~15 мин)', W / 2, H - 10);
+        }
       }
 
       function drawHistoryChart(canvas, snapshots) {
@@ -2475,16 +2555,15 @@
         const ctx = canvas.getContext('2d');
         const W = canvas.offsetWidth || 600;
         canvas.width = W;
-        const H = canvas.height || 200;
-        ctx.clearRect(0, 0, W, H);
+        const H = canvas.height || 220;
         const values = snapshots.map(s => s.total_value);
-        const costs = snapshots.map(s => s.total_cost);
+        const costs  = snapshots.map(s => s.total_cost);
         const maxV = Math.max(...values, ...costs);
         const minV = Math.min(...values, ...costs) * 0.98;
         const pad = { t: 16, r: 16, b: 32, l: 56 };
         const chartW = W - pad.l - pad.r;
         const chartH = H - pad.t - pad.b;
-        const xScale = (i) => pad.l + (i / (snapshots.length - 1)) * chartW;
+        const xScale = (i) => pad.l + (i / Math.max(snapshots.length - 1, 1)) * chartW;
         const yScale = (v) => pad.t + chartH - ((v - minV) / (maxV - minV || 1)) * chartH;
 
         const st = getComputedStyle(document.documentElement);
@@ -2492,47 +2571,130 @@
         const labelClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
         const lineClr  = st.getPropertyValue('--blue-500').trim() || '#3b82f6';
         const dashClr  = st.getPropertyValue('--border').trim() || 'rgba(148,163,184,.15)';
+        const bgClr    = st.getPropertyValue('--modal-bg').trim() || '#0d1829';
+        const textClr  = st.getPropertyValue('--text-primary').trim() || '#f1f5f9';
 
-        // Grid lines
-        ctx.strokeStyle = gridClr; ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) {
-          const y = pad.t + (chartH / 4) * i;
-          ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-          const val = maxV - ((maxV - minV) / 4) * i;
-          ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'right';
-          ctx.fillText(Math.round(val / 1000) + 'k', pad.l - 4, y + 3);
+        function drawBase(hoverIdx) {
+          ctx.clearRect(0, 0, W, H);
+
+          // Grid lines + Y labels
+          ctx.strokeStyle = gridClr; ctx.lineWidth = 1;
+          for (let i = 0; i <= 4; i++) {
+            const y = pad.t + (chartH / 4) * i;
+            ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+            const val = maxV - ((maxV - minV) / 4) * i;
+            ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'right';
+            ctx.fillText(Math.round(val / 1000) + 'k', pad.l - 4, y + 3);
+          }
+
+          // Cost baseline (dashed)
+          ctx.strokeStyle = dashClr; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          costs.forEach((c, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(c)) : ctx.lineTo(xScale(i), yScale(c)); });
+          ctx.stroke(); ctx.setLineDash([]);
+
+          // Value fill
+          ctx.beginPath();
+          values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
+          ctx.lineTo(xScale(values.length - 1), H - pad.b);
+          ctx.lineTo(xScale(0), H - pad.b);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
+          grad.addColorStop(0, 'rgba(59,130,246,0.18)'); grad.addColorStop(1, 'rgba(59,130,246,0)');
+          ctx.fillStyle = grad; ctx.fill();
+
+          // Value line
+          ctx.strokeStyle = lineClr; ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
+          ctx.stroke();
+
+          // X labels
+          const step = Math.max(1, Math.floor(snapshots.length / 6));
+          ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'center';
+          snapshots.forEach((s, i) => {
+            if (i % step === 0 || i === snapshots.length - 1) {
+              ctx.fillText(s.date.substring(5), xScale(i), H - pad.b + 14);
+            }
+          });
+
+          // Hover overlay
+          if (hoverIdx !== null && hoverIdx >= 0 && hoverIdx < snapshots.length) {
+            const x  = xScale(hoverIdx);
+            const yV = yScale(values[hoverIdx]);
+            const yC = yScale(costs[hoverIdx]);
+            const s  = snapshots[hoverIdx];
+
+            // Vertical hairline
+            ctx.strokeStyle = 'rgba(148,163,184,.35)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H - pad.b); ctx.stroke();
+
+            // Dot on value line
+            ctx.fillStyle = lineClr;
+            ctx.beginPath(); ctx.arc(x, yV, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = bgClr; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(x, yV, 4, 0, Math.PI * 2); ctx.stroke();
+
+            // Tooltip
+            const profit = s.total_value - s.total_cost;
+            const pct    = s.total_cost > 0 ? (profit / s.total_cost * 100) : 0;
+            const fmtV   = new Intl.NumberFormat('ru-RU').format(Math.round(s.total_value));
+            const fmtP   = (profit >= 0 ? '+' : '') + new Intl.NumberFormat('ru-RU').format(Math.round(profit));
+            const fmtPct = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+            const line1  = s.date;
+            const line2  = fmtV + ' ₽';
+            const line3  = fmtP + ' ₽  (' + fmtPct + ')';
+
+            ctx.font = 'bold 11px Inter,sans-serif';
+            const tw2 = ctx.measureText(line2).width;
+            ctx.font = '10px Inter,sans-serif';
+            const tw1 = ctx.measureText(line1).width;
+            const tw3 = ctx.measureText(line3).width;
+            const tw  = Math.max(tw1, tw2, tw3);
+            const th  = 52, tpad = 8, gap = 6;
+            let tx = x + gap;
+            if (tx + tw + tpad * 2 > W - pad.r) tx = x - tw - tpad * 2 - gap;
+
+            const ty = Math.max(pad.t, Math.min(yV - th / 2, H - pad.b - th));
+            ctx.fillStyle = bgClr;
+            ctx.beginPath();
+            if (ctx.roundRect) {
+              ctx.roundRect(tx, ty, tw + tpad * 2, th, 5);
+            } else {
+              ctx.rect(tx, ty, tw + tpad * 2, th);
+            }
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(148,163,184,.2)'; ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText(line1, tx + tpad, ty + 14);
+            ctx.fillStyle = textClr; ctx.font = 'bold 12px Inter,sans-serif';
+            ctx.fillText(line2, tx + tpad, ty + 30);
+            ctx.fillStyle = profit >= 0 ? '#4ade80' : '#f87171'; ctx.font = '10px Inter,sans-serif';
+            ctx.fillText(line3, tx + tpad, ty + 46);
+          }
         }
 
-        // Cost baseline
-        ctx.strokeStyle = dashClr; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        costs.forEach((c, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(c)) : ctx.lineTo(xScale(i), yScale(c)); });
-        ctx.stroke(); ctx.setLineDash([]);
+        drawBase(null);
 
-        // Value fill
-        ctx.beginPath();
-        values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
-        ctx.lineTo(xScale(values.length - 1), H - pad.b);
-        ctx.lineTo(xScale(0), H - pad.b);
-        ctx.closePath();
-        const grad = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
-        grad.addColorStop(0, 'rgba(59,130,246,0.2)'); grad.addColorStop(1, 'rgba(59,130,246,0)');
-        ctx.fillStyle = grad; ctx.fill();
+        // Hover interaction — replace listener each redraw
+        const oldHandler = canvas._historyMouseMove;
+        const oldLeave   = canvas._historyMouseLeave;
+        if (oldHandler) canvas.removeEventListener('mousemove', oldHandler);
+        if (oldLeave)   canvas.removeEventListener('mouseleave', oldLeave);
 
-        // Value line
-        ctx.strokeStyle = lineClr; ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
-        ctx.stroke();
+        canvas._historyMouseMove = (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const mx   = (e.clientX - rect.left) * (W / rect.width);
+          if (mx < pad.l || mx > W - pad.r) { drawBase(null); return; }
+          const idx = Math.round((mx - pad.l) / chartW * (snapshots.length - 1));
+          drawBase(Math.max(0, Math.min(idx, snapshots.length - 1)));
+        };
+        canvas._historyMouseLeave = () => drawBase(null);
 
-        // X labels (every N)
-        const step = Math.max(1, Math.floor(snapshots.length / 6));
-        ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'center';
-        snapshots.forEach((s, i) => {
-          if (i % step === 0 || i === snapshots.length - 1) {
-            ctx.fillText(s.date.substring(5), xScale(i), H - pad.b + 14);
-          }
-        });
+        canvas.addEventListener('mousemove', canvas._historyMouseMove);
+        canvas.addEventListener('mouseleave', canvas._historyMouseLeave);
       }
 
       async function manualRefresh() {
@@ -2812,7 +2974,7 @@
           let rows_html = sorted.map(b => {
             const shortName = b.name.length > 22 ? b.name.substring(0, 21) + '…' : b.name;
             return `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--border,rgba(148,163,184,.08));">
-              <span style="color:var(--text-secondary,#94a3b8);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${b.name}">${shortName}</span>
+              <span style="color:var(--text-secondary,#94a3b8);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(b.name)}">${esc(shortName)}</span>
               <span style="font-weight:600;white-space:nowrap;color:var(--green-400,#4ade80);">+${Math.round(b.amount).toLocaleString('ru')} ₽</span>
             </div>`;
           }).join('');
@@ -2982,18 +3144,22 @@
       // ── PORTFOLIO WIZARD ─────────────────────────────────────────
 
       const RISK_LABELS = {
-        ultra_low: { label: 'Минимальный', desc: 'ОФЗ — государственные облигации', color: '#22c55e', yieldMin: 5, yieldMax: 10 },
-        low:       { label: 'Низкий',      desc: 'Рейтинг AAA–AA, крупнейшие эмитенты', color: '#84cc16', yieldMin: 5, yieldMax: 13 },
-        moderate:  { label: 'Умеренный',   desc: 'Рейтинг A–BBB, надёжный корпоратив', color: '#eab308', yieldMin: 8, yieldMax: 18 },
-        elevated:  { label: 'Повышенный',  desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 22 },
-        high:      { label: 'Высокий',     desc: 'Рейтинг BB+, высокодоходные', color: '#f87171', yieldMin: 23, yieldMax: 27 },
+        ultra_low:    { label: 'Минимальный',   desc: 'ОФЗ — государственные облигации', color: '#22c55e', yieldMin: 5, yieldMax: 10 },
+        conservative: { label: 'Консервативный',desc: 'Купон < 12% — ОФЗ и 1-й эшелон', color: '#22c55e', yieldMin: 5, yieldMax: 12 },
+        low:          { label: 'Низкий',        desc: 'Рейтинг AAA–AA, крупнейшие эмитенты', color: '#84cc16', yieldMin: 5, yieldMax: 13 },
+        moderate:     { label: 'Умеренный',     desc: 'Рейтинг A–BBB, надёжный корпоратив', color: '#eab308', yieldMin: 8, yieldMax: 18 },
+        elevated:     { label: 'Повышенный',    desc: 'Рейтинг BBB–BB+, средний бизнес', color: '#f97316', yieldMin: 12, yieldMax: 22 },
+        high:         { label: 'Высокий',       desc: 'Рейтинг BB+, высокодоходные', color: '#f87171', yieldMin: 23, yieldMax: 27 },
+        aggressive:   { label: 'Агрессивный',   desc: 'Купон > 22% — ВДО и высокодоходные', color: '#ef4444', yieldMin: 22, yieldMax: 30 },
       };
       const RISK_LABELS_EN = {
-        ultra_low: { label: 'Minimal',  desc: 'OFZ — government bonds' },
-        low:       { label: 'Low',      desc: 'AAA–AA rating, largest issuers' },
-        moderate:  { label: 'Moderate', desc: 'A–BBB rating, reliable corporates' },
-        elevated:  { label: 'Elevated', desc: 'BBB–BB+ rating, mid-size business' },
-        high:      { label: 'High',     desc: 'BB+ rating, high-yield bonds' },
+        ultra_low:    { label: 'Minimal',       desc: 'OFZ — government bonds' },
+        conservative: { label: 'Conservative',  desc: 'Coupon < 12% — OFZ & tier-1' },
+        low:          { label: 'Low',           desc: 'AAA–AA rating, largest issuers' },
+        moderate:     { label: 'Moderate',      desc: 'A–BBB rating, reliable corporates' },
+        elevated:     { label: 'Elevated',      desc: 'BBB–BB+ rating, mid-size business' },
+        high:         { label: 'High',          desc: 'BB+ rating, high-yield bonds' },
+        aggressive:   { label: 'Aggressive',    desc: 'Coupon > 22% — high-yield / VDO' },
       };
       function getRiskInfo(key) {
         const base = RISK_LABELS[key];
@@ -3061,15 +3227,15 @@
           filtered.slice(0, 12).forEach(b => {
             const maturity = b.maturity ? b.maturity.substring(0, 7) : '—';
             const offerNote = b.offer_date ? ` · ${window._lang === 'en' ? 'offer' : 'оферта'} ${b.offer_date.substring(0,7)}` : '';
-            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg-elevated);color:var(--text-muted);margin-right:6px;">${b.rating}</span>` : '';
+            const ratingHtml = b.rating ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--bg-elevated);color:var(--text-muted);margin-right:6px;">${esc(b.rating)}</span>` : '';
             const card = document.createElement('div');
             card.className = 'suggest-card';
             card.innerHTML = `
               <div class="suggest-card-body">
-                <div class="suggest-card-name">${ratingHtml}${b.name}</div>
-                <div class="suggest-card-meta">${b.ticker} · ${window._lang === 'en' ? 'maturity' : 'погашение'} ${maturity}${offerNote}</div>
+                <div class="suggest-card-name">${ratingHtml}${esc(b.name)}</div>
+                <div class="suggest-card-meta">${esc(b.ticker)} · ${window._lang === 'en' ? 'maturity' : 'погашение'} ${esc(maturity)}${esc(offerNote)}</div>
               </div>
-              <div class="suggest-card-yield">${b.coupon_percent}%</div>
+              <div class="suggest-card-yield">${esc(String(b.coupon_percent))}%</div>
               <button class="suggest-card-add" title="${t('add.btn')}">+</button>
             `;
             const addBtn = card.querySelector('.suggest-card-add');
@@ -3408,12 +3574,12 @@
             <button class="pw-dismiss-btn" data-idx="${i}" title="Пропустить">×</button>
             ${ratingHtml}
             <div style="flex:1;min-width:0;">
-              <div style="font-weight:600;font-size:13px;color:var(--slate-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
-              <div style="font-size:11px;color:var(--slate-400);margin-top:2px;">${b.ticker} · ${t('wizard.maturity')} ${maturity}${offerNote}</div>
+              <div style="font-weight:600;font-size:13px;color:var(--slate-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(b.name)}</div>
+              <div style="font-size:11px;color:var(--slate-400);margin-top:2px;">${esc(b.ticker)} · ${t('wizard.maturity')} ${esc(maturity)}${esc(offerNote)}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:13px;font-weight:700;color:#4ade80;">${b.coupon_percent}% <span style="font-size:10px;font-weight:400;color:var(--slate-400);">${freq}</span></div>
-              <div style="font-size:11px;color:var(--slate-400);">${b.lots} ${t('wizard.lotX')} ${fmt(b.purchase_price)} ₽</div>
+              <div style="font-size:13px;font-weight:700;color:#4ade80;">${esc(String(b.coupon_percent))}% <span style="font-size:10px;font-weight:400;color:var(--slate-400);">${esc(freq)}</span></div>
+              <div style="font-size:11px;color:var(--slate-400);">${esc(String(b.lots))} ${t('wizard.lotX')} ${fmt(b.purchase_price)} ₽</div>
               <div style="font-size:12px;color:var(--slate-300);font-weight:600;">${fmt(b.total_cost)} ₽</div>
             </div>
           </div>`;
@@ -3650,6 +3816,20 @@
             };
             nameTd.appendChild(tickerBadge);
           }
+          if (row.face_unit && row.face_unit !== 'SUR') {
+            const fxBadge = document.createElement('span');
+            fxBadge.textContent = ({CNY:'¥ CNY', USD:'$ USD', EUR:'€ EUR', CHF:'₣ CHF'})[row.face_unit] || row.face_unit;
+            fxBadge.title = 'Номинал в ' + row.face_unit;
+            fxBadge.style.cssText = 'display:inline-block;margin-top:3px;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);letter-spacing:.3px;';
+            nameTd.appendChild(fxBadge);
+          }
+          if (row.is_qual) {
+            const qualBadge = document.createElement('span');
+            qualBadge.textContent = 'КИ';
+            qualBadge.title = 'Только для квалифицированных инвесторов';
+            qualBadge.style.cssText = 'display:inline-block;margin-top:3px;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(234,179,8,.15);color:#ca8a04;border:1px solid rgba(234,179,8,.3);letter-spacing:.3px;';
+            nameTd.appendChild(qualBadge);
+          }
           tr.appendChild(nameTd);
 
           tr.appendChild(createRatingCell(row.company_rating));
@@ -3767,7 +3947,7 @@
         sumRow.className = 'summary-row';
 
         // col 1-6 (colspan=6): label
-        const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = 'Итого'; sumRow.appendChild(lbl);
+        const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = t('table.total'); sumRow.appendChild(lbl);
         // col 7: Стоимость
         addCell(sumRow, fmt(roundTo2(summary.totalAssets)) + ' ₽');
         // col 8: Прибыль
@@ -3821,8 +4001,18 @@
       if (typeof ResizeObserver !== 'undefined') {
         const chartCard = document.getElementById('chart-card');
         new ResizeObserver(() => drawMonthlyChart(tableRows)).observe(chartCard);
+        const historyCard = document.getElementById('analytics-history-card');
+        if (historyCard) new ResizeObserver(() => {
+          const c = document.getElementById('analytics-history-chart');
+          if (c && c._snapshots) drawHistoryChart(c, c._snapshots);
+          else if (c) drawHistoryChartEmpty(c, c._emptySnap || null);
+        }).observe(historyCard);
       } else {
-        window.addEventListener('resize', () => drawMonthlyChart(tableRows));
+        window.addEventListener('resize', () => {
+          drawMonthlyChart(tableRows);
+          const c = document.getElementById('analytics-history-chart');
+          if (c && c._snapshots) drawHistoryChart(c, c._snapshots);
+        });
       }
 
       // ── SYNC ─────────────────────────────────────────────────────
@@ -3860,7 +4050,7 @@
         }
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
-        tableRows = payload.items || [];
+        tableRows = (payload.items || []).filter(r => r.is_traded !== false);
         if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
         renderTable();
         scheduleAnalytics();
@@ -4646,7 +4836,7 @@
             guideBtn.innerHTML = '?';
             guideBtn.onmouseover = () => { guideBtn.style.borderColor='var(--blue-500)'; guideBtn.style.background='rgba(96,165,250,.08)'; };
             guideBtn.onmouseout  = () => { guideBtn.style.borderColor='var(--border)'; guideBtn.style.background='transparent'; };
-            guideBtn.onclick = openGuideModal;
+            guideBtn.onclick = () => openGuideModal();
             topbarRight.appendChild(guideBtn);
 
             // Theme toggle button
@@ -5101,14 +5291,14 @@
         const list = document.getElementById('alert-list');
         const statusEl = document.getElementById('alert-modal-status');
         if (!list) return;
-        list.textContent = 'Загрузка...';
+        list.textContent = t('alert.loading');
         try {
           const r = await apiFetch(`/portfolios/${_alertPortfolioId}/instruments/${_alertItemId}/alerts`);
-          if (!r.ok) throw new Error('Ошибка загрузки');
+          if (!r.ok) throw new Error(t('alert.loadError'));
           const data = await r.json();
           list.innerHTML = '';
           if (!data.alerts || data.alerts.length === 0) {
-            list.textContent = 'Нет активных алертов';
+            list.textContent = t('alert.empty');
             return;
           }
           data.alerts.forEach(a => {
@@ -5127,7 +5317,7 @@
             list.appendChild(row);
           });
         } catch (e) {
-          list.textContent = 'Ошибка загрузки алертов';
+          list.textContent = t('alert.loadError');
           if (statusEl) { statusEl.textContent = e.message; statusEl.className = 'status error'; }
         }
       }
@@ -5138,7 +5328,7 @@
         const priceVal = parseFloat(document.getElementById('alert-price').value);
         const statusEl = document.getElementById('alert-modal-status');
         if (!priceVal || priceVal <= 0) {
-          if (statusEl) { statusEl.textContent = 'Введите корректную цену'; statusEl.className = 'status error'; }
+          if (statusEl) { statusEl.textContent = t('alert.priceInvalid'); statusEl.className = 'status error'; }
           return;
         }
         try {
@@ -5149,10 +5339,10 @@
           });
           if (!r.ok) {
             const err = await r.json();
-            throw new Error(err.detail || 'Не удалось создать алерт');
+            throw new Error(err.detail || t('error.prefix'));
           }
           document.getElementById('alert-price').value = '';
-          if (statusEl) { statusEl.textContent = 'Алерт создан'; statusEl.className = 'status'; }
+          if (statusEl) { statusEl.textContent = t('alert.created'); statusEl.className = 'status'; }
           await loadPriceAlerts();
         } catch (e) {
           if (statusEl) { statusEl.textContent = e.message; statusEl.className = 'status error'; }
@@ -5176,7 +5366,7 @@
 
       async function submitDeletePortfolio() {
         if (!portfolioId) {
-          alert(t('modal.deletePortfolio.noPortfolio'));
+          toast(t('modal.deletePortfolio.noPortfolio'), 'warn');
           return;
         }
 
@@ -5232,14 +5422,14 @@
           passwordInput.value = '';
           document.getElementById('share-status').textContent = '';
         } catch (err) {
-          document.getElementById('share-status').textContent = 'Ошибка загрузки данных: ' + err.message;
+          document.getElementById('share-status').textContent = t('share.loading') + ': ' + err.message;
         }
       }
 
       async function applySharePassword() {
         const passwordInput = document.getElementById('share-password-input');
         const statusEl = document.getElementById('share-status');
-        statusEl.textContent = 'Сохранение...';
+        statusEl.textContent = t('share.saving');
         try {
           const payload = { password: passwordInput.value.trim() || null };
           const res = await apiFetch(`/portfolios/${portfolioId}/share`, {
@@ -5249,38 +5439,38 @@
           });
           if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.detail || 'Ошибка сохранения');
+            throw new Error(err.detail || t('error.prefix'));
           }
           const data = await res.json();
           const urlTextarea = document.getElementById('share-url-textarea');
           urlTextarea.value = `${window.location.origin}${data.share_url}`;
           document.getElementById('share-revoke-btn').style.display = 'block';
-          statusEl.textContent = 'Ссылка поделиться создана!';
+          statusEl.textContent = t('share.created');
           setTimeout(() => { statusEl.textContent = ''; }, 3000);
         } catch (err) {
-          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось сохранить');
+          statusEl.textContent = t('error.prefix') + (err.message || '');
           statusEl.style.color = 'var(--red-600)';
         }
       }
 
       async function revokeShare() {
-        if (!confirm('Отозвать доступ к портфелю? Ссылка перестанет работать.')) return;
+        if (!confirm(t('share.revokeConfirm'))) return;
         const statusEl = document.getElementById('share-status');
-        statusEl.textContent = 'Отзыв доступа...';
+        statusEl.textContent = t('share.revoking');
         try {
           const res = await apiFetch(`/portfolios/${portfolioId}/share`, { method: 'DELETE' });
-          if (!res.ok) throw new Error('Ошибка отзыва');
+          if (!res.ok) throw new Error(t('error.prefix'));
           const urlTextarea = document.getElementById('share-url-textarea');
           const passwordInput = document.getElementById('share-password-input');
           const revokeBtn = document.getElementById('share-revoke-btn');
-          urlTextarea.value = 'Портфель более не опубликован.';
+          urlTextarea.value = t('share.notPublishedArea');
           passwordInput.value = '';
           revokeBtn.style.display = 'none';
-          statusEl.textContent = 'Доступ отозван';
+          statusEl.textContent = t('share.revoked');
           statusEl.style.color = 'var(--green-600)';
           setTimeout(() => { statusEl.textContent = ''; }, 3000);
         } catch (err) {
-          statusEl.textContent = 'Ошибка: ' + (err.message || 'Не удалось отозвать доступ');
+          statusEl.textContent = t('error.prefix') + (err.message || '');
           statusEl.style.color = 'var(--red-600)';
         }
       }
@@ -5457,7 +5647,7 @@
           // Revert checkbox on error
           const cb = document.getElementById(`src-toggle-${name}`);
           if (cb) cb.checked = !enabled;
-          alert('Ошибка изменения настройки');
+          toast('Ошибка изменения настройки', 'error');
         }
       }
 
@@ -5528,10 +5718,10 @@
             const tdRole = document.createElement('td');
             const roleSpan = document.createElement('span');
             if (u.is_admin) {
-              roleSpan.textContent = 'Администратор';
+              roleSpan.textContent = t('adm.roleAdmin');
               roleSpan.style.cssText = 'color:#f59e0b;font-weight:600;';
             } else {
-              roleSpan.textContent = 'Пользователь';
+              roleSpan.textContent = t('adm.roleUser');
               roleSpan.style.color = 'var(--slate-400)';
             }
             tdRole.appendChild(roleSpan);
@@ -5540,19 +5730,19 @@
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:4px;justify-content:center;flex-wrap:wrap;';
 
-            const pwdBtn = _mkBtn('Пароль', 'background:var(--blue-600);color:#fff',
+            const pwdBtn = _mkBtn(t('adm.btnPassword'), 'background:var(--blue-600);color:#fff',
               () => adminOpenPwdModal(u.id, u.username));
             div.appendChild(pwdBtn);
 
             if (u.is_admin && !isPrimary) {
-              const demoteBtn = _mkBtn('Снять администратора', 'background:#92400e;color:#fff',
+              const demoteBtn = _mkBtn(t('adm.btnDemote'), 'background:#92400e;color:#fff',
                 function() { adminSetRole(u.id, false, this); });
               div.appendChild(demoteBtn);
             } else if (!u.is_admin) {
-              const promoteBtn = _mkBtn('Сделать администратором', 'background:#d97706;color:#fff',
+              const promoteBtn = _mkBtn(t('adm.btnPromote'), 'background:#d97706;color:#fff',
                 function() { adminSetRole(u.id, true, this); });
               div.appendChild(promoteBtn);
-              const delBtn = _mkBtn('Удалить', 'background:var(--red-600);color:#fff',
+              const delBtn = _mkBtn(t('adm.btnDelete'), 'background:var(--red-600);color:#fff',
                 () => adminDeleteUser(u.id, u.username));
               div.appendChild(delBtn);
             }
@@ -5562,13 +5752,13 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 
       async function adminLoadPortfolios() {
         const tbody = document.getElementById('adm-portfolios-body');
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--slate-400);padding:16px;">${t('adm.loading')}</td></tr>`;
         try {
           const r = await apiFetch('/admin/portfolios');
           const portfolios = await r.json();
@@ -5599,7 +5789,7 @@
               link.href = `/share/${encodeURIComponent(p.share_token)}`;
               link.target = '_blank';
               link.style.cssText = 'color:var(--blue-600);font-size:11px;';
-              link.textContent = 'Открыть';
+              link.textContent = t('adm.openLink');
               tdShared.appendChild(link);
             } else {
               const dash = document.createElement('span');
@@ -5612,7 +5802,7 @@
             tdDate.textContent = p.created_at ? p.created_at.substring(0, 10) : '—';
 
             const tdActions = document.createElement('td');
-            const delBtn = _mkBtn('Удалить', 'background:var(--red-600);color:#fff',
+            const delBtn = _mkBtn(t('adm.btnDelete'), 'background:var(--red-600);color:#fff',
               () => adminDeletePortfolio(p.id, p.name));
             tdActions.appendChild(delBtn);
 
@@ -5620,7 +5810,7 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="7" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 
@@ -5630,14 +5820,14 @@
         document.getElementById('adm-pwd-input').value = '';
         document.getElementById('adm-pwd-status').textContent = '';
         document.getElementById('adm-pwd-modal').querySelector('.modal-title').textContent =
-          `Пароль: ${username}`;
+          t('adm.passwordLabel') + username;
         setTimeout(() => document.getElementById('adm-pwd-input').focus(), 50);
       }
 
       async function adminSubmitPassword() {
         const pwd = document.getElementById('adm-pwd-input').value.trim();
         const status = document.getElementById('adm-pwd-status');
-        if (pwd.length < 6) { status.textContent = 'Минимум 6 символов'; return; }
+        if (pwd.length < 6) { status.textContent = t('adm.pwMinLength'); return; }
         try {
           const r = await apiFetch(`/admin/users/${_admPwdUserId}/password`, {
             method: 'PATCH',
@@ -5646,7 +5836,7 @@
           });
           if (r.ok) {
             document.getElementById('adm-pwd-modal').style.display = 'none';
-            document.getElementById('adm-status').textContent = 'Пароль изменён';
+            document.getElementById('adm-status').textContent = t('adm.pwChanged');
             document.getElementById('adm-status').style.color = 'var(--green-600)';
           } else {
             const e = await r.json();
@@ -5656,8 +5846,8 @@
       }
 
       async function adminSetRole(userId, makeAdmin, btn) {
-        const action = makeAdmin ? 'назначить администратором' : 'снять права администратора';
-        if (!confirm(`Вы уверены, что хотите ${action} для этого пользователя?`)) return;
+        const action = makeAdmin ? t('adm.btnPromote') : t('adm.btnDemote');
+        if (!confirm(t('adm.confirmAction').replace('{action}', action))) return;
         btn.disabled = true;
         try {
           const r = await apiFetch(`/admin/users/${userId}/role`, {
@@ -5669,14 +5859,14 @@
             await adminLoadUsers();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            toast(e.detail || 'Ошибка', 'error');
             btn.disabled = false;
           }
-        } catch(e) { alert('Ошибка сети'); btn.disabled = false; }
+        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); btn.disabled = false; }
       }
 
       async function adminDeleteUser(userId, username) {
-        if (!confirm(`Удалить пользователя «${username}» и все его данные?`)) return;
+        if (!confirm(t('adm.confirmDelete').replace('{username}', username))) return;
         try {
           const r = await apiFetch(`/admin/users/${userId}`, {method: 'DELETE'});
           if (r.ok) {
@@ -5685,13 +5875,13 @@
             await adminLoadStats();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            toast(e.detail || 'Ошибка', 'error');
           }
-        } catch(e) { alert('Ошибка сети'); }
+        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
       }
 
       async function adminDeletePortfolio(portfolioId, name) {
-        if (!confirm(`Удалить портфель «${name}»?`)) return;
+        if (!confirm(t('adm.confirmDeletePort').replace('{name}', name))) return;
         try {
           const r = await apiFetch(`/admin/portfolios/${portfolioId}`, {method: 'DELETE'});
           if (r.ok) {
@@ -5699,9 +5889,9 @@
             await adminLoadStats();
           } else {
             const e = await r.json();
-            alert(e.detail || 'Ошибка');
+            toast(e.detail || 'Ошибка', 'error');
           }
-        } catch(e) { alert('Ошибка сети'); }
+        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
       }
 
       // Show admin panel tab if user is admin
@@ -5899,14 +6089,14 @@
         showConfirm(t('settings.portfolios.mergeTitle'), msg, async () => {
           try {
             const r = await apiFetch(`/portfolios/${sourceId}/merge-into/${targetId}`, { method: 'POST' });
-            if (!r.ok) { alert(t('settings.portfolios.mergeError')); return; }
+            if (!r.ok) { toast(t('settings.portfolios.mergeError'), 'error'); return; }
             await r.json();
             document.getElementById(`sp-row-${sourceId}`)?.remove();
             await loadPortfolios();
             updatePortfolioSelector();
             settingsLoadPortfolios();
             if (portfolioId === sourceId) { portfolioId = targetId; renderTable(); }
-          } catch(e) { alert(t('settings.portfolios.mergeError')); }
+          } catch(e) { toast(t('settings.portfolios.mergeError'), 'error'); }
         });
       }
 
@@ -5923,7 +6113,7 @@
         if (!newName) return;
         try {
           const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName }) });
-          if (!r.ok) { alert('Ошибка сохранения'); return; }
+          if (!r.ok) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); return; }
           document.getElementById(`sp-name-${id}`).textContent = newName;
           document.getElementById(`sp-name-${id}`).style.display = '';
           document.getElementById(`sp-input-${id}`).style.display = 'none';
@@ -5932,7 +6122,7 @@
           // Update portfolio selector
           await loadPortfolios();
           updatePortfolioSelector();
-        } catch(e) { alert('Ошибка сохранения'); }
+        } catch(e) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); }
       }
 
       async function settingsDeletePortfolio(id, name) {
@@ -5940,13 +6130,13 @@
         showConfirm(t('settings.portfolios.deleteTitle'), msg, async () => {
           try {
             const r = await apiFetch(`/portfolios/${id}`, { method: 'DELETE' });
-            if (!r.ok) { alert(t('settings.portfolios.deleteError')); return; }
+            if (!r.ok) { toast(t('settings.portfolios.deleteError'), 'error'); return; }
             document.getElementById(`sp-row-${id}`)?.remove();
             await loadPortfolios();
             updatePortfolioSelector();
             settingsLoadPortfolios();
             if (portfolioId === id) { portfolioId = portfolios[0]?.id || null; renderTable(); }
-          } catch(e) { alert(t('settings.portfolios.deleteError')); }
+          } catch(e) { toast(t('settings.portfolios.deleteError'), 'error'); }
         });
       }
 
@@ -6078,7 +6268,7 @@
         const body = document.getElementById('swot-body');
         if (!body) return;
         if (!rows || rows.length === 0) {
-          body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;grid-column:1/-1;padding:8px 0;">Нет данных для анализа</p>';
+          body.innerHTML = `<p style="color:var(--text-muted);font-size:13px;grid-column:1/-1;padding:8px 0;">${t('swot.noData')}</p>`;
           return;
         }
         // Each fact: { cat, score, text }
@@ -6224,19 +6414,19 @@
           div.style.cssText = `background:${color};border:1px solid ${color.replace('.08','0.18')};border-radius:var(--radius-lg);padding:14px 16px;`;
           div.innerHTML = `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:${accent};margin-bottom:10px;">${arrow} ${title}</div>`;
           if (!items.length) {
-            div.innerHTML += `<p style="font-size:12px;color:var(--text-muted);margin:0;">Нет замечаний</p>`;
+            div.innerHTML += `<p style="font-size:12px;color:var(--text-muted);margin:0;">${t('swot.noIssues')}</p>`;
           } else {
             items.forEach(item => {
               const p = document.createElement('p');
               p.style.cssText = 'margin:0 0 7px;font-size:12px;color:var(--text-secondary);display:flex;gap:6px;align-items:flex-start;line-height:1.45;';
-              p.innerHTML = `<span style="flex-shrink:0;color:${accent};margin-top:1px;">${arrow}</span><span>${item}</span>`;
+              p.innerHTML = `<span style="flex-shrink:0;color:${accent};margin-top:1px;">${arrow}</span><span>${esc(item)}</span>`;
               div.appendChild(p);
             });
           }
           return div;
         };
-        body.appendChild(mkSection('Сильные стороны', strengths, 'rgba(74,222,128,.08)', 'var(--green-400)', '↑'));
-        body.appendChild(mkSection('Зоны риска', weaknesses, 'rgba(248,113,113,.08)', 'var(--red-400)', '↓'));
+        body.appendChild(mkSection(t('swot.strengths'), strengths, 'rgba(74,222,128,.08)', 'var(--green-400)', '↑'));
+        body.appendChild(mkSection(t('swot.risks'), weaknesses, 'rgba(248,113,113,.08)', 'var(--red-400)', '↓'));
       }
 
       // ── PORTFOLIO RECOMMENDATIONS ────────────────────────────────
@@ -6244,10 +6434,10 @@
         const grid = document.getElementById('recommendations-grid');
         if (!grid) return;
         if (!tableRows.length) {
-          grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Добавьте бумаги в портфель для получения рекомендаций</p>';
+          grid.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">${t('rec.empty')}</p>`;
           return;
         }
-        grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Анализ портфеля...</p>';
+        grid.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">${t('rec.loading')}</p>`;
 
         // Analyze portfolio
         const existingTickers = new Set(tableRows.map(r => r.ticker));
@@ -6311,7 +6501,7 @@
         });
 
         if (!cards.length) {
-          grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">Не удалось подобрать рекомендации — портфель уже хорошо диверсифицирован</p>';
+          grid.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">${t('rec.noDiversify')}</p>`;
           return;
         }
 
@@ -6338,11 +6528,11 @@
               <span style="font-size:11px;color:var(--text-muted);">Купон <strong style="color:var(--text-secondary);">${coupon}</strong></span>
               <span style="font-size:11px;color:var(--text-muted);">YTM <strong style="color:var(--text-secondary);">${ytm}</strong></span>
             </div>
-            <div style="font-size:11px;color:var(--blue-400);background:rgba(59,130,246,.08);border-radius:6px;padding:5px 8px;margin-bottom:10px;">${c.rationale}</div>
-            <button onclick="addRecommendedBond('${c.ticker||''}',${c.purchase_price||100})"
+            <div style="font-size:11px;color:var(--blue-400);background:rgba(59,130,246,.08);border-radius:6px;padding:5px 8px;margin-bottom:10px;">${esc(c.rationale)}</div>
+            <button onclick="addRecommendedBond('${esc(c.ticker||'')}',${c.purchase_price||100})"
               style="width:100%;height:28px;font-size:12px;font-weight:600;background:var(--blue-600);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:.15s;"
               onmouseover="this.style.background='var(--blue-700)'" onmouseout="this.style.background='var(--blue-600)'">
-              + Добавить
+              ${t('rec.add')}
             </button>`;
           grid.appendChild(div);
         });
@@ -6430,22 +6620,23 @@
           items.forEach(b => {
             const row = document.createElement('div');
             row.setAttribute('data-ac-item', '1');
-            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;transition:background .1s;';
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;transition:background .1s;border-bottom:1px solid rgba(148,163,184,.08);';
             row.onmouseover = () => { drop.querySelectorAll('[data-ac-item]').forEach(r => r.classList.remove('ac-active')); row.classList.add('ac-active'); };
             const coupon = b.coupon_percent != null ? `${Number(b.coupon_percent).toFixed(1)}%` : '';
             const mat = b.maturity ? b.maturity.substring(0,7) : '';
-            const rating = b.rating ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);">${b.rating}</span>` : '';
+            const rating = b.rating ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.2);">${esc(b.rating)}</span>` : '';
+            const qualBadge = b.is_qual ? `<span title="Только для квалифицированных инвесторов" style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(234,179,8,.15);color:#ca8a04;border:1px solid rgba(234,179,8,.3);">КИ</span>` : '';
             row.innerHTML = `
               <div style="min-width:0;flex:1;">
-                <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
-                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${b.ticker}${mat ? ' · ' + mat : ''}${coupon ? ' · ' + coupon : ''}</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(b.name)}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${esc(b.ticker)}${mat ? ' · ' + esc(mat) : ''}${coupon ? ' · ' + esc(coupon) : ''}</div>
               </div>
-              ${rating}`;
+              ${rating}${qualBadge}`;
             row.addEventListener('click', () => {
               const tickerInput = document.getElementById('add-modal-ticker');
               tickerInput.value = b.ticker;
               tickerInput.style.textTransform = 'uppercase';
-              if (b.price) document.getElementById('add-modal-price').value = b.price;
+              document.getElementById('add-modal-price').value = '';  // auto-fetch current price
               drop.style.display = 'none';
             });
             drop.appendChild(row);
@@ -6455,7 +6646,7 @@
           if (!style) {
             const s = document.createElement('style');
             s.id = '_ac_style';
-            s.textContent = '[data-ac-item].ac-active{background:var(--bg-elevated);}';
+            s.textContent = '[data-ac-item].ac-active{background:rgba(148,163,184,.12)!important;}';
             document.head.appendChild(s);
           }
           drop.style.display = 'block';
@@ -6482,12 +6673,12 @@
             btn.onmouseout  = () => btn.style.borderColor = 'var(--border)';
             const coupon = s.coupon_percent != null ? Number(s.coupon_percent).toFixed(1)+'%' : '';
             const shortName = (s.name || s.ticker || '').substring(0, 22);
-            btn.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shortName}</div><div style="font-size:10px;color:var(--text-muted);">${s.ticker}${coupon ? ' · ' + coupon : ''}</div>`;
+            btn.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(shortName)}</div><div style="font-size:10px;color:var(--text-muted);">${esc(s.ticker)}${coupon ? ' · ' + esc(coupon) : ''}</div>`;
             btn.onclick = () => {
               const inp = document.getElementById('add-modal-ticker');
               inp.value = s.ticker;
               inp.style.textTransform = 'uppercase';
-              document.getElementById('add-modal-price').value = s.purchase_price || 100;
+              document.getElementById('add-modal-price').value = '';  // auto-fetch current price
               document.getElementById('add-modal-autocomplete').style.display = 'none';
             };
             list.appendChild(btn);
@@ -6499,7 +6690,8 @@
         const statusEl = document.getElementById('add-modal-status');
         const ticker = document.getElementById('add-modal-ticker').value.trim().toUpperCase();
         const qty = parseInt(document.getElementById('add-modal-qty').value) || 1;
-        const price = parseFloat(document.getElementById('add-modal-price').value) || 100;
+        const priceRaw = document.getElementById('add-modal-price').value.trim();
+        const price = priceRaw ? parseFloat(priceRaw) : null;
         if (!ticker) { statusEl.textContent = 'Введите тикер'; return; }
         if (!portfolioId) { statusEl.textContent = 'Портфель не выбран'; return; }
         statusEl.textContent = 'Добавление...';
@@ -6847,6 +7039,63 @@
           'watchlist.empty': 'Список наблюдения пуст',
           'instrument.bond': 'Облигация',
           'instrument.stock': 'Акция',
+          'swot.strengths': 'Сильные стороны',
+          'swot.risks': 'Зоны риска',
+          'swot.noIssues': 'Нет замечаний',
+          'swot.noData': 'Нет данных для анализа',
+          'adm.roleAdmin': 'Администратор',
+          'adm.roleUser': 'Пользователь',
+          'adm.btnPassword': 'Пароль',
+          'adm.btnDemote': 'Снять администратора',
+          'adm.btnPromote': 'Сделать администратором',
+          'adm.btnDelete': 'Удалить',
+          'adm.loadError': 'Ошибка загрузки',
+          'adm.loading': 'Загрузка...',
+          'adm.openLink': 'Открыть',
+          'adm.passwordLabel': 'Пароль: ',
+          'adm.confirmDelete': 'Удалить пользователя «{username}» и все его данные?',
+          'adm.confirmAction': 'Вы уверены, что хотите {action} для этого пользователя?',
+          'adm.confirmDeletePort': 'Удалить портфель «{name}»?',
+          'adm.cacheResetError': 'Ошибка сброса кэша',
+          'adm.pwMinLength': 'Минимум 6 символов',
+          'adm.pwChanged': 'Пароль изменён',
+          'adm.netError': 'Ошибка сети',
+          'table.total': 'Итого',
+          'share.loading': 'Ошибка загрузки данных',
+          'share.saving': 'Сохранение...',
+          'share.created': 'Ссылка поделиться создана!',
+          'share.revoking': 'Отзыв доступа...',
+          'share.revoked': 'Доступ отозван',
+          'share.revokeConfirm': 'Отозвать доступ к портфелю? Ссылка перестанет работать.',
+          'share.notPublishedArea': 'Портфель более не опубликован.',
+          'alert.loading': 'Загрузка...',
+          'alert.empty': 'Нет активных алертов',
+          'alert.loadError': 'Ошибка загрузки алертов',
+          'alert.priceInvalid': 'Введите корректную цену',
+          'alert.created': 'Алерт создан',
+          'rec.add': '+ Добавить',
+          'rec.empty': 'Добавьте бумаги в портфель для получения рекомендаций',
+          'rec.loading': 'Анализ портфеля...',
+          'rec.noDiversify': 'Не удалось подобрать рекомендации — портфель уже хорошо диверсифицирован',
+          'wizard.minAmount': 'Минимальная сумма 10 000 ₽',
+          'wizard.analyzing': '🤖 AI подбирает портфель...',
+          'wizard.noResults': 'Нет подходящих инструментов. Попробуйте изменить параметры.',
+          'wizard.error': 'Ошибка подбора. Попробуйте позже.',
+          'wizard.creating': 'Создаём портфель...',
+          'wizard.adding': 'Добавляю бумаги...',
+          'wizard.done': '✓ Портфель готов!',
+          'wizard.addAll': '✓ Добавить всё в портфель',
+          'import.adding': 'Добавляем...',
+          'general.netError': 'Ошибка сети',
+          'general.connError': 'Ошибка соединения',
+          'portfolio.notSelected': 'Портфель не выбран.',
+          'portfolio.adding': 'Добавление...',
+          'portfolio.tickerRequired': 'Введите тикер',
+          'portfolio.addPortfolio': '+ Добавить портфель',
+          'portfolio.createBtn': '+ Создать портфель',
+          'theme.dark': 'Тёмная тема',
+          'theme.light': 'Светлая тема',
+          'guide.title': 'Справочник инвестора',
         },
         en: {
           'nav.analytics': 'Analytics',
@@ -7168,6 +7417,63 @@
           'watchlist.empty': 'Watchlist is empty',
           'instrument.bond': 'Bond',
           'instrument.stock': 'Stock',
+          'swot.strengths': 'Strengths',
+          'swot.risks': 'Risk areas',
+          'swot.noIssues': 'No issues found',
+          'swot.noData': 'No data to analyze',
+          'adm.roleAdmin': 'Administrator',
+          'adm.roleUser': 'User',
+          'adm.btnPassword': 'Password',
+          'adm.btnDemote': 'Remove admin',
+          'adm.btnPromote': 'Make admin',
+          'adm.btnDelete': 'Delete',
+          'adm.loadError': 'Load error',
+          'adm.loading': 'Loading...',
+          'adm.openLink': 'Open',
+          'adm.passwordLabel': 'Password: ',
+          'adm.confirmDelete': 'Delete user «{username}» and all their data?',
+          'adm.confirmAction': 'Are you sure you want to {action} for this user?',
+          'adm.confirmDeletePort': 'Delete portfolio «{name}»?',
+          'adm.cacheResetError': 'Cache reset error',
+          'adm.pwMinLength': 'Minimum 6 characters',
+          'adm.pwChanged': 'Password changed',
+          'adm.netError': 'Network error',
+          'table.total': 'Total',
+          'share.loading': 'Data load error',
+          'share.saving': 'Saving...',
+          'share.created': 'Share link created!',
+          'share.revoking': 'Revoking...',
+          'share.revoked': 'Access revoked',
+          'share.revokeConfirm': 'Revoke portfolio access? The link will stop working.',
+          'share.notPublishedArea': 'Portfolio is no longer published.',
+          'alert.loading': 'Loading...',
+          'alert.empty': 'No active alerts',
+          'alert.loadError': 'Error loading alerts',
+          'alert.priceInvalid': 'Enter a valid price',
+          'alert.created': 'Alert created',
+          'rec.add': '+ Add',
+          'rec.empty': 'Add securities to get recommendations',
+          'rec.loading': 'Analyzing portfolio...',
+          'rec.noDiversify': 'No recommendations found — portfolio is already well diversified',
+          'wizard.minAmount': 'Minimum amount: 10,000 ₽',
+          'wizard.analyzing': '🤖 AI is building your portfolio...',
+          'wizard.noResults': 'No suitable instruments found. Try adjusting the parameters.',
+          'wizard.error': 'Search error. Please try again later.',
+          'wizard.creating': 'Creating portfolio...',
+          'wizard.adding': 'Adding bonds...',
+          'wizard.done': '✓ Portfolio ready!',
+          'wizard.addAll': '✓ Add all to portfolio',
+          'import.adding': 'Adding...',
+          'general.netError': 'Network error',
+          'general.connError': 'Connection error',
+          'portfolio.notSelected': 'No portfolio selected.',
+          'portfolio.adding': 'Adding...',
+          'portfolio.tickerRequired': 'Enter ticker',
+          'portfolio.addPortfolio': '+ Add portfolio',
+          'portfolio.createBtn': '+ Create portfolio',
+          'theme.dark': 'Dark theme',
+          'theme.light': 'Light theme',
+          'guide.title': 'Investor guide',
         },
       };
 
@@ -7221,13 +7527,13 @@
 
       async function obGoStep3() {
         const amount = parseInt(document.getElementById('ob-amount').value) || 100000;
-        if (amount < 10000) { alert('Минимальная сумма 10 000 ₽'); return; }
+        if (amount < 10000) { toast(t('wizard.minAmount'), 'warn'); return; }
         _obAmount = amount;
         document.getElementById('ob-step-2').style.display = 'none';
         document.getElementById('ob-step-3').style.display = '';
         document.getElementById('ob-progress').style.width = '100%';
         const resultEl = document.getElementById('ob-result');
-        resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">🤖 AI подбирает портфель...</div>';
+        resultEl.innerHTML = `<div style="text-align:center;padding:24px;color:#64748b;">${t('wizard.analyzing')}</div>`;
         document.getElementById('ob-add-all').disabled = true;
         try {
           const yieldMid = {ultra_low:9,low:12,moderate:15,elevated:18,high:21}[_obRisk] || 12;
@@ -7246,7 +7552,7 @@
             total_cost: b.total_cost,
           }));
           if (_obSuggested.length === 0) {
-            resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">Нет подходящих инструментов. Попробуйте изменить параметры.</div>';
+            resultEl.innerHTML = `<div style="text-align:center;padding:24px;color:#64748b;">${t('wizard.noResults')}</div>`;
             return;
           }
           resultEl.innerHTML = '';
@@ -7275,7 +7581,7 @@
           });
           document.getElementById('ob-add-all').disabled = false;
         } catch(e) {
-          resultEl.innerHTML = '<div style="text-align:center;padding:24px;color:#f87171;">Ошибка подбора. Попробуйте позже.</div>';
+          resultEl.innerHTML = `<div style="text-align:center;padding:24px;color:#f87171;">${t('wizard.error')}</div>`;
         }
       }
 
@@ -7283,7 +7589,7 @@
         if (!_obSuggested.length) return;
         const btn = document.getElementById('ob-add-all');
         btn.disabled = true;
-        btn.textContent = 'Создаём портфель...';
+        btn.textContent = t('wizard.creating');
         try {
           // If user has no portfolio yet — create one named after risk level
           let targetPortfolioId = portfolioId;
@@ -7300,7 +7606,7 @@
             targetPortfolioId = portData.id;
           }
 
-          btn.textContent = 'Добавляю бумаги...';
+          btn.textContent = t('wizard.adding');
           const payloads = _obSuggested.map(item => ({
             ticker: item.ticker,
             instrument_type: item.instrument_type,
@@ -7314,7 +7620,7 @@
           });
 
           // Success celebration
-          btn.textContent = '✓ Портфель готов!';
+          btn.textContent = t('wizard.done');
           btn.style.background = 'var(--green-600)';
           const overlay = document.getElementById('onboarding-overlay');
           if (overlay) {
@@ -7339,7 +7645,7 @@
         } catch(e) {
           btn.disabled = false;
           btn.textContent = '✓ Добавить всё в портфель';
-          alert('Ошибка добавления. Попробуйте ещё раз.');
+          toast(t('err.addFailed') || 'Ошибка добавления. Попробуйте ещё раз.', 'error');
         }
       }
 
@@ -7508,10 +7814,21 @@
       }
 
       // Hotkey R — manual refresh
+      // Hotkey Escape — close open modals
       document.addEventListener('keydown', e => {
         if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey
           && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
           if (typeof manualRefresh === 'function') manualRefresh();
+        }
+        if (e.key === 'Escape') {
+          // Close any open modal-overlay
+          const openModal = document.querySelector('.modal-overlay[style*="flex"],.modal-overlay:not([style*="none"])');
+          if (openModal) {
+            // Find close button and click it if exists
+            const closeBtn = openModal.querySelector('.modal-close, [onclick*="close"], [data-close-modal]');
+            if (closeBtn) closeBtn.click();
+            else openModal.style.display = 'none';
+          }
         }
       });
 
@@ -7720,7 +8037,9 @@
         const modal = document.getElementById('guide-modal');
         modal.style.display = 'flex';
         setTimeout(() => modal.classList.add('show'), 10);
-        switchGuideTab(startTab || 'basics');
+        const validTab = typeof startTab === 'string' ? startTab : null;
+        const lastTab = sessionStorage.getItem('guideTab') || 'basics';
+        switchGuideTab(validTab || lastTab);
         document.body.style.overflow = 'hidden';
       }
 
@@ -7731,6 +8050,7 @@
       }
 
       function switchGuideTab(tab) {
+        sessionStorage.setItem('guideTab', tab);
         document.querySelectorAll('.guide-tab').forEach(b => {
           b.classList.toggle('active', b.dataset.tab === tab);
         });

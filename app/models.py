@@ -44,6 +44,8 @@ class InstrumentMetrics(BaseModel):
     profit: float
     weight: float
     company_rating: str | None = None
+    is_qual: bool = False
+    is_traded: bool = True
     coupon: float | None = None
     coupon_period: int | None = None
     coupon_rate: float | None = None  # Ставка купона в % от номинала
@@ -57,6 +59,7 @@ class InstrumentMetrics(BaseModel):
     aci: float | None = None
     market_yield: float | None = None
     dividend_yield: float | None = None
+    face_unit: str | None = None  # Валюта номинала (SUR, CNY, USD, EUR, CHF)
     ai_comment: str
 
 
@@ -83,6 +86,10 @@ class BondSnapshot(BaseModel):
     aci: float | None = None
     market_yield: float | None = None
     company_rating: str | None = None
+    is_qual: bool = False
+    is_traded: bool = True
+    face_unit: str = "SUR"  # Валюта номинала (SUR=RUB, CNY, USD, EUR, CHF)
+    fx_rate: float = 1.0    # Курс валюты к рублю (1.0 для рублёвых)
 
 
 class StockSnapshot(BaseModel):

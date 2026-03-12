@@ -111,6 +111,30 @@ async def delete_instrument(
     return {"deleted": True}
 
 
+@router.get("/portfolios/{portfolio_id}/instruments/deleted")
+async def get_deleted_instruments(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> list[dict]:
+    """Get soft-deleted instruments for recovery."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    return storage_service.get_deleted_items(portfolio_id)
+
+
+@router.post("/portfolios/{portfolio_id}/instruments/{item_id}/restore")
+async def restore_instrument(
+    portfolio_id: int,
+    item_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict[str, bool]:
+    """Restore a soft-deleted instrument."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    restored = storage_service.restore_item(item_id, portfolio_id)
+    if not restored:
+        raise HTTPException(status_code=404, detail="Удалённая строка не найдена")
+    return {"restored": True}
+
+
 @router.patch("/portfolios/{portfolio_id}/instruments/{item_id}")
 async def update_instrument(
     portfolio_id: int,
