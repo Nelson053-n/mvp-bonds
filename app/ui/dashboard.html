@@ -1242,6 +1242,13 @@
                     <option value="en" data-i18n="settings.notif.langEn">English</option>
                   </select>
                 </div>
+                <div style="border-top:1px solid var(--card-border);padding-top:14px;margin-top:2px;">
+                  <div class="field">
+                    <label for="ym-counter" data-i18n="settings.notif.ymCounter">ID счётчика Яндекс.Метрики</label>
+                    <input id="ym-counter" type="text" class="input" placeholder="12345678" style="max-width:200px;" />
+                    <span style="font-size:11px;color:var(--text-muted);" data-i18n="settings.notif.ymHint">Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.</span>
+                  </div>
+                </div>
                 <div class="notif-actions">
                   <button class="btn" id="notif-save-btn" data-i18n="btn.save">Сохранить</button>
                   <button class="btn btn-secondary" id="notif-test-btn" data-i18n="settings.notif.test">Тест уведомления</button>
@@ -4193,6 +4200,7 @@
       const tgChatInput   = document.getElementById('tg-chat');
       const tgThreshInput = document.getElementById('tg-threshold');
       const tgLangSelect  = document.getElementById('tg-lang');
+      const ymCounterInput = document.getElementById('ym-counter');
       async function loadNotifSettings() {
         if (!_currentUserIsAdmin) return;
         try {
@@ -4203,6 +4211,7 @@
           tgChatInput.value   = s.tg_chat_id   || '';
           tgThreshInput.value = s.price_drop_threshold ?? 5;
           if (tgLangSelect && s.tg_lang) tgLangSelect.value = s.tg_lang;
+          if (ymCounterInput) ymCounterInput.value = s.ym_counter_id || '';
         } catch {}
       }
       document.getElementById('notif-save-btn').addEventListener('click', async () => {
@@ -4210,10 +4219,13 @@
         try {
           const r = await apiFetch('/settings/notifications', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru', ym_counter_id: ymCounterInput?.value.trim() || '' }),
           });
           if (!r.ok) throw new Error(t('settings.notif.saveError'));
           setStatus(notifStatusEl, t('settings.notif.saved'));
+          // Apply new YM counter immediately
+          const newYmId = Number(ymCounterInput?.value.trim()) || 0;
+          if (newYmId && newYmId !== window._ymId) { window._ymId = newYmId; }
         } catch (err) { setStatus(notifStatusEl, err.message, true); }
       });
       document.getElementById('notif-test-btn').addEventListener('click', async () => {
@@ -4221,7 +4233,7 @@
         try {
           const r = await apiFetch('/settings/notifications/test', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru', ym_counter_id: ymCounterInput?.value.trim() || '' }),
           });
           const res = await r.json();
           if (!r.ok || !res.success) throw new Error(t('settings.notif.sendError'));
@@ -7139,6 +7151,8 @@
           'settings.notif.lang': 'Язык уведомлений',
           'settings.notif.langRu': 'Русский',
           'settings.notif.langEn': 'English',
+          'settings.notif.ymCounter': 'ID счётчика Яндекс.Метрики',
+          'settings.notif.ymHint': 'Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.',
           'settings.portfolios.shareBtn': 'Поделиться',
           'settings.portfolios.deleteBtn': 'Удалить',
           'settings.portfolios.deleteTitle': 'Удалить портфель',
@@ -7541,6 +7555,8 @@
           'settings.notif.lang': 'Notification language',
           'settings.notif.langRu': 'Russian',
           'settings.notif.langEn': 'English',
+          'settings.notif.ymCounter': 'Yandex.Metrika counter ID',
+          'settings.notif.ymHint': 'From <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Applied to landing and dashboard.',
           'settings.portfolios.shareBtn': 'Share',
           'settings.portfolios.deleteBtn': 'Delete',
           'settings.portfolios.deleteTitle': 'Delete portfolio',
@@ -8406,20 +8422,20 @@
       })();
 
     </script>
-    <!-- Yandex.Metrika counter — замените 0 на реальный ID счётчика -->
+    <!-- Yandex.Metrika counter — ID загружается из настроек администратора -->
     <script type="text/javascript">
-      window._ymId = 0; // TODO: заменить на реальный ID из https://metrika.yandex.ru
-      if (window._ymId) {
-        (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-        m[i].l=1*new Date();
-        for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
-        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-        (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-        ym(window._ymId, "init", {
-          clickmap:true,
-          trackLinks:true,
-          accurateTrackBounce:true,
-          webvisor:true
-        });
-      }
+      window._ymId = 0;
+      (function() {
+        fetch('/settings/ym-counter').then(function(r) { return r.json(); }).then(function(d) {
+          var id = Number(d.ym_counter_id) || 0;
+          if (!id) return;
+          window._ymId = id;
+          (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+          (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+          ym(id, "init", { clickmap:true, trackLinks:true, accurateTrackBounce:true, webvisor:true });
+        }).catch(function() {});
+      })();
     </script>
