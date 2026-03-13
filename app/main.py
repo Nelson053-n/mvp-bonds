@@ -31,6 +31,8 @@ _ui_dir = Path(__file__).parent / "ui"
 dashboard_path = _ui_dir / "dashboard.html"
 landing_path = _ui_dir / "landing.html"
 share_error_path = _ui_dir / "share_error.html"
+privacy_path = _ui_dir / "privacy.html"
+terms_path = _ui_dir / "terms.html"
 
 _NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -47,11 +49,11 @@ _SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://mc.yandex.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data:; "
-        "connect-src 'self'; "
+        "img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com; "
+        "connect-src 'self' https://mc.yandex.ru https://mc.yandex.com; "
         "frame-ancestors 'none';"
     ),
 }
@@ -313,6 +315,16 @@ async def sitemap_xml():
         "    <changefreq>weekly</changefreq>\n"
         "    <priority>1.0</priority>\n"
         "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/privacy</loc>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.3</priority>\n"
+        "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/terms</loc>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.3</priority>\n"
+        "  </url>\n"
         "</urlset>\n"
     )
     return Response(content, media_type="application/xml")
@@ -348,6 +360,26 @@ async def icon_512():
     )
 
 
+@app.get("/favicon-32.png")
+async def favicon_32():
+    path = _ui_dir / "favicon-32.png"
+    return Response(
+        path.read_bytes(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/apple-touch-icon.png")
+async def apple_touch_icon():
+    path = _ui_dir / "apple-touch-icon.png"
+    return Response(
+        path.read_bytes(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/sw.js")
 async def service_worker():
     path = _ui_dir / "sw.js"
@@ -362,6 +394,22 @@ async def service_worker():
 async def root() -> HTMLResponse:
     return HTMLResponse(
         landing_path.read_text(encoding="utf-8"),
+        headers=_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy() -> HTMLResponse:
+    return HTMLResponse(
+        privacy_path.read_text(encoding="utf-8"),
+        headers=_NO_CACHE_HEADERS,
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms() -> HTMLResponse:
+    return HTMLResponse(
+        terms_path.read_text(encoding="utf-8"),
         headers=_NO_CACHE_HEADERS,
     )
 

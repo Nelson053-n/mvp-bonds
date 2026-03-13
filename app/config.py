@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
-    max_portfolios_per_user: int = 10
+    max_portfolios_per_user: int = 3
     max_items_per_portfolio: int = 200
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
