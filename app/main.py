@@ -3,10 +3,8 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-import time
 
-import bcrypt
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.api.auth import router as auth_router
@@ -17,10 +15,13 @@ from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
 from app.api.admin import router as admin_router
 from app.api.tbank import router as tbank_router
+from app.api.waitlist import router as waitlist_router
 from app.api.watchlist import router as watchlist_router
+from app.api.deps import get_shared_portfolio
 from app.services.cache_service import cache_service
 from app.services.storage_service import storage_service
 from app.services.portfolio_service import portfolio_service
+from app.services.rating_utils import rating_worsened
 from app.logging_config import setup_logging
 
 
@@ -31,8 +32,6 @@ _ui_dir = Path(__file__).parent / "ui"
 dashboard_path = _ui_dir / "dashboard.html"
 landing_path = _ui_dir / "landing.html"
 share_error_path = _ui_dir / "share_error.html"
-privacy_path = _ui_dir / "privacy.html"
-terms_path = _ui_dir / "terms.html"
 not_found_path = _ui_dir / "404.html"
 
 _NO_CACHE_HEADERS = {
@@ -59,6 +58,42 @@ _SECURITY_HEADERS = {
     ),
 }
 
+# ── Static file serving config ──────────────────────────────────────────────
+# Maps URL path → (filename, media_type, cache_header).
+# Binary files use read_bytes(); text files use read_text().
+
+_STATIC_CACHE = "public, max-age=86400"
+_NO_CACHE = "no-cache, no-store"
+
+_STATIC_FILES: dict[str, tuple[str, str, str]] = {
+    "/manifest.json":       ("manifest.json",       "application/manifest+json", _STATIC_CACHE),
+    "/og-image.png":        ("og-image.png",        "image/png",                 _STATIC_CACHE),
+    "/icon-192.png":        ("icon-192.png",        "image/png",                 _STATIC_CACHE),
+    "/icon-512.png":        ("icon-512.png",        "image/png",                 _STATIC_CACHE),
+    "/favicon-32.png":      ("favicon-32.png",      "image/png",                 _STATIC_CACHE),
+    "/favicon.ico":         ("favicon-32.png",      "image/png",                 _STATIC_CACHE),
+    "/apple-touch-icon.png":("apple-touch-icon.png","image/png",                 _STATIC_CACHE),
+    "/sw.js":               ("sw.js",               "application/javascript",    _NO_CACHE),
+}
+
+_TEXT_TYPES = {"application/manifest+json", "application/javascript"}
+
+
+def _register_static_routes(application: FastAPI) -> None:
+    """Register all static file routes from _STATIC_FILES config."""
+    for url_path, (filename, media_type, cache) in _STATIC_FILES.items():
+        file_path = _ui_dir / filename
+
+        def _make_handler(fp: Path = file_path, mt: str = media_type, ch: str = cache):
+            async def handler():
+                content = fp.read_text(encoding="utf-8") if mt in _TEXT_TYPES else fp.read_bytes()
+                return Response(content, media_type=mt, headers={"Cache-Control": ch})
+            return handler
+
+        application.get(url_path)(_make_handler())
+
+
+# ── Background tasks ────────────────────────────────────────────────────────
 
 async def _cleanup_shares_loop():
     while True:
@@ -73,7 +108,6 @@ async def _snapshot_loop():
     """Save daily portfolio snapshots for all portfolios."""
     from datetime import datetime, timezone
     while True:
-        # Run once per day at ~00:05 UTC
         now = datetime.now(timezone.utc)
         seconds_until_midnight = (24*3600) - (now.hour*3600 + now.minute*60 + now.second) + 300
         await asyncio.sleep(seconds_until_midnight % (24*3600) or 24*3600)
@@ -102,34 +136,8 @@ async def _notification_loop():
             pass
 
 
-_RATING_ORDER = [
-    "AAA", "AA+", "AA", "AA-", "A+", "A", "A-",
-    "BBB+", "BBB", "BBB-", "BB+", "BB", "BB-",
-    "B+", "B", "B-", "CCC+", "CCC", "CCC-", "CC", "C", "D",
-]
-
-
-def _rating_rank(r: str | None) -> int:
-    """Lower rank = better rating. None → 999 (unknown)."""
-    if r is None:
-        return 999
-    return _RATING_ORDER.index(r) if r in _RATING_ORDER else 998
-
-
-def _rating_worsened(prev: str | None, curr: str | None) -> bool:
-    """Return True if curr is strictly worse than prev."""
-    return _rating_rank(curr) > _rating_rank(prev)
-
-
 async def _rating_refresh_loop():
-    """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC.
-
-    Logic per ticker:
-    - Fetch SmartLab and MOEX ratings independently.
-    - If SmartLab rating differs from MOEX → use SmartLab (more up-to-date), save to history.
-    - If SmartLab rating worsened twice in a row → send Telegram alert.
-    - Update portfolio_items with the best available rating.
-    """
+    """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC."""
     from datetime import datetime, timezone
     from app.services.moex_service import moex_service
     from app.services.notification_service import notification_service
@@ -144,7 +152,6 @@ async def _rating_refresh_loop():
             items = storage_service.get_all_portfolio_items_for_rating()
             sem = asyncio.Semaphore(3)
 
-            # Load TG settings once
             s = storage_service.get_all_settings()
             tg_token = s.get("tg_bot_token", "")
             tg_chat_id = s.get("tg_chat_id", "")
@@ -159,20 +166,16 @@ async def _rating_refresh_loop():
                         return
 
                 sl_rating = result["smartlab"]
-                moex_rating = result["moex"]
                 best_rating = result["best"]
 
-                # Save SmartLab rating to history if available
                 if sl_rating is not None:
                     storage_service.save_rating_history(ticker, sl_rating, "smartlab")
 
-                    # Check double downgrade on SmartLab
                     history = storage_service.get_recent_rating_history(ticker, "smartlab", limit=3)
-                    # history[0] = newest (current), history[1] = previous, history[2] = one before
                     if (
                         len(history) >= 3
-                        and _rating_worsened(history[2], history[1])
-                        and _rating_worsened(history[1], history[0])
+                        and rating_worsened(history[2], history[1])
+                        and rating_worsened(history[1], history[0])
                         and tg_token and tg_chat_id
                     ):
                         msg = (
@@ -184,7 +187,6 @@ async def _rating_refresh_loop():
                         await notification_service.send_telegram(tg_token, tg_chat_id, msg)
                         logger.warning("Double downgrade alert sent for %s", ticker)
 
-                # Update DB if we got a best rating
                 if best_rating is not None:
                     storage_service.update_rating_all_items_for_ticker(ticker, best_rating)
 
@@ -195,10 +197,7 @@ async def _rating_refresh_loop():
 
 
 def _backup_db_on_startup() -> None:
-    """Create a rolling backup of the SQLite database on startup.
-
-    Keeps up to 3 dated backups in data/backups/.
-    """
+    """Create a rolling backup of the SQLite database on startup. Keeps 3 most recent."""
     import shutil
     from datetime import datetime, timezone
 
@@ -212,7 +211,6 @@ def _backup_db_on_startup() -> None:
     try:
         shutil.copy2(db_path, dst)
         logger.info("DB backup created: %s", dst)
-        # Keep only the 3 most recent backups
         backups = sorted(backup_dir.glob("portfolio_*.db"))
         for old in backups[:-3]:
             old.unlink()
@@ -221,9 +219,10 @@ def _backup_db_on_startup() -> None:
         logger.exception("Failed to create DB backup")
 
 
+# ── Application ─────────────────────────────────────────────────────────────
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create DB backup, then start background tasks
     logger.info("Starting up application")
     _backup_db_on_startup()
     cache_service.start_background()
@@ -232,7 +231,6 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_notification_loop())
     asyncio.create_task(_rating_refresh_loop())
     yield
-    # Shutdown
     logger.info("Shutting down application")
     cache_service.stop_background()
     try:
@@ -249,12 +247,19 @@ app = FastAPI(
 )
 
 
+# ── Exception handlers ──────────────────────────────────────────────────────
+
+_API_PREFIXES = (
+    "/auth/", "/bonds/", "/portfolios/", "/pdf/",
+    "/settings/", "/admin/", "/watchlist/", "/tbank/",
+    "/health", "/api-info",
+)
+
+
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
     """Return HTML 404 for browser requests, JSON 404 for API requests."""
-    if request.url.path.startswith(("/auth/", "/bonds/", "/portfolios/", "/pdf/",
-                                     "/settings/", "/admin/", "/watchlist/", "/tbank/",
-                                     "/health", "/api-info")):
+    if request.url.path.startswith(_API_PREFIXES):
         return JSONResponse(status_code=404, content={"detail": getattr(exc, "detail", "Not found")})
     return HTMLResponse(not_found_path.read_text(encoding="utf-8"), status_code=404)
 
@@ -265,6 +270,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+# ── Middleware ───────────────────────────────────────────────────────────────
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next) -> Response:
     response = await call_next(request)
@@ -272,6 +279,8 @@ async def add_security_headers(request: Request, call_next) -> Response:
         response.headers[header] = value
     return response
 
+
+# ── Routers ─────────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
 app.include_router(bonds_router)
@@ -281,18 +290,14 @@ app.include_router(portfolio_router)
 app.include_router(settings_router)
 app.include_router(admin_router)
 app.include_router(tbank_router)
+app.include_router(waitlist_router)
 app.include_router(watchlist_router)
 
+# Register all static file routes (favicon, icons, manifest, sw.js)
+_register_static_routes(app)
 
-@app.get("/manifest.json")
-async def manifest():
-    path = _ui_dir / "manifest.json"
-    return Response(
-        path.read_text(encoding="utf-8"),
-        media_type="application/manifest+json",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
 
+# ── SEO / text routes ───────────────────────────────────────────────────────
 
 @app.get("/robots.txt")
 async def robots_txt():
@@ -340,116 +345,25 @@ async def sitemap_xml():
     return Response(content, media_type="application/xml")
 
 
-@app.get("/og-image.png")
-async def og_image():
-    path = _ui_dir / "og-image.png"
-    return Response(
-        path.read_bytes(),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
+# ── HTML pages ──────────────────────────────────────────────────────────────
+
+_HTML_PAGES: dict[str, Path] = {
+    "/":        landing_path,
+    "/landing": landing_path,
+    "/privacy": _ui_dir / "privacy.html",
+    "/terms":   _ui_dir / "terms.html",
+    "/app":     dashboard_path,
+}
+
+for _page_url, _page_path in _HTML_PAGES.items():
+    def _make_page_handler(fp: Path = _page_path):
+        async def handler() -> HTMLResponse:
+            return HTMLResponse(fp.read_text(encoding="utf-8"), headers=_NO_CACHE_HEADERS)
+        return handler
+    app.get(_page_url, response_class=HTMLResponse)(_make_page_handler())
 
 
-@app.get("/icon-192.png")
-async def icon_192():
-    path = _ui_dir / "icon-192.png"
-    return Response(
-        path.read_bytes(),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-@app.get("/icon-512.png")
-async def icon_512():
-    path = _ui_dir / "icon-512.png"
-    return Response(
-        path.read_bytes(),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-@app.get("/favicon-32.png")
-async def favicon_32():
-    path = _ui_dir / "favicon-32.png"
-    return Response(
-        path.read_bytes(),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-@app.get("/apple-touch-icon.png")
-async def apple_touch_icon():
-    path = _ui_dir / "apple-touch-icon.png"
-    return Response(
-        path.read_bytes(),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
-
-
-@app.get("/sw.js")
-async def service_worker():
-    path = _ui_dir / "sw.js"
-    return Response(
-        path.read_text(encoding="utf-8"),
-        media_type="application/javascript",
-        headers={"Cache-Control": "no-cache, no-store"},
-    )
-
-
-@app.get("/", response_class=HTMLResponse)
-async def root() -> HTMLResponse:
-    return HTMLResponse(
-        landing_path.read_text(encoding="utf-8"),
-        headers=_NO_CACHE_HEADERS,
-    )
-
-
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy() -> HTMLResponse:
-    return HTMLResponse(
-        privacy_path.read_text(encoding="utf-8"),
-        headers=_NO_CACHE_HEADERS,
-    )
-
-
-@app.get("/terms", response_class=HTMLResponse)
-async def terms() -> HTMLResponse:
-    return HTMLResponse(
-        terms_path.read_text(encoding="utf-8"),
-        headers=_NO_CACHE_HEADERS,
-    )
-
-
-@app.get("/app", response_class=HTMLResponse)
-async def dashboard() -> HTMLResponse:
-    return HTMLResponse(
-        dashboard_path.read_text(encoding="utf-8"),
-        headers=_NO_CACHE_HEADERS,
-    )
-
-
-@app.get("/landing", response_class=HTMLResponse)
-async def landing() -> HTMLResponse:
-    """Kept for backwards compatibility — redirects to /."""
-    return HTMLResponse(
-        landing_path.read_text(encoding="utf-8"),
-        headers=_NO_CACHE_HEADERS,
-    )
-
-
-@app.get("/api-info")
-async def api_info() -> dict[str, str]:
-    return {
-        "service": "MVP LLM Portfolio API",
-        "docs": "/docs",
-        "health": "/health",
-        "dashboard": "/",
-    }
-
+# ── Share endpoints ─────────────────────────────────────────────────────────
 
 @app.get("/share/{share_token}", response_class=HTMLResponse)
 async def view_shared_portfolio(share_token: str) -> HTMLResponse:
@@ -461,7 +375,6 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
             status_code=404,
         )
 
-    # Inject share token via json.dumps to prevent XSS
     html = dashboard_path.read_text(encoding="utf-8")
     html = html.replace(
         "<!-- __SHARE_INJECT__ -->",
@@ -473,75 +386,36 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
 
 @app.get("/share/{share_token}/table")
 async def get_shared_portfolio_table(
-    share_token: str,
-    x_share_password: str | None = Header(None),
+    portfolio: dict = Depends(get_shared_portfolio),
 ) -> dict:
-    """View a shared portfolio (public endpoint, no auth required)."""
-    portfolio = storage_service.get_portfolio_by_share_token(share_token)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
-    if portfolio.get("share_expires_at") and portfolio["share_expires_at"] < int(time.time()):
-        raise HTTPException(status_code=404, detail="Ссылка устарела")
-
-    if portfolio["share_password_hash"]:
-        if not x_share_password:
-            raise HTTPException(status_code=403, detail="Требуется пароль")
-        if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
-            raise HTTPException(status_code=403, detail="Неверный пароль")
-
+    """Shared portfolio table (public, no auth)."""
     rows = await portfolio_service.get_table(portfolio["id"])
     return {"items": rows}
 
 
 @app.get("/share/{share_token}/snapshots")
 async def get_shared_portfolio_snapshots(
-    share_token: str,
     days: int = 90,
-    x_share_password: str | None = Header(None),
+    portfolio: dict = Depends(get_shared_portfolio),
 ) -> list[dict]:
-    """Portfolio value history for shared view (public, no auth required)."""
-    portfolio = storage_service.get_portfolio_by_share_token(share_token)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
-    if portfolio.get("share_expires_at") and portfolio["share_expires_at"] < int(time.time()):
-        raise HTTPException(status_code=404, detail="Ссылка устарела")
-
-    if portfolio["share_password_hash"]:
-        if not x_share_password:
-            raise HTTPException(status_code=403, detail="Требуется пароль")
-        if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
-            raise HTTPException(status_code=403, detail="Неверный пароль")
-
+    """Portfolio value history for shared view (public, no auth)."""
     if days not in (30, 90, 365):
         days = 90
     return storage_service.get_portfolio_snapshots(portfolio["id"], days)
 
 
+# ── Utility endpoints ───────────────────────────────────────────────────────
+
+@app.get("/api-info")
+async def api_info() -> dict[str, str]:
+    return {
+        "service": "MVP LLM Portfolio API",
+        "docs": "/docs",
+        "health": "/health",
+        "dashboard": "/",
+    }
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
-
-
-@app.post("/waitlist")
-async def join_waitlist(request: Request):
-    """Public endpoint: add email to Pro waitlist."""
-    import re as _re
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse(status_code=400, content={"detail": "Неверный формат запроса"})
-
-    email = (body.get("email") or "").strip().lower()
-    if not email or not _re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
-        return JSONResponse(status_code=422, content={"detail": "Укажите корректный email"})
-    if len(email) > 254:
-        return JSONResponse(status_code=422, content={"detail": "Email слишком длинный"})
-
-    try:
-        storage_service.add_waitlist_email(email)
-    except Exception:
-        return JSONResponse(status_code=200, content={"ok": True, "message": "Вы уже в списке ожидания!"})
-
-    return JSONResponse(status_code=201, content={"ok": True, "message": "Вы в списке ожидания!"})

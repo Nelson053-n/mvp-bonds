@@ -2,7 +2,10 @@
 FastAPI dependencies for authentication and portfolio access.
 """
 
-from fastapi import Depends, HTTPException, Request, status
+import time
+
+import bcrypt
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.services.auth_service import auth_service
@@ -64,5 +67,29 @@ async def get_portfolio_or_403(portfolio_id: int, current_user: dict) -> dict:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Доступ запрещен",
         )
+
+    return portfolio
+
+
+def get_shared_portfolio(
+    share_token: str,
+    x_share_password: str | None = Header(None),
+) -> dict:
+    """Validate shared portfolio token, expiry, and password.
+
+    Reusable dependency for all /share/{token}/... endpoints.
+    """
+    portfolio = storage_service.get_portfolio_by_share_token(share_token)
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Портфель не найден")
+
+    if portfolio.get("share_expires_at") and portfolio["share_expires_at"] < int(time.time()):
+        raise HTTPException(status_code=404, detail="Ссылка устарела")
+
+    if portfolio["share_password_hash"]:
+        if not x_share_password:
+            raise HTTPException(status_code=403, detail="Требуется пароль")
+        if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
+            raise HTTPException(status_code=403, detail="Неверный пароль")
 
     return portfolio
