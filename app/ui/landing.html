@@ -606,6 +606,111 @@
     .step-card h4 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
     .step-card p  { font-size: 13px; color: var(--slate-500); line-height: 1.65; }
 
+    /* ─── COMPARISON ───────────────────────────────────────── */
+    .comparison-section {
+      background: rgba(255,255,255,.012);
+      border-top: 1px solid rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+    }
+    .comparison-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 1px;
+      background: rgba(148,163,184,.07);
+      border: 1px solid rgba(148,163,184,.07);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      max-width: 900px;
+      margin: 0 auto;
+      min-width: 600px;
+    }
+    .comp-header {
+      background: rgba(255,255,255,.04);
+      padding: 16px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-400);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      text-align: center;
+    }
+    .comp-header.comp-feature { text-align: left; }
+    .comp-header.comp-hl {
+      background: rgba(37,99,235,.1);
+      color: var(--blue-400);
+    }
+    .comp-cell {
+      background: rgba(2,8,23,.85);
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--slate-500);
+      text-align: center;
+    }
+    .comp-cell.comp-feature {
+      text-align: left;
+      font-weight: 600;
+      color: var(--slate-300);
+    }
+    .comp-cell.comp-hl { background: rgba(37,99,235,.04); }
+    .comp-no { color: var(--slate-600); }
+    .comp-partial { color: var(--slate-400); }
+    .comp-yes { color: #4ade80; font-weight: 600; }
+    .comp-free { color: var(--blue-400); font-weight: 700; }
+
+    /* ─── TRUST STATS ──────────────────────────────────────── */
+    .trust-section { padding: 80px 24px; position: relative; z-index: 1; }
+    .trust-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .trust-stat {
+      text-align: center;
+      padding: 40px 20px;
+      position: relative;
+    }
+    .trust-stat::after {
+      content: '';
+      position: absolute;
+      top: 20%; bottom: 20%; right: 0;
+      width: 1px;
+      background: rgba(148,163,184,.1);
+    }
+    .trust-stat:last-child::after { display: none; }
+    .trust-stat-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .trust-stat-num {
+      font-size: clamp(28px, 3.5vw, 40px);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -1px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .trust-stat-grad {
+      background: linear-gradient(135deg, var(--blue-400), #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .trust-stat-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--slate-400);
+      margin-bottom: 6px;
+    }
+    .trust-stat-sub {
+      font-size: 12px;
+      color: var(--slate-600);
+      line-height: 1.5;
+    }
+
     /* ─── PRICING ───────────────────────────────────────────── */
     .pricing-section {
       background: rgba(255,255,255,.012);
@@ -1014,6 +1119,10 @@
       .ai-steps-grid { grid-template-columns: 1fr 1fr; gap: 32px 0; }
       .ai-steps-grid::before { display: none; }
       .ai-step-arrow { display: none; }
+      .comparison-grid { min-width: 560px; }
+      .comp-cell, .comp-header { padding: 12px 10px; font-size: 12px; }
+      .trust-stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .trust-stat:nth-child(2)::after { display: none; }
     }
     @media (max-width: 640px) {
       .topbar { padding: 0 16px; }
@@ -1028,6 +1137,7 @@
       .faq-a-inner { padding: 0 18px 16px; }
       .faq-q-text { font-size: 14px; }
       .disclaimer-inner { flex-direction: column; gap: 10px; }
+      .trust-stat { padding: 28px 12px; }
     }
     @media (max-width: 420px) {
       .demo-kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -1333,6 +1443,55 @@
     </div>
   </section>
 
+  <!-- ═══ COMPARISON ════════════════════════════════════════ -->
+  <section class="comparison-section">
+    <div class="container">
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Сравнение</div>
+        <h2 class="section-title">Почему Bond AI</h2>
+        <p class="section-sub">Сравните подходы к управлению портфелем облигаций.</p>
+      </div>
+      <div class="comparison-scroll reveal">
+        <div class="comparison-grid">
+          <div class="comp-header comp-feature">Функция</div>
+          <div class="comp-header">Таблицы Excel</div>
+          <div class="comp-header">Другие сервисы</div>
+          <div class="comp-header comp-hl">Bond AI</div>
+
+          <div class="comp-cell comp-feature">Цены в реальном времени</div>
+          <div class="comp-cell"><span class="comp-no">Ручной ввод</span></div>
+          <div class="comp-cell"><span class="comp-partial">Частично</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">MOEX каждые 15 мин</span></div>
+
+          <div class="comp-cell comp-feature">AI-подбор портфеля</div>
+          <div class="comp-cell"><span class="comp-no">Нет</span></div>
+          <div class="comp-cell"><span class="comp-no">Нет</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">Claude AI</span></div>
+
+          <div class="comp-cell comp-feature">Купонный календарь</div>
+          <div class="comp-cell"><span class="comp-no">Считать вручную</span></div>
+          <div class="comp-cell"><span class="comp-partial">Базовый</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">Автоматический</span></div>
+
+          <div class="comp-cell comp-feature">Telegram-уведомления</div>
+          <div class="comp-cell"><span class="comp-no">Нет</span></div>
+          <div class="comp-cell"><span class="comp-no">Email-only</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">Купоны + алерты</span></div>
+
+          <div class="comp-cell comp-feature">Кредитные рейтинги</div>
+          <div class="comp-cell"><span class="comp-no">Искать самому</span></div>
+          <div class="comp-cell"><span class="comp-partial">Только MOEX</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">SmartLab + MOEX</span></div>
+
+          <div class="comp-cell comp-feature">Стоимость</div>
+          <div class="comp-cell"><span class="comp-no">Лицензия Office</span></div>
+          <div class="comp-cell"><span class="comp-no">от 500 ₽/мес</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-free">Бесплатно</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ HOW IT WORKS ═══════════════════════════════════════ -->
   <section>
     <div class="container">
@@ -1360,6 +1519,46 @@
           <div class="step-num sn-4">4</div>
           <h4>Следите в реальном времени</h4>
           <p>Цены, купоны, P&amp;L и Telegram-уведомления — всё обновляется автоматически.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TRUST STATS ══════════════════════════════════════ -->
+  <section class="trust-section">
+    <div class="container">
+      <div class="trust-stats-grid reveal" id="trust-stats">
+        <div class="trust-stat">
+          <div class="trust-stat-icon" style="background:rgba(37,99,235,.12);box-shadow:0 0 20px rgba(37,99,235,.1);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="trust-stat-num"><span class="trust-counter" data-target="1200">0</span>+</div>
+          <div class="trust-stat-label">облигаций в базе</div>
+          <div class="trust-stat-sub">ОФЗ и корпоративные бумаги с MOEX</div>
+        </div>
+        <div class="trust-stat">
+          <div class="trust-stat-icon" style="background:rgba(22,163,74,.12);box-shadow:0 0 20px rgba(22,163,74,.1);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="trust-stat-num"><span class="trust-counter" data-target="15">0</span> мин</div>
+          <div class="trust-stat-label">обновление данных</div>
+          <div class="trust-stat-sub">Цены, доходность и рейтинги с Московской биржи</div>
+        </div>
+        <div class="trust-stat">
+          <div class="trust-stat-icon" style="background:rgba(168,85,247,.12);box-shadow:0 0 20px rgba(168,85,247,.1);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 1 5 5c0 2.76-5 8-5 8s-5-5.24-5-8a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5"/></svg>
+          </div>
+          <div class="trust-stat-num"><span class="trust-counter" data-target="30">0</span> сек</div>
+          <div class="trust-stat-label">AI-подбор портфеля</div>
+          <div class="trust-stat-sub">Claude AI анализирует рынок и подбирает бумаги</div>
+        </div>
+        <div class="trust-stat">
+          <div class="trust-stat-icon" style="background:rgba(6,182,212,.12);box-shadow:0 0 20px rgba(6,182,212,.1);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="trust-stat-num trust-stat-grad">Бесплатно</div>
+          <div class="trust-stat-label">навсегда</div>
+          <div class="trust-stat-sub">Никаких скрытых платежей и подписок</div>
         </div>
       </div>
     </div>
@@ -1413,9 +1612,18 @@
             <li><span class="pf-check">✓</span> API-доступ</li>
             <li><span class="pf-dash">—</span> Приоритетная поддержка</li>
           </ul>
-          <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="wizOpen()">
-            Войти в лист ожидания
-          </button>
+          <div id="waitlist-form">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="email" id="waitlist-email" placeholder="you@example.com"
+                style="flex:1;height:42px;background:rgba(255,255,255,.05);border:1.5px solid rgba(148,163,184,.15);border-radius:8px;padding:0 14px;font-size:14px;color:#fff;font-family:inherit;outline:none;transition:border-color .15s;box-sizing:border-box;"
+                onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(148,163,184,.15)'"
+                onkeydown="if(event.key==='Enter')submitWaitlist()">
+              <button class="btn btn-primary" style="flex-shrink:0;padding:0 20px;height:42px;" onclick="submitWaitlist()">
+                Записаться
+              </button>
+            </div>
+            <div id="waitlist-msg" style="min-height:16px;font-size:12px;"></div>
+          </div>
         </div>
 
       </div>
@@ -1667,6 +1875,40 @@
       if (!wasOpen) item.classList.add('open');
     }
 
+    async function submitWaitlist() {
+      const input = document.getElementById('waitlist-email');
+      const msg = document.getElementById('waitlist-msg');
+      const email = input.value.trim();
+      if (!email || !email.includes('@') || !email.includes('.')) {
+        msg.style.color = '#f87171';
+        msg.textContent = 'Укажите корректный email';
+        return;
+      }
+      msg.style.color = '#94a3b8';
+      msg.textContent = 'Отправляем...';
+      try {
+        const res = await fetch('/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          msg.style.color = '#4ade80';
+          msg.textContent = data.message;
+          input.disabled = true;
+          input.style.opacity = '0.5';
+          try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', 'waitlist_signup'); } catch(_) {}
+        } else {
+          msg.style.color = '#f87171';
+          msg.textContent = data.detail || 'Ошибка. Попробуйте ещё раз';
+        }
+      } catch (e) {
+        msg.style.color = '#f87171';
+        msg.textContent = 'Ошибка сети. Попробуйте ещё раз';
+      }
+    }
+
     // Topbar scroll effect
     const topbar = document.getElementById('topbar');
     window.addEventListener('scroll', () => {
@@ -1686,6 +1928,28 @@
       el.style.transitionDelay = (i * 0.05) + 's';
       observer.observe(el);
     });
+
+    // ═══ ANIMATED COUNTERS ════════════════════════════
+    const counterObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.querySelectorAll('.trust-counter').forEach(counter => {
+          const target = parseInt(counter.dataset.target);
+          const duration = 1500;
+          const startTime = performance.now();
+          function update(now) {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            counter.textContent = Math.round(target * eased).toLocaleString('ru-RU');
+            if (progress < 1) requestAnimationFrame(update);
+          }
+          requestAnimationFrame(update);
+        });
+        counterObserver.unobserve(entry.target);
+      });
+    }, { threshold: 0.3 });
+    const trustGrid = document.getElementById('trust-stats');
+    if (trustGrid) counterObserver.observe(trustGrid);
 
     // ═══════════════════════════════════════════════════
     // ONBOARDING WIZARD
@@ -2067,6 +2331,41 @@
     document.getElementById('landing-auth-modal').addEventListener('click', function(e) {
       if (e.target === this) landingAuthClose();
     });
+
+    // ═══ LIVE DEMO DATA ═══════════════════════════════
+    (async function loadDemoData() {
+      try {
+        const [ofzRes, corpRes] = await Promise.all([
+          fetch('/bonds/search?q=SU26&limit=3'),
+          fetch('/bonds/search?q=RU000A1&limit=2')
+        ]);
+        if (!ofzRes.ok || !corpRes.ok) return;
+        const ofz = await ofzRes.json();
+        const corp = await corpRes.json();
+        const bonds = [...ofz, ...corp].slice(0, 5);
+        if (bonds.length < 3) return;
+        const tbody = document.querySelector('.demo-table tbody');
+        if (!tbody) return;
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        tbody.innerHTML = bonds.map(b => {
+          const isOfz = (b.ticker || '').startsWith('SU');
+          const badge = isOfz
+            ? '<span class="type-badge tb-ofz">ОФЗ</span>'
+            : '<span class="type-badge tb-bond">Корп.</span>';
+          const coupon = b.coupon_percent ? b.coupon_percent.toFixed(2) + '%' : '—';
+          const price = b.price ? b.price.toFixed(2) + ' ₽' : '—';
+          const maturity = b.maturity || '—';
+          return '<tr>' +
+            '<td><div class="inst-name">' + esc(b.name || '') + '</div><div class="inst-ticker">' + esc(b.ticker || '') + '</div></td>' +
+            '<td><span style="font-family:monospace;font-size:12px;color:var(--slate-500);">' + esc(b.ticker || '') + '</span></td>' +
+            '<td>' + badge + '</td>' +
+            '<td><span class="coupon-v">' + coupon + '</span></td>' +
+            '<td style="color:var(--slate-600);">' + maturity + '</td>' +
+            '<td><span class="price-v">' + price + '</span></td>' +
+            '</tr>';
+        }).join('');
+      } catch (e) { /* keep static fallback */ }
+    })();
   </script>
   <script type="application/ld+json">
   {

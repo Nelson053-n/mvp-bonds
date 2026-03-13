@@ -228,6 +228,14 @@ class StorageService:
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS waitlist (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
             # Create indices
             try:
                 conn.execute(
@@ -1468,6 +1476,20 @@ class StorageService:
             )
             conn.commit()
             return cursor.rowcount > 0
+
+    # ── Waitlist ────────────────────────────────────────────
+
+    def add_waitlist_email(self, email: str) -> int:
+        """Add email to Pro waitlist. Returns id. Raises IntegrityError on duplicate."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "INSERT INTO waitlist (email, created_at) VALUES (?, ?)",
+                (email, now),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)  # type: ignore[arg-type]
 
 
 storage_service = StorageService()

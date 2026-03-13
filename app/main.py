@@ -7,7 +7,7 @@ import time
 
 import bcrypt
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.api.auth import router as auth_router
 from app.api.bonds import router as bonds_router
@@ -33,6 +33,7 @@ landing_path = _ui_dir / "landing.html"
 share_error_path = _ui_dir / "share_error.html"
 privacy_path = _ui_dir / "privacy.html"
 terms_path = _ui_dir / "terms.html"
+not_found_path = _ui_dir / "404.html"
 
 _NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -248,10 +249,19 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    """Return HTML 404 for browser requests, JSON 404 for API requests."""
+    if request.url.path.startswith(("/auth/", "/bonds/", "/portfolios/", "/pdf/",
+                                     "/settings/", "/admin/", "/watchlist/", "/tbank/",
+                                     "/health", "/api-info")):
+        return JSONResponse(status_code=404, content={"detail": getattr(exc, "detail", "Not found")})
+    return HTMLResponse(not_found_path.read_text(encoding="utf-8"), status_code=404)
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled exception: %s %s — %s", request.method, request.url.path, exc, exc_info=exc)
-    from fastapi.responses import JSONResponse
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
@@ -512,3 +522,26 @@ async def get_shared_portfolio_snapshots(
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/waitlist")
+async def join_waitlist(request: Request):
+    """Public endpoint: add email to Pro waitlist."""
+    import re as _re
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"detail": "Неверный формат запроса"})
+
+    email = (body.get("email") or "").strip().lower()
+    if not email or not _re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return JSONResponse(status_code=422, content={"detail": "Укажите корректный email"})
+    if len(email) > 254:
+        return JSONResponse(status_code=422, content={"detail": "Email слишком длинный"})
+
+    try:
+        storage_service.add_waitlist_email(email)
+    except Exception:
+        return JSONResponse(status_code=200, content={"ok": True, "message": "Вы уже в списке ожидания!"})
+
+    return JSONResponse(status_code=201, content={"ok": True, "message": "Вы в списке ожидания!"})
