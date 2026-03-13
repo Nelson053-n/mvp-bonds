@@ -282,6 +282,72 @@ async def manifest():
     )
 
 
+@app.get("/robots.txt")
+async def robots_txt():
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /app\n"
+        "Disallow: /share/\n"
+        "Disallow: /auth/\n"
+        "Disallow: /portfolios/\n"
+        "Disallow: /admin/\n"
+        "Disallow: /settings/\n"
+        "Disallow: /bonds/\n"
+        "Disallow: /tbank/\n"
+        "Disallow: /watchlist/\n"
+        "Disallow: /pdf/\n"
+        "\n"
+        "Sitemap: https://bondai.ru/sitemap.xml\n"
+    )
+    return Response(content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml():
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        "    <loc>https://bondai.ru/</loc>\n"
+        "    <changefreq>weekly</changefreq>\n"
+        "    <priority>1.0</priority>\n"
+        "  </url>\n"
+        "</urlset>\n"
+    )
+    return Response(content, media_type="application/xml")
+
+
+@app.get("/og-image.png")
+async def og_image():
+    path = _ui_dir / "og-image.png"
+    return Response(
+        path.read_bytes(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/icon-192.png")
+async def icon_192():
+    path = _ui_dir / "icon-192.png"
+    return Response(
+        path.read_bytes(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/icon-512.png")
+async def icon_512():
+    path = _ui_dir / "icon-512.png"
+    return Response(
+        path.read_bytes(),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/sw.js")
 async def service_worker():
     path = _ui_dir / "sw.js"
