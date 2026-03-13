@@ -13,6 +13,7 @@ class NotificationSettings(BaseModel):
     tg_chat_id: str = Field(default="", max_length=64)
     price_drop_threshold: float = Field(default=5.0, ge=0.1, le=100.0)
     tg_lang: str = Field(default="ru", pattern="^(ru|en)$")
+    ym_counter_id: str = Field(default="", max_length=20)
 
 
 class PersonalNotificationsInput(BaseModel):
@@ -28,6 +29,7 @@ async def get_notifications(admin: dict = Depends(get_admin_user)) -> Notificati
         tg_chat_id=s.get("tg_chat_id", ""),
         price_drop_threshold=float(s.get("price_drop_threshold", "5.0")),
         tg_lang=s.get("tg_lang", "ru"),
+        ym_counter_id=s.get("ym_counter_id", ""),
     )
 
 
@@ -40,6 +42,7 @@ async def save_notifications(
     storage_service.set_setting("tg_chat_id", payload.tg_chat_id)
     storage_service.set_setting("price_drop_threshold", str(payload.price_drop_threshold))
     storage_service.set_setting("tg_lang", payload.tg_lang or "ru")
+    storage_service.set_setting("ym_counter_id", payload.ym_counter_id)
     return payload
 
 
@@ -59,6 +62,12 @@ async def test_notification(
         msg,
     )
     return {"success": ok}
+
+
+@router.get("/ym-counter")
+async def get_ym_counter() -> dict[str, str]:
+    """Public endpoint — returns Yandex.Metrika counter ID."""
+    return {"ym_counter_id": storage_service.get_setting("ym_counter_id")}
 
 
 @router.get("/notifications/personal")
