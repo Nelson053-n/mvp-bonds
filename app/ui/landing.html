@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <title>Bond AI — Умный портфель облигаций с AI-аналитикой</title>
   <meta name="description" content="Подбирайте облигации под ваш риск-профиль, отслеживайте купонный доход и получайте уведомления в Telegram. Данные MOEX в реальном времени.">
   <meta name="robots" content="index, follow">
@@ -433,6 +434,51 @@
     }
     .feature-card p { font-size: 14px; color: var(--slate-500); line-height: 1.7; }
 
+    /* ─── HOW AI WORKS ────────────────────────────────────────── */
+    .ai-steps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      position: relative;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .ai-steps-grid::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--blue-500), var(--indigo-500), var(--purple-500), #16a34a);
+      opacity: .3;
+      pointer-events: none;
+    }
+    .ai-step {
+      text-align: center;
+      padding: 0 16px;
+      position: relative;
+    }
+    .ai-step-icon {
+      width: 80px; height: 80px;
+      margin: 0 auto 20px;
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 1;
+    }
+    .ai-icon-1 { background: rgba(37,99,235,.12); border: 1px solid rgba(37,99,235,.2); box-shadow: 0 0 24px rgba(37,99,235,.12); }
+    .ai-icon-2 { background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.2); box-shadow: 0 0 24px rgba(99,102,241,.12); }
+    .ai-icon-3 { background: rgba(168,85,247,.12); border: 1px solid rgba(168,85,247,.2); box-shadow: 0 0 24px rgba(168,85,247,.12); }
+    .ai-icon-4 { background: rgba(22,163,74,.12); border: 1px solid rgba(22,163,74,.2); box-shadow: 0 0 24px rgba(22,163,74,.12); }
+    .ai-step-arrow {
+      position: absolute;
+      top: 36px; right: -8px;
+      color: var(--slate-700);
+      font-size: 16px; z-index: 2;
+    }
+    .ai-step h4 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; letter-spacing: -.2px; }
+    .ai-step p { font-size: 13px; color: var(--slate-500); line-height: 1.7; }
+
     /* ─── DEMO BLOCK ────────────────────────────────────────── */
     .demo-block {
       background: rgba(148,163,184,.06);
@@ -643,6 +689,70 @@
       font-size: 13px !important; color: var(--slate-700) !important;
     }
 
+    /* ─── FAQ ───────────────────────────────────────────────── */
+    .faq-section {
+      background: rgba(255,255,255,.012);
+      border-top: 1px solid rgba(148,163,184,.07);
+      border-bottom: 1px solid rgba(148,163,184,.07);
+    }
+    .faq-list {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex; flex-direction: column; gap: 1px;
+      background: rgba(148,163,184,.07);
+      border: 1px solid rgba(148,163,184,.07);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+    .faq-item { background: rgba(2,8,23,.85); transition: background .2s; }
+    .faq-item:hover { background: rgba(15,23,42,.9); }
+    .faq-q {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding: 20px 24px;
+      cursor: pointer; user-select: none;
+    }
+    .faq-q-text { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.5; }
+    .faq-chevron {
+      width: 20px; height: 20px; flex-shrink: 0;
+      color: var(--slate-600);
+      transition: transform .25s ease, color .2s;
+    }
+    .faq-item.open .faq-chevron { transform: rotate(180deg); color: var(--blue-400); }
+    .faq-a {
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s ease, padding .25s ease;
+    }
+    .faq-item.open .faq-a { max-height: 300px; }
+    .faq-a-inner {
+      padding: 0 24px 20px;
+      font-size: 14px; color: var(--slate-500); line-height: 1.75;
+    }
+    .faq-a-inner a { color: var(--blue-400); text-decoration: none; }
+    .faq-a-inner a:hover { text-decoration: underline; }
+
+    /* ─── DISCLAIMER ────────────────────────────────────────── */
+    .disclaimer-banner {
+      position: relative; z-index: 1;
+      padding: 28px 24px;
+      background: rgba(217,119,6,.06);
+      border-top: 1px solid rgba(217,119,6,.12);
+      border-bottom: 1px solid rgba(217,119,6,.12);
+    }
+    .disclaimer-inner {
+      max-width: 860px; margin: 0 auto;
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .disclaimer-icon {
+      flex-shrink: 0; width: 36px; height: 36px;
+      border-radius: var(--radius);
+      background: rgba(217,119,6,.12);
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 2px;
+    }
+    .disclaimer-text { font-size: 13px; color: var(--slate-500); line-height: 1.75; }
+    .disclaimer-text a { color: var(--blue-400); text-decoration: none; }
+    .disclaimer-text a:hover { text-decoration: underline; }
+
     /* ─── FOOTER ────────────────────────────────────────────── */
     .footer {
       position: relative; z-index: 1;
@@ -652,6 +762,8 @@
     }
     .footer p { font-size: 12px; color: var(--slate-700); line-height: 2; }
     .footer-sep { margin: 0 8px; opacity: .35; }
+    .footer-link { color: var(--slate-600); text-decoration: none; transition: color .15s; }
+    .footer-link:hover { color: var(--blue-400); }
 
     /* ─── ONBOARDING WIZARD ─────────────────────────────────── */
     .wiz-overlay {
@@ -899,6 +1011,9 @@
       .demo-kpi-row { grid-template-columns: repeat(2, 1fr); }
       .stats-grid   { grid-template-columns: 1fr; }
       .stat-cell    { padding: 28px 20px; }
+      .ai-steps-grid { grid-template-columns: 1fr 1fr; gap: 32px 0; }
+      .ai-steps-grid::before { display: none; }
+      .ai-step-arrow { display: none; }
     }
     @media (max-width: 640px) {
       .topbar { padding: 0 16px; }
@@ -908,6 +1023,11 @@
       .hero-actions .btn { justify-content: center; }
       .demo-table th:nth-child(5), .demo-table td:nth-child(5) { display: none; }
       .steps-grid::before { display: none; }
+      .ai-steps-grid { grid-template-columns: 1fr; gap: 24px; }
+      .faq-q { padding: 16px 18px; }
+      .faq-a-inner { padding: 0 18px 16px; }
+      .faq-q-text { font-size: 14px; }
+      .disclaimer-inner { flex-direction: column; gap: 10px; }
     }
     @media (max-width: 420px) {
       .demo-kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -968,7 +1088,7 @@
       <div class="trust-row">
         <div class="trust-badge"><span class="icon">🎁</span> Бесплатно навсегда</div>
         <div class="trust-badge"><span class="icon">🏦</span> Без брокера</div>
-        <div class="trust-badge"><span class="icon">⚡</span> Обновление каждые 2 мин</div>
+        <div class="trust-badge"><span class="icon">⚡</span> Обновление каждые 15 мин</div>
         <div class="trust-badge"><span class="icon">🔔</span> Уведомления в Telegram</div>
       </div>
 
@@ -1022,7 +1142,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
           </div>
           <h3>Аналитика в реальном времени</h3>
-          <p>Цены, купонная доходность и YTM с MOEX обновляются каждые 2 минуты. P&amp;L по каждой позиции и по портфелю целиком.</p>
+          <p>Цены, купонная доходность и YTM с MOEX обновляются каждые 15 минут. P&amp;L по каждой позиции и по портфелю целиком.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon-wrap fi-purple">
@@ -1051,6 +1171,54 @@
           </div>
           <h3>Совместный доступ</h3>
           <p>Поделитесь портфелем по ссылке с коллегой или советником. Опциональная защита паролем. Ссылка автоматически истекает.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ HOW AI WORKS ════════════════════════════════════════ -->
+  <section>
+    <div class="container">
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Технология</div>
+        <h2 class="section-title">Как работает AI</h2>
+        <p class="section-sub">Четыре этапа от рыночных данных до готового портфеля с обоснованием каждой позиции.</p>
+      </div>
+
+      <div class="ai-steps-grid reveal">
+        <div class="ai-step">
+          <div class="ai-step-icon ai-icon-1">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+          </div>
+          <span class="ai-step-arrow">&rarr;</span>
+          <h4>Данные MOEX</h4>
+          <p>Загружаем цены, купоны, доходность к погашению и кредитные рейтинги 1 200+ облигаций каждые 15 минут.</p>
+        </div>
+
+        <div class="ai-step">
+          <div class="ai-step-icon ai-icon-2">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          </div>
+          <span class="ai-step-arrow">&rarr;</span>
+          <h4>Фильтрация</h4>
+          <p>Отсеиваем неликвидные бумаги, фильтруем по кредитному рейтингу, дюрации и вашему профилю риска.</p>
+        </div>
+
+        <div class="ai-step">
+          <div class="ai-step-icon ai-icon-3">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 1 5 5c0 2.76-5 8-5 8s-5-5.24-5-8a5 5 0 0 1 5-5z"/><circle cx="12" cy="7" r="1.5"/><path d="M12 15v7"/><path d="M9 18h6"/></svg>
+          </div>
+          <span class="ai-step-arrow">&rarr;</span>
+          <h4>AI-оптимизация</h4>
+          <p>Claude AI составляет диверсифицированный портфель, распределяя бюджет по лотам с учётом секторов и сроков.</p>
+        </div>
+
+        <div class="ai-step">
+          <div class="ai-step-icon ai-icon-4">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h4>Обоснование</h4>
+          <p>Каждая позиция сопровождается объяснением: рейтинг эмитента, доходность относительно рынка, ожидаемый купонный поток.</p>
         </div>
       </div>
     </div>
@@ -1214,8 +1382,8 @@
           <div class="plan-desc">Всё необходимое для управления личным портфелем облигаций.</div>
           <div class="plan-divider"></div>
           <ul class="plan-features">
-            <li><span class="pf-check">✓</span> До 5 портфелей</li>
-            <li><span class="pf-check">✓</span> Цены MOEX каждые 2 минуты</li>
+            <li><span class="pf-check">✓</span> До 3 портфелей</li>
+            <li><span class="pf-check">✓</span> Цены MOEX каждые 15 минут</li>
             <li><span class="pf-check">✓</span> AI-подбор портфеля</li>
             <li><span class="pf-check">✓</span> Купонный календарь</li>
             <li><span class="pf-check">✓</span> Telegram-уведомления</li>
@@ -1238,7 +1406,7 @@
           <div class="plan-divider"></div>
           <ul class="plan-features">
             <li><span class="pf-check">✓</span> Неограниченные портфели</li>
-            <li><span class="pf-check">✓</span> Обновление каждую минуту</li>
+            <li><span class="pf-check">✓</span> Обновление каждые 5 минут</li>
             <li><span class="pf-check">✓</span> Расширенная AI-аналитика</li>
             <li><span class="pf-check">✓</span> Исторические snapshots</li>
             <li><span class="pf-check">✓</span> Ценовые алерты без лимита</li>
@@ -1254,6 +1422,83 @@
     </div>
   </section>
 
+  <!-- ═══ FAQ ═════════════════════════════════════════════════ -->
+  <section class="faq-section" id="faq-section">
+    <div class="container">
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">FAQ</div>
+        <h2 class="section-title">Частые вопросы</h2>
+        <p class="section-sub">Ответы на самые популярные вопросы о Bond AI.</p>
+      </div>
+
+      <div class="faq-list reveal" id="faq-list">
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Bond AI — это бесплатно?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Да, базовый тариф полностью бесплатен и навсегда. Вы получаете AI-подбор портфеля, данные MOEX в реальном времени, купонный календарь, Telegram-уведомления и PDF-экспорт. В будущем появится Pro-тариф с расширенными возможностями, но бесплатный функционал не будет урезан.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Нужен ли брокерский счёт?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Нет. Bond AI — аналитический инструмент. Мы не подключаемся к вашему брокерскому счёту и не совершаем сделок. Вы добавляете тикеры облигаций вручную или импортируете из Т-Банк, а мы показываем актуальные цены, доходность и купонные выплаты с MOEX.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Откуда берутся данные о ценах?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 15 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Как работает AI-подбор портфеля?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Вы указываете сумму инвестиций и уровень риска. AI анализирует текущие облигации на MOEX, фильтрует по кредитному рейтингу и доходности, затем составляет диверсифицированный портфель с учётом размера лота. Каждая рекомендация сопровождается обоснованием.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Является ли Bond AI инвестиционной рекомендацией?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Нет. Bond AI предоставляет аналитические инструменты и информацию. Мы не являемся инвестиционным советником и не несём ответственности за инвестиционные решения. AI-рекомендации основаны на открытых данных и могут содержать ошибки. Перед принятием решения проконсультируйтесь с финансовым консультантом.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Как настроить уведомления в Telegram?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">В настройках профиля подключите Telegram-бот и укажите chat ID. После этого вы будете получать оповещения о предстоящих купонных выплатах, изменениях кредитных рейтингов и достижении пороговых цен по вашим облигациям.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Могу ли я поделиться портфелем?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Да. Создайте ссылку для совместного доступа в один клик. Можно установить пароль и срок действия ссылки. Получатель увидит портфель в режиме только для чтения, без возможности редактирования.</div></div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="faqToggle(this)">
+            <span class="faq-q-text">Мои данные в безопасности?</span>
+            <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="faq-a"><div class="faq-a-inner">Пароли хешируются с помощью bcrypt, авторизация через JWT-токены. Мы не храним данные банковских карт или брокерских счетов. Все данные находятся на серверах в России. Подробнее — в нашей <a href="/privacy">политике конфиденциальности</a>.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ CTA ═══════════════════════════════════════════════ -->
   <section class="cta-section">
     <div class="cta-glow"></div>
@@ -1264,6 +1509,18 @@
     </button>
     <p class="cta-fine">Уже есть аккаунт? <a href="/app?auth=login" style="color:var(--blue-400);text-decoration:none;">Войти →</a></p>
   </section>
+
+  <!-- ═══ DISCLAIMER ══════════════════════════════════════════ -->
+  <div class="disclaimer-banner reveal">
+    <div class="disclaimer-inner">
+      <div class="disclaimer-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </div>
+      <div class="disclaimer-text">
+        Bond AI предоставляет аналитические инструменты и информацию на основе данных Московской биржи. Сервис не является инвестиционным советником и не несёт ответственности за инвестиционные решения пользователей. AI-рекомендации носят информационный характер и могут содержать неточности. Прошлые результаты не гарантируют будущей доходности. <a href="/terms">Подробнее &rarr;</a>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ ONBOARDING WIZARD ════════════════════════════════ -->
   <div class="wiz-overlay" id="wiz-overlay">
@@ -1359,6 +1616,10 @@
                 <input class="wiz-reg-input" id="wiz-reg-user" type="text" placeholder="Придумайте логин" autocomplete="username" />
                 <input class="wiz-reg-input" id="wiz-reg-pass" type="password" placeholder="Пароль (мин. 6 символов)" autocomplete="new-password" />
               </div>
+              <label style="display:flex;align-items:flex-start;gap:8px;margin:10px 0 4px;cursor:pointer;font-size:12px;color:#94a3b8;line-height:1.5;">
+                <input type="checkbox" id="wiz-reg-consent" style="margin-top:3px;accent-color:#3b82f6;flex-shrink:0;">
+                <span>Регистрируясь, я соглашаюсь с <a href="/terms" target="_blank" style="color:#60a5fa;">Условиями использования</a> и <a href="/privacy" target="_blank" style="color:#60a5fa;">Политикой конфиденциальности</a></span>
+              </label>
               <div class="wiz-reg-msg" id="wiz-reg-msg"></div>
               <button class="wiz-btn-next" id="wiz-reg-btn" onclick="wizRegister()" style="width:100%;">
                 Создать аккаунт и сохранить портфель
@@ -1389,13 +1650,23 @@
     <p>
       &copy; 2025 Bond AI
       <span class="footer-sep">&middot;</span>
-      Данные предоставлены Московской биржей
+      <a href="/privacy" class="footer-link">Конфиденциальность</a>
       <span class="footer-sep">&middot;</span>
-      Не является инвестиционной рекомендацией
+      <a href="/terms" class="footer-link">Условия использования</a>
+      <span class="footer-sep">&middot;</span>
+      Данные предоставлены Московской биржей
     </p>
   </footer>
 
   <script>
+    // ═══ FAQ ACCORDION ═══════════════════════════════
+    function faqToggle(qEl) {
+      const item = qEl.parentElement;
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    }
+
     // Topbar scroll effect
     const topbar = document.getElementById('topbar');
     window.addEventListener('scroll', () => {
@@ -1426,6 +1697,7 @@
     function wizOpen() {
       document.getElementById('wiz-overlay').classList.add('open');
       document.body.style.overflow = 'hidden';
+      try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', 'wizard_start'); } catch(_) {}
     }
     function wizClose() {
       document.getElementById('wiz-overlay').classList.remove('open');
@@ -1505,6 +1777,7 @@
         }));
 
         wizRenderResult(data, amount);
+        try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', 'wizard_complete'); } catch(_) {}
 
         document.getElementById('wiz-loading').style.display = 'none';
         document.getElementById('wiz-result').style.display  = '';
@@ -1572,6 +1845,7 @@
 
       if (!username || username.length < 3) { msg.className='wiz-reg-msg error'; msg.textContent='Логин минимум 3 символа'; return; }
       if (!password || password.length < 6) { msg.className='wiz-reg-msg error'; msg.textContent='Пароль минимум 6 символов'; return; }
+      if (!document.getElementById('wiz-reg-consent').checked) { msg.className='wiz-reg-msg error'; msg.textContent='Необходимо принять условия использования'; return; }
 
       btn.disabled = true;
       btn.textContent = 'Создаём аккаунт...';
@@ -1621,6 +1895,7 @@
         msg.className = 'wiz-reg-msg success';
         msg.textContent = '✓ Готово! Переходим в приложение...';
         btn.textContent = '✓ Аккаунт создан!';
+        try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', 'registration'); } catch(_) {}
 
         setTimeout(() => { window.location.href = '/app'; }, 900);
 
@@ -1696,6 +1971,10 @@
             onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='rgba(148,163,184,.2)'"
             onkeydown="if(event.key==='Enter')landingAuthSubmit()">
         </div>
+        <label id="landing-auth-consent-wrap" style="display:none;align-items:flex-start;gap:8px;margin-bottom:14px;cursor:pointer;font-size:12px;color:#94a3b8;line-height:1.5;">
+          <input type="checkbox" id="landing-auth-consent" style="margin-top:3px;accent-color:#3b82f6;flex-shrink:0;">
+          <span>Регистрируясь, я соглашаюсь с <a href="/terms" target="_blank" style="color:#60a5fa;">Условиями использования</a> и <a href="/privacy" target="_blank" style="color:#60a5fa;">Политикой конфиденциальности</a></span>
+        </label>
         <div id="landing-auth-status" style="min-height:16px;margin-bottom:12px;font-size:12px;color:#f87171;"></div>
         <button onclick="landingAuthSubmit()" id="landing-auth-submit"
           style="width:100%;height:42px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;"
@@ -1720,18 +1999,23 @@
       const submitEl = document.getElementById('landing-auth-submit');
       const tabLogin = document.getElementById('landing-tab-login');
       const tabReg   = document.getElementById('landing-tab-register');
+      const consentWrap = document.getElementById('landing-auth-consent-wrap');
+      const consentCb = document.getElementById('landing-auth-consent');
       if (_landingAuthTab === 'register') {
         if (titleEl) titleEl.textContent = 'Создать аккаунт';
         if (subEl)   subEl.textContent = 'Регистрация займёт 30 секунд';
         if (submitEl) submitEl.textContent = 'Зарегистрироваться';
         if (tabLogin)  { tabLogin.style.color = 'rgba(148,163,184,.6)'; tabLogin.style.borderBottom = '2px solid transparent'; }
         if (tabReg)    { tabReg.style.color = '#60a5fa'; tabReg.style.borderBottom = '2px solid #3b82f6'; }
+        if (consentWrap) consentWrap.style.display = 'flex';
       } else {
         if (titleEl) titleEl.textContent = 'Добро пожаловать';
         if (subEl)   subEl.textContent = 'Войдите в свой аккаунт Bond AI';
         if (submitEl) submitEl.textContent = 'Войти';
         if (tabLogin)  { tabLogin.style.color = '#60a5fa'; tabLogin.style.borderBottom = '2px solid #3b82f6'; }
         if (tabReg)    { tabReg.style.color = 'rgba(148,163,184,.6)'; tabReg.style.borderBottom = '2px solid transparent'; }
+        if (consentWrap) consentWrap.style.display = 'none';
+        if (consentCb) consentCb.checked = false;
       }
       document.getElementById('landing-auth-status').textContent = '';
       setTimeout(() => document.getElementById('landing-auth-username').focus(), 50);
@@ -1746,6 +2030,10 @@
       const statusEl = document.getElementById('landing-auth-status');
       const submitBtn = document.getElementById('landing-auth-submit');
       if (!username || !password) { statusEl.textContent = 'Введите логин и пароль'; return; }
+      if (_landingAuthTab === 'register' && !document.getElementById('landing-auth-consent').checked) {
+        statusEl.textContent = 'Необходимо принять условия использования';
+        return;
+      }
       statusEl.textContent = 'Проверяем...';
       statusEl.style.color = '#94a3b8';
       submitBtn.disabled = true;
@@ -1766,6 +2054,7 @@
         if (data.access_token) {
           localStorage.setItem('mvp_auth_token', data.access_token);
           if (data.username) localStorage.setItem('mvp_username', data.username);
+          try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', _landingAuthTab === 'register' ? 'registration' : 'login'); } catch(_) {}
           window.location.href = '/app';
         }
       } catch(e) {
@@ -1794,6 +2083,23 @@
       "priceCurrency": "RUB"
     }
   }
+  </script>
+  <!-- Yandex.Metrika counter — замените 0 на реальный ID счётчика -->
+  <script type="text/javascript">
+    window._ymId = 0; // TODO: заменить на реальный ID из https://metrika.yandex.ru
+    if (window._ymId) {
+      (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+      m[i].l=1*new Date();
+      for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+      k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+      ym(window._ymId, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true
+      });
+    }
   </script>
 </body>
 </html>
