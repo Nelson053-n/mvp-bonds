@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>if (location.pathname === '/') location.replace('/app');</script>
     <title>Bond AI</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
     <link rel="manifest" href="/manifest.json">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0f172a">
@@ -1006,6 +1006,7 @@
         <div class="card" id="chart-card" style="padding: 0;">
           <div class="card-header">
             <h2 class="card-title" data-i18n="chart.title">Купонный доход по месяцам</h2>
+            <div id="coupon-period-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           </div>
           <div style="padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
             <div id="chart-empty" class="chart-empty" style="display:none;" data-i18n="chart.noData">Нет данных по купонным выплатам</div>
@@ -1273,104 +1274,127 @@
 
         <!-- ── TAB: Import/Export ── -->
         <div id="stab-io" class="stab-content" style="display:none;">
-          <div class="panel-cols panel-cols-2" style="margin-bottom:16px;">
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title" data-i18n="io.exportTitle">Экспорт</h2>
+
+          <!-- ── Section 1: Current portfolio ── -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;" data-i18n="io.sectionCurrent">Текущий портфель</div>
+            <div class="panel-cols panel-cols-2">
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title" data-i18n="io.exportTitle">Экспорт</h2>
+                </div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                  <div class="info-box" data-i18n-html="io.exportDesc">
+                    Скачайте все позиции текущего портфеля в формате CSV или PDF.<br>
+                    CSV содержит: тикер, тип, количество, цену покупки.
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn" id="export-btn" data-i18n="io.exportBtn">⬇ CSV</button>
+                    <button class="btn btn-secondary" id="export-pdf-btn" data-i18n="io.exportPdfBtn">⬇ PDF</button>
+                  </div>
+                  <div id="io-export-status" class="status"></div>
+                </div>
               </div>
-              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                <div class="info-box" data-i18n-html="io.exportDesc">
-                  Скачайте все позиции текущего портфеля в формате CSV.<br>
-                  Файл содержит: тикер, тип, количество, цену покупки.
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title" data-i18n="io.importTitle">Импорт CSV</h2>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button class="btn" id="export-btn" data-i18n="io.exportBtn">⬇ Скачать CSV</button>
-                  <button class="btn" id="export-pdf-btn" data-i18n="io.exportPdfBtn">⬇ Скачать PDF</button>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                  <div class="info-box">
+                    <span data-i18n-html="io.importDesc">Колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Существующие позиции обновляются, новые — добавляются.</span>
+                  </div>
+                  <div class="field">
+                    <label for="import-portfolio" data-i18n="io.importPortfolio">Портфель для импорта</label>
+                    <select id="import-portfolio" class="select-input">
+                      <option value="" data-i18n="io.importPortfolioPlaceholder">Выберите портфель</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <label class="file-label" for="import-file" style="flex:1;justify-content:center;margin:0;" data-i18n="io.chooseFile">📂 Выбрать файл</label>
+                    <input type="file" id="import-file" accept=".csv,text/csv" />
+                    <button class="btn" id="import-btn" data-i18n="io.importBtn">⬆ Импортировать</button>
+                  </div>
+                  <div id="io-import-status" class="status"></div>
                 </div>
-                <div id="io-export-status" class="status"></div>
               </div>
             </div>
+          </div>
+
+          <!-- ── Section 2: All portfolios ── -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;" data-i18n="io.sectionAll">Все портфели</div>
+            <div class="panel-cols panel-cols-2">
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title" data-i18n="io.exportAllTitle">Экспорт</h2>
+                </div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                  <div class="info-box" data-i18n-html="io.exportAllDesc">
+                    Все портфели в один CSV-файл.<br>
+                    Колонка <code>portfolio_name</code> определяет принадлежность.
+                  </div>
+                  <button class="btn" id="export-all-btn" data-i18n="io.exportAllBtn">⬇ Скачать CSV</button>
+                  <div id="io-export-all-status" class="status"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h2 class="card-title" data-i18n="io.importAllTitle">Импорт</h2>
+                </div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                  <div class="info-box">
+                    <span data-i18n-html="io.importAllDesc">Колонки: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.</span>
+                  </div>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <label class="file-label" for="import-all-file" style="flex:1;justify-content:center;margin:0;" data-i18n="io.chooseFile">📂 Выбрать файл</label>
+                    <input type="file" id="import-all-file" accept=".csv,text/csv" />
+                    <button class="btn" id="import-all-btn" data-i18n="io.importAllBtn">⬆ Импортировать</button>
+                  </div>
+                  <div id="io-import-all-status" class="status"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Section 3: T-Bank ── -->
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;" data-i18n="io.sectionTbank">Импорт из брокера</div>
             <div class="card">
-              <div class="card-header">
-                <h2 class="card-title" data-i18n="io.importTitle">Импорт</h2>
+              <div class="card-header" style="display:flex;align-items:center;gap:10px;">
+                <h2 class="card-title" data-i18n="io.tbankTitle" style="margin:0;">Т-Банк Инвестиции</h2>
+                <span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(255,221,51,.12);color:#ffdd33;font-weight:600;">API</span>
               </div>
               <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                <div class="info-box">
-                  <span data-i18n-html="io.importDesc">Формат CSV — колонки: <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code></span>
+                <div class="info-box" data-i18n-html="io.tbankDesc">
+                  Введите read-only токен из <a href="https://www.tbank.ru/invest/settings/" target="_blank" rel="noopener" style="color:var(--blue-400);">настроек Т-Инвестиций</a>. Будет создан новый портфель с вашими бумагами.<br>Токен нигде не сохраняется.
                 </div>
+
+                <!-- Step 1: Token -->
                 <div class="field">
-                  <label for="import-portfolio" data-i18n="io.importPortfolio">Портфель для импорта</label>
-                  <select id="import-portfolio" class="select-input">
-                    <option value="" data-i18n="io.importPortfolioPlaceholder">Выберите портфель</option>
-                  </select>
+                  <label for="tbank-token" data-i18n="io.tbankToken">Токен (read-only)</label>
+                  <div style="display:flex;gap:8px;">
+                    <input type="password" id="tbank-token" class="input" style="flex:1;" data-i18n-placeholder="io.tbankTokenPlaceholder" placeholder="Вставьте токен..." autocomplete="off" />
+                    <button class="btn btn-secondary" id="tbank-load-btn" data-i18n="io.tbankLoadBtn">Загрузить счета</button>
+                  </div>
                 </div>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                  <label class="file-label" for="import-file" style="justify-content:center;" data-i18n="io.chooseFile">📂 Выбрать файл CSV</label>
-                  <input type="file" id="import-file" accept=".csv,text/csv" />
-                  <button class="btn" id="import-btn" data-i18n="io.importBtn">⬆ Импортировать</button>
+
+                <!-- Step 2: Account select (hidden until accounts loaded) -->
+                <div class="field" id="tbank-account-field" style="display:none;">
+                  <label for="tbank-account-sel" data-i18n="io.tbankAccount">Счёт</label>
+                  <select id="tbank-account-sel" class="select-input"></select>
                 </div>
-                <div id="io-import-status" class="status"></div>
+
+                <!-- Step 3: Preview + import buttons (hidden until preview loaded) -->
+                <div id="tbank-preview-box" class="info-box info-box-warning" style="display:none;"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn" id="tbank-bonds-btn" style="display:none;" data-i18n="io.tbankBondsBtn">⬆ Только облигации</button>
+                  <button class="btn btn-secondary" id="tbank-all-btn" style="display:none;" data-i18n="io.tbankAllBtn">⬆ Все бумаги</button>
+                </div>
+                <div id="io-tbank-status" class="status"></div>
               </div>
             </div>
           </div>
-          <div class="panel-cols panel-cols-2">
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title" data-i18n="io.exportAllTitle">Экспорт всех портфелей</h2>
-              </div>
-              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                <div class="info-box" data-i18n-html="io.exportAllDesc">
-                  Скачайте все портфели в один CSV-файл.<br>
-                  Дополнительная колонка <code>portfolio_name</code> определяет принадлежность.
-                </div>
-                <div>
-                  <button class="btn" id="export-all-btn" data-i18n="io.exportAllBtn">⬇ Скачать все портфели</button>
-                </div>
-                <div id="io-export-all-status" class="status"></div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title" data-i18n="io.importAllTitle">Импорт всех портфелей</h2>
-              </div>
-              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                <div class="info-box">
-                  <span data-i18n-html="io.importAllDesc">CSV с колонками: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                  <label class="file-label" for="import-all-file" style="justify-content:center;" data-i18n="io.chooseFile">📂 Выбрать файл CSV</label>
-                  <input type="file" id="import-all-file" accept=".csv,text/csv" />
-                  <button class="btn" id="import-all-btn" data-i18n="io.importAllBtn">⬆ Импортировать все</button>
-                </div>
-                <div id="io-import-all-status" class="status"></div>
-              </div>
-            </div>
-          </div>
-          <div class="card" style="margin-top:16px;">
-            <div class="card-header">
-              <h2 class="card-title" data-i18n="io.tbankTitle">Импорт из Т-Банка</h2>
-            </div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-              <div class="info-box" data-i18n-html="io.tbankDesc">
-                Введите read-only токен Т-Банк Инвестиции. Будет создан новый портфель с вашими облигациями и акциями.<br>Токен нигде не сохраняется.
-              </div>
-              <div class="field">
-                <label for="tbank-token" data-i18n="io.tbankToken">Токен Т-Банк (read-only)</label>
-                <input type="password" id="tbank-token" class="input" data-i18n-placeholder="io.tbankTokenPlaceholder" placeholder="Вставьте токен..." autocomplete="off" />
-              </div>
-              <div class="field" id="tbank-account-field" style="display:none;">
-                <label for="tbank-account-sel" data-i18n="io.tbankAccount">Счёт</label>
-                <select id="tbank-account-sel" class="select-input"></select>
-              </div>
-              <div id="tbank-preview-box" class="info-box info-box-warning" style="display:none;"></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-secondary" id="tbank-load-btn" data-i18n="io.tbankLoadBtn">Загрузить счета</button>
-                <button class="btn" id="tbank-bonds-btn" style="display:none;" data-i18n="io.tbankBondsBtn">⬆ Только облигации</button>
-                <button class="btn btn-secondary" id="tbank-all-btn" style="display:none;" data-i18n="io.tbankAllBtn">⬆ Все бумаги</button>
-              </div>
-              <div id="io-tbank-status" class="status"></div>
-            </div>
-          </div>
+
         </div>
 
       </div>
@@ -2741,21 +2765,16 @@
         return new Date(year, month - 1, day);
       }
 
-      function generatePaymentDates(nextCouponIso, periodDays) {
+      function generatePaymentDates(nextCouponIso, periodDays, rangeStart, rangeEnd) {
         const dates = [];
         if (!nextCouponIso || periodDays <= 0) return dates;
-        const anchor     = parseLocalDate(nextCouponIso);
+        const anchor = parseLocalDate(nextCouponIso);
         if (isNaN(anchor.getTime())) return dates;
-        const now        = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end        = new Date(now.getFullYear(), now.getMonth() + 13, 1);
-        // Откатываемся от якоря назад до начала текущего месяца
         let d = new Date(anchor);
-        while (d > monthStart) d = new Date(d.getTime() - periodDays * 86400000);
-        if (d < monthStart) d = new Date(d.getTime() + periodDays * 86400000);
-        // Собираем даты — не более одной выплаты в месяц на облигацию
+        while (d > rangeStart) d = new Date(d.getTime() - periodDays * 86400000);
+        if (d < rangeStart) d = new Date(d.getTime() + periodDays * 86400000);
         const seenMonths = new Set();
-        while (d < end) {
+        while (d < rangeEnd) {
           const key = `${d.getFullYear()}-${d.getMonth()}`;
           if (!seenMonths.has(key)) {
             seenMonths.add(key);
@@ -2766,11 +2785,30 @@
         return dates;
       }
 
-      function calculateMonthlyIncome(rows) {
+      // couponPeriodMode: 'year-ahead' (default) | 2026 | 2027 | 2028 ...
+      var _couponPeriodMode = 'year-ahead';
+
+      function _couponRange() {
         const now = new Date();
+        if (_couponPeriodMode === 'year-ahead') {
+          return {
+            start: new Date(now.getFullYear(), now.getMonth(), 1),
+            months: 12
+          };
+        }
+        const yr = Number(_couponPeriodMode);
+        return {
+          start: new Date(yr, 0, 1),
+          months: 12
+        };
+      }
+
+      function calculateMonthlyIncome(rows) {
+        const { start, months } = _couponRange();
+        const rangeEnd = new Date(start.getFullYear(), start.getMonth() + months + 1, 1);
         const slots = [];
-        for (let i = 0; i < 12; i++) {
-          const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        for (let i = 0; i < months; i++) {
+          const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
           slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, hasOffer: false, bonds: [] });
         }
         for (const row of rows) {
@@ -2779,8 +2817,18 @@
           const qty     = Number(row.quantity || 0);
           const period  = Number(row.coupon_period || 0);
           if (!row.next_coupon_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
-          const payDates = generatePaymentDates(row.next_coupon_date, period);
+
+          // Дата погашения — после неё купоны не платятся
+          let matDate = null;
+          if (row.maturity_date) {
+            matDate = parseLocalDate(row.maturity_date);
+            if (isNaN(matDate.getTime())) matDate = null;
+          }
+
+          const payDates = generatePaymentDates(row.next_coupon_date, period, start, rangeEnd);
           for (const pd of payDates) {
+            // Пропускаем выплаты после погашения
+            if (matDate && pd >= matDate) continue;
             for (const slot of slots) {
               if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
                 const amount = coupon * qty;
@@ -2790,7 +2838,7 @@
               }
             }
           }
-          // Mark months with offer dates
+          // Оферта — отмечаем месяц
           if (row.offer_date) {
             const od = parseLocalDate(row.offer_date);
             if (!isNaN(od.getTime())) {
@@ -2798,6 +2846,17 @@
                 if (od.getFullYear() === slot.year && od.getMonth() === slot.month) {
                   slot.hasOffer = true; break;
                 }
+              }
+            }
+          }
+          // Погашение — отмечаем месяц
+          if (matDate) {
+            for (const slot of slots) {
+              if (matDate.getFullYear() === slot.year && matDate.getMonth() === slot.month) {
+                slot.hasMaturity = true;
+                if (!slot.maturingBonds) slot.maturingBonds = [];
+                slot.maturingBonds.push({ name: row.name || row.ticker, ticker: row.ticker });
+                break;
               }
             }
           }
@@ -2926,6 +2985,15 @@
             ctx.fillText(t('chart.offer'), cx, labelY);
           }
 
+          // "Погашение/Maturity" marker — red dot under the bar
+          if (d.hasMaturity) {
+            const mLabelY = barH > 0 && !d.hasOffer ? y - (barH >= 18 ? 18 : 16) : PAD_T - (d.hasOffer ? 14 : 5);
+            ctx.fillStyle  = '#ef4444';
+            ctx.font       = 'bold 8px Inter, system-ui, sans-serif';
+            ctx.textAlign  = 'center';
+            ctx.fillText(t('chart.maturity'), cx, mLabelY);
+          }
+
           // Month name at bottom
           ctx.fillStyle = mLabelClr;
           ctx.font      = '9px Inter, system-ui, sans-serif';
@@ -2988,14 +3056,13 @@
               found = { d, x, barY: y2, cx: x + barW / 2 };
             }
           });
-          if (!found || !found.d.income) {
+          if (!found || (!found.d.income && !found.d.hasMaturity && !found.d.hasOffer)) {
             _chartTooltip.style.display = 'none';
             return;
           }
           const { d } = found;
           const monthName = getMonthNames()[d.month] + (d.year !== new Date().getFullYear() ? ' ' + d.year : '');
           const total = d.income;
-          // Sort bonds by amount desc
           const sorted = [...d.bonds].sort((a, b) => b.amount - a.amount);
           let rows_html = sorted.map(b => {
             const shortName = b.name.length > 22 ? b.name.substring(0, 21) + '…' : b.name;
@@ -3004,13 +3071,22 @@
               <span style="font-weight:600;white-space:nowrap;color:var(--green-400,#4ade80);">+${Math.round(b.amount).toLocaleString('ru')} ₽</span>
             </div>`;
           }).join('');
+          let matHtml = '';
+          if (d.hasMaturity && d.maturingBonds && d.maturingBonds.length) {
+            const matLabel = window._lang === 'en' ? 'Maturing' : 'Погашение';
+            matHtml = `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(239,68,68,.25);">
+              <div style="font-weight:600;font-size:11px;color:#ef4444;margin-bottom:3px;">${matLabel}:</div>
+              ${d.maturingBonds.map(b => `<div style="font-size:11px;color:var(--text-secondary,#94a3b8);padding:1px 0;">${esc(b.name || b.ticker)}</div>`).join('')}
+            </div>`;
+          }
           _chartTooltip.innerHTML = `
             <div style="font-weight:700;font-size:13px;margin-bottom:7px;color:var(--text-primary,#f1f5f9);">${monthName}</div>
             ${rows_html}
-            <div style="display:flex;justify-content:space-between;gap:12px;padding-top:6px;margin-top:2px;font-weight:700;">
-              <span>Итого</span>
+            ${total > 0 ? `<div style="display:flex;justify-content:space-between;gap:12px;padding-top:6px;margin-top:2px;font-weight:700;">
+              <span>${window._lang === 'en' ? 'Total' : 'Итого'}</span>
               <span style="color:var(--green-400,#4ade80);">+${Math.round(total).toLocaleString('ru')} ₽</span>
-            </div>`;
+            </div>` : ''}
+            ${matHtml}`;
           // Position tooltip near cursor, keep within viewport
           const TW = 264, TH = _chartTooltip.offsetHeight || 120;
           let tx = e.clientX + 14;
@@ -3031,6 +3107,32 @@
         canvas.addEventListener('mouseleave', () => {
           _chartTooltip.style.display = 'none';
         }, _sig);
+      }
+
+      function initCouponPeriodBtns() {
+        const container = document.getElementById('coupon-period-btns');
+        if (!container) return;
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const buttons = [
+          { label: t('chart.yearAhead') || 'На год вперёд', value: 'year-ahead' },
+          { label: String(curYear), value: String(curYear) },
+          { label: String(curYear + 1), value: String(curYear + 1) },
+          { label: String(curYear + 2), value: String(curYear + 2) },
+        ];
+        container.innerHTML = '';
+        buttons.forEach(b => {
+          const btn = document.createElement('button');
+          btn.className = 'analytics-period-btn' + (b.value === _couponPeriodMode ? ' active' : '');
+          btn.textContent = b.label;
+          btn.onclick = function() {
+            _couponPeriodMode = b.value;
+            container.querySelectorAll('.analytics-period-btn').forEach(el => el.classList.remove('active'));
+            btn.classList.add('active');
+            if (typeof tableRows !== 'undefined') drawMonthlyChart(tableRows);
+          };
+          container.appendChild(btn);
+        });
       }
 
       // ── EDITABLE CELLS ───────────────────────────────────────────
@@ -3995,6 +4097,7 @@
         const c5 = document.createElement('td'); c5.colSpan = 3; c5.textContent = ''; sumRow.appendChild(c5);
         tableBody.appendChild(sumRow);
 
+        initCouponPeriodBtns();
         drawMonthlyChart(tableRows);
       }
 
@@ -6890,6 +6993,8 @@
           'chart.offer': 'оферта',
           'chart.noData': 'Нет данных по купонным выплатам',
           'chart.yLabel': 'Купонный доход, ₽',
+          'chart.yearAhead': 'На год вперёд',
+          'chart.maturity': 'погашение',
           'auth.enterCreds': 'Введите логин и пароль',
           'auth.checking': 'Проверяем...',
           'auth.signing': 'Входим...',
@@ -7004,10 +7109,13 @@
           'settings.coupon_notif_days': 'Дней до выплаты:',
           'settings.coupon_notif_no_tg': 'Для уведомлений нужно привязать Telegram-аккаунт (укажите Chat ID в разделе «Аккаунт»)',
           'settings.save': 'Сохранить',
+          'io.sectionCurrent': 'Текущий портфель',
+          'io.sectionAll': 'Все портфели',
+          'io.sectionTbank': 'Импорт из брокера',
           'io.exportTitle': 'Экспорт',
-          'io.exportBtn': 'Скачать CSV',
-          'io.exportPdfBtn': 'Скачать PDF',
-          'io.importTitle': 'Импорт',
+          'io.exportBtn': 'CSV',
+          'io.exportPdfBtn': 'PDF',
+          'io.importTitle': 'Импорт CSV',
           'io.importPortfolio': 'Портфель для импорта',
           'io.importPortfolioPlaceholder': 'Выберите портфель',
           'io.chooseFile': '📂 Выбрать файл CSV',
@@ -7043,14 +7151,14 @@
           'settings.portfolios.mergeError': 'Ошибка объединения портфелей',
           'confirm.cancel': 'Отмена',
           'confirm.ok': 'OK',
-          'io.exportAllTitle': 'Экспорт всех портфелей',
-          'io.exportAllDesc': 'Скачайте все портфели в один CSV-файл.<br>Дополнительная колонка <code>portfolio_name</code> определяет принадлежность.',
-          'io.exportAllBtn': '⬇ Скачать все портфели',
-          'io.importAllTitle': 'Импорт всех портфелей',
-          'io.importAllDesc': 'CSV с колонками: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.',
-          'io.importAllBtn': '⬆ Импортировать все',
-          'io.tbankTitle': 'Импорт из Т-Банка',
-          'io.tbankDesc': 'Введите read-only токен Т-Банк Инвестиции. Будет создан новый портфель с вашими облигациями и акциями.<br>Токен нигде не сохраняется.',
+          'io.exportAllTitle': 'Экспорт',
+          'io.exportAllDesc': 'Все портфели в один CSV-файл.<br>Колонка <code>portfolio_name</code> определяет принадлежность.',
+          'io.exportAllBtn': 'Скачать CSV',
+          'io.importAllTitle': 'Импорт',
+          'io.importAllDesc': 'Колонки: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Новые портфели создаются автоматически.',
+          'io.importAllBtn': 'Импортировать',
+          'io.tbankTitle': 'Т-Банк Инвестиции',
+          'io.tbankDesc': 'Введите read-only токен из <a href="https://www.tbank.ru/invest/settings/" target="_blank" rel="noopener" style="color:var(--blue-400);">настроек Т-Инвестиций</a>. Будет создан новый портфель с вашими бумагами.<br>Токен нигде не сохраняется.',
           'io.tbankToken': 'Токен Т-Банк (read-only)',
           'io.tbankTokenPlaceholder': 'Вставьте токен...',
           'io.tbankAccount': 'Счёт',
@@ -7287,6 +7395,8 @@
           'chart.offer': 'offer',
           'chart.noData': 'No coupon payment data',
           'chart.yLabel': 'Coupon Income, ₽',
+          'chart.yearAhead': 'Year ahead',
+          'chart.maturity': 'maturity',
           'auth.enterCreds': 'Enter username and password',
           'auth.checking': 'Checking...',
           'auth.signing': 'Signing in...',
@@ -7401,10 +7511,13 @@
           'settings.coupon_notif_days': 'Days before payment:',
           'settings.coupon_notif_no_tg': 'You need to link a Telegram account first (set Chat ID in the Account tab)',
           'settings.save': 'Save',
+          'io.sectionCurrent': 'Current portfolio',
+          'io.sectionAll': 'All portfolios',
+          'io.sectionTbank': 'Broker import',
           'io.exportTitle': 'Export',
-          'io.exportBtn': 'Download CSV',
-          'io.exportPdfBtn': 'Download PDF',
-          'io.importTitle': 'Import',
+          'io.exportBtn': 'CSV',
+          'io.exportPdfBtn': 'PDF',
+          'io.importTitle': 'Import CSV',
           'io.importPortfolio': 'Target portfolio',
           'io.importPortfolioPlaceholder': 'Select portfolio',
           'io.chooseFile': '📂 Choose CSV file',
@@ -7440,14 +7553,14 @@
           'settings.portfolios.mergeError': 'Failed to merge portfolios',
           'confirm.cancel': 'Cancel',
           'confirm.ok': 'OK',
-          'io.exportAllTitle': 'Export All Portfolios',
-          'io.exportAllDesc': 'Download all portfolios as a single CSV file.<br>Column <code>portfolio_name</code> identifies each portfolio.',
-          'io.exportAllBtn': '⬇ Download all portfolios',
-          'io.importAllTitle': 'Import All Portfolios',
-          'io.importAllDesc': 'CSV columns: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>Missing portfolios are created automatically.',
-          'io.importAllBtn': '⬆ Import all',
-          'io.tbankTitle': 'Import from T-Bank',
-          'io.tbankDesc': 'Enter your T-Bank Invest read-only token. A new portfolio will be created with your bonds and stocks.<br>The token is never stored.',
+          'io.exportAllTitle': 'Export',
+          'io.exportAllDesc': 'All portfolios in one CSV file.<br>Column <code>portfolio_name</code> identifies each portfolio.',
+          'io.exportAllBtn': 'Download CSV',
+          'io.importAllTitle': 'Import',
+          'io.importAllDesc': 'Columns: <code>portfolio_name</code>, <code>ticker</code>, <code>instrument_type</code>, <code>quantity</code>, <code>purchase_price</code>.<br>New portfolios are created automatically.',
+          'io.importAllBtn': 'Import',
+          'io.tbankTitle': 'T-Bank Investments',
+          'io.tbankDesc': 'Enter a read-only token from <a href="https://www.tbank.ru/invest/settings/" target="_blank" rel="noopener" style="color:var(--blue-400);">T-Invest settings</a>. A new portfolio will be created with your instruments.<br>Token is never stored.',
           'io.tbankToken': 'T-Bank token (read-only)',
           'io.tbankTokenPlaceholder': 'Paste token...',
           'io.tbankAccount': 'Account',
@@ -7912,6 +8025,7 @@
             const summary = calculateSummary(tableRows);
             updateStatCards(summary);
           }
+          if (typeof initCouponPeriodBtns === 'function') initCouponPeriodBtns();
           if (typeof drawMonthlyChart === 'function' && typeof tableRows !== 'undefined') {
             drawMonthlyChart(tableRows);
           }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <title>Bond AI — Умный портфель облигаций с AI-аналитикой</title>
   <meta name="description" content="Подбирайте облигации под ваш риск-профиль, отслеживайте купонный доход и получайте уведомления в Telegram. Данные MOEX в реальном времени.">
@@ -399,9 +399,20 @@
     .feature-card {
       background: rgba(2,8,23,.85);
       padding: 32px 28px;
-      transition: background .2s;
+      transition: background .2s, opacity .5s ease, transform .5s ease;
       position: relative;
       overflow: hidden;
+    }
+    .feature-card.fc-hidden {
+      display: none;
+    }
+    .feature-card.fc-fade-out {
+      opacity: 0;
+      transform: scale(.96);
+    }
+    .feature-card.fc-fade-in {
+      opacity: 0;
+      transform: scale(.96);
     }
     .feature-card::before {
       content: '';
@@ -858,6 +869,35 @@
     .disclaimer-text a { color: var(--blue-400); text-decoration: none; }
     .disclaimer-text a:hover { text-decoration: underline; }
 
+    /* ─── TBANK BANNER ──────────────────────────────────────── */
+    .tbank-banner {
+      position: relative; z-index: 1;
+      padding: 32px 24px;
+      text-align: center;
+      background: linear-gradient(135deg, rgba(255,221,51,.06), rgba(255,221,51,.02));
+      border-top: 1px solid rgba(255,221,51,.10);
+      border-bottom: 1px solid rgba(255,221,51,.10);
+    }
+    .tbank-banner-inner {
+      max-width: 640px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .tbank-banner-text {
+      font-size: 14px; color: var(--slate-400); line-height: 1.6;
+    }
+    .tbank-banner-text strong { color: #ffdd33; font-weight: 600; }
+    .tbank-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      background: #ffdd33; color: #1a1a1a;
+      font-size: 13px; font-weight: 700;
+      border-radius: 8px; text-decoration: none;
+      transition: background .15s, transform .1s;
+      white-space: nowrap;
+    }
+    .tbank-btn:hover { background: #ffe566; transform: translateY(-1px); }
+
     /* ─── FOOTER ────────────────────────────────────────────── */
     .footer {
       position: relative; z-index: 1;
@@ -1220,7 +1260,7 @@
         <div class="stat-label">облигаций с MOEX</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-num"><span class="accent">2</span> мин</div>
+        <div class="stat-num"><span class="accent">5</span> мин</div>
         <div class="stat-label">интервал обновления данных</div>
       </div>
       <div class="stat-cell">
@@ -1281,6 +1321,48 @@
           </div>
           <h3>Совместный доступ</h3>
           <p>Поделитесь портфелем по ссылке с коллегой или советником. Опциональная защита паролем. Ссылка автоматически истекает.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(255,221,51,.10);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffdd33" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+          </div>
+          <h3>Импорт из Т-Банк</h3>
+          <p>Подключите брокерский счёт Т-Инвестиций по API и загрузите портфель в один клик. Все позиции синхронизируются автоматически.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(14,165,233,.15);box-shadow:0 0 16px rgba(14,165,233,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h3>Список наблюдения</h3>
+          <p>Отслеживайте интересные облигации без добавления в портфель. Добавляйте заметки, следите за ценами и доходностью в реальном времени.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(239,68,68,.15);box-shadow:0 0 16px rgba(239,68,68,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h3>Ценовые алерты</h3>
+          <p>Установите целевую цену «выше» или «ниже» — получите мгновенное оповещение в Telegram, когда бумага достигнет порога.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(34,197,94,.15);box-shadow:0 0 16px rgba(34,197,94,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h3>Кредитные рейтинги</h3>
+          <p>Рейтинги из SmartLab и MOEX обновляются ежедневно. При двойном понижении — автоматический алерт в Telegram о возможном риске.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(168,85,247,.15);box-shadow:0 0 16px rgba(168,85,247,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <h3>CSV импорт и экспорт</h3>
+          <p>Загрузите портфель из CSV-файла или выгрузите все данные для анализа в Excel. Поддержка массового добавления бумаг.</p>
+        </div>
+        <div class="feature-card fc-hidden" data-fc-rotate>
+          <div class="feature-icon-wrap" style="background:rgba(99,102,241,.15);box-shadow:0 0 16px rgba(99,102,241,.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <h3>Русский и English</h3>
+          <p>Полная двуязычная поддержка интерфейса и PDF-отчётов. Переключайтесь между русским и английским в один клик.</p>
         </div>
       </div>
     </div>
@@ -1483,6 +1565,11 @@
           <div class="comp-cell"><span class="comp-partial">Только MOEX</span></div>
           <div class="comp-cell comp-hl"><span class="comp-yes">SmartLab + MOEX</span></div>
 
+          <div class="comp-cell comp-feature">Импорт из брокера</div>
+          <div class="comp-cell"><span class="comp-no">Нет</span></div>
+          <div class="comp-cell"><span class="comp-partial">Частично</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">Т-Банк API</span></div>
+
           <div class="comp-cell comp-feature">Стоимость</div>
           <div class="comp-cell"><span class="comp-no">Лицензия Office</span></div>
           <div class="comp-cell"><span class="comp-no">от 500 ₽/мес</span></div>
@@ -1610,7 +1697,7 @@
             <li><span class="pf-check">✓</span> Исторические snapshots</li>
             <li><span class="pf-check">✓</span> Ценовые алерты без лимита</li>
             <li><span class="pf-check">✓</span> API-доступ</li>
-            <li><span class="pf-dash">—</span> Приоритетная поддержка</li>
+            <li><span class="pf-check">✓</span> Приоритетная поддержка</li>
           </ul>
           <div id="waitlist-form">
             <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -1834,7 +1921,7 @@
               </button>
             </div>
             <div style="text-align:center;">
-              <button class="wiz-btn-skip" onclick="wizClose()">Войти в существующий аккаунт →</button>
+              <button class="wiz-btn-skip" onclick="wizClose();landingAuthOpen('login')">Войти в существующий аккаунт →</button>
             </div>
           </div>
           <!-- Error state -->
@@ -1854,6 +1941,16 @@
   </div>
 
   <!-- ═══ FOOTER ════════════════════════════════════════════ -->
+  <!-- ═══ TBANK BANNER ═══════════════════════════════════════ -->
+  <div class="tbank-banner">
+    <div class="tbank-banner-inner">
+      <span class="tbank-banner-text">Нет брокерского счёта? Откройте в <strong>Т-Инвестициях</strong> и получите акции на 2 000 &#8381;</span>
+      <a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" class="tbank-btn">
+        Открыть счёт &rarr;
+      </a>
+    </div>
+  </div>
+
   <footer class="footer">
     <p>
       &copy; 2025 Bond AI
@@ -1863,6 +1960,9 @@
       <a href="/terms" class="footer-link">Условия использования</a>
       <span class="footer-sep">&middot;</span>
       Данные предоставлены Московской биржей
+    </p>
+    <p style="margin-top:6px;">
+      <a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" class="footer-link" style="color:var(--blue-400);">Откройте счёт в Т-Инвестициях и получите акции на 2000 &#8381; &rarr;</a>
     </p>
   </footer>
 
@@ -1966,15 +2066,14 @@
     function wizClose() {
       document.getElementById('wiz-overlay').classList.remove('open');
       document.body.style.overflow = '';
-      // If we have results, redirect to login page
-      if (_wizSuggested.length > 0) {
-        window.location.href = '/app?auth=login';
-      }
     }
 
-    // Close on overlay click
+    // Close on overlay (backdrop) click — ignore on step 3 to prevent accidental close
     document.getElementById('wiz-overlay').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('wiz-overlay')) wizClose();
+      if (e.target !== document.getElementById('wiz-overlay')) return;
+      const onStep3 = document.getElementById('wiz-s3').classList.contains('active');
+      if (onStep3) return; // don't close on backdrop click during registration
+      wizClose();
     });
     document.getElementById('wiz-close').addEventListener('click', wizClose);
 
@@ -2366,6 +2465,48 @@
         }).join('');
       } catch (e) { /* keep static fallback */ }
     })();
+  </script>
+  <script>
+  // ═══ FEATURE CARD ROTATION ═══════════════════════════
+  (function() {
+    var grid = document.querySelector('.features-grid');
+    if (!grid) return;
+    var all = Array.from(grid.querySelectorAll('.feature-card'));
+    if (all.length <= 6) return;
+
+    var visible = all.filter(function(c) { return !c.classList.contains('fc-hidden'); });
+    var queue = all.filter(function(c) { return c.classList.contains('fc-hidden'); });
+    var rotating = false;
+    var slotIdx = visible.length - 1;
+
+    setInterval(function() {
+      if (rotating || queue.length === 0) return;
+      rotating = true;
+
+      var outCard = visible[slotIdx];
+      var inCard = queue.shift();
+
+      outCard.classList.add('fc-fade-out');
+
+      setTimeout(function() {
+        outCard.classList.add('fc-hidden');
+        outCard.classList.remove('fc-fade-out');
+
+        inCard.classList.remove('fc-hidden');
+        inCard.classList.add('fc-fade-in');
+        outCard.parentNode.insertBefore(inCard, outCard);
+
+        void inCard.offsetWidth;
+        inCard.classList.remove('fc-fade-in');
+
+        visible[slotIdx] = inCard;
+        queue.push(outCard);
+
+        slotIdx = (slotIdx + 1) % visible.length;
+        rotating = false;
+      }, 500);
+    }, 5000);
+  })();
   </script>
   <script type="application/ld+json">
   {
