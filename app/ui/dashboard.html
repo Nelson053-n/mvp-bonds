@@ -1242,13 +1242,6 @@
                     <option value="en" data-i18n="settings.notif.langEn">English</option>
                   </select>
                 </div>
-                <div style="border-top:1px solid var(--card-border);padding-top:14px;margin-top:2px;">
-                  <div class="field">
-                    <label for="ym-counter" data-i18n="settings.notif.ymCounter">ID счётчика Яндекс.Метрики</label>
-                    <input id="ym-counter" type="text" class="input" placeholder="12345678" style="max-width:200px;" />
-                    <span style="font-size:11px;color:var(--text-muted);" data-i18n="settings.notif.ymHint">Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.</span>
-                  </div>
-                </div>
                 <div class="notif-actions">
                   <button class="btn" id="notif-save-btn" data-i18n="btn.save">Сохранить</button>
                   <button class="btn btn-secondary" id="notif-test-btn" data-i18n="settings.notif.test">Тест уведомления</button>
@@ -1498,6 +1491,24 @@
           <div id="adm-sources-body" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
           <div id="adm-sources-info" style="padding:0 16px 12px;font-size:11px;color:var(--text-muted);line-height:1.5;">
             Статистика накапливается с момента последнего запуска сервера. Рейтинги кэшируются в памяти до перезапуска или ручного сброса — при следующем обновлении портфеля будут запрошены повторно.
+          </div>
+        </div>
+
+        <!-- Analytics settings -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header">
+            <h2 class="card-title" data-i18n="adm.analyticsTitle">Аналитика</h2>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+            <div class="field">
+              <label for="ym-counter" data-i18n="adm.ymCounter">ID счётчика Яндекс.Метрики</label>
+              <input id="ym-counter" type="text" class="input" placeholder="12345678" style="max-width:200px;" />
+              <span style="font-size:11px;color:var(--text-muted);" data-i18n-html="adm.ymHint">Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.</span>
+            </div>
+            <div>
+              <button class="btn" id="ym-save-btn" data-i18n="btn.save">Сохранить</button>
+              <span id="ym-status" class="status" style="margin-left:8px;"></span>
+            </div>
           </div>
         </div>
 
@@ -4200,7 +4211,6 @@
       const tgChatInput   = document.getElementById('tg-chat');
       const tgThreshInput = document.getElementById('tg-threshold');
       const tgLangSelect  = document.getElementById('tg-lang');
-      const ymCounterInput = document.getElementById('ym-counter');
       async function loadNotifSettings() {
         if (!_currentUserIsAdmin) return;
         try {
@@ -4211,7 +4221,6 @@
           tgChatInput.value   = s.tg_chat_id   || '';
           tgThreshInput.value = s.price_drop_threshold ?? 5;
           if (tgLangSelect && s.tg_lang) tgLangSelect.value = s.tg_lang;
-          if (ymCounterInput) ymCounterInput.value = s.ym_counter_id || '';
         } catch {}
       }
       document.getElementById('notif-save-btn').addEventListener('click', async () => {
@@ -4219,13 +4228,10 @@
         try {
           const r = await apiFetch('/settings/notifications', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru', ym_counter_id: ymCounterInput?.value.trim() || '' }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
           });
           if (!r.ok) throw new Error(t('settings.notif.saveError'));
           setStatus(notifStatusEl, t('settings.notif.saved'));
-          // Apply new YM counter immediately
-          const newYmId = Number(ymCounterInput?.value.trim()) || 0;
-          if (newYmId && newYmId !== window._ymId) { window._ymId = newYmId; }
         } catch (err) { setStatus(notifStatusEl, err.message, true); }
       });
       document.getElementById('notif-test-btn').addEventListener('click', async () => {
@@ -4233,7 +4239,7 @@
         try {
           const r = await apiFetch('/settings/notifications/test', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru', ym_counter_id: ymCounterInput?.value.trim() || '' }),
+            body: JSON.stringify({ tg_bot_token: tgTokenInput.value.trim(), tg_chat_id: tgChatInput.value.trim(), price_drop_threshold: Number(tgThreshInput.value) || 5, tg_lang: tgLangSelect?.value || 'ru' }),
           });
           const res = await r.json();
           if (!r.ok || !res.success) throw new Error(t('settings.notif.sendError'));
@@ -5928,6 +5934,33 @@
         }
       }
 
+      // ── YM Counter (admin) ──────────────────────────────────────
+      (function() {
+        const ymInput = document.getElementById('ym-counter');
+        const ymBtn = document.getElementById('ym-save-btn');
+        const ymStatus = document.getElementById('ym-status');
+        if (!ymInput || !ymBtn) return;
+
+        // Load current value
+        fetch('/settings/ym-counter').then(function(r) { return r.json(); }).then(function(d) {
+          ymInput.value = d.ym_counter_id || '';
+        }).catch(function() {});
+
+        ymBtn.addEventListener('click', async function() {
+          setStatus(ymStatus, t('settings.notif.saving'));
+          try {
+            const r = await apiFetch('/settings/ym-counter', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ym_counter_id: ymInput.value.trim() }),
+            });
+            if (!r.ok) throw new Error();
+            setStatus(ymStatus, t('settings.notif.saved'));
+            const newId = Number(ymInput.value.trim()) || 0;
+            if (newId) window._ymId = newId;
+          } catch(e) { setStatus(ymStatus, t('settings.notif.saveError'), true); }
+        });
+      })();
+
       async function adminLoadStats() {
         try {
           const r = await apiFetch('/admin/stats');
@@ -7151,8 +7184,9 @@
           'settings.notif.lang': 'Язык уведомлений',
           'settings.notif.langRu': 'Русский',
           'settings.notif.langEn': 'English',
-          'settings.notif.ymCounter': 'ID счётчика Яндекс.Метрики',
-          'settings.notif.ymHint': 'Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.',
+          'adm.analyticsTitle': 'Аналитика',
+          'adm.ymCounter': 'ID счётчика Яндекс.Метрики',
+          'adm.ymHint': 'Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.',
           'settings.portfolios.shareBtn': 'Поделиться',
           'settings.portfolios.deleteBtn': 'Удалить',
           'settings.portfolios.deleteTitle': 'Удалить портфель',
@@ -7555,8 +7589,9 @@
           'settings.notif.lang': 'Notification language',
           'settings.notif.langRu': 'Russian',
           'settings.notif.langEn': 'English',
-          'settings.notif.ymCounter': 'Yandex.Metrika counter ID',
-          'settings.notif.ymHint': 'From <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Applied to landing and dashboard.',
+          'adm.analyticsTitle': 'Analytics',
+          'adm.ymCounter': 'Yandex.Metrika counter ID',
+          'adm.ymHint': 'From <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Applied to landing and dashboard.',
           'settings.portfolios.shareBtn': 'Share',
           'settings.portfolios.deleteBtn': 'Delete',
           'settings.portfolios.deleteTitle': 'Delete portfolio',
