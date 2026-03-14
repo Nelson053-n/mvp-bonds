@@ -1494,24 +1494,6 @@
           </div>
         </div>
 
-        <!-- Analytics settings -->
-        <div class="card" style="margin-top:16px;">
-          <div class="card-header">
-            <h2 class="card-title" data-i18n="adm.analyticsTitle">Аналитика</h2>
-          </div>
-          <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-            <div class="field">
-              <label for="ym-counter" data-i18n="adm.ymCounter">ID счётчика Яндекс.Метрики</label>
-              <input id="ym-counter" type="text" class="input" placeholder="12345678" style="max-width:200px;" />
-              <span style="font-size:11px;color:var(--text-muted);" data-i18n-html="adm.ymHint">Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.</span>
-            </div>
-            <div>
-              <button class="btn" id="ym-save-btn" data-i18n="btn.save">Сохранить</button>
-              <span id="ym-status" class="status" style="margin-left:8px;"></span>
-            </div>
-          </div>
-        </div>
-
         <div id="adm-status" class="status" style="margin-top:12px;"></div>
       </div>
 
@@ -5934,33 +5916,6 @@
         }
       }
 
-      // ── YM Counter (admin) ──────────────────────────────────────
-      (function() {
-        const ymInput = document.getElementById('ym-counter');
-        const ymBtn = document.getElementById('ym-save-btn');
-        const ymStatus = document.getElementById('ym-status');
-        if (!ymInput || !ymBtn) return;
-
-        // Load current value
-        fetch('/settings/ym-counter').then(function(r) { return r.json(); }).then(function(d) {
-          ymInput.value = d.ym_counter_id || '';
-        }).catch(function() {});
-
-        ymBtn.addEventListener('click', async function() {
-          setStatus(ymStatus, t('settings.notif.saving'));
-          try {
-            const r = await apiFetch('/settings/ym-counter', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ym_counter_id: ymInput.value.trim() }),
-            });
-            if (!r.ok) throw new Error();
-            setStatus(ymStatus, t('settings.notif.saved'));
-            const newId = Number(ymInput.value.trim()) || 0;
-            if (newId) window._ymId = newId;
-          } catch(e) { setStatus(ymStatus, t('settings.notif.saveError'), true); }
-        });
-      })();
-
       async function adminLoadStats() {
         try {
           const r = await apiFetch('/admin/stats');
@@ -7184,9 +7139,6 @@
           'settings.notif.lang': 'Язык уведомлений',
           'settings.notif.langRu': 'Русский',
           'settings.notif.langEn': 'English',
-          'adm.analyticsTitle': 'Аналитика',
-          'adm.ymCounter': 'ID счётчика Яндекс.Метрики',
-          'adm.ymHint': 'Из <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Применяется на лендинге и дашборде.',
           'settings.portfolios.shareBtn': 'Поделиться',
           'settings.portfolios.deleteBtn': 'Удалить',
           'settings.portfolios.deleteTitle': 'Удалить портфель',
@@ -7589,9 +7541,6 @@
           'settings.notif.lang': 'Notification language',
           'settings.notif.langRu': 'Russian',
           'settings.notif.langEn': 'English',
-          'adm.analyticsTitle': 'Analytics',
-          'adm.ymCounter': 'Yandex.Metrika counter ID',
-          'adm.ymHint': 'From <a href="https://metrika.yandex.ru" target="_blank" rel="noopener" style="color:var(--blue-400);">metrika.yandex.ru</a>. Applied to landing and dashboard.',
           'settings.portfolios.shareBtn': 'Share',
           'settings.portfolios.deleteBtn': 'Delete',
           'settings.portfolios.deleteTitle': 'Delete portfolio',
@@ -8457,20 +8406,15 @@
       })();
 
     </script>
-    <!-- Yandex.Metrika counter — ID загружается из настроек администратора -->
+    <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
-      window._ymId = 0;
-      (function() {
-        fetch('/settings/ym-counter').then(function(r) { return r.json(); }).then(function(d) {
-          var id = Number(d.ym_counter_id) || 0;
-          if (!id) return;
-          window._ymId = id;
-          (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-          m[i].l=1*new Date();
-          for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
-          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
-          (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-          ym(id, "init", { clickmap:true, trackLinks:true, accurateTrackBounce:true, webvisor:true });
-        }).catch(function() {});
-      })();
+      window._ymId = 107693104;
+      (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=107693104', 'ym');
+      ym(107693104, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer:document.referrer, url:location.href, accurateTrackBounce:true, trackLinks:true});
     </script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/107693104" style="position:absolute;left:-9999px;" alt=""></div></noscript>

@@ -15,10 +15,6 @@ class NotificationSettings(BaseModel):
     tg_lang: str = Field(default="ru", pattern="^(ru|en)$")
 
 
-class YmCounterInput(BaseModel):
-    ym_counter_id: str = Field(default="", max_length=20)
-
-
 class PersonalNotificationsInput(BaseModel):
     coupon_notif_enabled: bool
     coupon_notif_days: int = Field(..., ge=1, le=30)
@@ -63,21 +59,6 @@ async def test_notification(
         msg,
     )
     return {"success": ok}
-
-
-@router.get("/ym-counter")
-async def get_ym_counter() -> dict[str, str]:
-    """Public endpoint — returns Yandex.Metrika counter ID."""
-    return {"ym_counter_id": storage_service.get_setting("ym_counter_id")}
-
-
-@router.post("/ym-counter")
-async def save_ym_counter(
-    payload: YmCounterInput,
-    admin: dict = Depends(get_admin_user),
-) -> dict[str, str]:
-    storage_service.set_setting("ym_counter_id", payload.ym_counter_id)
-    return {"ym_counter_id": payload.ym_counter_id}
 
 
 @router.get("/notifications/personal")
