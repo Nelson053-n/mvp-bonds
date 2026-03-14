@@ -399,7 +399,7 @@ async def get_shared_portfolio_snapshots(
     portfolio: dict = Depends(get_shared_portfolio),
 ) -> list[dict]:
     """Portfolio value history for shared view (public, no auth)."""
-    if days not in (30, 90, 365):
+    if days not in (7, 30, 90, 365):
         days = 90
     return storage_service.get_portfolio_snapshots(portfolio["id"], days)
 

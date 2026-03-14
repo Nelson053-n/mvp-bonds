@@ -1026,6 +1026,7 @@
               <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
             </div>
             <div style="display:flex;gap:6px;">
+              <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
               <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
               <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
               <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
@@ -2601,7 +2602,7 @@
         }
       }
 
-      function drawHistoryChart(canvas, snapshots) {
+      function drawHistoryChart(canvas, snapshots, skipAnimation) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const W = canvas.offsetWidth || 600;
@@ -2625,8 +2626,19 @@
         const bgClr    = st.getPropertyValue('--modal-bg').trim() || '#0d1829';
         const textClr  = st.getPropertyValue('--text-primary').trim() || '#f1f5f9';
 
-        function drawBase(hoverIdx) {
+        // Interpolate point along polyline at fractional index
+        function interpPoint(arr, fIdx) {
+          if (fIdx <= 0) return arr[0];
+          if (fIdx >= arr.length - 1) return arr[arr.length - 1];
+          const lo = Math.floor(fIdx), hi = lo + 1, t = fIdx - lo;
+          return arr[lo] + (arr[hi] - arr[lo]) * t;
+        }
+
+        function drawBase(hoverIdx, progress) {
+          if (progress === undefined) progress = 1;
           ctx.clearRect(0, 0, W, H);
+          // How many points to draw (fractional)
+          const maxIdx = (values.length - 1) * progress;
 
           // Grid lines + Y labels
           ctx.strokeStyle = gridClr; ctx.lineWidth = 1;
@@ -2638,29 +2650,44 @@
             ctx.fillText(Math.round(val / 1000) + 'k', pad.l - 4, y + 3);
           }
 
-          // Cost baseline (dashed)
+          // Cost baseline (dashed) — animated
           ctx.strokeStyle = dashClr; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          costs.forEach((c, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(c)) : ctx.lineTo(xScale(i), yScale(c)); });
+          for (let i = 0; i <= Math.floor(maxIdx); i++) {
+            i === 0 ? ctx.moveTo(xScale(i), yScale(costs[i])) : ctx.lineTo(xScale(i), yScale(costs[i]));
+          }
+          if (maxIdx > Math.floor(maxIdx)) {
+            ctx.lineTo(xScale(maxIdx), yScale(interpPoint(costs, maxIdx)));
+          }
           ctx.stroke(); ctx.setLineDash([]);
 
-          // Value fill
+          // Value fill — animated
           ctx.beginPath();
-          values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
-          ctx.lineTo(xScale(values.length - 1), H - pad.b);
+          for (let i = 0; i <= Math.floor(maxIdx); i++) {
+            i === 0 ? ctx.moveTo(xScale(i), yScale(values[i])) : ctx.lineTo(xScale(i), yScale(values[i]));
+          }
+          if (maxIdx > Math.floor(maxIdx)) {
+            ctx.lineTo(xScale(maxIdx), yScale(interpPoint(values, maxIdx)));
+          }
+          ctx.lineTo(xScale(maxIdx), H - pad.b);
           ctx.lineTo(xScale(0), H - pad.b);
           ctx.closePath();
           const grad = ctx.createLinearGradient(0, pad.t, 0, H - pad.b);
           grad.addColorStop(0, 'rgba(59,130,246,0.18)'); grad.addColorStop(1, 'rgba(59,130,246,0)');
           ctx.fillStyle = grad; ctx.fill();
 
-          // Value line
+          // Value line — animated
           ctx.strokeStyle = lineClr; ctx.lineWidth = 2.5;
           ctx.beginPath();
-          values.forEach((v, i) => { i === 0 ? ctx.moveTo(xScale(i), yScale(v)) : ctx.lineTo(xScale(i), yScale(v)); });
+          for (let i = 0; i <= Math.floor(maxIdx); i++) {
+            i === 0 ? ctx.moveTo(xScale(i), yScale(values[i])) : ctx.lineTo(xScale(i), yScale(values[i]));
+          }
+          if (maxIdx > Math.floor(maxIdx)) {
+            ctx.lineTo(xScale(maxIdx), yScale(interpPoint(values, maxIdx)));
+          }
           ctx.stroke();
 
-          // X labels
+          // X labels — show all (static)
           const step = Math.max(1, Math.floor(snapshots.length / 6));
           ctx.fillStyle = labelClr; ctx.font = '10px Inter,sans-serif'; ctx.textAlign = 'center';
           snapshots.forEach((s, i) => {
@@ -2727,7 +2754,27 @@
           }
         }
 
-        drawBase(null);
+        // Cancel previous animation if running
+        if (canvas._histAnimId) { cancelAnimationFrame(canvas._histAnimId); canvas._histAnimId = null; }
+
+        if (skipAnimation) {
+          drawBase(null, 1);
+        } else {
+          // Animate line drawing over 600ms with ease-out
+          var animStart = null;
+          var ANIM_DURATION = 600;
+          function animStep(ts) {
+            if (!animStart) animStart = ts;
+            var elapsed = ts - animStart;
+            var t = Math.min(elapsed / ANIM_DURATION, 1);
+            // ease-out cubic
+            var progress = 1 - Math.pow(1 - t, 3);
+            drawBase(null, progress);
+            if (t < 1) { canvas._histAnimId = requestAnimationFrame(animStep); }
+            else { canvas._histAnimId = null; }
+          }
+          canvas._histAnimId = requestAnimationFrame(animStep);
+        }
 
         // Hover interaction — replace listener each redraw
         const oldHandler = canvas._historyMouseMove;
@@ -2736,13 +2783,14 @@
         if (oldLeave)   canvas.removeEventListener('mouseleave', oldLeave);
 
         canvas._historyMouseMove = (e) => {
+          if (canvas._histAnimId) return; // Don't hover during animation
           const rect = canvas.getBoundingClientRect();
           const mx   = (e.clientX - rect.left) * (W / rect.width);
-          if (mx < pad.l || mx > W - pad.r) { drawBase(null); return; }
+          if (mx < pad.l || mx > W - pad.r) { drawBase(null, 1); return; }
           const idx = Math.round((mx - pad.l) / chartW * (snapshots.length - 1));
-          drawBase(Math.max(0, Math.min(idx, snapshots.length - 1)));
+          drawBase(Math.max(0, Math.min(idx, snapshots.length - 1)), 1);
         };
-        canvas._historyMouseLeave = () => drawBase(null);
+        canvas._historyMouseLeave = () => { if (!canvas._histAnimId) drawBase(null, 1); };
 
         canvas.addEventListener('mousemove', canvas._historyMouseMove);
         canvas.addEventListener('mouseleave', canvas._historyMouseLeave);
@@ -4134,14 +4182,14 @@
         const historyCard = document.getElementById('analytics-history-card');
         if (historyCard) new ResizeObserver(() => {
           const c = document.getElementById('analytics-history-chart');
-          if (c && c._snapshots) drawHistoryChart(c, c._snapshots);
+          if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
           else if (c) drawHistoryChartEmpty(c, c._emptySnap || null);
         }).observe(historyCard);
       } else {
         window.addEventListener('resize', () => {
           drawMonthlyChart(tableRows);
           const c = document.getElementById('analytics-history-chart');
-          if (c && c._snapshots) drawHistoryChart(c, c._snapshots);
+          if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
         });
       }
 
@@ -8101,7 +8149,7 @@
         if (tableRows.length) {
           drawMonthlyChart(tableRows);
           const histCanvas = document.getElementById('analytics-history-chart');
-          if (histCanvas && histCanvas._snapshots) drawHistoryChart(histCanvas, histCanvas._snapshots);
+          if (histCanvas && histCanvas._snapshots) drawHistoryChart(histCanvas, histCanvas._snapshots, true);
           else if (histCanvas && histCanvas.style.display !== 'none') drawHistoryChartEmpty(histCanvas);
         }
       });
