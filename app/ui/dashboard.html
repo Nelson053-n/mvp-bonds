@@ -2253,25 +2253,26 @@
       }
       function recalculateRow(row, qty, price) {
         const cp = Number(row.current_price || 0);
+        const aci = Number(row.aci || 0);
+        const dirty = cp + aci;
         row.quantity = qty; row.purchase_price = price;
-        row.current_value = roundTo2(cp * qty);
-        row.profit = roundTo2((cp - price) * qty);
+        row.current_value = roundTo2(dirty * qty);
+        row.profit = roundTo2((dirty - price) * qty);
       }
 
       // ── SUMMARY ──────────────────────────────────────────────────
       function calculateSummary(rows) {
         const totalAssets  = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
-        const totalProfit  = rows.reduce((s, r) =>
-          s + roundTo2((Number(r.current_price) - Number(r.purchase_price)) * Number(r.quantity)), 0);
+        const totalProfit  = rows.reduce((s, r) => s + Number(r.profit || 0), 0);
         let annualIncome = 0, weightedYield = 0, bondWeightSum = 0;
         let weightedCouponRate = 0, couponRateWeightSum = 0;
         for (const row of rows) {
           if (row.type !== 'bond') continue;
-          const qty = Number(row.quantity || 0), cp = Number(row.current_price || 0);
+          const qty = Number(row.quantity || 0);
           const coupon = Number(row.coupon || 0), period = Number(row.coupon_period || 0);
           const freq = period > 0 ? Math.round(365 / period) : 2;
           if (coupon > 0 && qty > 0) annualIncome += coupon * qty * freq;
-          const pv = cp * qty, my = Number(row.market_yield || 0);
+          const pv = Number(row.current_value || 0), my = Number(row.market_yield || 0);
           if (pv > 0 && my > 0) { weightedYield += my * pv; bondWeightSum += pv; }
           const cr = Number(row.coupon_rate || 0);
           if (pv > 0 && cr > 0) { weightedCouponRate += cr * pv; couponRateWeightSum += pv; }
@@ -3966,16 +3967,16 @@
           tr.appendChild(createEditableCell(row, 'purchase_price', ''));
           addCell(tr, fmt(row.current_value));
 
-          // Profit
-          const computedProfit = roundTo2((Number(row.current_price) - Number(row.purchase_price)) * Number(row.quantity));
+          // Profit (use server-calculated row.profit which accounts for dirty price / ACI)
+          const profitVal = Number(row.profit || 0);
           const profitTd = document.createElement('td');
-          profitTd.textContent = fmt(computedProfit);
-          if (computedProfit > 0) profitTd.classList.add('profit-positive');
-          else if (computedProfit < 0) profitTd.classList.add('profit-negative');
+          profitTd.textContent = fmt(profitVal);
+          if (profitVal > 0) profitTd.classList.add('profit-positive');
+          else if (profitVal < 0) profitTd.classList.add('profit-negative');
           tr.appendChild(profitTd);
           // Цветовая индикация строки по прибыли
-          if (computedProfit > 0) tr.style.setProperty('--row-profit-color', 'rgba(22,163,74,0.04)');
-          else if (computedProfit < 0) tr.style.setProperty('--row-profit-color', 'rgba(220,38,38,0.04)');
+          if (profitVal > 0) tr.style.setProperty('--row-profit-color', 'rgba(22,163,74,0.04)');
+          else if (profitVal < 0) tr.style.setProperty('--row-profit-color', 'rgba(220,38,38,0.04)');
 
           addCell(tr, fmt(row.weight) + '%');
           tr.appendChild(createCouponCell(row));
