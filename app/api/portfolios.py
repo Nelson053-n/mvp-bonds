@@ -335,6 +335,6 @@ async def get_snapshots(
 ) -> list[dict]:
     """Get portfolio value history."""
     await get_portfolio_or_403(portfolio_id, current_user)
-    if days not in (30, 90, 365):
+    if days not in (7, 30, 90, 365):
         days = 90
     return storage_service.get_portfolio_snapshots(portfolio_id, days)
