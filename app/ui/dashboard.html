@@ -2258,7 +2258,7 @@
         const dirty = cp + aci;
         row.quantity = qty; row.purchase_price = price;
         row.current_value = roundTo2(dirty * qty);
-        row.profit = roundTo2((dirty - price) * qty);
+        row.profit = roundTo2((cp - price) * qty);
       }
 
       // ── SUMMARY ──────────────────────────────────────────────────

@@ -70,9 +70,8 @@ class PortfolioService:
             if override_price is None:
                 nominal = snapshot.nominal or 1000.0
                 clean_price = (snapshot.clean_price_percent / 100.0) * nominal
-                aci = snapshot.aci or 0.0
-                # Сохраняем грязную цену (с НКД) — реальная сумма покупки
-                price = round(clean_price + aci, 2)
+                # Сохраняем чистую цену (без НКД) — как на бирже
+                price = round(clean_price, 2)
             else:
                 price = override_price
         else:
@@ -340,7 +339,7 @@ class PortfolioService:
                         # стоимость позиции считается по грязной цене
                         current_value = dirty_price * item.quantity
                         profit = (
-                            (dirty_price - item.purchase_price)
+                            (clean_price - item.purchase_price)
                             * item.quantity
                         )
                         return InstrumentMetrics(
