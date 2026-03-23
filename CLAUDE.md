@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Run application:**
 ```bash
-MVP_JWT_SECRET=REDACTED .venv/bin/uvicorn app.main:app --reload
+MVP_JWT_SECRET=<YOUR_JWT_SECRET> .venv/bin/uvicorn app.main:app --reload
 ```
 
 **Run tests:**

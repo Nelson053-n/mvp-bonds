@@ -34,7 +34,7 @@ set MVP_JWT_SECRET=your_secret_key_here
 
 For development, you can use a simple secret:
 ```bash
-export MVP_JWT_SECRET=REDACTED
+export MVP_JWT_SECRET=<YOUR_JWT_SECRET>
 ```
 
 ### 4. Run the application

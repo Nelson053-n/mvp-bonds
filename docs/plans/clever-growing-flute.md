@@ -143,8 +143,8 @@ for row in rows:
 
 ## Verification
 
-1. Запустить: `MVP_JWT_SECRET=REDACTED .venv/bin/uvicorn app.main:app --reload`
+1. Запустить: `MVP_JWT_SECRET=<YOUR_JWT_SECRET> .venv/bin/uvicorn app.main:app --reload`
 2. Скачать PDF портфеля → все 16 колонок влезают, нет наезда, длинные названия переносятся
 3. Создать портфель через лендинг-wizard → Настройки → Мои портфели → риск показывает значение (не «Не определён»)
 4. Добавить консервативную облигацию с купоном 8% → риск портфеля должен снизиться
-5. Тесты: `MVP_JWT_SECRET=REDACTED_padding_ok .venv/bin/python -m pytest tests/ 2>&1 | tail -5`
+5. Тесты: `MVP_JWT_SECRET=<YOUR_JWT_SECRET> .venv/bin/python -m pytest tests/ 2>&1 | tail -5`

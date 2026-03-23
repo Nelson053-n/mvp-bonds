@@ -134,3 +134,15 @@ Thumbs.db
 
 # Project specific
 data/*.db
+
+# Database WAL/SHM files
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+
+# Certificates and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
