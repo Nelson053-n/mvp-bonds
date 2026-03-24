@@ -2318,7 +2318,7 @@
         sv.className = 'stat-value';
         animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
         const posText = n + ' ' + t('stat.sub.positions') + posSuffix;
-        const totalText = allPortfoliosTotalValue > 0 ? '\nВсего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽' : '';
+        const totalText = (portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '\nВсего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽' : '';
         svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + totalText).replace('\n', '<br>');
         svs.style.whiteSpace = 'pre-wrap';
 
