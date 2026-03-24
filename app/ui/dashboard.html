@@ -2002,6 +2002,7 @@
       let sortState = { key: null, direction: 'asc' };
       let portfolioId = null;
       let portfolios = [];
+      let allPortfoliosTotalValue = 0;
       let isReadOnly = false;
       let shareToken = null;
       let sharePassword = null;
@@ -2316,7 +2317,9 @@
 
         sv.className = 'stat-value';
         animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
-        svs.textContent = isEmpty ? t('stat.sub.empty') : n + ' ' + t('stat.sub.positions') + posSuffix;
+        const posText = n + ' ' + t('stat.sub.positions') + posSuffix;
+        const totalText = allPortfoliosTotalValue > 0 ? ' | Всего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽' : '';
+        svs.textContent = isEmpty ? t('stat.sub.empty') : posText + totalText;
 
         sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
         animateCounter(sp, isEmpty ? 0 : roundTo2(summary.totalProfit),
@@ -4232,6 +4235,14 @@
         if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
         renderTable();
         scheduleAnalytics();
+        // Update total portfolios value after sync
+        if (!isReadOnly) {
+          calculateAllPortfoliosTotal().then(val => {
+            allPortfoliosTotalValue = val;
+            const summary = calculateSummary(tableRows);
+            updateStatCards(summary);
+          }).catch(err => console.error('Failed to update totals:', err));
+        }
       }
 
       // ── ADD FORM (legacy stubs — форма перенесена в #add-instrument-modal) ───────
@@ -4579,6 +4590,8 @@
           setupAdminNav(meData.is_admin || false);
           showDashboard();
           await loadPortfolios();
+          // Calculate total value of all portfolios
+          allPortfoliosTotalValue = await calculateAllPortfoliosTotal();
           // Set portfolioId from saved value or first portfolio
           if (savedPortfolioId && portfolios.some(p => p.id === Number(savedPortfolioId))) {
             portfolioId = Number(savedPortfolioId);
@@ -5191,6 +5204,24 @@
         }
       }
 
+      async function calculateAllPortfoliosTotal() {
+        let totalValue = 0;
+        try {
+          for (const p of portfolios) {
+            const res = await apiFetch(`/portfolios/${p.id}/table`);
+            if (res.ok) {
+              const data = await res.json();
+              const items = data.items || [];
+              const portValue = items.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
+              totalValue += portValue;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to calculate total portfolios value:', err);
+        }
+        return totalValue;
+      }
+
       function updatePortfolioSelector() {
         const selector = document.getElementById('portfolio-selector');
         if (!selector) return;
@@ -5319,6 +5350,12 @@
                 showPanel('panel-table');
                 if (loadTableCache()) renderTable();
                 syncTableFromServer().catch(err => console.error('Failed to sync:', err));
+                // Recalculate total portfolios value
+                calculateAllPortfoliosTotal().then(val => {
+                  allPortfoliosTotalValue = val;
+                  const summary = calculateSummary(tableRows);
+                  updateStatCards(summary);
+                }).catch(err => console.error('Failed to recalculate totals:', err));
               }
             });
             container.appendChild(sel);
