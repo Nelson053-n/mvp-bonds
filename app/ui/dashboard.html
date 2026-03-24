@@ -829,7 +829,7 @@
       /* Mobile layout */
       body.mobile-mode .topbar-nav { display: none !important; }
       body.mobile-mode .topbar-inner { flex-wrap: wrap; }
-      body.mobile-mode .container { padding: 8px; padding-top: var(--topbar-h, 100px); }
+      body.mobile-mode .container { padding: 8px; padding-top: var(--topbar-h, 140px); }
       body.mobile-mode .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
       body.mobile-mode .stat-card { padding: 10px 12px; }
       body.mobile-mode .panel-cols { grid-template-columns: 1fr !important; }
@@ -2318,8 +2318,8 @@
         sv.className = 'stat-value';
         animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
         const posText = n + ' ' + t('stat.sub.positions') + posSuffix;
-        const totalText = (portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '\nВсего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽' : '';
-        svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + totalText).replace('\n', '<br>');
+        const totalText = (portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '<br><span style="color:var(--blue-500);font-weight:600">Всего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽</span>' : '';
+        svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + totalText);
         svs.style.whiteSpace = 'pre-wrap';
 
         sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
@@ -4591,8 +4591,14 @@
           setupAdminNav(meData.is_admin || false);
           showDashboard();
           await loadPortfolios();
-          // Calculate total value of all portfolios
-          allPortfoliosTotalValue = await calculateAllPortfoliosTotal();
+          // Calculate total value of all portfolios (non-blocking)
+          if (portfolios.length > 1) {
+            calculateAllPortfoliosTotal().then(val => {
+              allPortfoliosTotalValue = val;
+              const summary = calculateSummary(tableRows);
+              updateStatCards(summary);
+            }).catch(() => {});
+          }
           // Set portfolioId from saved value or first portfolio
           if (savedPortfolioId && portfolios.some(p => p.id === Number(savedPortfolioId))) {
             portfolioId = Number(savedPortfolioId);
@@ -5206,21 +5212,22 @@
       }
 
       async function calculateAllPortfoliosTotal() {
-        let totalValue = 0;
         try {
-          for (const p of portfolios) {
-            const res = await apiFetch(`/portfolios/${p.id}/table`);
-            if (res.ok) {
-              const data = await res.json();
-              const items = data.items || [];
-              const portValue = items.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
-              totalValue += portValue;
-            }
-          }
+          const results = await Promise.all(portfolios.map(async p => {
+            try {
+              const res = await apiFetch(`/portfolios/${p.id}/table`);
+              if (res.ok) {
+                const data = await res.json();
+                return (data.items || []).reduce((sum, item) => sum + Number(item.current_value || 0), 0);
+              }
+            } catch(e) {}
+            return 0;
+          }));
+          return results.reduce((a, b) => a + b, 0);
         } catch (err) {
           console.error('Failed to calculate total portfolios value:', err);
+          return 0;
         }
-        return totalValue;
       }
 
       function updatePortfolioSelector() {
@@ -8166,13 +8173,13 @@
       }
 
       function updateTopbarHeight() {
-        // Double rAF ensures layout is fully painted before measuring
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Triple rAF ensures layout is fully painted before measuring (mobile nav needs extra frame)
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
           const topbar = document.querySelector('.topbar');
           if (!topbar) return;
           const h = topbar.getBoundingClientRect().height;
-          document.documentElement.style.setProperty('--topbar-h', (h + 12) + 'px');
-        }));
+          document.documentElement.style.setProperty('--topbar-h', (h + 16) + 'px');
+        })));
       }
 
       // Keep topbar offset accurate on resize
