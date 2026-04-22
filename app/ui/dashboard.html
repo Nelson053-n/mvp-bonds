@@ -3283,11 +3283,12 @@
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon_rate);
         const floaterHasValue = row.is_floater && Number.isFinite(cv) && cv > 0;
-        const isEditable = !isReadOnly && (
+        // Флоатер с автоданными — всегда read-only (не редактировать даже если manual_coupon_rate_set=true)
+        const isEditable = !isReadOnly && !floaterHasValue && (
           row.manual_coupon_rate_set === true ||
           !(Number.isFinite(cv) && cv > 0)
         );
-        if (!isEditable || (row.is_floater && floaterHasValue && !row.manual_coupon_rate_set)) {
+        if (!isEditable) {
           const txt = fmt(roundTo2(cv)) + '%';
           if (row.is_floater && !row.manual_coupon_rate_set) {
             const tip = floaterHasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
@@ -3336,11 +3337,12 @@
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon);
         const floaterCouponHasValue = row.is_floater && Number.isFinite(cv) && cv > 0;
-        const isEditable = !isReadOnly && (
+        // Флоатер с автоданными — всегда read-only
+        const isEditable = !isReadOnly && !floaterCouponHasValue && (
           row.manual_coupon_set === true ||
           !(Number.isFinite(cv) && cv > 0)
         );
-        if (!isEditable || (row.is_floater && floaterCouponHasValue && !row.manual_coupon_set)) {
+        if (!isEditable) {
           if (row.is_floater && !row.manual_coupon_set) {
             const tip = floaterCouponHasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
             const label = floaterCouponHasValue ? `${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
