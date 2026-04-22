@@ -358,18 +358,26 @@ class PortfolioService:
                             is_traded=snapshot.is_traded,
                             nominal=nominal,
                             coupon=(
-                                item.manual_coupon
-                                if item.manual_coupon is not None
-                                else snapshot.coupon
+                                snapshot.coupon
+                                if snapshot.is_floater and snapshot.coupon is not None and snapshot.coupon > 0
+                                else (item.manual_coupon if item.manual_coupon is not None else snapshot.coupon)
                             ),
                             coupon_period=snapshot.coupon_period,
                             coupon_rate=(
-                                item.manual_coupon_rate
-                                if item.manual_coupon_rate is not None
-                                else snapshot.coupon_rate
+                                snapshot.coupon_rate
+                                if snapshot.is_floater and snapshot.coupon_rate is not None and snapshot.coupon_rate > 0
+                                else (item.manual_coupon_rate if item.manual_coupon_rate is not None else snapshot.coupon_rate)
                             ),
-                            manual_coupon_set=item.manual_coupon is not None,
-                            manual_coupon_rate_set=item.manual_coupon_rate is not None,
+                            manual_coupon_set=(
+                                False
+                                if snapshot.is_floater and snapshot.coupon is not None and snapshot.coupon > 0
+                                else item.manual_coupon is not None
+                            ),
+                            manual_coupon_rate_set=(
+                                False
+                                if snapshot.is_floater and snapshot.coupon_rate is not None and snapshot.coupon_rate > 0
+                                else item.manual_coupon_rate is not None
+                            ),
                             is_floater=snapshot.is_floater,
                             maturity_date=snapshot.maturity_date,
                             buyback_date=snapshot.buyback_date,
