@@ -199,6 +199,58 @@ class MOEXService:
             company_rating=company_rating,
         )
 
+    async def get_last_known_coupon(self, secid: str) -> dict | None:
+        """Fetch the last known coupon from bondization for floaters.
+
+        Returns {"value": float, "period_days": int} or None if unavailable.
+        Only called when MOEX reports COUPONVALUE=0 (floater / not yet announced).
+        """
+        url = (
+            f"{settings.moex_base_url}/securities/{secid}/bondization.json"
+            "?iss.meta=off&iss.only=coupons&limit=50"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            logger.debug("bondization fetch failed for %s: %s", secid, exc)
+            return None
+
+        cols = data.get("coupons", {}).get("columns", [])
+        rows = data.get("coupons", {}).get("data", [])
+        if not cols or not rows:
+            return None
+
+        # Find last row with a non-zero value
+        last_value: float | None = None
+        last_start: str | None = None
+        last_end: str | None = None
+        for row in rows:
+            r = dict(zip(cols, row))
+            v = r.get("value")
+            if v is not None and float(v) > 0:
+                last_value = float(v)
+                last_start = r.get("startdate")
+                last_end = r.get("coupondate")
+
+        if last_value is None:
+            return None
+
+        # Calculate actual period length in days
+        period_days: int | None = None
+        if last_start and last_end:
+            try:
+                from datetime import date as _date
+                d1 = _date.fromisoformat(last_start)
+                d2 = _date.fromisoformat(last_end)
+                period_days = (d2 - d1).days
+            except Exception:
+                pass
+
+        return {"value": last_value, "period_days": period_days}
+
     async def get_bond_snapshot(self, ticker: str) -> BondSnapshot:
         secid = ticker.upper().strip()
         url = (
@@ -226,6 +278,37 @@ class MOEXService:
         coupon = sec_row.get("COUPONVALUE")
         coupon_period = sec_row.get("COUPONPERIOD")
         coupon_rate = sec_row.get("COUPONPERCENT")  # Ставка купона в %
+        bond_type = sec_row.get("BONDTYPE", "")  # "Флоатер" for floaters
+
+        # For floaters MOEX sets COUPONVALUE=0 — fetch last known coupon from bondization
+        is_floater = (
+            (coupon is None or float(coupon) == 0)
+            and (coupon_rate is None or float(coupon_rate) == 0)
+            and ("флоатер" in (bond_type or "").lower() or "float" in (bond_type or "").lower())
+        )
+        if is_floater:
+            last_coupon = await self.get_last_known_coupon(secid)
+            if last_coupon:
+                coupon = last_coupon["value"]
+                # Recalculate coupon_rate from actual coupon value and period
+                if nominal and float(nominal) > 0 and last_coupon["period_days"]:
+                    coupon_rate = round(
+                        (last_coupon["value"] / float(nominal))
+                        * (365 / last_coupon["period_days"])
+                        * 100,
+                        4,
+                    )
+                    logger.debug(
+                        "Floater %s: last coupon=%.4f period=%d days -> rate=%.2f%%",
+                        secid, last_coupon["value"], last_coupon["period_days"], coupon_rate,
+                    )
+                elif coupon_period and float(coupon_period) > 0 and nominal and float(nominal) > 0:
+                    coupon_rate = round(
+                        (last_coupon["value"] / float(nominal))
+                        * (365 / float(coupon_period))
+                        * 100,
+                        4,
+                    )
         maturity_date = self._parse_date(sec_row.get("MATDATE"))
         buyback_date = self._parse_date(sec_row.get("BUYBACKDATE"))
         offer_date = self._parse_date(sec_row.get("OFFERDATE"))
@@ -295,6 +378,7 @@ class MOEXService:
             is_traded=is_traded,
             face_unit=face_unit,
             fx_rate=fx_rate,
+            is_floater=is_floater,
         )
 
     async def _fetch(self, url: str) -> dict[str, Any]:

@@ -51,6 +51,7 @@ class InstrumentMetrics(BaseModel):
     coupon_rate: float | None = None  # Ставка купона в % от номинала
     manual_coupon_set: bool = False
     manual_coupon_rate_set: bool = False
+    is_floater: bool = False  # True if coupon is based on last known (floater)
     maturity_date: date | None = None
     buyback_date: date | None = None
     offer_date: date | None = None
@@ -90,6 +91,7 @@ class BondSnapshot(BaseModel):
     is_traded: bool = True
     face_unit: str = "SUR"  # Валюта номинала (SUR=RUB, CNY, USD, EUR, CHF)
     fx_rate: float = 1.0    # Курс валюты к рублю (1.0 для рублёвых)
+    is_floater: bool = False  # True if coupon is derived from bondization (not announced yet)
 
 
 class StockSnapshot(BaseModel):

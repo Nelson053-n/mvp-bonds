@@ -3283,7 +3283,15 @@
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon_rate);
         const isEditable = !isReadOnly && (row.manual_coupon_rate_set === true || !(Number.isFinite(cv) && cv > 0));
-        if (!isEditable) { td.textContent = fmt(roundTo2(cv)) + '%'; return td; }
+        if (!isEditable) {
+          const txt = fmt(roundTo2(cv)) + '%';
+          if (row.is_floater && !row.manual_coupon_rate_set) {
+            td.innerHTML = `<span title="Плавающий купон — по последнему известному" style="cursor:default;">${txt}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup></span>`;
+          } else {
+            td.textContent = txt;
+          }
+          return td;
+        }
         const input = document.createElement('input');
         input.type = 'number'; input.className = 'editable-input coupon-input';
         input.min = '0'; input.step = '0.01'; input.value = Number.isFinite(cv) && cv > 0 ? String(cv) : '';
@@ -3319,7 +3327,14 @@
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon);
         const isEditable = !isReadOnly && (row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0));
-        if (!isEditable) { td.textContent = fmt(row.coupon); return td; }
+        if (!isEditable) {
+          if (row.is_floater && !row.manual_coupon_set) {
+            td.innerHTML = `<span title="Плавающий купон — по последнему известному" style="cursor:default;">${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup></span>`;
+          } else {
+            td.textContent = fmt(row.coupon);
+          }
+          return td;
+        }
         const input = document.createElement('input');
         input.type = 'number'; input.className = 'editable-input coupon-input';
         input.min = '0'; input.step = '0.01'; input.value = Number.isFinite(cv) ? String(cv) : '0';
