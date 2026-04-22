@@ -1370,6 +1370,15 @@
                   Введите read-only токен из <a href="https://www.tbank.ru/invest/settings/" target="_blank" rel="noopener" style="color:var(--blue-400);">настроек Т-Инвестиций</a>. Будет создан новый портфель с вашими бумагами.<br>Токен нигде не сохраняется.
                 </div>
 
+                <!-- Autosync checkbox -->
+                <div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
+                  <input type="checkbox" id="tbank-autosync-cb" style="width:16px;height:16px;cursor:pointer;" />
+                  <label for="tbank-autosync-cb" style="cursor:pointer;margin:0;font-size:14px;">
+                    Сохранять и синхронизировать портфель (каждые 10 минут)
+                  </label>
+                </div>
+                <div id="tbank-sync-status-box" style="display:none;font-size:12px;color:var(--text-muted);margin-bottom:0;"></div>
+
                 <!-- Step 1: Token -->
                 <div class="field">
                   <label for="tbank-token" data-i18n="io.tbankToken">Токен (read-only)</label>
@@ -1390,8 +1399,19 @@
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                   <button class="btn" id="tbank-bonds-btn" style="display:none;" data-i18n="io.tbankBondsBtn">⬆ Только облигации</button>
                   <button class="btn btn-secondary" id="tbank-all-btn" style="display:none;" data-i18n="io.tbankAllBtn">⬆ Все бумаги</button>
+                  <button class="btn btn-secondary" id="tbank-sync-now-btn" style="display:none;">↻ Синхронизировать сейчас</button>
                 </div>
                 <div id="io-tbank-status" class="status"></div>
+
+                <!-- Removal confirmation modal -->
+                <div id="tbank-removal-modal" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:4px;">
+                  <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Бумаги исчезли из брокера</div>
+                  <div id="tbank-removal-list" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;"></div>
+                  <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" id="tbank-removal-keep-btn" style="font-size:12px;">Оставить</button>
+                    <button class="btn" id="tbank-removal-delete-btn" style="font-size:12px;background:var(--red-600);border-color:var(--red-600);">Удалить из портфеля</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1976,7 +1996,13 @@
         navBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === id));
         // panel-add and panel-analytics/watchlist are removed; no-op for them
       }
-      navBtns.forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
+      navBtns.forEach(b => b.addEventListener('click', () => {
+        showPanel(b.dataset.panel);
+        if (b.dataset.panel === 'panel-io' && window._loadTbankSyncStatus) {
+          const pid = parseInt(localStorage.getItem('mvp_active_portfolio_id') || '0', 10);
+          if (pid) window._loadTbankSyncStatus(pid);
+        }
+      }));
       document.querySelector('.topbar-brand').addEventListener('click', () => showPanel('panel-table'));
 
       // ── CONSTANTS ────────────────────────────────────────────────
@@ -4444,7 +4470,7 @@
         } catch (err) { setStatus(ioImportAllStatusEl, err.message, true); }
       });
 
-      // ── T-BANK IMPORT ─────────────────────────────────────────────
+      // ── T-BANK IMPORT & AUTO-SYNC ─────────────────────────────────
       (function() {
         const tbankTokenInp = document.getElementById('tbank-token');
         const tbankAccountField = document.getElementById('tbank-account-field');
@@ -4454,6 +4480,64 @@
         const tbankAllBtn = document.getElementById('tbank-all-btn');
         const tbankPreviewBox = document.getElementById('tbank-preview-box');
         const tbankStatusEl = document.getElementById('io-tbank-status');
+        const tbankAutosyncCb = document.getElementById('tbank-autosync-cb');
+        const tbankSyncStatusBox = document.getElementById('tbank-sync-status-box');
+        const tbankSyncNowBtn = document.getElementById('tbank-sync-now-btn');
+        const tbankRemovalModal = document.getElementById('tbank-removal-modal');
+        const tbankRemovalList = document.getElementById('tbank-removal-list');
+        const tbankRemovalKeepBtn = document.getElementById('tbank-removal-keep-btn');
+        const tbankRemovalDeleteBtn = document.getElementById('tbank-removal-delete-btn');
+
+        let _currentSyncPortfolioId = null;
+        let _pendingRemovalTickers = [];
+
+        function _relativeTime(isoStr) {
+          if (!isoStr) return '';
+          const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+          if (diff < 60) return 'только что';
+          if (diff < 3600) return Math.floor(diff / 60) + ' мин назад';
+          if (diff < 86400) return Math.floor(diff / 3600) + ' ч назад';
+          return Math.floor(diff / 86400) + ' д назад';
+        }
+
+        function _showRemovalModal(tickers, portfolioId) {
+          if (!tickers || tickers.length === 0) { tbankRemovalModal.style.display = 'none'; return; }
+          _pendingRemovalTickers = tickers;
+          _currentSyncPortfolioId = portfolioId;
+          tbankRemovalList.textContent = 'Исчезли из брокера: ' + tickers.join(', ');
+          tbankRemovalModal.style.display = '';
+        }
+
+        async function loadTbankSyncStatus(portfolioId) {
+          if (!portfolioId) { tbankSyncStatusBox.style.display = 'none'; tbankSyncNowBtn.style.display = 'none'; return; }
+          _currentSyncPortfolioId = portfolioId;
+          try {
+            const r = await apiFetch('/tbank/sync/status?portfolio_id=' + portfolioId);
+            if (!r.ok) { tbankSyncStatusBox.style.display = 'none'; return; }
+            const s = await r.json();
+            if (!s.enabled) {
+              tbankAutosyncCb.checked = false;
+              tbankSyncStatusBox.style.display = 'none';
+              tbankSyncNowBtn.style.display = 'none';
+              tbankRemovalModal.style.display = 'none';
+              return;
+            }
+            tbankAutosyncCb.checked = true;
+            let statusText = 'Токен: ' + (s.masked_token || '?') + ' · Счёт: ' + (s.account_id || '?');
+            if (s.last_sync_at) statusText += ' · Синхр. ' + _relativeTime(s.last_sync_at);
+            if (s.last_sync_error) statusText += ' · ⚠ ' + s.last_sync_error;
+            tbankSyncStatusBox.textContent = statusText;
+            tbankSyncStatusBox.style.display = '';
+            tbankSyncNowBtn.style.display = '';
+            if (s.pending_removal && s.pending_removal.length > 0) {
+              _showRemovalModal(s.pending_removal, portfolioId);
+            } else {
+              tbankRemovalModal.style.display = 'none';
+            }
+          } catch (_) {
+            tbankSyncStatusBox.style.display = 'none';
+          }
+        }
 
         function resetTbankUI() {
           tbankTokenInp.value = '';
@@ -4461,6 +4545,9 @@
           tbankPreviewBox.style.display = 'none';
           tbankBondsBtn.style.display = 'none';
           tbankAllBtn.style.display = 'none';
+          tbankAutosyncCb.checked = false;
+          tbankSyncStatusBox.style.display = 'none';
+          tbankRemovalModal.style.display = 'none';
         }
 
         tbankLoadBtn.addEventListener('click', async () => {
@@ -4548,6 +4635,21 @@
             if (!r.ok) throw new Error(res.detail || t('io.tbankImportError'));
             let msg = t('io.tbankImportSuccess').replace('{name}', res.portfolio_name).replace('{n}', res.added);
             if (res.errors > 0) msg += ' ' + t('io.importErrors').replace('{n}', res.errors);
+
+            // If autosync is checked, enable sync on the new portfolio
+            if (tbankAutosyncCb.checked) {
+              try {
+                const sr = await apiFetch('/tbank/sync/enable', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ portfolio_id: res.portfolio_id, token, account_id, bonds_only: bondsOnly }),
+                });
+                if (sr.ok) {
+                  msg += ' · Автосинхронизация включена';
+                }
+              } catch (_) {}
+            }
+
             setStatus(tbankStatusEl, msg, res.errors > 0);
             resetTbankUI();
             await loadPortfolios();
@@ -4560,6 +4662,85 @@
             tbankAllBtn.disabled = false;
           }
         }
+
+        // Disable sync when checkbox unchecked (only if already configured)
+        tbankAutosyncCb.addEventListener('change', async () => {
+          if (!tbankAutosyncCb.checked && _currentSyncPortfolioId) {
+            try {
+              await apiFetch('/tbank/sync/disable', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ portfolio_id: _currentSyncPortfolioId }),
+              });
+              tbankSyncStatusBox.style.display = 'none';
+              tbankSyncNowBtn.style.display = 'none';
+            } catch (_) {}
+          }
+        });
+
+        // Sync now button
+        tbankSyncNowBtn.addEventListener('click', async () => {
+          if (!_currentSyncPortfolioId) return;
+          tbankSyncNowBtn.disabled = true;
+          setStatus(tbankStatusEl, 'Синхронизация...');
+          try {
+            const r = await apiFetch('/tbank/sync/now', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ portfolio_id: _currentSyncPortfolioId }),
+            });
+            const res = await r.json();
+            if (!r.ok) throw new Error(res.detail || 'Ошибка синхронизации');
+            let msg = 'Синхронизировано: +' + res.added + ' новых, ' + res.updated + ' обновлено';
+            if (res.skipped) msg = 'Синхронизация уже выполняется';
+            setStatus(tbankStatusEl, msg);
+            await loadTbankSyncStatus(_currentSyncPortfolioId);
+            if (res.removed_candidates && res.removed_candidates.length > 0) {
+              _showRemovalModal(res.removed_candidates, _currentSyncPortfolioId);
+            }
+            // Refresh table
+            syncTableFromServer().catch(() => {});
+          } catch (err) {
+            setStatus(tbankStatusEl, err.message, true);
+          } finally {
+            tbankSyncNowBtn.disabled = false;
+          }
+        });
+
+        // Removal modal buttons
+        tbankRemovalKeepBtn.addEventListener('click', async () => {
+          if (!_currentSyncPortfolioId) return;
+          try {
+            await apiFetch('/tbank/sync/confirm-removal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ portfolio_id: _currentSyncPortfolioId, tickers: _pendingRemovalTickers, confirm: false }),
+            });
+          } catch (_) {}
+          tbankRemovalModal.style.display = 'none';
+          _pendingRemovalTickers = [];
+        });
+
+        tbankRemovalDeleteBtn.addEventListener('click', async () => {
+          if (!_currentSyncPortfolioId) return;
+          try {
+            const r = await apiFetch('/tbank/sync/confirm-removal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ portfolio_id: _currentSyncPortfolioId, tickers: _pendingRemovalTickers, confirm: true }),
+            });
+            const res = await r.json();
+            if (r.ok) {
+              setStatus(tbankStatusEl, 'Удалено ' + res.removed + ' позиций из портфеля');
+              syncTableFromServer().catch(() => {});
+            }
+          } catch (_) {}
+          tbankRemovalModal.style.display = 'none';
+          _pendingRemovalTickers = [];
+        });
+
+        // Expose loadTbankSyncStatus globally for portfolio switch
+        window._loadTbankSyncStatus = loadTbankSyncStatus;
 
         tbankBondsBtn.addEventListener('click', () => doImport(true));
         tbankAllBtn.addEventListener('click', () => doImport(false));

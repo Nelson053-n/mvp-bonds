@@ -136,6 +136,24 @@ async def _notification_loop():
             pass
 
 
+async def _tbank_sync_loop():
+    """Sync all enabled T-Bank portfolios every 10 minutes."""
+    SYNC_INTERVAL = 600
+    await asyncio.sleep(SYNC_INTERVAL)  # first run 10 min after startup
+    while True:
+        try:
+            from app.services.tbank_sync_service import do_sync_one
+            syncs = storage_service.get_all_enabled_syncs()
+            for cfg in syncs:
+                try:
+                    await do_sync_one(cfg["portfolio_id"], cfg)
+                except Exception:
+                    pass
+        except Exception:
+            logger.exception("tbank_sync_loop: unexpected error")
+        await asyncio.sleep(SYNC_INTERVAL)
+
+
 async def _rating_refresh_loop():
     """Refresh credit ratings for all portfolio tickers daily at 03:00 UTC."""
     from datetime import datetime, timezone
@@ -230,6 +248,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_snapshot_loop())
     asyncio.create_task(_notification_loop())
     asyncio.create_task(_rating_refresh_loop())
+    asyncio.create_task(_tbank_sync_loop())
     yield
     logger.info("Shutting down application")
     cache_service.stop_background()

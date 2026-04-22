@@ -236,6 +236,31 @@ class StorageService:
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_sync (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolio_id INTEGER NOT NULL UNIQUE REFERENCES portfolios(id) ON DELETE CASCADE,
+                    tbank_token_enc TEXT NOT NULL,
+                    tbank_token_prefix TEXT NOT NULL,
+                    tbank_account_id TEXT NOT NULL,
+                    bonds_only INTEGER NOT NULL DEFAULT 0,
+                    sync_enabled INTEGER NOT NULL DEFAULT 1,
+                    last_sync_at TEXT,
+                    last_sync_error TEXT
+                )
+            """)
+
+            # Migrations for portfolio_items — add source column
+            for col, col_def in [
+                ("source", "TEXT NOT NULL DEFAULT 'manual'"),
+            ]:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
+
             # Create indices
             try:
                 conn.execute(
@@ -277,6 +302,7 @@ class StorageService:
                 "CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)",
                 "CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)",
                 "CREATE INDEX IF NOT EXISTS idx_rating_history_ticker_source ON rating_history(ticker, source, recorded_at)",
+                "CREATE INDEX IF NOT EXISTS idx_portfolio_sync_enabled ON portfolio_sync(sync_enabled)",
             ]:
                 try:
                     conn.execute(idx_sql)
@@ -331,24 +357,25 @@ class StorageService:
         quantity: float,
         purchase_price: float,
         portfolio_id: int,
+        source: str = "manual",
     ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO portfolio_items (
-                    portfolio_id, ticker, instrument_type, quantity, purchase_price
+                    portfolio_id, ticker, instrument_type, quantity, purchase_price, source
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (portfolio_id, ticker, instrument_type, quantity, purchase_price),
+                (portfolio_id, ticker, instrument_type, quantity, purchase_price, source),
             )
             conn.commit()
             if cursor.lastrowid is None:
                 raise RuntimeError("Не удалось получить id добавленной записи")
             item_id = int(cursor.lastrowid)
             logger.info(
-                "AUDIT add_item: portfolio_id=%d ticker=%s type=%s qty=%.4f price=%.4f -> item_id=%d",
-                portfolio_id, ticker, instrument_type, quantity, purchase_price, item_id,
+                "AUDIT add_item: portfolio_id=%d ticker=%s type=%s qty=%.4f price=%.4f source=%s -> item_id=%d",
+                portfolio_id, ticker, instrument_type, quantity, purchase_price, source, item_id,
             )
             return item_id
 
@@ -1490,6 +1517,156 @@ class StorageService:
             )
             conn.commit()
             return int(cursor.lastrowid)  # type: ignore[arg-type]
+
+    # ── T-Bank auto-sync ─────────────────────────────────────────────────────
+
+    def get_tbank_items(self, portfolio_id: int) -> list[dict]:
+        """Return portfolio_items with source='tbank' that are not soft-deleted."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, ticker, instrument_type, quantity, purchase_price
+                FROM portfolio_items
+                WHERE portfolio_id = ? AND source = 'tbank' AND deleted_at IS NULL
+                ORDER BY id ASC
+                """,
+                (portfolio_id,),
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "ticker": row[1],
+                "instrument_type": row[2],
+                "quantity": float(row[3]),
+                "purchase_price": float(row[4]),
+            }
+            for row in rows
+        ]
+
+    def upsert_sync_config(
+        self,
+        portfolio_id: int,
+        tbank_token_enc: str,
+        tbank_token_prefix: str,
+        tbank_account_id: str,
+        bonds_only: bool,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO portfolio_sync
+                    (portfolio_id, tbank_token_enc, tbank_token_prefix, tbank_account_id, bonds_only, sync_enabled)
+                VALUES (?, ?, ?, ?, ?, 1)
+                ON CONFLICT(portfolio_id) DO UPDATE SET
+                    tbank_token_enc = excluded.tbank_token_enc,
+                    tbank_token_prefix = excluded.tbank_token_prefix,
+                    tbank_account_id = excluded.tbank_account_id,
+                    bonds_only = excluded.bonds_only,
+                    sync_enabled = 1
+                """,
+                (portfolio_id, tbank_token_enc, tbank_token_prefix, tbank_account_id, int(bonds_only)),
+            )
+            conn.commit()
+
+    def get_sync_config(self, portfolio_id: int) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, portfolio_id, tbank_token_enc, tbank_token_prefix,
+                       tbank_account_id, bonds_only, sync_enabled, last_sync_at, last_sync_error
+                FROM portfolio_sync
+                WHERE portfolio_id = ?
+                """,
+                (portfolio_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "portfolio_id": row[1],
+            "tbank_token_enc": row[2],
+            "tbank_token_prefix": row[3],
+            "tbank_account_id": row[4],
+            "bonds_only": bool(row[5]),
+            "sync_enabled": bool(row[6]),
+            "last_sync_at": row[7],
+            "last_sync_error": row[8],
+        }
+
+    def set_sync_enabled(self, portfolio_id: int, enabled: bool) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_sync SET sync_enabled = ? WHERE portfolio_id = ?",
+                (int(enabled), portfolio_id),
+            )
+            conn.commit()
+
+    def update_sync_status(
+        self,
+        portfolio_id: int,
+        last_sync_at: str,
+        last_sync_error: str | None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE portfolio_sync
+                SET last_sync_at = ?, last_sync_error = ?
+                WHERE portfolio_id = ?
+                """,
+                (last_sync_at, last_sync_error, portfolio_id),
+            )
+            conn.commit()
+
+    def get_all_enabled_syncs(self) -> list[dict]:
+        """Return all sync configs where sync_enabled=1, with user_id from portfolios."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT ps.id, ps.portfolio_id, ps.tbank_token_enc, ps.tbank_token_prefix,
+                       ps.tbank_account_id, ps.bonds_only, ps.sync_enabled,
+                       ps.last_sync_at, ps.last_sync_error,
+                       p.user_id
+                FROM portfolio_sync ps
+                JOIN portfolios p ON p.id = ps.portfolio_id
+                WHERE ps.sync_enabled = 1
+                """,
+            ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "portfolio_id": row[1],
+                "tbank_token_enc": row[2],
+                "tbank_token_prefix": row[3],
+                "tbank_account_id": row[4],
+                "bonds_only": bool(row[5]),
+                "sync_enabled": bool(row[6]),
+                "last_sync_at": row[7],
+                "last_sync_error": row[8],
+                "user_id": row[9],
+            }
+            for row in rows
+        ]
+
+    def soft_delete_tbank_items(self, portfolio_id: int, tickers: list[str]) -> int:
+        """Soft-delete tbank items by ticker list. Returns count deleted."""
+        from datetime import datetime, timezone
+        if not tickers:
+            return 0
+        now = datetime.now(timezone.utc).isoformat()
+        placeholders = ",".join("?" * len(tickers))
+        with self._connect() as conn:
+            cursor = conn.execute(
+                f"""
+                UPDATE portfolio_items
+                SET deleted_at = ?
+                WHERE portfolio_id = ? AND source = 'tbank' AND ticker IN ({placeholders})
+                      AND deleted_at IS NULL
+                """,
+                (now, portfolio_id, *tickers),
+            )
+            conn.commit()
+            return cursor.rowcount
 
 
 storage_service = StorageService()
