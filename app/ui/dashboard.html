@@ -3286,7 +3286,10 @@
         if (!isEditable) {
           const txt = fmt(roundTo2(cv)) + '%';
           if (row.is_floater) {
-            td.innerHTML = `<span title="Плавающий купон — по последнему известному" style="cursor:default;">${txt}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup></span>`;
+            const hasValue = Number.isFinite(cv) && cv > 0;
+            const tip = hasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
+            const label = hasValue ? `${txt}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
+            td.innerHTML = `<span title="${tip}" style="cursor:default;">${label}</span>`;
           } else {
             td.textContent = txt;
           }
@@ -3329,7 +3332,10 @@
         const isEditable = !isReadOnly && !row.is_floater && (row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0));
         if (!isEditable) {
           if (row.is_floater) {
-            td.innerHTML = `<span title="Плавающий купон — по последнему известному" style="cursor:default;">${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup></span>`;
+            const hasValue = Number.isFinite(Number(row.coupon)) && Number(row.coupon) > 0;
+            const tip = hasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
+            const label = hasValue ? `${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
+            td.innerHTML = `<span title="${tip}" style="cursor:default;">${label}</span>`;
           } else {
             td.textContent = fmt(row.coupon);
           }
