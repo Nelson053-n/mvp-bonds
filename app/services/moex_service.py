@@ -78,12 +78,15 @@ class MOEXService:
         re.IGNORECASE,
     )
 
-    FX_RATE_TTL = 3600  # 1 hour cache for FX rates
+    FX_RATE_TTL = 3600   # 1 hour cache for FX rates
+    SNAPSHOT_TTL = 60    # 60 sec cache for bond/stock snapshots
 
     def __init__(self) -> None:
         self._credit_rating_cache: dict[str, str | None] = {}
         self._is_qual_cache: dict[str, bool] = {}
         self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
+        self._bond_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
+        self._stock_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
         self.sources: dict[str, SourceStats] = {
             "moex_price": SourceStats("moex_price", "MOEX ISS (цены)"),
             "moex_rating": SourceStats("moex_rating", "MOEX ISS (рейтинг)"),
@@ -175,6 +178,10 @@ class MOEXService:
 
     async def get_stock_snapshot(self, ticker: str) -> StockSnapshot:
         secid = ticker.upper().strip()
+        cached = self._stock_snapshot_cache.get(secid)
+        if cached and (time.time() - cached[1]) < self.SNAPSHOT_TTL:
+            return cached[0]
+
         url = (
             f"{settings.moex_base_url}/engines/stock/markets/"
             f"shares/boards/TQBR/securities/{secid}.json"
@@ -191,13 +198,20 @@ class MOEXService:
             raise PriceNotFoundError(secid, "акция")
         company_rating = await self._get_credit_rating(secid)
 
-        return StockSnapshot(
+        snapshot = StockSnapshot(
             ticker=secid,
             name=str(name),
             current_price=float(current_price),
             dividend_yield=None,
             company_rating=company_rating,
         )
+        self._stock_snapshot_cache[secid] = (snapshot, time.time())
+        return snapshot
+
+    def invalidate_snapshot_cache(self, secid: str) -> None:
+        """Remove a ticker from snapshot caches (call after manual data change)."""
+        self._bond_snapshot_cache.pop(secid.upper(), None)
+        self._stock_snapshot_cache.pop(secid.upper(), None)
 
     async def get_last_known_coupon(self, secid: str) -> dict | None:
         """Fetch the last known coupon from bondization for floaters.
@@ -253,6 +267,10 @@ class MOEXService:
 
     async def get_bond_snapshot(self, ticker: str) -> BondSnapshot:
         secid = ticker.upper().strip()
+        cached = self._bond_snapshot_cache.get(secid)
+        if cached and (time.time() - cached[1]) < self.SNAPSHOT_TTL:
+            return cached[0]
+
         url = (
             f"{settings.moex_base_url}/engines/stock/markets/"
             f"bonds/securities/{secid}.json"
@@ -347,7 +365,7 @@ class MOEXService:
         coupon_rub = round(float(coupon) * fx_rate, 4) if coupon is not None else None
         aci_rub = round(float(aci) * fx_rate, 5) if aci is not None else None
 
-        return BondSnapshot(
+        snapshot = BondSnapshot(
             ticker=secid,
             name=str(name),
             clean_price_percent=float(clean_price_percent),
@@ -380,6 +398,8 @@ class MOEXService:
             fx_rate=fx_rate,
             is_floater=is_floater,
         )
+        self._bond_snapshot_cache[secid] = (snapshot, time.time())
+        return snapshot
 
     async def _fetch(self, url: str) -> dict[str, Any]:
         logger.debug("Fetching data from %s", url)
@@ -616,7 +636,7 @@ class MOEXService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=8) as client:
+            async with httpx.AsyncClient(timeout=3) as client:
                 response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 html = response.text

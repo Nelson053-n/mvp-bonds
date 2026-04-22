@@ -320,7 +320,7 @@ class PortfolioService:
         ]
 
         # Limit concurrent MOEX requests to avoid rate-limits/timeouts
-        semaphore = asyncio.Semaphore(3)
+        semaphore = asyncio.Semaphore(8)
 
         async def fetch_row(item: PortfolioItem) -> InstrumentMetrics:
             async with semaphore:
