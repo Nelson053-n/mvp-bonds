@@ -3282,13 +3282,16 @@
         const td = document.createElement('td');
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon_rate);
-        const isEditable = !isReadOnly && !row.is_floater && (row.manual_coupon_rate_set === true || !(Number.isFinite(cv) && cv > 0));
-        if (!isEditable) {
+        const floaterHasValue = row.is_floater && Number.isFinite(cv) && cv > 0;
+        const isEditable = !isReadOnly && (
+          row.manual_coupon_rate_set === true ||
+          !(Number.isFinite(cv) && cv > 0)
+        );
+        if (!isEditable || (row.is_floater && floaterHasValue && !row.manual_coupon_rate_set)) {
           const txt = fmt(roundTo2(cv)) + '%';
-          if (row.is_floater) {
-            const hasValue = Number.isFinite(cv) && cv > 0;
-            const tip = hasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
-            const label = hasValue ? `${txt}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
+          if (row.is_floater && !row.manual_coupon_rate_set) {
+            const tip = floaterHasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
+            const label = floaterHasValue ? `${txt}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
             td.innerHTML = `<span title="${tip}" style="cursor:default;">${label}</span>`;
           } else {
             td.textContent = txt;
@@ -3301,6 +3304,7 @@
         input.placeholder = '%';
         const needsHighlight = !(Number.isFinite(cv) && cv > 0) && !row.manual_coupon_rate_set;
         if (needsHighlight) td.style.cssText = 'background:rgba(251,191,36,.15);outline:1px solid rgba(251,191,36,.5);';
+        if (row.is_floater && !row.manual_coupon_rate_set) input.title = 'Плавающий купон — введите вручную пока не объявлен';
         const commit = async () => {
           const orig   = Number.isFinite(Number(row.coupon_rate)) ? Number(row.coupon_rate) : 0;
           const parsed = Number(input.value);
@@ -3331,12 +3335,15 @@
         const td = document.createElement('td');
         if (row.type !== 'bond') { td.textContent = '—'; return td; }
         const cv = Number(row.coupon);
-        const isEditable = !isReadOnly && !row.is_floater && (row.manual_coupon_set === true || (Number.isFinite(cv) && cv <= 0));
-        if (!isEditable) {
-          if (row.is_floater) {
-            const hasValue = Number.isFinite(Number(row.coupon)) && Number(row.coupon) > 0;
-            const tip = hasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
-            const label = hasValue ? `${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
+        const floaterCouponHasValue = row.is_floater && Number.isFinite(cv) && cv > 0;
+        const isEditable = !isReadOnly && (
+          row.manual_coupon_set === true ||
+          !(Number.isFinite(cv) && cv > 0)
+        );
+        if (!isEditable || (row.is_floater && floaterCouponHasValue && !row.manual_coupon_set)) {
+          if (row.is_floater && !row.manual_coupon_set) {
+            const tip = floaterCouponHasValue ? 'Плавающий купон — по последнему известному' : 'Плавающий купон — ещё не объявлен';
+            const label = floaterCouponHasValue ? `${fmt(row.coupon)}<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>` : `—<sup style="color:var(--blue-500);font-size:9px;margin-left:1px;">~</sup>`;
             td.innerHTML = `<span title="${tip}" style="cursor:default;">${label}</span>`;
           } else {
             td.textContent = fmt(row.coupon);
@@ -3349,6 +3356,7 @@
         input.placeholder = '₽';
         const needsHighlight = !(Number.isFinite(cv) && cv > 0) && !row.manual_coupon_set;
         if (needsHighlight) td.style.cssText = 'background:rgba(251,191,36,.15);outline:1px solid rgba(251,191,36,.5);';
+        if (row.is_floater && !row.manual_coupon_set) input.title = 'Плавающий купон — введите вручную пока не объявлен';
         const commit = async () => {
           const orig   = Number.isFinite(Number(row.coupon)) ? Number(row.coupon) : 0;
           const parsed = Number(input.value);
