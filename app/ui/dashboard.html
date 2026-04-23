@@ -969,6 +969,21 @@
           <div id="table-status" class="status"></div>
         </div>
 
+        <!-- Sync sold-position banner -->
+        <div id="sold-banner" style="display:none;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <span style="font-size:18px;line-height:1;">⚠️</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Бумаги проданы у брокера</div>
+              <div id="sold-banner-list" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;word-break:break-word;"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="sold-banner-sync-btn" class="btn" style="font-size:12px;height:28px;padding:0 12px;background:var(--red-600);border-color:var(--red-600);">Привести к виду брокера</button>
+                <button id="sold-banner-keep-btn" class="btn btn-secondary" style="font-size:12px;height:28px;padding:0 12px;">Оставить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
             <h2 class="card-title">Портфель</h2>
@@ -4263,6 +4278,7 @@
       // ── SYNC ─────────────────────────────────────────────────────
       async function syncTableFromServer() {
         showSkeletonRows();
+        if (_soldBanner) _soldBanner.style.display = 'none';
         let url;
         if (isReadOnly && shareToken) {
           url = `/share/${shareToken}/table?ts=${Date.now()}`;
@@ -4306,8 +4322,73 @@
             const summary = calculateSummary(tableRows);
             updateStatCards(summary);
           }).catch(err => console.error('Failed to update totals:', err));
+          // Check for sold positions that need user action
+          checkPendingRemovalBanner(portfolioId).catch(() => {});
         }
       }
+
+      // ── SOLD-POSITION BANNER ──────────────────────────────────────
+      const _soldBanner     = document.getElementById('sold-banner');
+      const _soldBannerList = document.getElementById('sold-banner-list');
+
+      async function checkPendingRemovalBanner(pid) {
+        if (!pid || isReadOnly) { _soldBanner.style.display = 'none'; return; }
+        try {
+          const r = await apiFetch(`/tbank/sync/status?portfolio_id=${pid}`);
+          if (!r.ok) { _soldBanner.style.display = 'none'; return; }
+          const s = await r.json();
+          if (!s.enabled || !s.pending_removal || s.pending_removal.length === 0) {
+            _soldBanner.style.display = 'none';
+            return;
+          }
+          _soldBanner._pid     = pid;
+          _soldBanner._tickers = s.pending_removal;
+          _soldBannerList.textContent = 'Исчезли из брокера: ' + s.pending_removal.join(', ');
+          _soldBanner.style.display = '';
+        } catch (_) {
+          _soldBanner.style.display = 'none';
+        }
+      }
+
+      document.getElementById('sold-banner-sync-btn').addEventListener('click', async () => {
+        const pid     = _soldBanner._pid;
+        const tickers = _soldBanner._tickers || [];
+        if (!pid || !tickers.length) return;
+        const btn = document.getElementById('sold-banner-sync-btn');
+        btn.disabled = true;
+        btn.textContent = 'Удаляю…';
+        try {
+          const r = await apiFetch('/tbank/sync/confirm-removal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ portfolio_id: pid, tickers, confirm: true }),
+          });
+          const res = await r.json();
+          if (r.ok) {
+            setStatus(tableStatusEl, 'Удалено ' + res.removed + ' позиций из портфеля');
+            _soldBanner.style.display = 'none';
+            syncTableFromServer().catch(() => {});
+          } else {
+            btn.disabled = false; btn.textContent = 'Привести к виду брокера';
+          }
+        } catch (_) {
+          btn.disabled = false; btn.textContent = 'Привести к виду брокера';
+        }
+      });
+
+      document.getElementById('sold-banner-keep-btn').addEventListener('click', async () => {
+        const pid     = _soldBanner._pid;
+        const tickers = _soldBanner._tickers || [];
+        _soldBanner.style.display = 'none';
+        if (!pid || !tickers.length) return;
+        try {
+          await apiFetch('/tbank/sync/confirm-removal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ portfolio_id: pid, tickers, confirm: false }),
+          });
+        } catch (_) {}
+      });
 
       // ── ADD FORM (legacy stubs — форма перенесена в #add-instrument-modal) ───────
 

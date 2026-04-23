@@ -27,7 +27,7 @@ class CacheService:
     def __init__(self) -> None:
         self._caches: dict[int, PortfolioCache] = {}  # portfolio_id -> cache
         self._refresh_task: asyncio.Task[None] | None = None
-        self.refresh_interval: int = 900  # seconds
+        self.refresh_interval: int = 300  # seconds
 
     def get_cache(self, portfolio_id: int) -> PortfolioCache:
         """Get or create cache for a portfolio."""
