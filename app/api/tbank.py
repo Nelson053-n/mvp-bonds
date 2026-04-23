@@ -191,7 +191,7 @@ class TBankSyncNowInput(BaseModel):
 
 class TBankConfirmRemovalInput(BaseModel):
     portfolio_id: int
-    tickers: list[Annotated[str, Field(max_length=50)]] = Field(..., max_length=200)
+    tickers: Annotated[list[Annotated[str, Field(max_length=50)]], Field(max_length=200)]
     confirm: bool
 
 
