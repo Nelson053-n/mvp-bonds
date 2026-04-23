@@ -1660,7 +1660,7 @@ class StorageService:
                 f"""
                 UPDATE portfolio_items
                 SET deleted_at = ?
-                WHERE portfolio_id = ? AND source = 'tbank' AND ticker IN ({placeholders})
+                WHERE portfolio_id = ? AND ticker IN ({placeholders})
                       AND deleted_at IS NULL
                 """,
                 (now, portfolio_id, *tickers),
