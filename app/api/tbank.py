@@ -1,6 +1,7 @@
 """T-Bank Invest API import and auto-sync endpoints."""
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -190,7 +191,7 @@ class TBankSyncNowInput(BaseModel):
 
 class TBankConfirmRemovalInput(BaseModel):
     portfolio_id: int
-    tickers: list[str]
+    tickers: list[Annotated[str, Field(max_length=50)]] = Field(..., max_length=200)
     confirm: bool
 
 
