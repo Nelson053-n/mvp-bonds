@@ -321,6 +321,27 @@ _register_static_routes(app)
 @app.get("/robots.txt")
 async def robots_txt():
     content = (
+        "User-agent: GPTBot\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: OAI-SearchBot\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: ChatGPT-User\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: ClaudeBot\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: PerplexityBot\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: Google-Extended\n"
+        "Allow: /\n"
+        "\n"
+        "User-agent: Applebot-Extended\n"
+        "Allow: /\n"
+        "\n"
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /app\n"
@@ -346,22 +367,57 @@ async def sitemap_xml():
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         "  <url>\n"
         "    <loc>https://bondai.ru/</loc>\n"
+        "    <lastmod>2026-04-25</lastmod>\n"
         "    <changefreq>weekly</changefreq>\n"
         "    <priority>1.0</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/privacy</loc>\n"
+        "    <lastmod>2026-03-13</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.3</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/terms</loc>\n"
+        "    <lastmod>2026-03-13</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.3</priority>\n"
         "  </url>\n"
         "</urlset>\n"
     )
     return Response(content, media_type="application/xml")
+
+
+@app.get("/llms.txt")
+async def llms_txt():
+    content = (
+        "# Bond AI\n"
+        "\n"
+        "> Bond AI (bondai.ru) — AI-сервис для управления портфелем облигаций для российских розничных инвесторов. "
+        "Отслеживает 1200+ облигаций MOEX в реальном времени с расчётом YTM, купонным календарём и AI-аналитикой "
+        "на базе Anthropic Claude. Базовый тариф бесплатен навсегда.\n"
+        "\n"
+        "## Продукт\n"
+        "\n"
+        "- [Главная страница](https://bondai.ru/): Управление портфелем облигаций с AI-аналитикой и данными MOEX в реальном времени\n"
+        "- [Политика конфиденциальности](https://bondai.ru/privacy): Обработка персональных данных по ФЗ-152\n"
+        "- [Условия использования](https://bondai.ru/terms): Условия использования сервиса\n"
+        "\n"
+        "## Ключевые возможности\n"
+        "\n"
+        "- Данные MOEX ISS API в реальном времени (обновление каждые 15 минут)\n"
+        "- AI-подбор портфеля по риск-профилю (от консервативного до агрессивного) на базе Claude\n"
+        "- Купонный календарь с Telegram-уведомлениями о выплатах\n"
+        "- Импорт портфеля из Т-Банк (Т-Инвестиции) по API\n"
+        "- Мониторинг кредитных рейтингов (SmartLab + MOEX) с ежедневным обновлением\n"
+        "- PDF-экспорт и совместные ссылки на портфель с защитой паролем\n"
+        "- Список наблюдения с ценовыми алертами\n"
+        "\n"
+        "## Контакт\n"
+        "\n"
+        "- Email: support@bondai.ru\n"
+    )
+    return Response(content, media_type="text/plain; charset=utf-8")
 
 
 # ── HTML pages ──────────────────────────────────────────────────────────────

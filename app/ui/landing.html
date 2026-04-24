@@ -790,7 +790,7 @@
       background: radial-gradient(ellipse, rgba(37,99,235,.25) 0%, transparent 70%);
       pointer-events: none;
     }
-    .cta-section h2 {
+    .cta-section h2, .cta-headline {
       font-size: clamp(26px, 4vw, 44px); font-weight: 800;
       color: #fff; letter-spacing: -1px; margin-bottom: 16px; line-height: 1.15;
       position: relative;
@@ -1184,6 +1184,171 @@
       .demo-table th:nth-child(4), .demo-table td:nth-child(4) { display: none; }
     }
   </style>
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Bond AI",
+    "alternateName": "BondAI — Умный портфель облигаций",
+    "url": "https://bondai.ru",
+    "description": "Управление портфелем облигаций с AI-аналитикой. Данные Московской биржи в реальном времени.",
+    "inLanguage": "ru",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Bond AI",
+      "url": "https://bondai.ru"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Bond AI",
+    "alternateName": "BondAI",
+    "url": "https://bondai.ru",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://bondai.ru/og-image.png",
+      "width": 1200,
+      "height": 630
+    },
+    "description": "Bond AI — веб-приложение для управления портфелем облигаций с искусственным интеллектом. Данные Московской биржи в реальном времени, AI-подбор портфеля на базе Claude, купонный календарь и Telegram-уведомления.",
+    "inLanguage": "ru",
+    "areaServed": {
+      "@type": "Country",
+      "name": "Russia"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "email": "support@bondai.ru",
+      "availableLanguage": ["Russian", "English"]
+    },
+    "sameAs": []
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Bond AI",
+    "alternateName": "BondAI",
+    "url": "https://bondai.ru",
+    "description": "Управление портфелем облигаций с AI-аналитикой. Подбор оптимального портфеля под риск-профиль, данные MOEX в реальном времени, купонный календарь, Telegram-уведомления и PDF-отчёты.",
+    "applicationCategory": "FinanceApplication",
+    "applicationSubCategory": "Investment Portfolio Management",
+    "operatingSystem": "Web",
+    "inLanguage": ["ru", "en"],
+    "softwareVersion": "3.0",
+    "featureList": [
+      "AI-подбор портфеля облигаций на базе Claude AI",
+      "Данные Московской биржи (MOEX) в реальном времени каждые 15 минут",
+      "Купонный календарь и планирование денежного потока",
+      "Telegram-уведомления о купонных выплатах и ценовых алертах",
+      "Кредитные рейтинги из SmartLab и MOEX с алертом на двойное понижение",
+      "PDF-экспорт портфеля",
+      "Совместный доступ к портфелю по ссылке с защитой паролем",
+      "Импорт из Т-Банк (Т-Инвестиции) по API",
+      "Список наблюдения с ценовыми алертами",
+      "Расчёт YTM, P&L и купонной доходности по каждой позиции"
+    ],
+    "offers": {
+      "@type": "Offer",
+      "name": "Базовый тариф",
+      "price": 0,
+      "priceCurrency": "RUB",
+      "availability": "https://schema.org/OnlineOnly",
+      "description": "Полный базовый функционал бесплатно навсегда: AI-подбор, до 3 портфелей, данные MOEX, Telegram-уведомления, PDF-экспорт"
+    },
+    "provider": {
+      "@type": "Organization",
+      "name": "Bond AI",
+      "url": "https://bondai.ru"
+    },
+    "audience": {
+      "@type": "Audience",
+      "audienceType": "Russian private bond investors",
+      "geographicArea": {
+        "@type": "Country",
+        "name": "Russia"
+      }
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Bond AI — это бесплатно?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Да, базовый тариф полностью бесплатен и навсегда. Вы получаете AI-подбор портфеля, данные MOEX в реальном времени, купонный календарь, Telegram-уведомления и PDF-экспорт."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Нужен ли брокерский счёт для работы с Bond AI?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Нет. Bond AI — аналитический инструмент. Сервис не подключается к брокерскому счёту и не совершает сделок. Вы добавляете тикеры облигаций вручную или импортируете из Т-Банк (Т-Инвестиции)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Откуда берутся данные о ценах облигаций?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 15 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Как работает AI-подбор портфеля облигаций?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Вы указываете сумму инвестиций и уровень риска. AI на базе Claude анализирует текущие облигации на MOEX, фильтрует по кредитному рейтингу и доходности, затем составляет диверсифицированный портфель с обоснованием каждой рекомендации."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Является ли Bond AI инвестиционной рекомендацией?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Нет. Bond AI предоставляет аналитические инструменты и информацию. Сервис не является инвестиционным советником и не несёт ответственности за инвестиционные решения."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Как настроить уведомления о купонах в Telegram?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "В настройках профиля подключите Telegram-бот и укажите chat ID. После этого вы будете получать оповещения о предстоящих купонных выплатах и изменениях кредитных рейтингов."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Можно ли поделиться портфелем с другим человеком?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Да. Bond AI позволяет создать ссылку для совместного доступа в один клик с возможностью установить пароль и срок действия. Получатель видит портфель только для чтения."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Безопасны ли мои данные в Bond AI?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Пароли хешируются через bcrypt, авторизация — через JWT-токены. Bond AI не хранит данные банковских карт или брокерских счетов. Подробнее — в политике конфиденциальности на bondai.ru/privacy."
+        }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -1275,7 +1440,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Возможности</div>
-        <h2 class="section-title">Всё для умного инвестора</h2>
+        <h2 class="section-title">Инструменты для управления портфелем облигаций</h2>
         <p class="section-sub">Профессиональные инструменты, которые раньше были доступны только управляющим фондами.</p>
       </div>
 
@@ -1373,7 +1538,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Технология</div>
-        <h2 class="section-title">Как работает AI</h2>
+        <h2 class="section-title">Как AI подбирает портфель облигаций</h2>
         <p class="section-sub">Четыре этапа от рыночных данных до готового портфеля с обоснованием каждой позиции.</p>
       </div>
 
@@ -1421,7 +1586,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Демо</div>
-        <h2 class="section-title">Посмотрите как это работает</h2>
+        <h2 class="section-title">Демо-портфель облигаций с реальными данными MOEX</h2>
         <p class="section-sub">Живой пример портфеля. Зарегистрируйтесь, чтобы добавить свои инструменты.</p>
       </div>
 
@@ -1530,7 +1695,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Сравнение</div>
-        <h2 class="section-title">Почему Bond AI</h2>
+        <h2 class="section-title">Bond AI против таблиц и брокерских приложений</h2>
         <p class="section-sub">Сравните подходы к управлению портфелем облигаций.</p>
       </div>
       <div class="comparison-scroll reveal">
@@ -1584,7 +1749,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Как это работает</div>
-        <h2 class="section-title">Четыре шага до готового портфеля</h2>
+        <h2 class="section-title">Как начать работу с Bond AI</h2>
       </div>
       <div class="steps-grid reveal">
         <div class="step-card">
@@ -1656,7 +1821,7 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">Тарифы</div>
-        <h2 class="section-title">Просто и честно</h2>
+        <h2 class="section-title">Тарифы Bond AI — бесплатно навсегда</h2>
         <p class="section-sub">Все основные функции бесплатны навсегда. Никаких скрытых платежей.</p>
       </div>
       <div class="pricing-grid reveal">
@@ -1722,8 +1887,8 @@
     <div class="container">
       <div class="section-head centered reveal">
         <div class="section-eyebrow">FAQ</div>
-        <h2 class="section-title">Частые вопросы</h2>
-        <p class="section-sub">Ответы на самые популярные вопросы о Bond AI.</p>
+        <h2 class="section-title">Частые вопросы об облигациях и Bond AI</h2>
+        <p class="section-sub">Ответы на самые популярные вопросы о сервисе и рынке облигаций.</p>
       </div>
 
       <div class="faq-list reveal" id="faq-list">
@@ -1797,7 +1962,7 @@
   <!-- ═══ CTA ═══════════════════════════════════════════════ -->
   <section class="cta-section">
     <div class="cta-glow"></div>
-    <h2>Начните прямо сейчас —<br>это займёт 30 секунд</h2>
+    <p class="cta-headline">Начните прямо сейчас —<br>это займёт 30 секунд</p>
     <p>Бесплатная регистрация. Никакой кредитной карты. Никакого брокерского счёта.</p>
     <button class="btn btn-primary btn-xl" onclick="wizOpen()">
       Создать аккаунт бесплатно
@@ -2507,22 +2672,6 @@
       }, 500);
     }, 5000);
   })();
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Bond AI",
-    "url": "https://bondai.ru",
-    "description": "Умный портфель облигаций с AI-аналитикой. Данные MOEX в реальном времени.",
-    "applicationCategory": "FinanceApplication",
-    "operatingSystem": "Web",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "RUB"
-    }
-  }
   </script>
   <!-- Yandex.Metrika counter -->
   <script type="text/javascript">
