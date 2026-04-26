@@ -6429,11 +6429,12 @@
         return btn;
       }
 
-      function _mkIconBtn(icon, title, style, onClick) {
+      function _mkIconBtn(icon, title, colorStyle, onClick) {
         const btn = document.createElement('button');
         btn.textContent = icon;
         btn.title = title;
-        btn.style.cssText = style + ';width:26px;height:26px;font-size:13px;border:none;border-radius:4px;cursor:pointer;padding:0;line-height:1;';
+        btn.dataset.colorStyle = colorStyle;
+        btn.style.cssText = 'width:26px;height:26px;font-size:12px;border-radius:var(--radius-sm);cursor:pointer;padding:0;line-height:1;font-family:inherit;transition:background .15s,color .15s,border-color .15s;' + colorStyle;
         btn.addEventListener('click', onClick);
         return btn;
       }
@@ -6523,19 +6524,19 @@
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:2px;justify-content:center;';
 
-            const pwdBtn = _mkIconBtn('🔑', t('adm.btnPassword'), 'background:var(--blue-600);color:#fff',
+            const pwdBtn = _mkIconBtn('🔑', t('adm.btnPassword'), 'background:rgba(59,130,246,.12);color:var(--blue-600);border:1px solid rgba(59,130,246,.25);',
               () => adminOpenPwdModal(u.id, u.username));
             div.appendChild(pwdBtn);
 
             if (u.is_admin && !isPrimary) {
-              const demoteBtn = _mkIconBtn('⬇', t('adm.btnDemote'), 'background:#92400e;color:#fff',
+              const demoteBtn = _mkIconBtn('⬇', t('adm.btnDemote'), 'background:rgba(217,119,6,.12);color:#d97706;border:1px solid rgba(217,119,6,.25);',
                 function() { adminSetRole(u.id, false, this); });
               div.appendChild(demoteBtn);
             } else if (!u.is_admin) {
-              const promoteBtn = _mkIconBtn('⬆', t('adm.btnPromote'), 'background:#d97706;color:#fff',
+              const promoteBtn = _mkIconBtn('⬆', t('adm.btnPromote'), 'background:rgba(217,119,6,.12);color:#d97706;border:1px solid rgba(217,119,6,.25);',
                 function() { adminSetRole(u.id, true, this); });
               div.appendChild(promoteBtn);
-              const delBtn = _mkIconBtn('🗑', t('adm.btnDelete'), 'background:var(--red-600);color:#fff',
+              const delBtn = _mkIconBtn('🗑', t('adm.btnDelete'), 'background:rgba(220,38,38,.1);color:var(--red-400);border:1px solid rgba(220,38,38,.25);',
                 () => adminDeleteUser(u.id, u.username));
               div.appendChild(delBtn);
             }
@@ -6595,7 +6596,7 @@
             tdDate.textContent = p.created_at ? p.created_at.substring(0, 10) : '—';
 
             const tdActions = document.createElement('td');
-            const delBtn = _mkIconBtn('🗑', t('adm.btnDelete'), 'background:var(--red-600);color:#fff',
+            const delBtn = _mkIconBtn('🗑', t('adm.btnDelete'), 'background:rgba(220,38,38,.1);color:var(--red-400);border:1px solid rgba(220,38,38,.25);',
               () => adminDeletePortfolio(p.id, p.name));
             tdActions.appendChild(delBtn);
 
@@ -6731,9 +6732,9 @@
             const tdAct = document.createElement('td');
             const actDiv = document.createElement('div');
             actDiv.style.cssText = 'display:flex;gap:4px;';
-            const dlBtn = _mkIconBtn('⬇', 'Скачать', 'background:var(--blue-600);color:#fff',
+            const dlBtn = _mkIconBtn('⬇', 'Скачать', 'background:rgba(59,130,246,.12);color:var(--blue-600);border:1px solid rgba(59,130,246,.25);',
               () => window.open(`/admin/backups/${encodeURIComponent(b.filename)}`, '_blank'));
-            const delBtn = _mkIconBtn('🗑', 'Удалить', 'background:var(--red-600);color:#fff',
+            const delBtn = _mkIconBtn('🗑', 'Удалить', 'background:rgba(220,38,38,.1);color:var(--red-400);border:1px solid rgba(220,38,38,.25);',
               () => adminDeleteBackup(b.filename));
             actDiv.append(dlBtn, delBtn);
             tdAct.appendChild(actDiv);
