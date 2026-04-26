@@ -1482,6 +1482,7 @@
                     <th>Последний вход</th>
                     <th>Автосинк</th>
                     <th>TG</th>
+                    <th>Купоны</th>
                     <th>Шеринг</th>
                     <th data-i18n="adm.colRole">Роль</th>
                     <th class="no-sort" data-i18n="tbl.actions">Действия</th>
@@ -6385,7 +6386,7 @@
 
       async function adminLoadUsers() {
         const tbody = document.getElementById('adm-users-body');
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/admin/users');
           const users = await r.json();
@@ -6431,7 +6432,11 @@
 
             const tdTg = document.createElement('td');
             tdTg.style.textAlign = 'center';
-            tdTg.appendChild(_featureBadge(u.has_tg_notif));
+            tdTg.appendChild(_featureBadge(u.has_tg));
+
+            const tdCoupon = document.createElement('td');
+            tdCoupon.style.textAlign = 'center';
+            tdCoupon.appendChild(_featureBadge(u.has_coupon_notif));
 
             const tdShare = document.createElement('td');
             tdShare.style.textAlign = 'center';
@@ -6470,11 +6475,11 @@
             }
 
             tdActions.appendChild(div);
-            tr.append(tdId, tdName, tdCount, tdDate, tdLastLogin, tdSync, tdTg, tdShare, tdRole, tdActions);
+            tr.append(tdId, tdName, tdCount, tdDate, tdLastLogin, tdSync, tdTg, tdCoupon, tdShare, tdRole, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = `<tr><td colspan="10" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="11" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 

@@ -999,8 +999,8 @@ class StorageService:
                     u.last_login,
                     COUNT(DISTINCT p.id) AS portfolio_count,
                     COALESCE(MAX(ps.sync_enabled), 0) AS has_autosync,
-                    CASE WHEN u.coupon_notif_enabled = 1
-                              AND u.tg_chat_id IS NOT NULL THEN 1 ELSE 0 END AS has_tg_notif,
+                    CASE WHEN u.tg_chat_id IS NOT NULL THEN 1 ELSE 0 END AS has_tg,
+                    CASE WHEN u.coupon_notif_enabled = 1 THEN 1 ELSE 0 END AS has_coupon_notif,
                     MAX(CASE WHEN p.share_token IS NOT NULL
                               AND (p.share_expires_at IS NULL
                                    OR p.share_expires_at > CAST(strftime('%s','now') AS INTEGER)) THEN 1 ELSE 0 END
@@ -1021,8 +1021,9 @@ class StorageService:
                 "last_login": row[4],
                 "portfolio_count": int(row[5]),
                 "has_autosync": bool(row[6]),
-                "has_tg_notif": bool(row[7]),
-                "has_sharing": bool(row[8]) if row[8] is not None else False,
+                "has_tg": bool(row[7]),
+                "has_coupon_notif": bool(row[8]),
+                "has_sharing": bool(row[9]) if row[9] is not None else False,
             }
             for row in rows
         ]
