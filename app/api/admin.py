@@ -4,9 +4,10 @@ Only accessible to users with is_admin=True.
 """
 
 import bcrypt
+import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_admin_user
@@ -16,6 +17,10 @@ from app.services.moex_service import moex_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _get_ip(request: Request) -> str:
+    return request.client.host if request.client else ""
 
 
 class ChangePasswordInput(BaseModel):
@@ -83,7 +88,7 @@ async def list_users(admin: dict = Depends(get_admin_user)) -> list:
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)) -> dict:
+async def delete_user(user_id: int, request: Request, admin: dict = Depends(get_admin_user)) -> dict:
     """Delete a user and all their data."""
     if user_id == admin["sub"]:
         raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
@@ -92,6 +97,14 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)) -> di
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     storage_service.delete_user(user_id)
     logger.info("Admin %s deleted user %d (%s)", admin["username"], user_id, user["username"])
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="delete_user",
+        target_type="user",
+        target_id=user_id,
+        details=json.dumps({"username": user["username"]}, ensure_ascii=False),
+        ip_address=_get_ip(request),
+    )
     return {"ok": True}
 
 
@@ -99,6 +112,7 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)) -> di
 async def change_user_password(
     user_id: int,
     payload: ChangePasswordInput,
+    request: Request,
     admin: dict = Depends(get_admin_user),
 ) -> dict:
     """Change any user's password."""
@@ -108,6 +122,14 @@ async def change_user_password(
     hash_ = bcrypt.hashpw(payload.password.encode(), bcrypt.gensalt()).decode()
     storage_service.update_user_password(user_id, hash_)
     logger.info("Admin %s changed password for user %d (%s)", admin["username"], user_id, user["username"])
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="change_password",
+        target_type="user",
+        target_id=user_id,
+        details=json.dumps({"username": user["username"]}, ensure_ascii=False),
+        ip_address=_get_ip(request),
+    )
     return {"ok": True}
 
 
@@ -115,6 +137,7 @@ async def change_user_password(
 async def set_user_role(
     user_id: int,
     payload: SetAdminInput,
+    request: Request,
     admin: dict = Depends(get_admin_user),
 ) -> dict:
     """Grant or revoke admin role. The primary admin (id=1) cannot be demoted."""
@@ -124,8 +147,16 @@ async def set_user_role(
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     storage_service.set_user_admin(user_id, payload.is_admin)
-    action = "granted admin" if payload.is_admin else "revoked admin"
-    logger.info("Admin %s %s for user %d (%s)", admin["username"], action, user_id, user["username"])
+    action_str = "grant_admin" if payload.is_admin else "revoke_admin"
+    logger.info("Admin %s %s for user %d (%s)", admin["username"], action_str, user_id, user["username"])
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action=action_str,
+        target_type="user",
+        target_id=user_id,
+        details=json.dumps({"username": user["username"], "is_admin": payload.is_admin}, ensure_ascii=False),
+        ip_address=_get_ip(request),
+    )
     return {"ok": True, "is_admin": payload.is_admin}
 
 
@@ -147,14 +178,36 @@ async def list_user_portfolios(user_id: int, admin: dict = Depends(get_admin_use
 
 
 @router.delete("/portfolios/{portfolio_id}")
-async def delete_portfolio(portfolio_id: int, admin: dict = Depends(get_admin_user)) -> dict:
+async def delete_portfolio(portfolio_id: int, request: Request, admin: dict = Depends(get_admin_user)) -> dict:
     """Delete any portfolio."""
     portfolio = storage_service.get_portfolio(portfolio_id)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
     storage_service.delete_portfolio(portfolio_id)
     logger.info("Admin %s deleted portfolio %d", admin["username"], portfolio_id)
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="delete_portfolio",
+        target_type="portfolio",
+        target_id=portfolio_id,
+        details=json.dumps({"name": portfolio.get("name"), "user_id": portfolio.get("user_id")}, ensure_ascii=False),
+        ip_address=_get_ip(request),
+    )
     return {"ok": True}
+
+
+# ── Audit Log ─────────────────────────────────────────────────────────────────
+
+@router.get("/audit-log")
+async def get_audit_log(
+    limit: int = 100,
+    offset: int = 0,
+    admin: dict = Depends(get_admin_user),
+) -> list:
+    """Paginated admin audit log."""
+    if limit > 500:
+        limit = 500
+    return storage_service.get_audit_log(limit=limit, offset=offset)
 
 
 class BulkInstrumentItem(BaseModel):

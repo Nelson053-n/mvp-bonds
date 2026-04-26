@@ -1479,11 +1479,44 @@
                     <th data-i18n="adm.colUsername">Имя пользователя</th>
                     <th data-i18n="adm.colPortfolios">Портфелей</th>
                     <th data-i18n="adm.colCreated">Дата регистрации</th>
+                    <th>Последний вход</th>
+                    <th>Автосинк</th>
+                    <th>TG</th>
+                    <th>Шеринг</th>
                     <th data-i18n="adm.colRole">Роль</th>
                     <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
                 <tbody id="adm-users-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Audit Log -->
+        <div class="card" style="margin-bottom:16px;" id="adm-audit-card">
+          <div class="card-header">
+            <h2 class="card-title">Журнал администратора</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadAuditLog()">↺ Обновить</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap" style="max-height:320px;overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Админ</th>
+                    <th>Действие</th>
+                    <th>Тип цели</th>
+                    <th>Цель ID</th>
+                    <th>Детали</th>
+                    <th>IP</th>
+                    <th>Время</th>
+                  </tr>
+                </thead>
+                <tbody id="adm-audit-body">
+                  <tr><td colspan="8" style="text-align:center;color:var(--slate-400);padding:16px;">Нажмите ↺ для загрузки</td></tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -6201,6 +6234,7 @@
         await adminLoadUsers();
         await adminLoadPortfolios();
         adminLoadSources().catch(() => {});
+        adminLoadAuditLog().catch(() => {});
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -6328,9 +6362,21 @@
         return btn;
       }
 
+      function _featureBadge(active) {
+        const span = document.createElement('span');
+        if (active) {
+          span.style.cssText = 'display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:rgba(22,163,74,.12);color:var(--green-600);font-weight:500;';
+          span.textContent = 'Да';
+        } else {
+          span.style.cssText = 'color:var(--slate-400);font-size:12px;';
+          span.textContent = '—';
+        }
+        return span;
+      }
+
       async function adminLoadUsers() {
         const tbody = document.getElementById('adm-users-body');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/admin/users');
           const users = await r.json();
@@ -6357,6 +6403,30 @@
 
             const tdDate = document.createElement('td');
             tdDate.textContent = u.created_at ? u.created_at.substring(0, 10) : '—';
+
+            const tdLastLogin = document.createElement('td');
+            if (u.last_login) {
+              const d = new Date(u.last_login);
+              const daysAgo = Math.floor((Date.now() - d.getTime()) / 86400000);
+              tdLastLogin.title = u.last_login.substring(0, 19).replace('T', ' ') + ' UTC';
+              tdLastLogin.style.cssText = 'color:var(--text-secondary);font-size:11px;white-space:nowrap;';
+              tdLastLogin.textContent = daysAgo === 0 ? 'Сегодня' : daysAgo === 1 ? 'Вчера' : `${daysAgo}д назад`;
+            } else {
+              tdLastLogin.style.color = 'var(--slate-400)';
+              tdLastLogin.textContent = '—';
+            }
+
+            const tdSync = document.createElement('td');
+            tdSync.style.textAlign = 'center';
+            tdSync.appendChild(_featureBadge(u.has_autosync));
+
+            const tdTg = document.createElement('td');
+            tdTg.style.textAlign = 'center';
+            tdTg.appendChild(_featureBadge(u.has_tg_notif));
+
+            const tdShare = document.createElement('td');
+            tdShare.style.textAlign = 'center';
+            tdShare.appendChild(_featureBadge(u.has_sharing));
 
             const tdRole = document.createElement('td');
             const roleSpan = document.createElement('span');
@@ -6391,11 +6461,11 @@
             }
 
             tdActions.appendChild(div);
-            tr.append(tdId, tdName, tdCount, tdDate, tdRole, tdActions);
+            tr.append(tdId, tdName, tdCount, tdDate, tdLastLogin, tdSync, tdTg, tdShare, tdRole, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="10" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 
@@ -6535,6 +6605,48 @@
             toast(e.detail || 'Ошибка', 'error');
           }
         } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
+      }
+
+      async function adminLoadAuditLog() {
+        const tbody = document.getElementById('adm-audit-body');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        try {
+          const r = await apiFetch('/admin/audit-log?limit=100&offset=0');
+          if (!r.ok) throw new Error();
+          const entries = await r.json();
+          if (!entries.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate-400);padding:16px;">Нет записей</td></tr>';
+            return;
+          }
+          tbody.innerHTML = '';
+          entries.forEach(e => {
+            const tr = document.createElement('tr');
+            let detailsText = '—';
+            if (e.details) {
+              try { detailsText = JSON.stringify(JSON.parse(e.details)).substring(0, 80); }
+              catch { detailsText = String(e.details).substring(0, 80); }
+            }
+            const cells = [
+              e.id,
+              e.admin_username || e.admin_user_id,
+              e.action,
+              e.target_type || '—',
+              e.target_id !== null && e.target_id !== undefined ? e.target_id : '—',
+              detailsText,
+              e.ip_address || '—',
+              e.created_at ? e.created_at.substring(0, 19).replace('T', ' ') : '—',
+            ];
+            cells.forEach(text => {
+              const td = document.createElement('td');
+              td.textContent = text;
+              td.style.fontSize = '11px';
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+        } catch(err) {
+          tbody.innerHTML = '<tr><td colspan="8" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+        }
       }
 
       // Show admin panel tab if user is admin

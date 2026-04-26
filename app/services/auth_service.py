@@ -78,6 +78,7 @@ class AuthService:
             return None
 
         logger.info("User logged in: %s (id=%d)", username, user["id"])
+        storage_service.update_last_login(user["id"])
         is_admin = bool(user.get("is_admin", False))
         token = self.create_token(user["id"], user["username"], is_admin)
         return {

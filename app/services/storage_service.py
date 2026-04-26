@@ -133,6 +133,11 @@ class StorageService:
             except sqlite3.OperationalError:
                 pass
 
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS coupon_notifications (
@@ -250,6 +255,19 @@ class StorageService:
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    action TEXT NOT NULL,
+                    target_type TEXT,
+                    target_id INTEGER,
+                    details TEXT,
+                    ip_address TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
             # Migrations for portfolio_items — add source column
             for col, col_def in [
                 ("source", "TEXT NOT NULL DEFAULT 'manual'"),
@@ -303,6 +321,8 @@ class StorageService:
                 "CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)",
                 "CREATE INDEX IF NOT EXISTS idx_rating_history_ticker_source ON rating_history(ticker, source, recorded_at)",
                 "CREATE INDEX IF NOT EXISTS idx_portfolio_sync_enabled ON portfolio_sync(sync_enabled)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON admin_audit_log(admin_user_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON admin_audit_log(created_at)",
             ]:
                 try:
                     conn.execute(idx_sql)
@@ -971,10 +991,23 @@ class StorageService:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT u.id, u.username, u.is_admin, u.created_at,
-                       COUNT(p.id) as portfolio_count
+                SELECT
+                    u.id,
+                    u.username,
+                    u.is_admin,
+                    u.created_at,
+                    u.last_login,
+                    COUNT(DISTINCT p.id) AS portfolio_count,
+                    COALESCE(MAX(ps.sync_enabled), 0) AS has_autosync,
+                    CASE WHEN u.coupon_notif_enabled = 1
+                              AND u.tg_chat_id IS NOT NULL THEN 1 ELSE 0 END AS has_tg_notif,
+                    MAX(CASE WHEN p.share_token IS NOT NULL
+                              AND (p.share_expires_at IS NULL
+                                   OR p.share_expires_at > unixepoch()) THEN 1 ELSE 0 END
+                    ) AS has_sharing
                 FROM users u
                 LEFT JOIN portfolios p ON p.user_id = u.id
+                LEFT JOIN portfolio_sync ps ON ps.portfolio_id = p.id
                 GROUP BY u.id
                 ORDER BY u.id ASC
                 """
@@ -985,7 +1018,11 @@ class StorageService:
                 "username": row[1],
                 "is_admin": bool(row[2]),
                 "created_at": row[3],
-                "portfolio_count": int(row[4]),
+                "last_login": row[4],
+                "portfolio_count": int(row[5]),
+                "has_autosync": bool(row[6]),
+                "has_tg_notif": bool(row[7]),
+                "has_sharing": bool(row[8]) if row[8] is not None else False,
             }
             for row in rows
         ]
@@ -1028,6 +1065,60 @@ class StorageService:
             )
             conn.commit()
             return int(cursor.rowcount)
+
+    def update_last_login(self, user_id: int) -> None:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (now, user_id))
+            conn.commit()
+
+    def write_audit_log(
+        self,
+        admin_user_id: int,
+        action: str,
+        target_type: str | None,
+        target_id: int | None,
+        details: str | None,
+        ip_address: str | None,
+    ) -> None:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO admin_audit_log
+                   (admin_user_id, action, target_type, target_id, details, ip_address, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (admin_user_id, action, target_type, target_id, details, ip_address, now),
+            )
+            conn.commit()
+
+    def get_audit_log(self, limit: int = 100, offset: int = 0) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT a.id, a.admin_user_id, u.username AS admin_username,
+                          a.action, a.target_type, a.target_id,
+                          a.details, a.ip_address, a.created_at
+                   FROM admin_audit_log a
+                   LEFT JOIN users u ON u.id = a.admin_user_id
+                   ORDER BY a.id DESC
+                   LIMIT ? OFFSET ?""",
+                (limit, offset),
+            ).fetchall()
+        return [
+            {
+                "id": int(row[0]),
+                "admin_user_id": int(row[1]),
+                "admin_username": row[2],
+                "action": row[3],
+                "target_type": row[4],
+                "target_id": int(row[5]) if row[5] is not None else None,
+                "details": row[6],
+                "ip_address": row[7],
+                "created_at": row[8],
+            }
+            for row in rows
+        ]
 
     def update_user_username(self, user_id: int, new_username: str) -> bool:
         """Returns False if username already taken."""
