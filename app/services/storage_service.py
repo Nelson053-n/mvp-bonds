@@ -1003,7 +1003,7 @@ class StorageService:
                               AND u.tg_chat_id IS NOT NULL THEN 1 ELSE 0 END AS has_tg_notif,
                     MAX(CASE WHEN p.share_token IS NOT NULL
                               AND (p.share_expires_at IS NULL
-                                   OR p.share_expires_at > unixepoch()) THEN 1 ELSE 0 END
+                                   OR p.share_expires_at > CAST(strftime('%s','now') AS INTEGER)) THEN 1 ELSE 0 END
                     ) AS has_sharing
                 FROM users u
                 LEFT JOIN portfolios p ON p.user_id = u.id
