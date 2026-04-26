@@ -1567,8 +1567,8 @@
                   style="width:72px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
               </div>
               <div>
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Время авто-бэкапа (UTC, час)</label>
-                <input type="number" id="adm-backup-hour" min="0" max="23" value="2"
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Время авто-бэкапа (Владивосток)</label>
+                <input type="number" id="adm-backup-hour" min="0" max="23" value="12"
                   style="width:72px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
               </div>
               <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 14px;" onclick="adminSaveBackupSettings()">Сохранить</button>
@@ -6675,7 +6675,7 @@
           if (!r.ok) throw new Error();
           const data = await r.json();
           document.getElementById('adm-backup-keep').value = data.keep_count;
-          document.getElementById('adm-backup-hour').value = data.daily_hour;
+          document.getElementById('adm-backup-hour').value = (data.daily_hour + 10) % 24;
           if (!data.backups.length) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--slate-400);padding:16px;">Нет резервных копий</td></tr>';
             return;
@@ -6753,8 +6753,9 @@
 
       async function adminSaveBackupSettings() {
         const keep = parseInt(document.getElementById('adm-backup-keep').value);
-        const hour = parseInt(document.getElementById('adm-backup-hour').value);
-        if (isNaN(keep) || keep < 1 || isNaN(hour) || hour < 0 || hour > 23) {
+        const hourVld = parseInt(document.getElementById('adm-backup-hour').value);
+        const hour = (hourVld - 10 + 24) % 24;
+        if (isNaN(keep) || keep < 1 || isNaN(hourVld) || hourVld < 0 || hourVld > 23) {
           toast('Некорректные значения', 'error'); return;
         }
         try {
