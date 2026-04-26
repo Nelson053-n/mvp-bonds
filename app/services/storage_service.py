@@ -1366,6 +1366,8 @@ class StorageService:
         ]
 
     def get_stats(self) -> dict:
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         with self._connect() as conn:
             users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             portfolios = conn.execute("SELECT COUNT(*) FROM portfolios").fetchone()[0]
@@ -1373,11 +1375,25 @@ class StorageService:
                 "SELECT COUNT(*) FROM portfolios WHERE share_token IS NOT NULL"
             ).fetchone()[0]
             items = conn.execute("SELECT COUNT(*) FROM portfolio_items WHERE deleted_at IS NULL").fetchone()[0]
+            active_today = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE last_login >= ?", (today,)
+            ).fetchone()[0]
+            autosync_count = conn.execute(
+                "SELECT COUNT(*) FROM portfolio_sync WHERE sync_enabled = 1"
+            ).fetchone()[0]
+            tg_notif_count = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE tg_chat_id IS NOT NULL AND coupon_notif_enabled = 1"
+            ).fetchone()[0]
+        backup_count = len(self.get_backups())
         return {
             "users": int(users),
             "portfolios": int(portfolios),
             "shared_links": int(shared),
             "total_instruments": int(items),
+            "active_today": int(active_today),
+            "autosync_count": int(autosync_count),
+            "tg_notif_count": int(tg_notif_count),
+            "backup_count": backup_count,
         }
 
     def get_all_portfolios_raw(self) -> list[dict]:

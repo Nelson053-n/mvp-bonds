@@ -1462,6 +1462,22 @@
             <div class="stat-label" data-i18n="adm.statInstruments">Инструментов всего</div>
             <div class="stat-value" id="adm-stat-instruments">—</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Активны сегодня</div>
+            <div class="stat-value" id="adm-stat-active-today">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Автосинков</div>
+            <div class="stat-value" id="adm-stat-autosync">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">TG-уведомлений</div>
+            <div class="stat-value" id="adm-stat-tg-notif">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Резервных копий</div>
+            <div class="stat-value" id="adm-stat-backups">—</div>
+          </div>
         </div>
 
         <!-- Users table -->
@@ -6398,6 +6414,10 @@
           document.getElementById('adm-stat-portfolios').textContent = s.portfolios;
           document.getElementById('adm-stat-shared').textContent = s.shared_links;
           document.getElementById('adm-stat-instruments').textContent = s.total_instruments;
+          document.getElementById('adm-stat-active-today').textContent = s.active_today;
+          document.getElementById('adm-stat-autosync').textContent = s.autosync_count;
+          document.getElementById('adm-stat-tg-notif').textContent = s.tg_notif_count;
+          document.getElementById('adm-stat-backups').textContent = s.backup_count;
         } catch(e) {}
       }
 
