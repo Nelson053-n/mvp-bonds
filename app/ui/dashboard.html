@@ -1550,6 +1550,51 @@
         </div>
 
         <!-- Data Sources -->
+        <!-- Backups -->
+        <div class="card" style="margin-top:16px;" id="adm-backup-card">
+          <div class="card-header">
+            <h2 class="card-title">Резервные копии</h2>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminCreateBackup()">+ Создать сейчас</button>
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadBackups()">↺</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:12px 16px 0;">
+            <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+              <div>
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Хранить копий</label>
+                <input type="number" id="adm-backup-keep" min="1" max="100" value="10"
+                  style="width:72px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Время авто-бэкапа (UTC, час)</label>
+                <input type="number" id="adm-backup-hour" min="0" max="23" value="2"
+                  style="width:72px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+              </div>
+              <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 14px;" onclick="adminSaveBackupSettings()">Сохранить</button>
+              <span id="adm-backup-settings-status" style="font-size:11px;color:var(--green-600);"></span>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap" style="max-height:280px;overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Файл</th>
+                    <th>Размер</th>
+                    <th>Дата (UTC)</th>
+                    <th>Тип</th>
+                    <th class="no-sort">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="adm-backup-body">
+                  <tr><td colspan="5" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:16px;" id="adm-sources-card">
           <div class="card-header">
             <h2 class="card-title">Источники данных</h2>
@@ -6236,6 +6281,7 @@
         await adminLoadPortfolios();
         adminLoadSources().catch(() => {});
         adminLoadAuditLog().catch(() => {});
+        adminLoadBackups().catch(() => {});
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -6619,6 +6665,110 @@
             toast(e.detail || 'Ошибка', 'error');
           }
         } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
+      }
+
+      async function adminLoadBackups() {
+        const tbody = document.getElementById('adm-backup-body');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        try {
+          const r = await apiFetch('/admin/backups');
+          if (!r.ok) throw new Error();
+          const data = await r.json();
+          document.getElementById('adm-backup-keep').value = data.keep_count;
+          document.getElementById('adm-backup-hour').value = data.daily_hour;
+          if (!data.backups.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--slate-400);padding:16px;">Нет резервных копий</td></tr>';
+            return;
+          }
+          tbody.innerHTML = '';
+          data.backups.forEach(b => {
+            const tr = document.createElement('tr');
+            const parts = b.filename.replace('.db','').split('_');
+            const dateStr = parts.length >= 3 ? `${parts[1].substring(0,4)}-${parts[1].substring(4,6)}-${parts[1].substring(6,8)} ${parts[2].substring(0,2)}:${parts[2].substring(2,4)}` : '—';
+            const label = parts[3] || 'startup';
+            const sizeKb = (b.size / 1024).toFixed(0) + ' KB';
+            const labelBadge = label === 'manual'
+              ? '<span style="background:rgba(59,130,246,.12);color:var(--blue-600);padding:1px 6px;border-radius:8px;font-size:10px;">ручной</span>'
+              : label === 'auto'
+              ? '<span style="background:rgba(22,163,74,.12);color:var(--green-600);padding:1px 6px;border-radius:8px;font-size:10px;">авто</span>'
+              : '<span style="color:var(--slate-400);font-size:10px;">запуск</span>';
+
+            const tdName = document.createElement('td');
+            tdName.style.fontSize = '11px';
+            tdName.textContent = b.filename;
+
+            const tdSize = document.createElement('td');
+            tdSize.style.cssText = 'font-size:11px;color:var(--text-secondary);';
+            tdSize.textContent = sizeKb;
+
+            const tdDate = document.createElement('td');
+            tdDate.style.cssText = 'font-size:11px;color:var(--text-secondary);white-space:nowrap;';
+            tdDate.textContent = dateStr;
+
+            const tdLabel = document.createElement('td');
+            tdLabel.innerHTML = labelBadge;
+
+            const tdAct = document.createElement('td');
+            const actDiv = document.createElement('div');
+            actDiv.style.cssText = 'display:flex;gap:4px;';
+            const dlBtn = _mkIconBtn('⬇', 'Скачать', 'background:var(--blue-600);color:#fff',
+              () => window.open(`/admin/backups/${encodeURIComponent(b.filename)}`, '_blank'));
+            const delBtn = _mkIconBtn('🗑', 'Удалить', 'background:var(--red-600);color:#fff',
+              () => adminDeleteBackup(b.filename));
+            actDiv.append(dlBtn, delBtn);
+            tdAct.appendChild(actDiv);
+
+            tr.append(tdName, tdSize, tdDate, tdLabel, tdAct);
+            tbody.appendChild(tr);
+          });
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+        }
+      }
+
+      async function adminCreateBackup() {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.textContent = 'Создание...';
+        try {
+          const r = await apiFetch('/admin/backups', {method: 'POST'});
+          if (r.ok) {
+            await adminLoadBackups();
+            toast('Резервная копия создана', 'success');
+          } else {
+            toast('Ошибка создания бэкапа', 'error');
+          }
+        } catch(e) { toast('Ошибка сети', 'error'); }
+        finally { btn.disabled = false; btn.textContent = '+ Создать сейчас'; }
+      }
+
+      async function adminDeleteBackup(filename) {
+        if (!confirm(`Удалить резервную копию ${filename}?`)) return;
+        try {
+          const r = await apiFetch(`/admin/backups/${encodeURIComponent(filename)}`, {method: 'DELETE'});
+          if (r.ok) { await adminLoadBackups(); }
+          else { toast('Ошибка удаления', 'error'); }
+        } catch(e) { toast('Ошибка сети', 'error'); }
+      }
+
+      async function adminSaveBackupSettings() {
+        const keep = parseInt(document.getElementById('adm-backup-keep').value);
+        const hour = parseInt(document.getElementById('adm-backup-hour').value);
+        if (isNaN(keep) || keep < 1 || isNaN(hour) || hour < 0 || hour > 23) {
+          toast('Некорректные значения', 'error'); return;
+        }
+        try {
+          const r = await apiFetch('/admin/backup-settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({backup_keep_count: keep, backup_daily_hour: hour}),
+          });
+          if (r.ok) {
+            const s = document.getElementById('adm-backup-settings-status');
+            s.textContent = '✓ Сохранено';
+            setTimeout(() => s.textContent = '', 2000);
+          } else { toast('Ошибка сохранения', 'error'); }
+        } catch(e) { toast('Ошибка сети', 'error'); }
       }
 
       async function adminLoadAuditLog() {

@@ -7,7 +7,8 @@ import bcrypt
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_admin_user
@@ -197,6 +198,82 @@ async def delete_portfolio(portfolio_id: int, request: Request, admin: dict = De
 
 
 # ── Audit Log ─────────────────────────────────────────────────────────────────
+
+# ── Backups ───────────────────────────────────────────────────────────────────
+
+class BackupSettingsInput(BaseModel):
+    backup_keep_count: int = Field(10, ge=1, le=100)
+    backup_daily_hour: int = Field(2, ge=0, le=23)
+
+
+@router.get("/backups")
+async def list_backups(admin: dict = Depends(get_admin_user)) -> dict:
+    backups = storage_service.get_backups()
+    keep = storage_service.get_setting("backup_keep_count", "10")
+    hour = storage_service.get_setting("backup_daily_hour", "2")
+    return {"backups": backups, "keep_count": int(keep), "daily_hour": int(hour)}
+
+
+@router.post("/backups")
+async def create_backup(request: Request, admin: dict = Depends(get_admin_user)) -> dict:
+    filename = storage_service.create_backup(label="manual")
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="create_backup",
+        target_type="backup",
+        target_id=None,
+        details=json.dumps({"filename": filename}),
+        ip_address=_get_ip(request),
+    )
+    return {"ok": True, "filename": filename}
+
+
+@router.get("/backups/{filename}")
+async def download_backup(filename: str, admin: dict = Depends(get_admin_user)):
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    path = storage_service.get_backup_path(filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    return FileResponse(path=str(path), filename=filename, media_type="application/octet-stream")
+
+
+@router.delete("/backups/{filename}")
+async def delete_backup(filename: str, request: Request, admin: dict = Depends(get_admin_user)) -> dict:
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    ok = storage_service.delete_backup(filename)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="delete_backup",
+        target_type="backup",
+        target_id=None,
+        details=json.dumps({"filename": filename}),
+        ip_address=_get_ip(request),
+    )
+    return {"ok": True}
+
+
+@router.post("/backup-settings")
+async def save_backup_settings(
+    payload: BackupSettingsInput,
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    storage_service.set_setting("backup_keep_count", str(payload.backup_keep_count))
+    storage_service.set_setting("backup_daily_hour", str(payload.backup_daily_hour))
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action="update_backup_settings",
+        target_type=None,
+        target_id=None,
+        details=json.dumps({"keep": payload.backup_keep_count, "hour": payload.backup_daily_hour}),
+        ip_address=_get_ip(request),
+    )
+    return {"ok": True}
+
 
 @router.get("/audit-log")
 async def get_audit_log(

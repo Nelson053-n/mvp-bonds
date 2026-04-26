@@ -214,6 +214,26 @@ async def _rating_refresh_loop():
             logger.exception("Daily rating refresh failed")
 
 
+async def _daily_backup_loop():
+    """Create a daily automatic backup at the configured hour (UTC)."""
+    from datetime import datetime, timezone
+    while True:
+        try:
+            hour = int(storage_service.get_setting("backup_daily_hour", "2"))
+        except ValueError:
+            hour = 2
+        now = datetime.now(timezone.utc)
+        secs_to_hour = ((hour - now.hour) % 24) * 3600 - now.minute * 60 - now.second
+        if secs_to_hour <= 0:
+            secs_to_hour += 86400
+        await asyncio.sleep(secs_to_hour)
+        try:
+            storage_service.create_backup(label="auto")
+            logger.info("Daily auto backup completed")
+        except Exception:
+            logger.exception("Daily auto backup failed")
+
+
 def _backup_db_on_startup() -> None:
     """Create a rolling backup of the SQLite database on startup. Keeps 3 most recent."""
     import shutil
@@ -249,6 +269,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_notification_loop())
     asyncio.create_task(_rating_refresh_loop())
     asyncio.create_task(_tbank_sync_loop())
+    asyncio.create_task(_daily_backup_loop())
     yield
     logger.info("Shutting down application")
     cache_service.stop_background()

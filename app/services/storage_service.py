@@ -1121,6 +1121,63 @@ class StorageService:
             for row in rows
         ]
 
+    # ── Backups ─────────────────────────────────────────────────────────────
+
+    def _backup_dir(self) -> Path:
+        return Path(self.db_path).parent / "backups"
+
+    def create_backup(self, label: str = "manual") -> str:
+        import shutil
+        from datetime import datetime, timezone
+        db_path = Path(self.db_path)
+        backup_dir = self._backup_dir()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        filename = f"portfolio_{stamp}_{label}.db"
+        shutil.copy2(db_path, backup_dir / filename)
+        logger.info("Backup created: %s", filename)
+        self._prune_backups()
+        return filename
+
+    def _prune_backups(self) -> None:
+        try:
+            keep = int(self.get_setting("backup_keep_count", "10"))
+        except ValueError:
+            keep = 10
+        backups = sorted(self._backup_dir().glob("portfolio_*.db"))
+        for old in backups[:-keep]:
+            old.unlink()
+            logger.info("Old backup removed: %s", old.name)
+
+    def get_backups(self) -> list[dict]:
+        backup_dir = self._backup_dir()
+        if not backup_dir.exists():
+            return []
+        backups = sorted(backup_dir.glob("portfolio_*.db"), reverse=True)
+        result = []
+        for p in backups:
+            stat = p.stat()
+            result.append({
+                "filename": p.name,
+                "size": stat.st_size,
+                "created_at": p.name.split("_")[1] + "_" + p.name.split("_")[2] if len(p.name.split("_")) >= 3 else "",
+            })
+        return result
+
+    def delete_backup(self, filename: str) -> bool:
+        path = self._backup_dir() / filename
+        if not path.exists() or path.parent != self._backup_dir():
+            return False
+        path.unlink()
+        logger.info("Backup deleted: %s", filename)
+        return True
+
+    def get_backup_path(self, filename: str) -> Path | None:
+        path = self._backup_dir() / filename
+        if not path.exists() or path.parent.resolve() != self._backup_dir().resolve():
+            return None
+        return path
+
     def update_user_username(self, user_id: int, new_username: str) -> bool:
         """Returns False if username already taken."""
         with self._connect() as conn:
