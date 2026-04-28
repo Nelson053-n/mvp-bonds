@@ -184,13 +184,16 @@ class TBankService:
                         source="tbank",
                     )
                     added += 1
-                elif abs(db_item["quantity"] - api_item["quantity"]) > 1e-6:
-                    # Quantity changed — update, preserve original purchase_price
+                elif (
+                    abs(db_item["quantity"] - api_item["quantity"]) > 1e-6
+                    or abs(db_item["purchase_price"] - api_item["purchase_price"]) > 0.01
+                ):
+                    # Quantity or average price changed — sync both from API
                     storage.update_item(
                         item_id=db_item["id"],
                         portfolio_id=portfolio_id,
                         quantity=api_item["quantity"],
-                        purchase_price=db_item["purchase_price"],
+                        purchase_price=api_item["purchase_price"],
                     )
                     updated += 1
             except Exception as exc:
