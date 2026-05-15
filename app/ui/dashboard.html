@@ -1054,7 +1054,7 @@
             <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
           </div>
           <div class="card" id="events-card">
-            <div class="card-header"><h2 class="card-title">События 30 дней</h2></div>
+            <div class="card-header"><h2 class="card-title" id="events-card-title">События до конца месяца</h2></div>
             <div id="events-body" style="padding:6px 0;max-height:260px;overflow-y:auto;"></div>
           </div>
         </div>
@@ -3376,35 +3376,39 @@
         if (!row || !body) return;
         const freeCash = Number(extra?.free_cash_rub || window.cashTotalRub || 0);
         const events = extra?.events || [];
-        // Strictly future: today's events исключаем, чтобы не дублировать с freeCash
-        // (купон, выплаченный сегодня, скорее всего уже зачислен брокером).
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const horizonStr = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-        const futureCoupons = events.filter(e => e.type === 'coupon' && e.date > todayStr && e.date <= horizonStr);
-        const futureMaturity = events.filter(e => e.type === 'maturity' && e.date > todayStr && e.date <= horizonStr);
+        // Horizon — конец текущего месяца. Сегодняшние купоны исключаем (уже в freeCash).
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // last day of current month
+        const endStr = endOfMonth.toISOString().slice(0, 10);
+        const daysLeft = Math.max(0, Math.ceil((endOfMonth - today) / 86400000));
+        const futureCoupons = events.filter(e => e.type === 'coupon' && e.date > todayStr && e.date <= endStr);
+        const futureMaturity = events.filter(e => e.type === 'maturity' && e.date > todayStr && e.date <= endStr);
         const incomingCoupons = futureCoupons.reduce((s, e) => s + (e.amount || 0), 0);
         const incomingMaturity = futureMaturity.reduce((s, e) => s + (e.amount || 0), 0);
         const totalAvailable = freeCash + incomingCoupons + incomingMaturity;
         const hasAnything = freeCash > 0 || incomingCoupons > 0 || incomingMaturity > 0 || events.length > 0;
         row.style.display = hasAnything ? '' : 'none';
         const fmtRub = v => Math.round(v).toLocaleString('ru');
+        const monthName = endOfMonth.toLocaleDateString('ru', { month: 'long' });
+        const daysLeftLbl = daysLeft === 0 ? 'сегодня последний день' : daysLeft === 1 ? 'остался 1 день' : (daysLeft < 5 ? `осталось ${daysLeft} дня` : `осталось ${daysLeft} дней`);
         body.innerHTML = `
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
-            <div style="font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;" title="Свободные деньги на счёте + купоны и погашения, которые поступят в ближайшие 30 дней (не считая сегодняшних — они скорее всего уже зачислены)">${fmtRub(totalAvailable)} ₽</div>
+            <div style="font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;" title="Свободные деньги на счёте + купоны и погашения, которые поступят до конца ${monthName} (не считая сегодняшних — они скорее всего уже зачислены)">${fmtRub(totalAvailable)} ₽</div>
             <div style="font-size:12px;color:var(--text-muted);">доступно к реинвесту</div>
           </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;line-height:1.4;">Свободно сейчас + поступления за 30 дней (без сегодняшних)</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;line-height:1.4;">Свободно сейчас + поступления до конца ${monthName} · ${daysLeftLbl}</div>
           <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
             <div style="display:flex;justify-content:space-between;gap:8px;">
               <span style="color:var(--text-secondary);" title="Деньги, уже зачисленные брокером на счёт (включая ранее полученные купоны)">Свободно сейчас</span>
               <span style="font-weight:600;">${fmtRub(freeCash)} ₽</span>
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;">
-              <span style="color:var(--text-secondary);" title="Купоны с датой выплаты строго после сегодняшней (в течение 30 дней)">Купоны впереди</span>
+              <span style="color:var(--text-secondary);" title="Купоны с датой выплаты строго после сегодняшней до конца ${monthName}">Купоны впереди</span>
               <span style="font-weight:600;color:${incomingCoupons > 0 ? 'var(--green-400)' : 'var(--text-muted)'};">${incomingCoupons > 0 ? '+' : ''}${fmtRub(incomingCoupons)} ₽</span>
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;">
-              <span style="color:var(--text-secondary);" title="Возврат номинала по облигациям с погашением в ближайшие 30 дней">Погашения впереди</span>
+              <span style="color:var(--text-secondary);" title="Возврат номинала по облигациям с погашением до конца ${monthName}">Погашения впереди</span>
               <span style="font-weight:600;color:${incomingMaturity > 0 ? 'var(--green-400)' : 'var(--text-muted)'};">${incomingMaturity > 0 ? '+' : ''}${fmtRub(incomingMaturity)} ₽</span>
             </div>
           </div>
@@ -3415,18 +3419,25 @@
       // ── EVENTS 30 DAYS CARD ──────────────────────────────────────
       function renderEventsCard(events) {
         const body = document.getElementById('events-body');
+        const titleEl = document.getElementById('events-card-title');
         if (!body) return;
-        if (!events.length) {
-          body.innerHTML = '<div style="padding:14px 18px;color:var(--text-muted);font-size:13px;text-align:center;">Нет событий в ближайшие 30 дней</div>';
+        const today = new Date();
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const endStr = endOfMonth.toISOString().slice(0, 10);
+        const monthName = endOfMonth.toLocaleDateString('ru', { month: 'long' });
+        if (titleEl) titleEl.textContent = `События до конца ${monthName}`;
+        const filtered = events.filter(e => e.date <= endStr);
+        if (!filtered.length) {
+          body.innerHTML = `<div style="padding:14px 18px;color:var(--text-muted);font-size:13px;text-align:center;">Нет событий до конца ${monthName}</div>`;
           return;
         }
         const typeIcon = { coupon: '💰', maturity: '🟢', offer: '📋', buyback: '📋' };
         const typeColor = { coupon: 'var(--blue-500)', maturity: 'var(--green-400)', offer: '#f59e0b', buyback: '#f59e0b' };
         const typeLabel = { coupon: 'купон', maturity: 'погашение', offer: 'оферта', buyback: 'buyback' };
-        body.innerHTML = events.slice(0, 30).map(e => {
+        const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+        body.innerHTML = filtered.map(e => {
           const d = new Date(e.date);
-          const today = new Date(); today.setHours(0,0,0,0);
-          const diff = Math.round((d - today) / 86400000);
+          const diff = Math.round((d - todayMid) / 86400000);
           const dStr = d.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
           const dayLbl = diff === 0 ? 'сегодня' : diff === 1 ? 'завтра' : `через ${diff} дн.`;
           const amtStr = e.amount > 0 ? `+${Math.round(e.amount).toLocaleString('ru')} ₽` : '';
