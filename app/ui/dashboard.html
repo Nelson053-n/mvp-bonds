@@ -837,7 +837,6 @@
       body.mobile-mode th, body.mobile-mode td { padding: 5px 6px; }
       body.mobile-mode .mobile-toggle-bar { display: flex; }
       body.mobile-mode .brand-badge { display: none; }
-      body.mobile-mode #analytics-type-card { display: none !important; }
       /* В мобильном режиме скрываем кнопку выхода и лишние кнопки из topbar-right */
       body.mobile-mode #btn-logout,
       body.mobile-mode #btn-guide,
@@ -963,16 +962,6 @@
             <div class="stat-value" id="stat-ytm">—</div>
             <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-label">Диверсификация</div>
-            <div class="stat-value" id="stat-diversification" style="font-size:22px;">—</div>
-            <div class="stat-sub" id="stat-diversification-sub">&nbsp;</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Duration</div>
-            <div class="stat-value" id="stat-duration" style="font-size:22px;">—</div>
-            <div class="stat-sub" id="stat-duration-sub">&nbsp;</div>
-          </div>
         </div>
 
         <!-- Anomalies alert banner -->
@@ -983,18 +972,6 @@
               <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Обратите внимание</div>
               <div id="anomalies-list" style="font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:4px;"></div>
             </div>
-          </div>
-        </div>
-
-        <!-- Cash-to-reinvest + Upcoming events -->
-        <div class="panel-cols" id="actionable-row" style="grid-template-columns:1fr 1fr;display:none;">
-          <div class="card" id="cash-reinvest-card">
-            <div class="card-header"><h2 class="card-title">К реинвесту</h2></div>
-            <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
-          </div>
-          <div class="card" id="events-card">
-            <div class="card-header"><h2 class="card-title">События 30 дней</h2></div>
-            <div id="events-body" style="padding:6px 0;max-height:260px;overflow-y:auto;"></div>
           </div>
         </div>
 
@@ -1054,10 +1031,10 @@
           </div>
         </div>
 
-        <!-- Monthly income chart -->
+        <!-- Monthly cashflow chart -->
         <div class="card" id="chart-card" style="padding: 0;">
           <div class="card-header">
-            <h2 class="card-title" data-i18n="chart.title">Купонный доход по месяцам</h2>
+            <h2 class="card-title" data-i18n="chart.title">Денежный поток</h2>
             <div id="coupon-period-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           </div>
           <div style="padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
@@ -1065,6 +1042,18 @@
             <div id="chart-wrap">
               <canvas id="monthly-chart" height="190"></canvas>
             </div>
+          </div>
+        </div>
+
+        <!-- Cash-to-reinvest + Upcoming events (moved under cashflow) -->
+        <div class="panel-cols" id="actionable-row" style="grid-template-columns:1fr 1fr;display:none;">
+          <div class="card" id="cash-reinvest-card">
+            <div class="card-header"><h2 class="card-title">К реинвесту</h2></div>
+            <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
+          </div>
+          <div class="card" id="events-card">
+            <div class="card-header"><h2 class="card-title">События 30 дней</h2></div>
+            <div id="events-body" style="padding:6px 0;max-height:260px;overflow-y:auto;"></div>
           </div>
         </div>
 
@@ -1082,9 +1071,9 @@
                 <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
                 <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
               </div>
-              <label id="rgbi-toggle-label" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none;">
+              <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
                 <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
-                <span>vs RGBI</span>
+                <span>vs Индекс ОФЗ</span>
               </label>
               <div style="display:flex;gap:6px;">
                 <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
@@ -1099,75 +1088,83 @@
           </div>
         </div>
 
-        <!-- Bond-specific analytics row 1: Duration + Maturity ladder -->
-        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
-          <div class="card" id="duration-card">
-            <div class="card-header"><h2 class="card-title">Процентный риск (Duration)</h2></div>
-            <div id="duration-body" style="padding:16px 18px;">
-              <div style="color:var(--text-muted);font-size:13px;">—</div>
-            </div>
+        <!-- Bond analytics row 1: Duration (full-width) -->
+        <div class="card" id="duration-card">
+          <div class="card-header"><h2 class="card-title">Процентный риск (Duration)</h2></div>
+          <div id="duration-body" style="padding:16px 18px;">
+            <div style="color:var(--text-muted);font-size:13px;">—</div>
           </div>
-          <div class="card" id="maturity-ladder-card">
-            <div class="card-header"><h2 class="card-title">Срочная структура</h2></div>
-            <div style="padding:12px 16px 16px;">
+        </div>
+
+        <!-- Bond analytics row 2: Maturity ladder + Currencies (combined) -->
+        <div class="card" id="maturity-currency-card">
+          <div class="card-header"><h2 class="card-title">Сроки погашения и валюты</h2></div>
+          <div class="panel-cols" style="grid-template-columns:1fr 1fr;gap:0;padding:0;">
+            <div id="maturity-ladder-pane" style="padding:14px 16px;border-right:1px solid var(--table-border);">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Срочная структура</div>
               <canvas id="maturity-ladder-chart" height="160" style="display:block;width:100%;"></canvas>
               <div id="maturity-ladder-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о датах погашения</div>
             </div>
+            <div id="currency-pane" style="padding:14px 16px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">По валютам</div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <canvas id="currency-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
+                <div id="currency-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
+              </div>
+              <div id="currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
+            </div>
           </div>
         </div>
+        <style>
+          @media (max-width: 860px) {
+            #maturity-currency-card .panel-cols { grid-template-columns: 1fr !important; }
+            #maturity-currency-card #maturity-ladder-pane { border-right: none; border-bottom: 1px solid var(--table-border); }
+            #ratings-coupon-card .panel-cols { grid-template-columns: 1fr !important; }
+            #ratings-coupon-card #ratings-pane { border-right: none; border-bottom: 1px solid var(--table-border); }
+          }
+        </style>
 
-        <!-- Bond-specific analytics row 2: Ratings + Currencies -->
-        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
-          <div class="card" id="ratings-card">
-            <div class="card-header"><h2 class="card-title">Кредитные рейтинги</h2></div>
-            <div style="padding:12px 16px 16px;">
+        <!-- Bond analytics row 3: Ratings + Coupon type (combined) -->
+        <div class="card" id="ratings-coupon-card">
+          <div class="card-header"><h2 class="card-title">Кредитное качество и тип купона</h2></div>
+          <div class="panel-cols" style="grid-template-columns:1fr 1fr;gap:0;padding:0;">
+            <div id="ratings-pane" style="padding:14px 16px;border-right:1px solid var(--table-border);">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Кредитные рейтинги</div>
               <canvas id="ratings-chart" height="160" style="display:block;width:100%;"></canvas>
               <div id="ratings-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о рейтингах</div>
             </div>
-          </div>
-          <div class="card" id="currency-card">
-            <div class="card-header"><h2 class="card-title">По валютам</h2></div>
-            <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
-              <canvas id="currency-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="currency-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;"></div>
-            </div>
-            <div id="currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
-          </div>
-        </div>
-
-        <!-- Bond-specific analytics row 3: Fixed vs Floater -->
-        <div class="card" id="coupon-type-card">
-          <div class="card-header"><h2 class="card-title">Тип купона</h2></div>
-          <div style="padding:14px 18px 18px;">
-            <div id="coupon-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:14px 0;">В портфеле нет облигаций</div>
-            <div id="coupon-type-bar" style="display:none;">
-              <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--table-border);">
-                <div id="coupon-type-fixed-fill" style="height:100%;background:#2563eb;transition:width .25s;"></div>
-                <div id="coupon-type-float-fill" style="height:100%;background:#f59e0b;transition:width .25s;"></div>
-              </div>
-              <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text-secondary);gap:12px;flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0;"></span>
-                  <span id="coupon-type-fixed-label">Фиксированный — 0%</span>
+            <div id="coupon-type-pane" style="padding:14px 16px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Тип купона</div>
+              <div id="coupon-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">В портфеле нет облигаций</div>
+              <div id="coupon-type-bar" style="display:none;">
+                <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--table-border);">
+                  <div id="coupon-type-fixed-fill" style="height:100%;background:#2563eb;transition:width .25s;"></div>
+                  <div id="coupon-type-float-fill" style="height:100%;background:#f59e0b;transition:width .25s;"></div>
                 </div>
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
-                  <span id="coupon-type-float-label">Плавающий — 0%</span>
+                <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text-secondary);gap:12px;flex-wrap:wrap;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0;"></span>
+                    <span id="coupon-type-fixed-label">Фиксированный — 0%</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+                    <span id="coupon-type-float-label">Плавающий — 0%</span>
+                  </div>
                 </div>
+                <div id="coupon-type-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
               </div>
-              <div id="coupon-type-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;"></div>
             </div>
           </div>
         </div>
 
-        <!-- Bond-specific analytics row 4: YTM curve + Stress test -->
+        <!-- Bond analytics row 4: YTM curve + Stress test -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
           <div class="card" id="ytm-curve-card">
             <div class="card-header"><h2 class="card-title">YTM-кривая</h2></div>
             <div style="padding:12px 16px 16px;">
-              <canvas id="ytm-curve-chart" height="220" style="display:block;width:100%;"></canvas>
+              <canvas id="ytm-curve-chart" height="240" style="display:block;width:100%;"></canvas>
               <div id="ytm-curve-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по YTM и срокам</div>
-              <div id="ytm-curve-hint" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+              <div id="ytm-curve-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
             </div>
           </div>
           <div class="card" id="stress-test-card">
@@ -1178,20 +1175,23 @@
           </div>
         </div>
 
-        <!-- Charts row -->
-        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
-          <div class="card" id="analytics-type-card">
-            <div class="card-header"><h2 class="card-title">По типам</h2></div>
-            <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
-              <canvas id="analytics-type-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);"></div>
+        <!-- Portfolio structure (tabs: issuers / types) -->
+        <div class="card" id="analytics-type-card">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <h2 class="card-title">Структура портфеля</h2>
+            <div id="structure-tabs" style="display:inline-flex;gap:0;background:var(--table-border);border-radius:8px;padding:2px;">
+              <button class="structure-tab active" data-tab="issuers" style="border:none;background:var(--bg-card);color:var(--text-primary);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:500;">Эмитенты</button>
+              <button class="structure-tab" data-tab="types" style="border:none;background:transparent;color:var(--text-secondary);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:500;">Типы</button>
             </div>
           </div>
-          <div class="card">
-            <div class="card-header"><h2 class="card-title">По эмитентам (топ-5)</h2></div>
-            <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
+          <div style="padding:14px 16px;">
+            <div id="structure-tab-issuers" style="display:flex;align-items:center;gap:16px;">
               <canvas id="analytics-issuer-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);"></div>
+              <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
+            </div>
+            <div id="structure-tab-types" style="display:none;align-items:center;gap:16px;">
+              <canvas id="analytics-type-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
+              <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
             </div>
           </div>
         </div>
@@ -2637,7 +2637,15 @@
             const rInfo = getRiskInfo(riskKey);
             sr.textContent = rInfo.label;
             sr.style.color = rInfo.color;
-            srs.textContent = (summary.totalBondYield > 0 ? summary.totalBondYield.toFixed(1) + '% ' : '') + t('stat.sub.avgYtm');
+            const parts = [];
+            if (summary.totalBondYield > 0) parts.push(summary.totalBondYield.toFixed(1) + '% ' + t('stat.sub.avgYtm'));
+            const divObj = calculateDiversificationScore(tableRows);
+            if (divObj && divObj.score >= 0) {
+              const lbl = divObj.score >= 70 ? 'отличная' : divObj.score >= 50 ? 'хорошая' : divObj.score >= 30 ? 'средняя' : 'слабая';
+              const col = divObj.score >= 70 ? 'var(--green-400)' : divObj.score >= 50 ? 'var(--text-secondary)' : divObj.score >= 30 ? '#f59e0b' : 'var(--red-400)';
+              parts.push('<span style="font-size:10px;color:var(--text-muted);" title="Композитный показатель диверсификации (0-100). Учитывает разброс по эмитентам, рейтингам, срокам, валютам и типу купона.">диверсификация: <span style="color:' + col + ';">' + divObj.score + '/100</span> · ' + lbl + '</span>');
+            }
+            srs.innerHTML = parts.join('<br>');
           }
         }
       }
@@ -2699,6 +2707,16 @@
             parts.push('средневзвешенная');
           }
           parts.push(`<span style="font-size:10px;color:var(--text-muted);">после налогов: ${netYtm.toFixed(1)}%</span>`);
+          // Duration inline
+          const now = new Date();
+          const withMat = rows.filter(r => r.type === 'bond' && r.current_value > 0)
+            .map(r => ({ r, yrs: _bondMaturityYears(r, now) }))
+            .filter(x => x.yrs != null && x.yrs > 0);
+          if (withMat.length) {
+            const totVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
+            const mac = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totVal;
+            parts.push(`<span style="font-size:10px;color:var(--text-muted);" title="Macaulay duration — средневзвешенный срок до погашения. Чем больше — тем чувствительнее портфель к ставке ЦБ.">дюрация: ${mac.toFixed(1)} г</span>`);
+          }
           sub.innerHTML = parts.join('<br>');
         }
       }
@@ -2784,39 +2802,6 @@
         const score = Math.max(0, Math.min(100, Math.round((1 - combinedHHI) * 100)));
         return { score, components: { issuerHHI, ratingHHI, maturityHHI, currencyHHI, couponHHI } };
       }
-      function updateDiversificationWidget(rows) {
-        const el = document.getElementById('stat-diversification');
-        const sub = document.getElementById('stat-diversification-sub');
-        if (!el) return;
-        if (!rows.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
-        const { score } = calculateDiversificationScore(rows);
-        el.textContent = `${score} / 100`;
-        el.style.color = score >= 70 ? 'var(--green-400)' : score >= 50 ? 'var(--text-primary)' : score >= 30 ? '#f59e0b' : 'var(--red-400)';
-        if (sub) {
-          const label = score >= 70 ? 'отличная' : score >= 50 ? 'хорошая' : score >= 30 ? 'средняя' : 'слабая';
-          sub.textContent = label;
-        }
-      }
-      function updateDurationStatWidget(rows) {
-        const el = document.getElementById('stat-duration');
-        const sub = document.getElementById('stat-duration-sub');
-        if (!el) return;
-        const now = new Date();
-        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
-        const withMat = bonds.map(r => ({ r, yrs: _bondMaturityYears(r, now) })).filter(x => x.yrs != null && x.yrs > 0);
-        if (!withMat.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
-        const totalVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
-        const macaulay = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totalVal;
-        el.textContent = `${macaulay.toFixed(1)} г`;
-        if (sub) {
-          const lbl = macaulay < 1 ? 'короткий портфель'
-            : macaulay < 3 ? 'умеренная дюрация'
-            : macaulay < 5 ? 'средняя дюрация'
-            : 'длинный портфель';
-          sub.textContent = lbl;
-        }
-      }
-
       async function updateCashWidget(pid) {
         const badge = document.getElementById('autosync-badge');
         const cashRow = document.getElementById('autosync-cash');
@@ -2939,6 +2924,29 @@
         drawPieChart('analytics-issuer-chart', top5, issuerColors);
         const issuerTotal = top5.reduce((s, d) => s + d.value, 0);
         buildLegend('analytics-issuer-legend', top5, issuerColors, issuerTotal);
+
+        // Wire structure tabs (idempotent)
+        if (!window._structureTabsWired) {
+          window._structureTabsWired = true;
+          const tabsEl = document.getElementById('structure-tabs');
+          if (tabsEl) {
+            tabsEl.addEventListener('click', e => {
+              const btn = e.target.closest('.structure-tab');
+              if (!btn) return;
+              const tab = btn.dataset.tab;
+              tabsEl.querySelectorAll('.structure-tab').forEach(b => {
+                const active = b.dataset.tab === tab;
+                b.classList.toggle('active', active);
+                b.style.background = active ? 'var(--bg-card)' : 'transparent';
+                b.style.color = active ? 'var(--text-primary)' : 'var(--text-secondary)';
+              });
+              const issEl = document.getElementById('structure-tab-issuers');
+              const typEl = document.getElementById('structure-tab-types');
+              if (issEl) issEl.style.display = tab === 'issuers' ? 'flex' : 'none';
+              if (typEl) typEl.style.display = tab === 'types' ? 'flex' : 'none';
+            });
+          }
+        }
 
         // Top/loss performers
         const withProfit = rows.filter(r => typeof r.profit === 'number');
@@ -3445,81 +3453,238 @@
         }
         canvas.style.display = 'block';
         if (emptyEl) emptyEl.style.display = 'none';
+
         const dpr = window.devicePixelRatio || 1;
         const parent = canvas.parentElement;
         const W = (parent ? parent.clientWidth : 0) || 400;
-        const H = 220;
+        const H = 240;
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
         canvas.width = W * dpr;
         canvas.height = H * dpr;
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, W, H);
+
         const st = getComputedStyle(document.documentElement);
         const gridClr = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.15)';
         const labelClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
-        const dotClr = st.getPropertyValue('--blue-400').trim() || '#60a5fa';
-        const PAD_L = 36, PAD_R = 8, PAD_T = 12, PAD_B = 22;
-        const chartW = W - PAD_L - PAD_R, chartH = H - PAD_T - PAD_B;
+        const axisTitleClr = st.getPropertyValue('--text-secondary').trim() || '#94a3b8';
+
+        // Color by rating bucket (greens for AAA, ambers for BB and weaker, gray for unrated)
+        const ratingBucketColor = r => {
+          const x = String(r || '').toUpperCase().replace(/^RU/, '');
+          if (x.startsWith('AAA')) return '#16a34a';
+          if (x.startsWith('AA'))  return '#22c55e';
+          if (x.startsWith('A'))   return '#84cc16';
+          if (x.startsWith('BBB')) return '#eab308';
+          if (x.startsWith('BB'))  return '#f59e0b';
+          if (x.startsWith('B'))   return '#f97316';
+          if (x.startsWith('C') || x.startsWith('D')) return '#dc2626';
+          return '#64748b';
+        };
+
+        const PAD_L = 52, PAD_R = 12, PAD_T = 28, PAD_B = 40;
+        const chartW = W - PAD_L - PAD_R;
+        const chartH = H - PAD_T - PAD_B;
         const maxYrs = Math.max(...points.map(p => p.yrs), 1);
         const maxYtm = Math.max(...points.map(p => p.r.market_yield), 1);
         const minYtm = Math.min(...points.map(p => p.r.market_yield), maxYtm);
-        const ytmLo = Math.max(0, Math.floor(minYtm - 1));
-        const ytmHi = Math.ceil(maxYtm + 1);
-        const xrange = Math.ceil(maxYrs);
-        const xticks = xrange <= 5 ? xrange : 5;
-        const yticks = 4;
-        // Grid + ticks
-        ctx.strokeStyle = gridClr;
-        ctx.lineWidth = 1;
-        ctx.font = '500 9px Inter, system-ui, sans-serif';
-        ctx.fillStyle = labelClr;
-        for (let i = 0; i <= yticks; i++) {
-          const y = PAD_T + chartH * (1 - i / yticks);
-          const v = ytmLo + (ytmHi - ytmLo) * i / yticks;
-          ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-          ctx.textAlign = 'right';
-          ctx.fillText(v.toFixed(0) + '%', PAD_L - 4, y + 3);
-        }
-        for (let i = 0; i <= xticks; i++) {
-          const x = PAD_L + chartW * i / xticks;
-          const v = xrange * i / xticks;
-          ctx.textAlign = 'center';
-          ctx.fillText(v.toFixed(1) + 'г', x, H - PAD_B + 12);
-        }
-        // Key rate horizontal line
         const keyRate = Number(window._keyRate || 0);
-        if (keyRate > 0 && keyRate >= ytmLo && keyRate <= ytmHi) {
-          const yK = PAD_T + chartH * (1 - (keyRate - ytmLo) / (ytmHi - ytmLo));
-          ctx.save();
-          ctx.strokeStyle = '#f59e0b';
-          ctx.setLineDash([4, 3]);
-          ctx.beginPath(); ctx.moveTo(PAD_L, yK); ctx.lineTo(W - PAD_R, yK); ctx.stroke();
-          ctx.restore();
-          ctx.fillStyle = '#f59e0b';
-          ctx.font = 'bold 9px Inter, system-ui, sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(`ключевая ${keyRate.toFixed(1)}%`, PAD_L + 4, yK - 3);
-        }
-        // Dots
+        let ytmLoRaw = Math.min(minYtm - 1, keyRate > 0 ? keyRate - 1 : minYtm - 1);
+        let ytmHiRaw = Math.max(maxYtm + 1, keyRate > 0 ? keyRate + 1 : maxYtm + 1);
+        const ytmLo = Math.max(0, Math.floor(ytmLoRaw));
+        const ytmHi = Math.ceil(ytmHiRaw);
+        const xrange = Math.ceil(maxYrs);
+        const xticks = xrange <= 5 ? Math.max(2, xrange) : 5;
+        const yticks = 4;
+
+        const xToPx = yrs => PAD_L + chartW * (yrs / xrange);
+        const yToPx = ytm => PAD_T + chartH * (1 - (ytm - ytmLo) / (ytmHi - ytmLo));
+
         const totalVal = points.reduce((s, p) => s + p.r.current_value, 0);
-        points.forEach(p => {
-          const x = PAD_L + chartW * (p.yrs / xrange);
-          const y = PAD_T + chartH * (1 - (p.r.market_yield - ytmLo) / (ytmHi - ytmLo));
+        const enriched = points.map(p => {
           const share = p.r.current_value / totalVal;
-          const radius = 3 + Math.sqrt(share * 200);
-          ctx.fillStyle = dotClr + 'cc';
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 1;
-          ctx.stroke();
+          return {
+            ...p,
+            share,
+            radius: 5 + Math.sqrt(share * 400),
+            color: ratingBucketColor(p.r.company_rating),
+            x: xToPx(p.yrs),
+            y: yToPx(p.r.market_yield),
+          };
         });
+
+        function drawScene(hoverIdx) {
+          ctx.clearRect(0, 0, W, H);
+
+          // Axis titles
+          ctx.fillStyle = axisTitleClr;
+          ctx.font = '600 10px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText('YTM, %', 6, PAD_T - 14);
+          ctx.textAlign = 'right';
+          ctx.fillText('Срок до погашения/оферты, лет →', W - PAD_R, H - 6);
+
+          // Grid lines + Y labels
+          ctx.strokeStyle = gridClr;
+          ctx.lineWidth = 1;
+          ctx.font = '500 10px Inter, system-ui, sans-serif';
+          ctx.fillStyle = labelClr;
+          for (let i = 0; i <= yticks; i++) {
+            const y = PAD_T + chartH * (1 - i / yticks);
+            const v = ytmLo + (ytmHi - ytmLo) * i / yticks;
+            ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+            ctx.textAlign = 'right';
+            ctx.fillText(v.toFixed(1) + '%', PAD_L - 6, y + 3);
+          }
+          for (let i = 0; i <= xticks; i++) {
+            const x = PAD_L + chartW * i / xticks;
+            const v = xrange * i / xticks;
+            // Vertical light grid line
+            ctx.strokeStyle = gridClr;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, PAD_T + chartH); ctx.stroke();
+            ctx.textAlign = 'center';
+            ctx.fillStyle = labelClr;
+            ctx.fillText(v.toFixed(v < 1 ? 1 : 0) + ' г', x, H - PAD_B + 14);
+          }
+
+          // Key rate horizontal dashed line + label
+          if (keyRate > 0 && keyRate >= ytmLo && keyRate <= ytmHi) {
+            const yK = yToPx(keyRate);
+            ctx.save();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath(); ctx.moveTo(PAD_L, yK); ctx.lineTo(W - PAD_R, yK); ctx.stroke();
+            ctx.restore();
+            // Badge background
+            const txt = `Ключевая ${keyRate.toFixed(1)}%`;
+            ctx.font = 'bold 10px Inter, system-ui, sans-serif';
+            const tw = ctx.measureText(txt).width;
+            ctx.fillStyle = '#f59e0b';
+            _roundRect(ctx, W - PAD_R - tw - 12, yK - 16, tw + 10, 14, 3);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'right';
+            ctx.fillText(txt, W - PAD_R - 5, yK - 5);
+          }
+
+          // Dots
+          enriched.forEach((p, i) => {
+            const isHover = i === hoverIdx;
+            const r = isHover ? p.radius + 2 : p.radius;
+            ctx.fillStyle = p.color + (isHover ? 'ee' : 'cc');
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = isHover ? '#fff' : 'rgba(255,255,255,0.7)';
+            ctx.lineWidth = isHover ? 2 : 1;
+            ctx.stroke();
+          });
+
+          // Hover crosshair + nice label near dot
+          if (hoverIdx != null && hoverIdx >= 0) {
+            const p = enriched[hoverIdx];
+            ctx.save();
+            ctx.strokeStyle = 'rgba(148,163,184,0.35)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(PAD_L, p.y); ctx.lineTo(W - PAD_R, p.y);
+            ctx.moveTo(p.x, PAD_T); ctx.lineTo(p.x, PAD_T + chartH);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        drawScene(null);
+
+        // Tooltip
+        let tip = document.getElementById('_ytm_curve_tooltip');
+        if (!tip) {
+          tip = document.createElement('div');
+          tip.id = '_ytm_curve_tooltip';
+          tip.style.cssText = [
+            'position:fixed;z-index:9999;pointer-events:none;',
+            'background:#1e293b;border:1px solid rgba(148,163,184,.2);',
+            'border-radius:8px;padding:8px 11px;',
+            'box-shadow:0 8px 32px rgba(0,0,0,.55);',
+            'font-family:Inter,sans-serif;font-size:12px;color:#f1f5f9;',
+            'min-width:180px;max-width:240px;display:none;transition:opacity .12s;',
+          ].join('');
+          document.body.appendChild(tip);
+        }
+
+        if (canvas._curveAbort) canvas._curveAbort.abort();
+        canvas._curveAbort = new AbortController();
+        const sig = { signal: canvas._curveAbort.signal };
+
+        const findHit = (mx, my) => {
+          // Find nearest dot in pixel space within (radius + 4)
+          let best = -1, bestDist = Infinity;
+          enriched.forEach((p, i) => {
+            const d = Math.hypot(mx - p.x, my - p.y);
+            if (d <= p.radius + 4 && d < bestDist) { bestDist = d; best = i; }
+          });
+          return best;
+        };
+
+        canvas.addEventListener('mousemove', e => {
+          const rect = canvas.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+          const idx = findHit(mx, my);
+          drawScene(idx >= 0 ? idx : null);
+          if (idx < 0) { tip.style.display = 'none'; return; }
+          const p = enriched[idx];
+          const r = p.r;
+          const matDate = r.maturity_date ? new Date(r.maturity_date).toLocaleDateString('ru', { day:'numeric', month:'short', year:'numeric' }) : null;
+          const offerDate = r.offer_date ? new Date(r.offer_date).toLocaleDateString('ru', { day:'numeric', month:'short', year:'numeric' }) : null;
+          const buybackDate = r.buyback_date ? new Date(r.buyback_date).toLocaleDateString('ru', { day:'numeric', month:'short', year:'numeric' }) : null;
+          const dateLine = offerDate ? `Оферта: ${offerDate}` : (buybackDate ? `Buyback: ${buybackDate}` : (matDate ? `Погашение: ${matDate}` : ''));
+          const ratingLabel = r.company_rating && r.company_rating !== '—' ? r.company_rating : 'без рейтинга';
+          const couponLine = r.coupon_rate ? `Купон: ${r.coupon_rate.toFixed(1)}%/год` : '';
+          const sharePct = (p.share * 100).toFixed(1);
+          const cv = Math.round(r.current_value).toLocaleString('ru');
+          tip.innerHTML = `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></span>
+              <span style="font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.name || r.ticker)}">${esc((r.name || r.ticker).substring(0, 28))}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:auto auto;gap:4px 10px;font-size:11px;color:#cbd5e1;">
+              <span>YTM:</span><span style="text-align:right;font-weight:700;color:#fff;">${r.market_yield.toFixed(2)}%</span>
+              <span>Срок:</span><span style="text-align:right;color:#fff;">${p.yrs.toFixed(2)} г</span>
+              <span>Доля:</span><span style="text-align:right;color:#fff;">${sharePct}% (${cv} ₽)</span>
+              <span>Рейтинг:</span><span style="text-align:right;color:${p.color};font-weight:600;">${ratingLabel}</span>
+              ${couponLine ? `<span>Купон:</span><span style="text-align:right;color:#fff;">${r.coupon_rate.toFixed(2)}%</span>` : ''}
+            </div>
+            ${dateLine ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.18);font-size:10px;color:#94a3b8;">${dateLine}</div>` : ''}
+          `;
+          tip.style.display = 'block';
+          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          tip.style.background = isLight ? '#ffffff' : '#1e293b';
+          tip.style.color = isLight ? '#0f172a' : '#f1f5f9';
+          tip.style.border = isLight ? '1px solid #e2e8f0' : '1px solid rgba(148,163,184,.2)';
+          const TW = tip.offsetWidth || 200, TH = tip.offsetHeight || 100;
+          let tx = e.clientX + 14;
+          let ty = e.clientY - TH / 2;
+          if (tx + TW > window.innerWidth - 8) tx = e.clientX - TW - 14;
+          if (ty < 8) ty = 8;
+          if (ty + TH > window.innerHeight - 8) ty = window.innerHeight - TH - 8;
+          tip.style.left = tx + 'px';
+          tip.style.top = ty + 'px';
+        }, sig);
+        canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; drawScene(null); }, sig);
+
         if (hintEl) {
-          hintEl.textContent = 'X — годы до погашения/оферты, Y — YTM, размер точки = доля в портфеле. ' +
-            (keyRate > 0 ? 'Пунктир — ключевая ставка ЦБ.' : '');
+          const rated = enriched.filter(p => p.r.company_rating && p.r.company_rating !== '—').length;
+          const hintParts = [
+            'X — годы до ближайшего события, Y — YTM, размер = доля в портфеле, цвет = кредитный рейтинг.',
+          ];
+          if (keyRate > 0) hintParts.push('Точки <b>выше</b> жёлтой пунктирной линии ключевой ставки — обгоняют депозит.');
+          if (rated < enriched.length) hintParts.push(`<span style="color:var(--text-muted);">${enriched.length - rated} бумаг без рейтинга показаны серым.</span>`);
+          hintEl.innerHTML = hintParts.join(' ');
         }
       }
 
@@ -3896,7 +4061,7 @@
               ctx.fillStyle = '#f59e0b';
               ctx.font = 'bold 9px Inter, sans-serif';
               ctx.textAlign = 'left';
-              ctx.fillText('— RGBI (норм.)', pad.l + 4, pad.t + 10);
+              ctx.fillText('— Индекс ОФЗ (норм.)', pad.l + 4, pad.t + 10);
             }
           }
 
@@ -5410,8 +5575,6 @@
         updateStatCards(summary);
         updateNextCouponWidget(tableRows);
         updateYTMWidget(tableRows);
-        updateDiversificationWidget(tableRows);
-        updateDurationStatWidget(tableRows);
         updateLastUpdateTime();
 
         const sumRow = document.createElement('tr');
@@ -8837,10 +9000,10 @@
           'stat.sub.ofValue': '% от стоимости',
           'stat.sub.noYtm': 'в пустом портфеле',
           'stat.sub.avgYtm': 'средневзвешенная YTM',
-          'chart.title': 'Cashflow по месяцам',
+          'chart.title': 'Денежный поток',
           'chart.offer': 'оферта',
           'chart.noData': 'Нет данных по купонным выплатам',
-          'chart.yLabel': 'Cashflow, ₽',
+          'chart.yLabel': 'Денежный поток, ₽',
           'chart.yearAhead': 'На год вперёд',
           'chart.maturity': 'погашение',
           'auth.enterCreds': 'Введите логин и пароль',
