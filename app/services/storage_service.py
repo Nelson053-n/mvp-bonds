@@ -268,6 +268,23 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 )
             """)
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS benchmark_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    benchmark TEXT NOT NULL,
+                    snapshot_date TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    UNIQUE(benchmark, snapshot_date)
+                )
+            """)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_benchmark_snapshots_lookup "
+                    "ON benchmark_snapshots(benchmark, snapshot_date)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
             # Migrations for portfolio_items — add source column
             for col, col_def in [
                 ("source", "TEXT NOT NULL DEFAULT 'manual'"),
@@ -999,6 +1016,40 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             conn.commit()
             return cursor.rowcount
+
+    # ── Benchmark snapshots ─────────────────────────────────────────
+    def upsert_benchmark_snapshot(self, benchmark: str, snapshot_date: str, value: float) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO benchmark_snapshots (benchmark, snapshot_date, value) "
+                "VALUES (?, ?, ?)",
+                (benchmark.upper(), snapshot_date, float(value)),
+            )
+            conn.commit()
+
+    def bulk_upsert_benchmark_snapshots(self, benchmark: str, rows: list[dict]) -> int:
+        if not rows:
+            return 0
+        bm = benchmark.upper()
+        with self._connect() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO benchmark_snapshots (benchmark, snapshot_date, value) "
+                "VALUES (?, ?, ?)",
+                [(bm, r["date"], float(r["value"])) for r in rows if r.get("date") and r.get("value") is not None],
+            )
+            conn.commit()
+        return len(rows)
+
+    def get_benchmark_snapshots(self, benchmark: str, days: int) -> list[dict]:
+        from datetime import date, timedelta
+        date_from = (date.today() - timedelta(days=days)).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "SELECT snapshot_date, value FROM benchmark_snapshots "
+                "WHERE benchmark = ? AND snapshot_date >= ? ORDER BY snapshot_date ASC",
+                (benchmark.upper(), date_from),
+            )
+            return [{"date": r[0], "value": r[1]} for r in cursor.fetchall()]
 
 
 storage_service = StorageService()

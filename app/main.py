@@ -214,6 +214,37 @@ async def _rating_refresh_loop():
             logger.exception("Daily rating refresh failed")
 
 
+async def _benchmark_snapshot_loop():
+    """Persist RGBI snapshot daily at 23:00 UTC. On startup, backfill last year."""
+    from datetime import datetime, timezone, date
+    from app.services.moex_service import moex_service
+
+    # On startup: backfill if we have fewer than 100 RGBI points
+    try:
+        existing = storage_service.get_benchmark_snapshots("RGBI", days=400)
+        if len(existing) < 100:
+            history = await moex_service.get_index_history("RGBI", days=400)
+            if history:
+                storage_service.bulk_upsert_benchmark_snapshots("RGBI", history)
+                logger.info("RGBI backfill: %d points", len(history))
+    except Exception:
+        logger.exception("RGBI backfill failed")
+
+    while True:
+        now = datetime.now(timezone.utc)
+        secs_to_23 = ((23 - now.hour) % 24) * 3600 - now.minute * 60 - now.second
+        if secs_to_23 <= 0:
+            secs_to_23 += 86400
+        await asyncio.sleep(secs_to_23)
+        try:
+            value = await moex_service.get_index_value("RGBI")
+            if value is not None:
+                storage_service.upsert_benchmark_snapshot("RGBI", date.today().isoformat(), value)
+                logger.info("RGBI snapshot saved: %.2f", value)
+        except Exception:
+            logger.exception("RGBI snapshot failed")
+
+
 async def _daily_backup_loop():
     """Create a daily automatic backup at the configured hour (UTC)."""
     from datetime import datetime, timezone
@@ -270,6 +301,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_rating_refresh_loop())
     asyncio.create_task(_tbank_sync_loop())
     asyncio.create_task(_daily_backup_loop())
+    asyncio.create_task(_benchmark_snapshot_loop())
     yield
     logger.info("Shutting down application")
     cache_service.stop_background()

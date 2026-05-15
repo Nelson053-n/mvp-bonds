@@ -176,6 +176,58 @@ class MOEXService:
             return cached[0]
         return None
 
+    async def get_index_value(self, index_id: str = "RGBI") -> float | None:
+        """Get current value of MOEX index (e.g., RGBI for OFZ index)."""
+        url = (
+            f"{settings.moex_base_url}/engines/stock/markets/index/"
+            f"securities/{index_id}.json?iss.meta=off&iss.only=marketdata"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+            md = data.get("marketdata", {})
+            cols = md.get("columns", [])
+            rows = md.get("data", [])
+            if not rows:
+                return None
+            row = dict(zip(cols, rows[0]))
+            val = row.get("CURRENTVALUE") or row.get("LASTVALUE")
+            return float(val) if val is not None else None
+        except Exception as exc:
+            logger.warning("Failed to fetch index %s: %s", index_id, exc)
+            return None
+
+    async def get_index_history(self, index_id: str = "RGBI", days: int = 400) -> list[dict]:
+        """Get historical daily close values of an index. Returns [{date, value}, ...]."""
+        from datetime import date, timedelta
+        date_from = (date.today() - timedelta(days=days)).isoformat()
+        url = (
+            f"{settings.moex_base_url}/history/engines/stock/markets/index/"
+            f"securities/{index_id}.json?from={date_from}&iss.meta=off"
+            f"&iss.only=history&history.columns=TRADEDATE,CLOSE"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+            hist = data.get("history", {})
+            cols = hist.get("columns", [])
+            rows = hist.get("data", [])
+            result = []
+            for r in rows:
+                d = dict(zip(cols, r))
+                val = d.get("CLOSE")
+                tdate = d.get("TRADEDATE")
+                if val is not None and tdate:
+                    result.append({"date": tdate, "value": float(val)})
+            return result
+        except Exception as exc:
+            logger.warning("Failed to fetch index history %s: %s", index_id, exc)
+            return []
+
     async def get_stock_snapshot(self, ticker: str) -> StockSnapshot:
         secid = ticker.upper().strip()
         cached = self._stock_snapshot_cache.get(secid)

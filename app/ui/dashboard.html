@@ -963,6 +963,39 @@
             <div class="stat-value" id="stat-ytm">—</div>
             <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Диверсификация</div>
+            <div class="stat-value" id="stat-diversification" style="font-size:22px;">—</div>
+            <div class="stat-sub" id="stat-diversification-sub">&nbsp;</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Duration</div>
+            <div class="stat-value" id="stat-duration" style="font-size:22px;">—</div>
+            <div class="stat-sub" id="stat-duration-sub">&nbsp;</div>
+          </div>
+        </div>
+
+        <!-- Anomalies alert banner -->
+        <div id="anomalies-banner" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <span style="font-size:18px;line-height:1;">⚠️</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Обратите внимание</div>
+              <div id="anomalies-list" style="font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:4px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cash-to-reinvest + Upcoming events -->
+        <div class="panel-cols" id="actionable-row" style="grid-template-columns:1fr 1fr;display:none;">
+          <div class="card" id="cash-reinvest-card">
+            <div class="card-header"><h2 class="card-title">К реинвесту</h2></div>
+            <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
+          </div>
+          <div class="card" id="events-card">
+            <div class="card-header"><h2 class="card-title">События 30 дней</h2></div>
+            <div id="events-body" style="padding:6px 0;max-height:260px;overflow-y:auto;"></div>
+          </div>
         </div>
 
         <div style="margin-bottom:4px;">
@@ -1049,6 +1082,10 @@
                 <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
                 <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
               </div>
+              <label id="rgbi-toggle-label" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none;">
+                <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
+                <span>vs RGBI</span>
+              </label>
               <div style="display:flex;gap:6px;">
                 <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
                 <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
@@ -1123,6 +1160,24 @@
           </div>
         </div>
 
+        <!-- Bond-specific analytics row 4: YTM curve + Stress test -->
+        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
+          <div class="card" id="ytm-curve-card">
+            <div class="card-header"><h2 class="card-title">YTM-кривая</h2></div>
+            <div style="padding:12px 16px 16px;">
+              <canvas id="ytm-curve-chart" height="220" style="display:block;width:100%;"></canvas>
+              <div id="ytm-curve-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по YTM и срокам</div>
+              <div id="ytm-curve-hint" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+            </div>
+          </div>
+          <div class="card" id="stress-test-card">
+            <div class="card-header"><h2 class="card-title">Стресс-тест: дефолт эмитента</h2></div>
+            <div id="stress-test-body" style="padding:14px 18px;">
+              <div style="color:var(--text-muted);font-size:13px;">—</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Charts row -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
           <div class="card" id="analytics-type-card">
@@ -1142,7 +1197,7 @@
         </div>
 
         <!-- Top performers -->
-        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
+        <div class="panel-cols panel-cols-3">
           <div class="card">
             <div class="card-header"><h2 class="card-title">Лучшие позиции</h2></div>
             <div id="analytics-top-gain" style="padding:0;"></div>
@@ -1150,6 +1205,13 @@
           <div class="card">
             <div class="card-header"><h2 class="card-title">Слабые позиции</h2></div>
             <div id="analytics-top-loss" style="padding:0;"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Что продать первым</h2>
+              <span style="font-size:11px;color:var(--text-muted);" title="Композитный скор: убыток + близость оферты + ухудшение рейтинга + низкий YTM к ставке ЦБ">i</span>
+            </div>
+            <div id="analytics-sell-first" style="padding:0;"></div>
           </div>
         </div>
 
@@ -2535,12 +2597,35 @@
         sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
         animateCounter(sp, isEmpty ? 0 : roundTo2(summary.totalProfit),
           v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
-        sps.textContent = isEmpty ? t('stat.sub.addItems') : summary.totalAssets > 0
-          ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + t('stat.sub.ofPortfolio') : '\u00a0';
+        if (isEmpty) {
+          sps.textContent = t('stat.sub.addItems');
+        } else {
+          const pctOfPortfolio = summary.totalAssets > 0
+            ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
+            : '\u00a0';
+          const realizedCoupons = Number((window._analyticsExtra && window._analyticsExtra.realized_coupons) || 0);
+          const aciTotal = tableRows.reduce((s, r) => s + (Number(r.aci || 0) * Number(r.quantity || 0)), 0);
+          const parts = [];
+          if (realizedCoupons > 0) parts.push('купоны: ' + Math.round(realizedCoupons).toLocaleString('ru') + ' ₽');
+          if (aciTotal > 0) parts.push('НКД: ' + Math.round(aciTotal).toLocaleString('ru') + ' ₽');
+          const breakdown = parts.length
+            ? '<br><span style="font-size:10px;color:var(--text-muted);">' + parts.join(' · ') + '</span>'
+            : '';
+          sps.innerHTML = pctOfPortfolio + breakdown;
+        }
 
         sc.className = 'stat-value';
         animateCounter(sc, isEmpty ? 0 : roundTo2(summary.annualIncome), v => fmt(roundTo2(v)) + ' ₽');
-        scs.textContent = isEmpty ? t('stat.sub.noCoupons') : fmt(roundTo2(summary.annualYield)) + t('stat.sub.ofValue');
+        if (isEmpty) {
+          scs.textContent = t('stat.sub.noCoupons');
+        } else {
+          const grossPct = fmt(roundTo2(summary.annualYield)) + t('stat.sub.ofValue');
+          const netCoupon = _applyRfTax(summary.annualIncome);
+          const taxStr = netCoupon < summary.annualIncome
+            ? '<br><span style="font-size:10px;color:var(--text-muted);">после налогов: ' + Math.round(netCoupon).toLocaleString('ru') + ' ₽</span>'
+            : '';
+          scs.innerHTML = grossPct + taxStr;
+        }
 
         const sr  = document.getElementById('stat-risk');
         const srs = document.getElementById('stat-risk-sub');
@@ -2596,11 +2681,140 @@
         const sub = document.getElementById('stat-ytm-sub');
         if (!el) return;
         const bonds = rows.filter(r => r.type === 'bond' && r.market_yield > 0 && r.current_value > 0);
-        if (!bonds.length) { el.textContent = '—'; return; }
+        if (!bonds.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
         const totalVal = bonds.reduce((s, r) => s + r.current_value, 0);
         const wtd = bonds.reduce((s, r) => s + r.market_yield * r.current_value, 0) / totalVal;
         el.textContent = `${wtd.toFixed(1)}%`;
-        if (sub) sub.textContent = 'средневзвешенная';
+        if (sub) {
+          const keyRate = Number(window._keyRate || 0);
+          const annualGross = wtd / 100 * totalVal;
+          const netYtm = wtd * (1 - _effectiveTaxRate(annualGross));
+          const parts = [];
+          if (keyRate > 0) {
+            const spread = wtd - keyRate;
+            const sign = spread >= 0 ? '+' : '';
+            const col = spread >= 2 ? 'var(--green-400)' : spread < 0 ? 'var(--red-400)' : 'var(--text-muted)';
+            parts.push(`<span style="color:${col};">${sign}${spread.toFixed(1)} п.п.</span> к ставке ${keyRate.toFixed(1)}%`);
+          } else {
+            parts.push('средневзвешенная');
+          }
+          parts.push(`<span style="font-size:10px;color:var(--text-muted);">после налогов: ${netYtm.toFixed(1)}%</span>`);
+          sub.innerHTML = parts.join('<br>');
+        }
+      }
+
+      // RF tax helper: progressive 13/15% by annual income. Threshold 5 млн ₽/год.
+      function _effectiveTaxRate(annualIncome) {
+        if (annualIncome <= 0) return 0;
+        const threshold = 5_000_000;
+        if (annualIncome <= threshold) return 0.13;
+        return (threshold * 0.13 + (annualIncome - threshold) * 0.15) / annualIncome;
+      }
+      function _applyRfTax(annualIncome) {
+        return annualIncome * (1 - _effectiveTaxRate(annualIncome));
+      }
+
+      // Diversification score (0-100) from inverse HHI across 5 dimensions
+      function _hhiFromWeights(weights) {
+        const total = weights.reduce((s, w) => s + w, 0);
+        if (total <= 0) return 1;
+        return weights.reduce((s, w) => s + Math.pow(w / total, 2), 0);
+      }
+      function calculateDiversificationScore(rows) {
+        if (!rows.length) return 0;
+        // 1. Issuers
+        const byIssuer = {};
+        rows.forEach(r => {
+          const k = (r.name || r.ticker || '?').replace(/\s*(АО|ПАО|ООО|ОФЗ)\s*/gi, '').split(/[\s\-]/)[0].substring(0, 12);
+          byIssuer[k] = (byIssuer[k] || 0) + (r.current_value || 0);
+        });
+        const issuerHHI = _hhiFromWeights(Object.values(byIssuer));
+        // 2. Ratings (grouped to broad bucket)
+        const ratingBucket = r => {
+          const x = String(r || '').toUpperCase().replace(/^RU/, '');
+          if (x.startsWith('AAA')) return 'AAA';
+          if (x.startsWith('AA')) return 'AA';
+          if (x.startsWith('A')) return 'A';
+          if (x.startsWith('BBB')) return 'BBB';
+          if (x.startsWith('BB')) return 'BB';
+          if (x.startsWith('B')) return 'B';
+          if (x.startsWith('C') || x.startsWith('D')) return 'C';
+          return 'NR';
+        };
+        const byRating = {};
+        rows.forEach(r => { const b = ratingBucket(r.company_rating); byRating[b] = (byRating[b] || 0) + (r.current_value || 0); });
+        const ratingHHI = _hhiFromWeights(Object.values(byRating));
+        // 3. Maturity buckets
+        const now = new Date();
+        const matBuckets = { lt1: 0, m1_3: 0, m3_5: 0, gt5: 0, none: 0 };
+        rows.forEach(r => {
+          if (r.type !== 'bond') { matBuckets.none += (r.current_value || 0); return; }
+          const yrs = _bondMaturityYears(r, now);
+          if (yrs == null) { matBuckets.none += (r.current_value || 0); return; }
+          if (yrs < 1) matBuckets.lt1 += r.current_value;
+          else if (yrs < 3) matBuckets.m1_3 += r.current_value;
+          else if (yrs < 5) matBuckets.m3_5 += r.current_value;
+          else matBuckets.gt5 += r.current_value;
+        });
+        const maturityHHI = _hhiFromWeights(Object.values(matBuckets));
+        // 4. Currency
+        const byCcy = {};
+        rows.forEach(r => {
+          let c = (r.face_unit || 'SUR').toUpperCase();
+          if (c === 'SUR' || c === '') c = 'RUB';
+          byCcy[c] = (byCcy[c] || 0) + (r.current_value || 0);
+        });
+        const currencyHHI = _hhiFromWeights(Object.values(byCcy));
+        // 5. Coupon type (fix vs float)
+        const couponBuckets = { fix: 0, float: 0 };
+        rows.forEach(r => {
+          if (r.type !== 'bond') return;
+          if (r.is_floater) couponBuckets.float += (r.current_value || 0);
+          else couponBuckets.fix += (r.current_value || 0);
+        });
+        const couponHHI = _hhiFromWeights(Object.values(couponBuckets));
+        // Combine: inverse weighted. HHI=1 (fully concentrated) → 0, HHI=0 (perfect diversification) → 100.
+        // Weights: issuers 35%, ratings 25%, maturity 15%, currency 10%, coupon 15%.
+        const combinedHHI =
+          0.35 * issuerHHI +
+          0.25 * ratingHHI +
+          0.15 * maturityHHI +
+          0.10 * currencyHHI +
+          0.15 * couponHHI;
+        const score = Math.max(0, Math.min(100, Math.round((1 - combinedHHI) * 100)));
+        return { score, components: { issuerHHI, ratingHHI, maturityHHI, currencyHHI, couponHHI } };
+      }
+      function updateDiversificationWidget(rows) {
+        const el = document.getElementById('stat-diversification');
+        const sub = document.getElementById('stat-diversification-sub');
+        if (!el) return;
+        if (!rows.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
+        const { score } = calculateDiversificationScore(rows);
+        el.textContent = `${score} / 100`;
+        el.style.color = score >= 70 ? 'var(--green-400)' : score >= 50 ? 'var(--text-primary)' : score >= 30 ? '#f59e0b' : 'var(--red-400)';
+        if (sub) {
+          const label = score >= 70 ? 'отличная' : score >= 50 ? 'хорошая' : score >= 30 ? 'средняя' : 'слабая';
+          sub.textContent = label;
+        }
+      }
+      function updateDurationStatWidget(rows) {
+        const el = document.getElementById('stat-duration');
+        const sub = document.getElementById('stat-duration-sub');
+        if (!el) return;
+        const now = new Date();
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        const withMat = bonds.map(r => ({ r, yrs: _bondMaturityYears(r, now) })).filter(x => x.yrs != null && x.yrs > 0);
+        if (!withMat.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
+        const totalVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
+        const macaulay = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totalVal;
+        el.textContent = `${macaulay.toFixed(1)} г`;
+        if (sub) {
+          const lbl = macaulay < 1 ? 'короткий портфель'
+            : macaulay < 3 ? 'умеренная дюрация'
+            : macaulay < 5 ? 'средняя дюрация'
+            : 'длинный портфель';
+          sub.textContent = lbl;
+        }
       }
 
       async function updateCashWidget(pid) {
@@ -2762,6 +2976,9 @@
         renderRatingsChart(rows);
         renderCurrencyChart(rows);
         renderCouponTypeBar(rows);
+        renderYTMCurve(rows);
+        renderStressTest(rows);
+        renderSellFirst(rows);
       }
 
       // ── BOND ANALYTICS: Duration ─────────────────────────────────
@@ -2789,44 +3006,102 @@
           return;
         }
         const totalVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
-        // Macaulay duration ≈ weighted average time to nearest cashflow (упрощение)
         const macaulay = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totalVal;
-        // Modified duration ≈ Macaulay / (1 + y), где y = средневзвешенная YTM (в долях)
         const withYtm = bonds.filter(r => r.market_yield != null && r.market_yield > 0 && r.current_value > 0);
         const ytmTotal = withYtm.reduce((s, r) => s + r.current_value, 0);
-        const avgYtm = ytmTotal > 0
-          ? withYtm.reduce((s, r) => s + r.market_yield * r.current_value, 0) / ytmTotal / 100
-          : 0.1;
+        const avgYtmPct = ytmTotal > 0
+          ? withYtm.reduce((s, r) => s + r.market_yield * r.current_value, 0) / ytmTotal
+          : 10;
+        const avgYtm = avgYtmPct / 100;
         const modDur = macaulay / (1 + avgYtm);
-        // Impact on portfolio value for +/-1pp shift in rates
-        const upPct = -modDur * 1;
-        const dnPct =  modDur * 1;
         const portfolioVal = bonds.reduce((s, r) => s + r.current_value, 0);
-        const upRub = portfolioVal * upPct / 100;
-        const dnRub = portfolioVal * dnPct / 100;
         const macStr = macaulay.toFixed(2);
         const modStr = modDur.toFixed(2);
+
+        // Coupon-vs-YTM line: средневзвешенный coupon_rate vs avgYtm
+        const withCoupon = bonds.filter(r => r.coupon_rate != null && r.coupon_rate > 0 && r.current_value > 0);
+        const couponTotal = withCoupon.reduce((s, r) => s + r.current_value, 0);
+        const avgCouponRate = couponTotal > 0
+          ? withCoupon.reduce((s, r) => s + r.coupon_rate * r.current_value, 0) / couponTotal
+          : 0;
+
+        // Reinvestment risk: бумаги с погашением <12 мес
+        const soonMat = withMat.filter(x => x.yrs < 1);
+        const soonValue = soonMat.reduce((s, x) => s + x.r.current_value, 0);
+
+        const couponVsYtmStr = (avgCouponRate > 0 && avgYtmPct > 0) ? (() => {
+          const diff = avgYtmPct - avgCouponRate;
+          if (Math.abs(diff) < 0.3) return `Купон ≈ YTM (${avgCouponRate.toFixed(1)}%) — портфель торгуется около номинала.`;
+          if (diff > 0) return `Купон ${avgCouponRate.toFixed(1)}% / YTM ${avgYtmPct.toFixed(1)}% — бумаги <b style="color:var(--green-400);">ниже номинала</b>, +${diff.toFixed(1)}% upside к погашению.`;
+          return `Купон ${avgCouponRate.toFixed(1)}% / YTM ${avgYtmPct.toFixed(1)}% — бумаги <b style="color:var(--red-400);">выше номинала</b>, премия ${(-diff).toFixed(1)}%.`;
+        })() : '';
+
+        const reinvestStr = soonValue > 0 ? (() => {
+          const sharePct = soonValue / portfolioVal * 100;
+          return `<div style="margin-top:12px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);font-size:11px;color:var(--text-secondary);">
+            <b style="color:#f59e0b;">Реинвест-риск:</b> ${Math.round(sharePct)}% портфеля гасится в течение года (≈${Math.round(soonValue).toLocaleString('ru')} ₽). Нужен план куда перекладывать.
+          </div>`;
+        })() : '';
+
         body.innerHTML = `
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
-            <div style="font-size:30px;font-weight:700;color:var(--text-primary);line-height:1;">${macStr}</div>
+            <div style="font-size:28px;font-weight:700;color:var(--text-primary);line-height:1;">${macStr}</div>
             <div style="font-size:13px;color:var(--text-muted);">года · Macaulay duration</div>
           </div>
           <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Modified Duration: <b style="color:var(--text-secondary);">${modStr}</b></div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">Если ключевая ставка изменится на 1 п.п.:</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:140px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:var(--radius);padding:10px 12px;">
-              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">+1 п.п.</div>
-              <div style="font-size:15px;font-weight:700;color:var(--red-400);">${upPct.toFixed(2)}%</div>
-              <div style="font-size:11px;color:var(--text-muted);">≈ ${Math.round(upRub).toLocaleString('ru')} ₽</div>
+
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-size:12px;color:var(--text-secondary);font-weight:600;">Сценарий ставки:</span>
+              <span id="duration-slider-val" style="font-size:12px;font-weight:700;color:var(--blue-500);">+1.0 п.п.</span>
             </div>
-            <div style="flex:1;min-width:140px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);border-radius:var(--radius);padding:10px 12px;">
-              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">−1 п.п.</div>
-              <div style="font-size:15px;font-weight:700;color:var(--green-400);">+${dnPct.toFixed(2)}%</div>
-              <div style="font-size:11px;color:var(--text-muted);">≈ +${Math.round(dnRub).toLocaleString('ru')} ₽</div>
+            <input type="range" id="duration-slider" min="-300" max="300" value="100" step="25"
+              style="width:100%;cursor:pointer;accent-color:var(--blue-500);" />
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px;">
+              <span>−3 п.п.</span><span>0</span><span>+3 п.п.</span>
             </div>
           </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:10px;line-height:1.4;">Упрощённая оценка по сроку до ближайшего события (погашение/оферта). Не учитывает выпуклость и индивидуальные YTM.</div>
+
+          <div id="duration-impact" style="display:flex;gap:10px;align-items:stretch;margin-bottom:10px;">
+            <!-- filled by slider handler -->
+          </div>
+
+          ${couponVsYtmStr ? `<div style="font-size:11px;color:var(--text-secondary);padding:8px 10px;background:var(--bg-card-secondary, rgba(148,163,184,.06));border-radius:var(--radius-sm);line-height:1.4;">${couponVsYtmStr}</div>` : ''}
+          ${reinvestStr}
+
+          <div style="font-size:10px;color:var(--text-muted);margin-top:10px;line-height:1.4;">Упрощённая оценка по сроку до ближайшего события (погашение/оферта). Не учитывает выпуклость.</div>
         `;
+
+        const slider = document.getElementById('duration-slider');
+        const impactEl = document.getElementById('duration-impact');
+        const valEl = document.getElementById('duration-slider-val');
+        const fmtRub = v => Math.round(Math.abs(v)).toLocaleString('ru');
+        const updateImpact = () => {
+          const bp = parseFloat(slider.value);
+          const pp = bp / 100;
+          valEl.textContent = (pp >= 0 ? '+' : '') + pp.toFixed(2) + ' п.п.';
+          const impactPct = -modDur * pp;
+          const impactRub = portfolioVal * impactPct / 100;
+          const color = impactRub >= 0 ? 'var(--green-400)' : 'var(--red-400)';
+          const bg = impactRub >= 0 ? 'rgba(74,222,128,.08)' : 'rgba(248,113,113,.08)';
+          const border = impactRub >= 0 ? 'rgba(74,222,128,.25)' : 'rgba(248,113,113,.25)';
+          const sign = impactPct >= 0 ? '+' : '';
+          const newVal = portfolioVal + impactRub;
+          impactEl.innerHTML = `
+            <div style="flex:1;background:${bg};border:1px solid ${border};border-radius:var(--radius);padding:10px 12px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Изменение</div>
+              <div style="font-size:17px;font-weight:700;color:${color};line-height:1;">${sign}${impactPct.toFixed(2)}%</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${impactRub >= 0 ? '+' : '−'}${fmtRub(impactRub)} ₽</div>
+            </div>
+            <div style="flex:1;background:var(--bg-card-secondary, rgba(148,163,184,.06));border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Новая стоимость</div>
+              <div style="font-size:17px;font-weight:700;color:var(--text-primary);line-height:1;">${Math.round(newVal).toLocaleString('ru')} ₽</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">было ${Math.round(portfolioVal).toLocaleString('ru')} ₽</div>
+            </div>
+          `;
+        };
+        slider.addEventListener('input', updateImpact);
+        updateImpact();
       }
 
       // ── BOND ANALYTICS: Maturity ladder ──────────────────────────
@@ -3058,6 +3333,309 @@
         ctx.closePath();
       }
 
+      // ── ANOMALIES BANNER ─────────────────────────────────────────
+      function renderAnomaliesBanner(anomalies) {
+        const banner = document.getElementById('anomalies-banner');
+        const list = document.getElementById('anomalies-list');
+        if (!banner || !list) return;
+        if (!anomalies || !anomalies.length) {
+          banner.style.display = 'none';
+          return;
+        }
+        const sevOrder = { high: 0, medium: 1, low: 2 };
+        const sorted = [...anomalies].sort((a, b) => (sevOrder[a.severity] || 99) - (sevOrder[b.severity] || 99));
+        list.innerHTML = sorted.slice(0, 5).map(a => {
+          const dot = a.severity === 'high' ? '#dc2626' : a.severity === 'medium' ? '#f59e0b' : '#64748b';
+          return `<div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0;"></span>
+            <span>${esc(a.text)}</span>
+          </div>`;
+        }).join('');
+        banner.style.display = '';
+      }
+
+      // ── CASH-TO-REINVEST CARD ────────────────────────────────────
+      function renderCashReinvestCard(extra) {
+        const row = document.getElementById('actionable-row');
+        const body = document.getElementById('cash-reinvest-body');
+        if (!row || !body) return;
+        const freeCash = Number(extra?.free_cash_rub || window.cashTotalRub || 0);
+        const events = extra?.events || [];
+        const now = new Date();
+        const horizon = new Date(now.getTime() + 30 * 86400000);
+        const incomingCoupons = events
+          .filter(e => e.type === 'coupon' && new Date(e.date) <= horizon)
+          .reduce((s, e) => s + (e.amount || 0), 0);
+        const incomingMaturity = events
+          .filter(e => e.type === 'maturity' && new Date(e.date) <= horizon)
+          .reduce((s, e) => s + (e.amount || 0), 0);
+        const totalAvailable = freeCash + incomingCoupons + incomingMaturity;
+        // Скрываем строку (карточку с кэшем + события), если в портфеле нет ни одного из источников
+        const hasAnything = freeCash > 0 || incomingCoupons > 0 || incomingMaturity > 0 || events.length > 0;
+        row.style.display = hasAnything ? '' : 'none';
+        const fmtRub = v => Math.round(v).toLocaleString('ru');
+        body.innerHTML = `
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;">${fmtRub(totalAvailable)} ₽</div>
+            <div style="font-size:12px;color:var(--text-muted);">доступно за 30 дней</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+              <span style="color:var(--text-secondary);">Свободно сейчас</span>
+              <span style="font-weight:600;">${fmtRub(freeCash)} ₽</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+              <span style="color:var(--text-secondary);">Купоны 30 дн.</span>
+              <span style="font-weight:600;color:var(--green-400);">+${fmtRub(incomingCoupons)} ₽</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;">
+              <span style="color:var(--text-secondary);">Погашения 30 дн.</span>
+              <span style="font-weight:600;color:var(--green-400);">+${fmtRub(incomingMaturity)} ₽</span>
+            </div>
+          </div>
+          ${totalAvailable > 1000 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.4;">Совет: проверьте раздел «Рекомендации для диверсификации» ниже — есть бумаги, которые усилят портфель.</div>' : ''}
+        `;
+      }
+
+      // ── EVENTS 30 DAYS CARD ──────────────────────────────────────
+      function renderEventsCard(events) {
+        const body = document.getElementById('events-body');
+        if (!body) return;
+        if (!events.length) {
+          body.innerHTML = '<div style="padding:14px 18px;color:var(--text-muted);font-size:13px;text-align:center;">Нет событий в ближайшие 30 дней</div>';
+          return;
+        }
+        const typeIcon = { coupon: '💰', maturity: '🟢', offer: '📋', buyback: '📋' };
+        const typeColor = { coupon: 'var(--blue-500)', maturity: 'var(--green-400)', offer: '#f59e0b', buyback: '#f59e0b' };
+        const typeLabel = { coupon: 'купон', maturity: 'погашение', offer: 'оферта', buyback: 'buyback' };
+        body.innerHTML = events.slice(0, 30).map(e => {
+          const d = new Date(e.date);
+          const today = new Date(); today.setHours(0,0,0,0);
+          const diff = Math.round((d - today) / 86400000);
+          const dStr = d.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
+          const dayLbl = diff === 0 ? 'сегодня' : diff === 1 ? 'завтра' : `через ${diff} дн.`;
+          const amtStr = e.amount > 0 ? `+${Math.round(e.amount).toLocaleString('ru')} ₽` : '';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--table-border);">
+            <span style="font-size:14px;flex-shrink:0;">${typeIcon[e.type] || '•'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.name || e.ticker)}</div>
+              <div style="font-size:10px;color:var(--text-muted);">${typeLabel[e.type] || e.type} · ${dStr} (${dayLbl})</div>
+            </div>
+            ${amtStr ? `<div style="font-size:12px;font-weight:600;color:${typeColor[e.type]};white-space:nowrap;">${amtStr}</div>` : ''}
+          </div>`;
+        }).join('');
+      }
+
+      // ── YTM CURVE (scatter) ──────────────────────────────────────
+      function renderYTMCurve(rows) {
+        const canvas = document.getElementById('ytm-curve-chart');
+        const emptyEl = document.getElementById('ytm-curve-empty');
+        const hintEl = document.getElementById('ytm-curve-hint');
+        if (!canvas) return;
+        const now = new Date();
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0 && r.market_yield > 0);
+        const points = bonds
+          .map(r => ({ r, yrs: _bondMaturityYears(r, now) }))
+          .filter(x => x.yrs != null && x.yrs > 0 && x.yrs <= 30);
+        if (!points.length) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          if (hintEl) hintEl.textContent = '';
+          return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+        const dpr = window.devicePixelRatio || 1;
+        const parent = canvas.parentElement;
+        const W = (parent ? parent.clientWidth : 0) || 400;
+        const H = 220;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, W, H);
+        const st = getComputedStyle(document.documentElement);
+        const gridClr = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.15)';
+        const labelClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
+        const dotClr = st.getPropertyValue('--blue-400').trim() || '#60a5fa';
+        const PAD_L = 36, PAD_R = 8, PAD_T = 12, PAD_B = 22;
+        const chartW = W - PAD_L - PAD_R, chartH = H - PAD_T - PAD_B;
+        const maxYrs = Math.max(...points.map(p => p.yrs), 1);
+        const maxYtm = Math.max(...points.map(p => p.r.market_yield), 1);
+        const minYtm = Math.min(...points.map(p => p.r.market_yield), maxYtm);
+        const ytmLo = Math.max(0, Math.floor(minYtm - 1));
+        const ytmHi = Math.ceil(maxYtm + 1);
+        const xrange = Math.ceil(maxYrs);
+        const xticks = xrange <= 5 ? xrange : 5;
+        const yticks = 4;
+        // Grid + ticks
+        ctx.strokeStyle = gridClr;
+        ctx.lineWidth = 1;
+        ctx.font = '500 9px Inter, system-ui, sans-serif';
+        ctx.fillStyle = labelClr;
+        for (let i = 0; i <= yticks; i++) {
+          const y = PAD_T + chartH * (1 - i / yticks);
+          const v = ytmLo + (ytmHi - ytmLo) * i / yticks;
+          ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+          ctx.textAlign = 'right';
+          ctx.fillText(v.toFixed(0) + '%', PAD_L - 4, y + 3);
+        }
+        for (let i = 0; i <= xticks; i++) {
+          const x = PAD_L + chartW * i / xticks;
+          const v = xrange * i / xticks;
+          ctx.textAlign = 'center';
+          ctx.fillText(v.toFixed(1) + 'г', x, H - PAD_B + 12);
+        }
+        // Key rate horizontal line
+        const keyRate = Number(window._keyRate || 0);
+        if (keyRate > 0 && keyRate >= ytmLo && keyRate <= ytmHi) {
+          const yK = PAD_T + chartH * (1 - (keyRate - ytmLo) / (ytmHi - ytmLo));
+          ctx.save();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(PAD_L, yK); ctx.lineTo(W - PAD_R, yK); ctx.stroke();
+          ctx.restore();
+          ctx.fillStyle = '#f59e0b';
+          ctx.font = 'bold 9px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`ключевая ${keyRate.toFixed(1)}%`, PAD_L + 4, yK - 3);
+        }
+        // Dots
+        const totalVal = points.reduce((s, p) => s + p.r.current_value, 0);
+        points.forEach(p => {
+          const x = PAD_L + chartW * (p.yrs / xrange);
+          const y = PAD_T + chartH * (1 - (p.r.market_yield - ytmLo) / (ytmHi - ytmLo));
+          const share = p.r.current_value / totalVal;
+          const radius = 3 + Math.sqrt(share * 200);
+          ctx.fillStyle = dotClr + 'cc';
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+        if (hintEl) {
+          hintEl.textContent = 'X — годы до погашения/оферты, Y — YTM, размер точки = доля в портфеле. ' +
+            (keyRate > 0 ? 'Пунктир — ключевая ставка ЦБ.' : '');
+        }
+      }
+
+      // ── STRESS TEST: emitter default ─────────────────────────────
+      function renderStressTest(rows) {
+        const body = document.getElementById('stress-test-body');
+        if (!body) return;
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        if (!bonds.length) {
+          body.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Нет облигаций для расчёта</div>';
+          return;
+        }
+        // Group by issuer
+        const byIssuer = {};
+        bonds.forEach(r => {
+          const key = (r.name || r.ticker || '?')
+            .replace(/\s*(АО|ПАО|ООО|ОФЗ)\s*/gi, '').split(/[\s\-]/)[0].substring(0, 14);
+          if (!byIssuer[key]) byIssuer[key] = { name: key, value: 0, tickers: [] };
+          byIssuer[key].value += r.current_value;
+          byIssuer[key].tickers.push(r.ticker);
+        });
+        const totalVal = bonds.reduce((s, r) => s + r.current_value, 0);
+        const top3 = Object.values(byIssuer).sort((a, b) => b.value - a.value).slice(0, 3);
+        // Recovery scenarios
+        const scenarios = [
+          { label: 'Пессимистично', rec: 0.30, color: '#dc2626' },
+          { label: 'Базовый', rec: 0.50, color: '#f59e0b' },
+          { label: 'Оптимистично', rec: 0.70, color: '#16a34a' },
+        ];
+        const fmtRub = v => Math.round(v).toLocaleString('ru');
+        const rowsHtml = top3.map(em => {
+          const sharePct = (em.value / totalVal * 100).toFixed(1);
+          const losses = scenarios.map(sc => {
+            const loss = em.value * (1 - sc.rec);
+            const lossPct = (loss / totalVal * 100).toFixed(1);
+            return `<div style="flex:1;text-align:center;">
+              <div style="font-size:11px;color:${sc.color};font-weight:600;">${sc.label}</div>
+              <div style="font-size:11px;color:var(--text-secondary);">−${fmtRub(loss)} ₽</div>
+              <div style="font-size:10px;color:var(--text-muted);">(−${lossPct}%)</div>
+            </div>`;
+          }).join('');
+          return `<div style="padding:10px 0;border-bottom:1px solid var(--table-border);">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;">
+              <span style="font-size:13px;font-weight:600;color:var(--text-primary);">${esc(em.name)}</span>
+              <span style="font-size:11px;color:var(--text-muted);">${sharePct}% портфеля · ${fmtRub(em.value)} ₽</span>
+            </div>
+            <div style="display:flex;gap:8px;">${losses}</div>
+          </div>`;
+        }).join('');
+        body.innerHTML = `
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.4;">
+            Что потеряете если эмитент обанкротится. Сценарии восстановления: 30% / 50% / 70%.
+          </div>
+          ${rowsHtml}
+        `;
+      }
+
+      // ── "What to sell first" ─────────────────────────────────────
+      function renderSellFirst(rows) {
+        const el = document.getElementById('analytics-sell-first');
+        if (!el) return;
+        const now = new Date();
+        const keyRate = Number(window._keyRate || 0);
+        // Cache rating history hits from anomalies (only those in window._analyticsExtra)
+        const downgradeSet = new Set();
+        (window._analyticsExtra?.anomalies || []).forEach(a => {
+          if (a.type === 'rating_downgrade') downgradeSet.add(a.ticker);
+        });
+        const scored = rows.map(r => {
+          let score = 0;
+          const cv = r.current_value || 0;
+          const cost = (r.purchase_price || 0) * (r.quantity || 0);
+          // 1. Loss
+          if (cost > 0) {
+            const pnlPct = (r.profit || 0) / cost * 100;
+            if (pnlPct < -5) score += Math.min(5, -pnlPct / 5);
+          }
+          // 2. Imminent offer (<60 days)
+          for (const fld of ['offer_date', 'buyback_date']) {
+            const d = r[fld] ? new Date(r[fld]) : null;
+            if (d && d > now) {
+              const days = (d - now) / 86400000;
+              if (days < 60) score += 2;
+            }
+          }
+          // 3. Downgrade in last 14 days
+          if (downgradeSet.has(r.ticker)) score += 3;
+          // 4. Low YTM vs key rate
+          if (r.type === 'bond' && keyRate > 0 && r.market_yield > 0 && r.market_yield < keyRate - 1) {
+            score += 1;
+          }
+          return { r, score };
+        }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+        if (!scored.length) {
+          el.innerHTML = '<div style="padding:14px 16px;color:var(--text-muted);font-size:13px;">Все позиции в порядке — продавать ничего не нужно.</div>';
+          return;
+        }
+        el.innerHTML = '';
+        scored.slice(0, 5).forEach(({ r, score }) => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--table-border);';
+          const reasons = [];
+          if ((r.profit || 0) < 0) reasons.push('убыток');
+          const offerD = r.offer_date || r.buyback_date;
+          if (offerD && new Date(offerD) > now && (new Date(offerD) - now) / 86400000 < 60) reasons.push('скоро оферта');
+          if (downgradeSet.has(r.ticker)) reasons.push('downgrade');
+          if (r.type === 'bond' && keyRate > 0 && r.market_yield > 0 && r.market_yield < keyRate - 1) reasons.push('низкий YTM');
+          row.innerHTML = `<div style="min-width:0;flex:1;">
+              <div style="font-size:13px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.name || r.ticker)}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${reasons.join(' · ')}</div>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--red-400);margin-left:8px;flex-shrink:0;">${score.toFixed(1)}</div>`;
+          el.appendChild(row);
+        });
+      }
+
       async function loadAnalyticsHistory(days = 90) {
         // Update active button
         document.querySelectorAll('.analytics-period-btn').forEach(btn => {
@@ -3109,7 +3687,19 @@
             retPct.textContent = `${diff >= 0 ? '+' : ''}${pct.toFixed(2)}% за ${days} дн.`;
             retBox.style.display = '';
           }
-          if (canvas) { canvas._snapshots = snapshots; }
+          if (canvas) { canvas._snapshots = snapshots; canvas._lastDays = days; }
+          // Load RGBI in parallel (only when not in share mode and toggle is on)
+          const rgbiToggle = document.getElementById('rgbi-toggle');
+          if (canvas) canvas._rgbi = null;
+          if (!shareToken && rgbiToggle && rgbiToggle.checked) {
+            try {
+              const r = await apiFetch(`/portfolios/benchmarks/rgbi?days=${days}`);
+              if (r.ok) {
+                const rgbi = await r.json();
+                if (canvas) canvas._rgbi = rgbi;
+              }
+            } catch (_) {}
+          }
           drawHistoryChart(canvas, snapshots);
         } catch(e) {
           if (canvas) drawHistoryChartEmpty(canvas, null);
@@ -3258,6 +3848,57 @@
             ctx.lineTo(xScale(maxIdx), yScale(interpPoint(values, maxIdx)));
           }
           ctx.stroke();
+
+          // RGBI overlay (normalized to portfolio's first point) — second line
+          const rgbi = canvas._rgbi;
+          if (rgbi && rgbi.length >= 2) {
+            // Map RGBI points by date; align to snapshots[i].date
+            const rgbiByDate = {};
+            rgbi.forEach(p => { rgbiByDate[p.date] = p.value; });
+            // Build aligned series: for each snapshot date, find nearest RGBI value
+            const rgbiSorted = [...rgbi].sort((a, b) => a.date.localeCompare(b.date));
+            const alignedRgbi = snapshots.map(s => {
+              if (rgbiByDate[s.date] != null) return rgbiByDate[s.date];
+              // Find nearest earlier RGBI date
+              let candidate = null;
+              for (const p of rgbiSorted) {
+                if (p.date <= s.date) candidate = p.value;
+                else break;
+              }
+              return candidate;
+            });
+            // Normalize: first non-null aligned value = first portfolio value
+            const firstIdx = alignedRgbi.findIndex(v => v != null);
+            if (firstIdx >= 0 && values[firstIdx] > 0) {
+              const baseRgbi = alignedRgbi[firstIdx];
+              const baseVal = values[firstIdx];
+              const normRgbi = alignedRgbi.map(v => v != null ? (v / baseRgbi) * baseVal : null);
+              ctx.save();
+              ctx.strokeStyle = '#f59e0b';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([6, 4]);
+              ctx.beginPath();
+              let started = false;
+              for (let i = 0; i <= Math.floor(maxIdx); i++) {
+                const v = normRgbi[i];
+                if (v == null) continue;
+                const x = xScale(i), y = yScale(v);
+                if (!started) { ctx.moveTo(x, y); started = true; }
+                else ctx.lineTo(x, y);
+              }
+              if (maxIdx > Math.floor(maxIdx)) {
+                const v = interpPoint(normRgbi.filter(x => x != null), Math.min(maxIdx, normRgbi.length - 1));
+                if (!isNaN(v)) ctx.lineTo(xScale(maxIdx), yScale(v));
+              }
+              ctx.stroke();
+              ctx.restore();
+              // Legend
+              ctx.fillStyle = '#f59e0b';
+              ctx.font = 'bold 9px Inter, sans-serif';
+              ctx.textAlign = 'left';
+              ctx.fillText('— RGBI (норм.)', pad.l + 4, pad.t + 10);
+            }
+          }
 
           // X labels — show all (static)
           const step = Math.max(1, Math.floor(snapshots.length / 6));
@@ -4769,6 +5410,8 @@
         updateStatCards(summary);
         updateNextCouponWidget(tableRows);
         updateYTMWidget(tableRows);
+        updateDiversificationWidget(tableRows);
+        updateDurationStatWidget(tableRows);
         updateLastUpdateTime();
 
         const sumRow = document.createElement('tr');
@@ -4831,6 +5474,7 @@
         if (typeof tableRows === 'undefined' || !tableRows.length) return;
         renderMaturityLadder(tableRows);
         renderRatingsChart(tableRows);
+        renderYTMCurve(tableRows);
       };
       if (typeof ResizeObserver !== 'undefined') {
         const chartCard = document.getElementById('chart-card');
@@ -4845,6 +5489,8 @@
         if (mlCard) new ResizeObserver(_redrawBondAnalytics).observe(mlCard);
         const rtCard = document.getElementById('ratings-card');
         if (rtCard) new ResizeObserver(_redrawBondAnalytics).observe(rtCard);
+        const ytmCard = document.getElementById('ytm-curve-card');
+        if (ytmCard) new ResizeObserver(_redrawBondAnalytics).observe(ytmCard);
       } else {
         window.addEventListener('resize', () => {
           drawMonthlyChart(tableRows);
@@ -6716,6 +7362,11 @@
           if (logoutBtn) logoutBtn.style.display = 'none';
           const navBtns = document.querySelectorAll('.nav-btn:not([data-panel="panel-table"])');
           navBtns.forEach(btn => btn.style.display = 'none');
+          // Hide RGBI toggle and actionable row in share mode
+          const rgbiLbl = document.getElementById('rgbi-toggle-label');
+          if (rgbiLbl) rgbiLbl.style.display = 'none';
+          const actRow = document.getElementById('actionable-row');
+          if (actRow) actRow.style.display = 'none';
 
           // Make brand logo link to bondai.ru in share view
           const brand = document.querySelector('.topbar-brand');
@@ -7663,8 +8314,9 @@
         const obs = new IntersectionObserver(entries => {
           if (entries.some(e => e.isIntersecting) && !_analyticsLoaded && tableRows.length) {
             _analyticsLoaded = true;
+            loadExtraAnalytics();  // CBR key rate + anomalies + events + realized + cash
             renderAnalytics(tableRows);
-            loadAnalyticsHistory(90);
+            loadAnalyticsHistory(30);
             renderSwotAnalysis(tableRows);
             loadPortfolioRecommendations();
           }
@@ -7673,6 +8325,27 @@
           const el = document.getElementById(id);
           if (el) obs.observe(el);
         });
+      }
+
+      async function loadExtraAnalytics() {
+        if (!portfolioId || shareToken) return; // share-mode не имеет этих endpoint-ов
+        try {
+          const [keyRateR, extraR] = await Promise.all([
+            apiFetch('/portfolios/meta/key-rate').then(r => r.ok ? r.json() : null).catch(() => null),
+            apiFetch(`/portfolios/${portfolioId}/analytics-extra`).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          if (keyRateR && keyRateR.key_rate) window._keyRate = keyRateR.key_rate;
+          if (extraR) {
+            window._analyticsExtra = extraR;
+            if (typeof updateStatCards === 'function' && tableRows.length) {
+              updateStatCards(calculateSummary(tableRows));
+              updateYTMWidget(tableRows);
+            }
+            renderAnomaliesBanner(extraR.anomalies || []);
+            renderCashReinvestCard(extraR);
+            renderEventsCard(extraR.events || []);
+          }
+        } catch (e) { /* silent */ }
       }
 
       // ── SWOT ANALYSIS ────────────────────────────────────────────
