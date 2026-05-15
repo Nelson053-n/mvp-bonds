@@ -134,6 +134,8 @@ Thumbs.db
 
 # Project specific
 data/*.db
+/portfolio.db
+*.db
 
 # Database WAL/SHM files
 data/*.db-shm
