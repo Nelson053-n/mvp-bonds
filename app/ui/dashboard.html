@@ -1096,29 +1096,62 @@
           </div>
         </div>
 
-        <!-- Bond analytics row 2: Maturity ladder + Currencies (combined) -->
-        <div class="card" id="maturity-currency-card">
-          <div class="card-header"><h2 class="card-title">Сроки погашения и валюты</h2></div>
-          <div class="panel-cols" style="grid-template-columns:1fr 1fr;gap:0;padding:0;">
-            <div id="maturity-ladder-pane" style="padding:14px 16px;border-right:1px solid var(--table-border);">
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Срочная структура</div>
+        <!-- Bond analytics row 2: Portfolio structure (4-pane combined) -->
+        <div class="card" id="structure-card">
+          <div class="card-header"><h2 class="card-title">Структура портфеля</h2></div>
+          <div class="structure-grid">
+            <div id="structure-pane-issuers" class="structure-pane">
+              <div class="structure-pane-title">Эмитенты (топ-5)</div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <canvas id="analytics-issuer-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
+                <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
+              </div>
+            </div>
+            <div id="structure-pane-maturity" class="structure-pane">
+              <div class="structure-pane-title">Срочная структура</div>
               <canvas id="maturity-ladder-chart" height="160" style="display:block;width:100%;"></canvas>
               <div id="maturity-ladder-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о датах погашения</div>
             </div>
-            <div id="currency-pane" style="padding:14px 16px;">
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">По валютам</div>
+            <div id="structure-pane-currency" class="structure-pane">
+              <div class="structure-pane-title">По валютам</div>
               <div style="display:flex;align-items:center;gap:14px;">
                 <canvas id="currency-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
                 <div id="currency-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
               </div>
               <div id="currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
             </div>
+            <div id="structure-pane-types" class="structure-pane">
+              <div class="structure-pane-title">По типам</div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <canvas id="analytics-type-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
+                <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
+              </div>
+            </div>
           </div>
         </div>
         <style>
+          #structure-card .structure-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+          }
+          #structure-card .structure-pane {
+            padding: 14px 16px;
+          }
+          /* Internal dividers: right border for left column, bottom border for top row */
+          #structure-card .structure-pane:nth-child(odd) { border-right: 1px solid var(--table-border); }
+          #structure-card .structure-pane:nth-child(-n+2) { border-bottom: 1px solid var(--table-border); }
+          #structure-card .structure-pane-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 8px;
+          }
           @media (max-width: 860px) {
-            #maturity-currency-card .panel-cols { grid-template-columns: 1fr !important; }
-            #maturity-currency-card #maturity-ladder-pane { border-right: none; border-bottom: 1px solid var(--table-border); }
+            #structure-card .structure-grid { grid-template-columns: 1fr; }
+            #structure-card .structure-pane { border-right: none !important; border-bottom: 1px solid var(--table-border); }
+            #structure-card .structure-pane:last-child { border-bottom: none; }
             #ratings-coupon-card .panel-cols { grid-template-columns: 1fr !important; }
             #ratings-coupon-card #ratings-pane { border-right: none; border-bottom: 1px solid var(--table-border); }
           }
@@ -1171,27 +1204,6 @@
             <div class="card-header"><h2 class="card-title">Стресс-тест: дефолт эмитента</h2></div>
             <div id="stress-test-body" style="padding:14px 18px;">
               <div style="color:var(--text-muted);font-size:13px;">—</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Portfolio structure (tabs: issuers / types) -->
-        <div class="card" id="analytics-type-card">
-          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-            <h2 class="card-title">Структура портфеля</h2>
-            <div id="structure-tabs" style="display:inline-flex;gap:0;background:var(--table-border);border-radius:8px;padding:2px;">
-              <button class="structure-tab active" data-tab="issuers" style="border:none;background:var(--bg-card);color:var(--text-primary);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:500;">Эмитенты</button>
-              <button class="structure-tab" data-tab="types" style="border:none;background:transparent;color:var(--text-secondary);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:500;">Типы</button>
-            </div>
-          </div>
-          <div style="padding:14px 16px;">
-            <div id="structure-tab-issuers" style="display:flex;align-items:center;gap:16px;">
-              <canvas id="analytics-issuer-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
-            </div>
-            <div id="structure-tab-types" style="display:none;align-items:center;gap:16px;">
-              <canvas id="analytics-type-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
-              <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
             </div>
           </div>
         </div>
@@ -2925,28 +2937,6 @@
         const issuerTotal = top5.reduce((s, d) => s + d.value, 0);
         buildLegend('analytics-issuer-legend', top5, issuerColors, issuerTotal);
 
-        // Wire structure tabs (idempotent)
-        if (!window._structureTabsWired) {
-          window._structureTabsWired = true;
-          const tabsEl = document.getElementById('structure-tabs');
-          if (tabsEl) {
-            tabsEl.addEventListener('click', e => {
-              const btn = e.target.closest('.structure-tab');
-              if (!btn) return;
-              const tab = btn.dataset.tab;
-              tabsEl.querySelectorAll('.structure-tab').forEach(b => {
-                const active = b.dataset.tab === tab;
-                b.classList.toggle('active', active);
-                b.style.background = active ? 'var(--bg-card)' : 'transparent';
-                b.style.color = active ? 'var(--text-primary)' : 'var(--text-secondary)';
-              });
-              const issEl = document.getElementById('structure-tab-issuers');
-              const typEl = document.getElementById('structure-tab-types');
-              if (issEl) issEl.style.display = tab === 'issuers' ? 'flex' : 'none';
-              if (typEl) typEl.style.display = tab === 'types' ? 'flex' : 'none';
-            });
-          }
-        }
 
         // Top/loss performers
         const withProfit = rows.filter(r => typeof r.profit === 'number');
