@@ -991,7 +991,10 @@
 
         <div class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
-            <h2 class="card-title">Портфель</h2>
+            <h2 class="card-title" style="display:flex;align-items:center;gap:8px;">
+              <span>Портфель</span>
+              <span id="autosync-badge" title="Включена автосинхронизация с Т-Банк" style="display:none;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green-600);border:1px solid rgba(34,197,94,.3);">🔄 авто-синк</span>
+            </h2>
             <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить</button>
           </div>
           <div class="table-wrap">
@@ -2538,15 +2541,17 @@
         const card = document.getElementById('stat-cash-card');
         const el = document.getElementById('stat-cash');
         const sub = document.getElementById('stat-cash-sub');
+        const badge = document.getElementById('autosync-badge');
         if (!card || !el) return;
-        const hide = () => { card.style.display = 'none'; };
+        const hide = () => { card.style.display = 'none'; if (badge) badge.style.display = 'none'; };
         if (!pid) return hide();
         try {
           const r = await apiFetch('/tbank/sync/status?portfolio_id=' + pid);
           if (!r.ok) return hide();
           const s = await r.json();
+          if (badge) badge.style.display = s.enabled ? '' : 'none';
           const cash = (s.cash || []).filter(c => c.amount > 0);
-          if (!s.enabled || cash.length === 0) return hide();
+          if (!s.enabled || cash.length === 0) { card.style.display = 'none'; return; }
           const sym = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥', HKD: 'HK$', GBP: '£' };
           const fmt = (c) => {
             const amt = c.amount.toLocaleString('ru', { maximumFractionDigits: 2 });
