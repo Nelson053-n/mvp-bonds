@@ -986,9 +986,10 @@
 
         <div class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
-            <h2 class="card-title" style="display:flex;align-items:center;gap:8px;">
+            <h2 class="card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>Портфель</span>
               <span id="autosync-badge" title="Включена автосинхронизация с Т-Банк" style="display:none;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green-600);border:1px solid rgba(34,197,94,.3);">🔄 авто синхронизация с банком</span>
+              <span id="autosync-cash" style="display:none;font-size:11px;font-weight:500;color:var(--text-muted);flex-basis:100%;margin-top:2px;"></span>
             </h2>
             <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить</button>
           </div>
@@ -2449,16 +2450,19 @@
         const sps = document.getElementById('stat-profit-sub');
         const scs = document.getElementById('stat-coupon-sub');
 
-        const isEmpty = tableRows.length === 0;
+        const cashRub = Number(window.cashTotalRub || 0);
+        const isEmpty = tableRows.length === 0 && cashRub === 0;
 
         const n = tableRows.length;
         const posSuffix = n === 1 ? t('stat.sub.pos1') : n < 5 ? t('stat.sub.pos2') : t('stat.sub.pos5');
 
         sv.className = 'stat-value';
-        animateCounter(sv, isEmpty ? 0 : roundTo2(summary.totalAssets), v => fmt(roundTo2(v)) + ' ₽');
+        const displayTotal = roundTo2(summary.totalAssets + cashRub);
+        animateCounter(sv, isEmpty ? 0 : displayTotal, v => fmt(roundTo2(v)) + ' ₽');
         const posText = n + ' ' + t('stat.sub.positions') + posSuffix;
+        const cashText = cashRub > 0 ? '<br><span style="color:var(--text-muted)">в т.ч. свободно: ' + fmt(roundTo2(cashRub)) + ' ₽</span>' : '';
         const totalText = (portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '<br><span style="color:var(--blue-500);font-weight:600">Всего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽</span>' : '';
-        svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + totalText);
+        svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + cashText + totalText);
         svs.style.whiteSpace = 'pre-wrap';
 
         sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
@@ -2534,8 +2538,13 @@
 
       async function updateCashWidget(pid) {
         const badge = document.getElementById('autosync-badge');
+        const cashRow = document.getElementById('autosync-cash');
         if (!badge) return;
-        const hide = () => { badge.style.display = 'none'; };
+        const hide = () => {
+          badge.style.display = 'none';
+          if (cashRow) { cashRow.style.display = 'none'; cashRow.textContent = ''; }
+          if (Number(window.cashTotalRub || 0) !== 0) { window.cashTotalRub = 0; renderTable(); }
+        };
         if (!pid) return hide();
         try {
           const r = await apiFetch('/tbank/sync/status?portfolio_id=' + pid);
@@ -2544,16 +2553,26 @@
           if (!s.enabled) return hide();
           const sym = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥', HKD: 'HK$', GBP: '£' };
           const cash = (s.cash || []).filter(c => c.amount > 0);
-          let text = '🔄 авто синхронизация с банком';
-          if (cash.length > 0) {
-            const fmt = (c) => {
-              const amt = c.amount.toLocaleString('ru', { maximumFractionDigits: 2 });
-              return (sym[c.currency] || c.currency) + ' ' + amt;
-            };
-            text += ' · свободно ' + cash.map(fmt).join(' · ');
-          }
-          badge.textContent = text;
+          badge.textContent = '🔄 авто синхронизация с банком';
           badge.style.display = '';
+          if (cashRow) {
+            if (cash.length > 0) {
+              const fmt = (c) => {
+                const amt = c.amount.toLocaleString('ru', { maximumFractionDigits: 2 });
+                return (sym[c.currency] || c.currency) + ' ' + amt;
+              };
+              cashRow.textContent = 'свободно ' + cash.map(fmt).join(' · ');
+              cashRow.style.display = '';
+            } else {
+              cashRow.style.display = 'none';
+              cashRow.textContent = '';
+            }
+          }
+          const newTotal = Number(s.cash_total_rub || 0);
+          if (newTotal !== Number(window.cashTotalRub || 0)) {
+            window.cashTotalRub = newTotal;
+            renderTable();
+          }
         } catch (_) { hide(); }
       }
 

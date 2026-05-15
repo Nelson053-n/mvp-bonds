@@ -11,6 +11,7 @@ from app.api.deps import get_current_user
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.crypto_utils import encrypt_token
+from app.services.moex_service import moex_service
 from app.services.storage_service import storage_service
 from app.services.tbank_service import TBankError, TBankService
 from app.services.tbank_sync_service import do_sync_one, parse_pending_removal
@@ -288,6 +289,19 @@ async def tbank_sync_status(
         except (ValueError, TypeError):
             pass
 
+    cash_total_rub = 0.0
+    for c in cash:
+        currency = (c.get("currency") or "").upper()
+        amount = float(c.get("amount") or 0)
+        if currency in ("RUB", "SUR", ""):
+            rate = 1.0
+        else:
+            rate = await moex_service._get_fx_rate(currency) or 0.0
+        amount_rub = round(amount * rate, 2) if rate else 0.0
+        c["amount_rub"] = amount_rub
+        cash_total_rub += amount_rub
+    cash_total_rub = round(cash_total_rub, 2)
+
     return {
         "enabled": cfg["sync_enabled"],
         "masked_token": cfg["tbank_token_prefix"] + "***",
@@ -297,6 +311,7 @@ async def tbank_sync_status(
         "last_sync_error": last_error,
         "pending_removal": pending_removal,
         "cash": cash,
+        "cash_total_rub": cash_total_rub,
         "cash_updated_at": cfg.get("cash_updated_at"),
     }
 
