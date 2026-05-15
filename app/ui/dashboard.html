@@ -1053,50 +1053,39 @@
           </div>
         </div>
 
-        <!-- Cash-to-reinvest + Upcoming events (moved under cashflow) -->
-        <div class="panel-cols" id="actionable-row" style="grid-template-columns:1fr 1fr;display:none;">
-          <div class="card" id="cash-reinvest-card">
-            <div class="card-header"><h2 class="card-title">К реинвесту</h2></div>
-            <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
+        <!-- ── ANALYTICS (embedded) ───────────────────────────── -->
+
+        <!-- Portfolio history (full-width) -->
+        <div class="card" id="analytics-history-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Динамика стоимости</h2>
+              <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div id="analytics-history-return" style="display:none;text-align:right;line-height:1.15;">
+                <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
+                <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
+              </div>
+              <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
+                <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
+                <span>vs Индекс ОФЗ</span>
+              </label>
+              <div style="display:flex;gap:6px;">
+                <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
+                <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
+                <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
+                <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
+              </div>
+            </div>
           </div>
-          <div class="card" id="events-card">
-            <div class="card-header"><h2 class="card-title" id="events-card-title">События до конца месяца</h2></div>
-            <div id="events-body" style="padding:6px 0;max-height:260px;overflow-y:auto;"></div>
+          <div style="padding:12px 16px 16px;">
+            <canvas id="analytics-history-chart" height="240" style="display:block;width:100%;"></canvas>
           </div>
         </div>
 
-        <!-- ── ANALYTICS (embedded) ───────────────────────────── -->
-
-        <!-- Row: History chart + YTM curve (50/50, equal height) -->
-        <div class="panel-cols" id="history-ytm-row" style="grid-template-columns:1fr 1fr;">
-          <div class="card" id="analytics-history-card">
-            <div class="card-header">
-              <div>
-                <h2 class="card-title">Динамика стоимости</h2>
-                <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
-              </div>
-              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                <div id="analytics-history-return" style="display:none;text-align:right;line-height:1.15;">
-                  <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
-                  <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
-                </div>
-                <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
-                  <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
-                  <span>vs Индекс ОФЗ</span>
-                </label>
-                <div style="display:flex;gap:6px;">
-                  <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
-                  <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
-                  <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
-                  <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
-                </div>
-              </div>
-            </div>
-            <div style="padding:12px 16px 16px;">
-              <canvas id="analytics-history-chart" height="240" style="display:block;width:100%;"></canvas>
-            </div>
-          </div>
-
+        <!-- Row: YTM curve + Events (50/50, equal height) -->
+        <div class="panel-cols" id="ytm-events-row" style="grid-template-columns:1fr 1fr;display:none;">
           <div class="card" id="ytm-curve-card">
             <div class="card-header">
               <h2 class="card-title" style="display:inline-flex;align-items:center;gap:6px;">
@@ -1109,6 +1098,10 @@
               <div id="ytm-curve-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по YTM и срокам</div>
               <div id="ytm-curve-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
             </div>
+          </div>
+          <div class="card" id="events-card">
+            <div class="card-header"><h2 class="card-title" id="events-card-title">События до конца месяца</h2></div>
+            <div id="events-body" style="padding:6px 0;overflow-y:auto;flex:1;"></div>
           </div>
         </div>
 
@@ -1128,13 +1121,13 @@
           </div>
         </div>
         <style>
-          /* Equal-height cards in the row: flex-column so wrapper takes any
-             extra space; canvas keeps its own height (set in JS) so circles
-             stay round. */
-          #history-ytm-row .card { display: flex; flex-direction: column; }
-          #history-ytm-row .card > div:last-child { flex: 1; }
+          /* Equal-height cards in YTM/Events row: flex-column so events list
+             scrolls inside the wrapper, matching YTM canvas height. */
+          #ytm-events-row .card { display: flex; flex-direction: column; }
+          #ytm-events-row .card > div:last-child { flex: 1; min-height: 0; }
+          #ytm-events-row #events-body { max-height: none; }
           @media (max-width: 1024px) {
-            #history-ytm-row { grid-template-columns: 1fr !important; }
+            #ytm-events-row { grid-template-columns: 1fr !important; }
             #duration-stress-row { grid-template-columns: 1fr !important; }
           }
         </style>
@@ -1202,8 +1195,8 @@
           }
         </style>
 
-        <!-- Top performers -->
-        <div class="panel-cols panel-cols-3">
+        <!-- Top performers + sell-first + cash-to-reinvest (4 in a row) -->
+        <div class="panel-cols" id="performers-row" style="grid-template-columns:repeat(4,1fr);">
           <div class="card">
             <div class="card-header"><h2 class="card-title">Лучшие позиции</h2></div>
             <div id="analytics-top-gain" style="padding:0;"></div>
@@ -1219,7 +1212,19 @@
             </div>
             <div id="analytics-sell-first" style="padding:0;"></div>
           </div>
+          <div class="card" id="cash-reinvest-card" style="display:none;">
+            <div class="card-header"><h2 class="card-title">К реинвесту</h2></div>
+            <div id="cash-reinvest-body" style="padding:14px 18px;"></div>
+          </div>
         </div>
+        <style>
+          @media (max-width: 1280px) {
+            #performers-row { grid-template-columns: repeat(2, 1fr) !important; }
+          }
+          @media (max-width: 700px) {
+            #performers-row { grid-template-columns: 1fr !important; }
+          }
+        </style>
 
         <!-- SWOT Analysis -->
         <div class="card" id="swot-card">
@@ -3374,9 +3379,9 @@
 
       // ── CASH-TO-REINVEST CARD ────────────────────────────────────
       function renderCashReinvestCard(extra) {
-        const row = document.getElementById('actionable-row');
+        const card = document.getElementById('cash-reinvest-card');
         const body = document.getElementById('cash-reinvest-body');
-        if (!row || !body) return;
+        if (!card || !body) return;
         const freeCash = Number(extra?.free_cash_rub || window.cashTotalRub || 0);
         const events = extra?.events || [];
         // Horizon — конец текущего месяца. Сегодняшние купоны исключаем (уже в freeCash).
@@ -3391,7 +3396,7 @@
         const incomingMaturity = futureMaturity.reduce((s, e) => s + (e.amount || 0), 0);
         const totalAvailable = freeCash + incomingCoupons + incomingMaturity;
         const hasAnything = freeCash > 0 || incomingCoupons > 0 || incomingMaturity > 0 || events.length > 0;
-        row.style.display = hasAnything ? '' : 'none';
+        card.style.display = hasAnything ? '' : 'none';
         const fmtRub = v => Math.round(v).toLocaleString('ru');
         const monthName = endOfMonth.toLocaleDateString('ru', { month: 'long' });
         const daysLeftLbl = daysLeft === 0 ? 'сегодня последний день' : daysLeft === 1 ? 'остался 1 день' : (daysLeft < 5 ? `осталось ${daysLeft} дня` : `осталось ${daysLeft} дней`);
@@ -3461,6 +3466,9 @@
         const emptyEl = document.getElementById('ytm-curve-empty');
         const hintEl = document.getElementById('ytm-curve-hint');
         if (!canvas) return;
+        // Show the YTM/Events row whenever we have any portfolio data
+        const row = document.getElementById('ytm-events-row');
+        if (row) row.style.display = rows && rows.length ? '' : 'none';
         const now = new Date();
         const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0 && r.market_yield > 0);
         const points = bonds
@@ -7602,8 +7610,11 @@
           // Hide RGBI toggle and actionable row in share mode
           const rgbiLbl = document.getElementById('rgbi-toggle-label');
           if (rgbiLbl) rgbiLbl.style.display = 'none';
-          const actRow = document.getElementById('actionable-row');
-          if (actRow) actRow.style.display = 'none';
+          // hide events card and cash-reinvest card in share mode
+          const eventsCard = document.getElementById('events-card');
+          if (eventsCard) eventsCard.style.display = 'none';
+          const cashCard = document.getElementById('cash-reinvest-card');
+          if (cashCard) cashCard.style.display = 'none';
 
           // Make brand logo link to bondai.ru in share view
           const brand = document.querySelector('.topbar-brand');
