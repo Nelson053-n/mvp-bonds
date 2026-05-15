@@ -963,6 +963,11 @@
             <div class="stat-value" id="stat-ytm">—</div>
             <div class="stat-sub" id="stat-ytm-sub">&nbsp;</div>
           </div>
+          <div class="stat-card" id="stat-cash-card" style="display:none;">
+            <div class="stat-label">Свободные средства</div>
+            <div class="stat-value" id="stat-cash" style="font-size:16px;">—</div>
+            <div class="stat-sub" id="stat-cash-sub">&nbsp;</div>
+          </div>
         </div>
 
         <div style="margin-bottom:4px;">
@@ -2527,6 +2532,30 @@
         const wtd = bonds.reduce((s, r) => s + r.market_yield * r.current_value, 0) / totalVal;
         el.textContent = `${wtd.toFixed(1)}%`;
         if (sub) sub.textContent = 'средневзвешенная';
+      }
+
+      async function updateCashWidget(pid) {
+        const card = document.getElementById('stat-cash-card');
+        const el = document.getElementById('stat-cash');
+        const sub = document.getElementById('stat-cash-sub');
+        if (!card || !el) return;
+        const hide = () => { card.style.display = 'none'; };
+        if (!pid) return hide();
+        try {
+          const r = await apiFetch('/tbank/sync/status?portfolio_id=' + pid);
+          if (!r.ok) return hide();
+          const s = await r.json();
+          const cash = (s.cash || []).filter(c => c.amount > 0);
+          if (!s.enabled || cash.length === 0) return hide();
+          const sym = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥', HKD: 'HK$', GBP: '£' };
+          const fmt = (c) => {
+            const amt = c.amount.toLocaleString('ru', { maximumFractionDigits: 2 });
+            return (sym[c.currency] || c.currency) + ' ' + amt;
+          };
+          el.textContent = cash.map(fmt).join(' · ');
+          if (sub) sub.textContent = s.cash_updated_at ? 'обновлено ' + _relativeTime(s.cash_updated_at) : '';
+          card.style.display = '';
+        } catch (_) { hide(); }
       }
 
       function updateLastUpdateTime() {
@@ -4295,6 +4324,7 @@
         updateStatCards(summary);
         updateNextCouponWidget(tableRows);
         updateYTMWidget(tableRows);
+        updateCashWidget(portfolioId);
         updateLastUpdateTime();
 
         const sumRow = document.createElement('tr');

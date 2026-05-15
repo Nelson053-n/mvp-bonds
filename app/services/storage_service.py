@@ -279,6 +279,18 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 except sqlite3.OperationalError:
                     pass
 
+            # Migrations for portfolio_sync — cash balance JSON
+            for col, col_def in [
+                ("cash_balance", "TEXT"),
+                ("cash_updated_at", "TEXT"),
+            ]:
+                try:
+                    conn.execute(
+                        f"ALTER TABLE portfolio_sync ADD COLUMN {col} {col_def}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
+
             # Create indices
             try:
                 conn.execute(
@@ -880,7 +892,8 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             row = conn.execute(
                 """
                 SELECT id, portfolio_id, tbank_token_enc, tbank_token_prefix,
-                       tbank_account_id, bonds_only, sync_enabled, last_sync_at, last_sync_error
+                       tbank_account_id, bonds_only, sync_enabled, last_sync_at, last_sync_error,
+                       cash_balance, cash_updated_at
                 FROM portfolio_sync
                 WHERE portfolio_id = ?
                 """,
@@ -898,7 +911,19 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             "sync_enabled": bool(row[6]),
             "last_sync_at": row[7],
             "last_sync_error": row[8],
+            "cash_balance": row[9],
+            "cash_updated_at": row[10],
         }
+
+    def update_sync_cash(self, portfolio_id: int, cash_json: str) -> None:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_sync SET cash_balance = ?, cash_updated_at = ? WHERE portfolio_id = ?",
+                (cash_json, now, portfolio_id),
+            )
+            conn.commit()
 
     def set_sync_enabled(self, portfolio_id: int, enabled: bool) -> None:
         with self._connect() as conn:

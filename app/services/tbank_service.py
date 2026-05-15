@@ -87,16 +87,36 @@ class TBankService:
         self._check_response(resp)
         return resp.json().get("positions", [])
 
-    async def import_account(self, account_id: str) -> list[dict]:
-        """Fetch positions and return importable items.
+    async def get_portfolio_full(self, account_id: str) -> tuple[list[dict], list[dict]]:
+        """Return (positions, cash) from GetPortfolio.
 
-        Returns list of {ticker, instrument_type, quantity, purchase_price}.
-        Skips unsupported types and zero-quantity positions.
-        Ticker is taken directly from the position data (T-Bank REST API includes it).
+        cash is a list of {currency, amount} extracted from positions with
+        instrumentType=='currency'. Currency code is uppercased ISO (RUB/USD/...).
         """
-        positions = await self.get_positions(account_id)
-        items: list[dict] = []
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                _PORTFOLIO_URL,
+                json={"accountId": account_id},
+                headers=self._headers,
+            )
+        self._check_response(resp)
+        data = resp.json()
+        positions = data.get("positions", [])
+        cash: list[dict] = []
+        for pos in positions:
+            if pos.get("instrumentType") != "currency":
+                continue
+            amount = _quotation(pos.get("quantity"))
+            currency = (pos.get("currency") or "").upper()
+            if not currency or amount == 0:
+                continue
+            cash.append({"currency": currency, "amount": round(amount, 2)})
+        return positions, cash
 
+    @staticmethod
+    def _positions_to_items(positions: list[dict]) -> list[dict]:
+        """Convert raw T-Bank positions into importable items."""
+        items: list[dict] = []
         for pos in positions:
             instrument_type = _TYPE_MAP.get(pos.get("instrumentType", ""))
             if instrument_type is None:
@@ -124,8 +144,17 @@ class TBankService:
                 "quantity": quantity,
                 "purchase_price": round(purchase_price, 2),
             })
-
         return items
+
+    async def import_account(self, account_id: str) -> list[dict]:
+        """Fetch positions and return importable items.
+
+        Returns list of {ticker, instrument_type, quantity, purchase_price}.
+        Skips unsupported types and zero-quantity positions.
+        Ticker is taken directly from the position data (T-Bank REST API includes it).
+        """
+        positions = await self.get_positions(account_id)
+        return self._positions_to_items(positions)
 
     async def sync_portfolio(
         self,
@@ -136,19 +165,29 @@ class TBankService:
     ) -> dict:
         """Sync T-Bank positions into an existing portfolio.
 
-        Returns {added, updated, removed_candidates, errors}.
+        Returns {added, updated, removed_candidates, errors, cash}.
         New/changed positions are written to DB. Disappeared positions are
         returned as removed_candidates — NOT auto-deleted.
+        Cash balance (list of {currency, amount}) is persisted on the sync row.
         """
+        import json
+
         from app.services.cache_service import cache_service
 
-        # Fetch live positions from broker
+        # Fetch live positions + cash from broker
         try:
-            api_items = await self.import_account(account_id)
+            positions, cash = await self.get_portfolio_full(account_id)
+            api_items = self._positions_to_items(positions)
         except TBankError:
             raise
         except Exception as exc:
             raise TBankError(f"Ошибка получения позиций: {exc}") from exc
+
+        # Persist cash snapshot (always, even if empty)
+        try:
+            storage.update_sync_cash(portfolio_id, json.dumps(cash, ensure_ascii=False))
+        except Exception as exc:
+            logger.warning("update_sync_cash failed for portfolio_id=%d: %s", portfolio_id, exc)
 
         if bonds_only:
             api_items = [i for i in api_items if i["instrument_type"] == "bond"]
@@ -218,4 +257,5 @@ class TBankService:
             "updated": updated,
             "removed_candidates": removed_candidates,
             "errors": errors,
+            "cash": cash,
         }

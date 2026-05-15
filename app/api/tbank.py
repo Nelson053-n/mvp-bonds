@@ -1,5 +1,6 @@
 """T-Bank Invest API import and auto-sync endpoints."""
 
+import json
 import logging
 from typing import Annotated
 
@@ -277,6 +278,16 @@ async def tbank_sync_status(
     if last_error and last_error.startswith("PENDING_REMOVAL:"):
         last_error = None  # Don't expose raw prefix to UI
 
+    cash: list[dict] = []
+    raw_cash = cfg.get("cash_balance")
+    if raw_cash:
+        try:
+            parsed = json.loads(raw_cash)
+            if isinstance(parsed, list):
+                cash = parsed
+        except (ValueError, TypeError):
+            pass
+
     return {
         "enabled": cfg["sync_enabled"],
         "masked_token": cfg["tbank_token_prefix"] + "***",
@@ -285,6 +296,8 @@ async def tbank_sync_status(
         "last_sync_at": cfg["last_sync_at"],
         "last_sync_error": last_error,
         "pending_removal": pending_removal,
+        "cash": cash,
+        "cash_updated_at": cfg.get("cash_updated_at"),
     }
 
 
