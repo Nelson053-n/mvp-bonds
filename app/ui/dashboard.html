@@ -1037,7 +1037,13 @@
         <div class="card" id="chart-card" style="padding: 0;">
           <div class="card-header">
             <h2 class="card-title" data-i18n="chart.title">Денежный поток</h2>
-            <div id="coupon-period-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <label id="cashflow-show-principal-label" title="Возврат номинала по облигациям в месяце погашения. Снимите чтобы видеть только купонные выплаты." style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none;">
+                <input type="checkbox" id="cashflow-show-principal" checked style="cursor:pointer;" onchange="(function(){if(typeof drawMonthlyChart==='function'&&typeof tableRows!=='undefined')drawMonthlyChart(tableRows);})()" />
+                <span>Показывать погашения</span>
+              </label>
+              <div id="coupon-period-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+            </div>
           </div>
           <div style="padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
             <div id="chart-empty" class="chart-empty" style="display:none;" data-i18n="chart.noData">Нет данных по купонным выплатам</div>
@@ -1061,42 +1067,48 @@
 
         <!-- ── ANALYTICS (embedded) ───────────────────────────── -->
 
-        <!-- Portfolio history chart -->
-        <div class="card" id="analytics-history-card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">Динамика стоимости</h2>
-              <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+        <!-- Row: History chart (2fr) + Duration (1fr) -->
+        <div class="panel-cols" id="history-duration-row" style="grid-template-columns:2fr 1fr;">
+          <div class="card" id="analytics-history-card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Динамика стоимости</h2>
+                <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <div id="analytics-history-return" style="display:none;text-align:right;line-height:1.15;">
+                  <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
+                  <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
+                </div>
+                <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
+                  <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
+                  <span>vs Индекс ОФЗ</span>
+                </label>
+                <div style="display:flex;gap:6px;">
+                  <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
+                  <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
+                  <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
+                  <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
+                </div>
+              </div>
             </div>
-            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-              <div id="analytics-history-return" style="display:none;text-align:right;line-height:1.15;">
-                <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
-                <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
-              </div>
-              <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
-                <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
-                <span>vs Индекс ОФЗ</span>
-              </label>
-              <div style="display:flex;gap:6px;">
-                <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
-                <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
-                <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
-                <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
-              </div>
+            <div style="padding:12px 16px 16px;">
+              <canvas id="analytics-history-chart" height="220" style="display:block;width:100%;"></canvas>
             </div>
           </div>
-          <div style="padding:12px 16px 16px;">
-            <canvas id="analytics-history-chart" height="220" style="display:block;width:100%;"></canvas>
-          </div>
-        </div>
 
-        <!-- Bond analytics row 1: Duration (full-width) -->
-        <div class="card" id="duration-card">
-          <div class="card-header"><h2 class="card-title">Процентный риск (Duration)</h2></div>
-          <div id="duration-body" style="padding:16px 18px;">
-            <div style="color:var(--text-muted);font-size:13px;">—</div>
+          <div class="card" id="duration-card">
+            <div class="card-header"><h2 class="card-title">Чувствительность к ставке</h2></div>
+            <div id="duration-body" style="padding:16px 18px;">
+              <div style="color:var(--text-muted);font-size:13px;">—</div>
+            </div>
           </div>
         </div>
+        <style>
+          @media (max-width: 1024px) {
+            #history-duration-row { grid-template-columns: 1fr !important; }
+          }
+        </style>
 
         <!-- Bond analytics: unified Portfolio structure (6 panes, horizontal bars) -->
         <div class="card" id="structure-card">
@@ -3007,7 +3019,7 @@
             </div>
           </div>
 
-          <div id="duration-impact" style="display:flex;gap:10px;align-items:stretch;margin-bottom:10px;">
+          <div id="duration-impact" style="display:flex;gap:10px;align-items:stretch;margin-bottom:10px;flex-wrap:wrap;">
             <!-- filled by slider handler -->
           </div>
 
@@ -3033,12 +3045,12 @@
           const sign = impactPct >= 0 ? '+' : '';
           const newVal = portfolioVal + impactRub;
           impactEl.innerHTML = `
-            <div style="flex:1;background:${bg};border:1px solid ${border};border-radius:var(--radius);padding:10px 12px;">
+            <div style="flex:1 1 130px;min-width:130px;background:${bg};border:1px solid ${border};border-radius:var(--radius);padding:10px 12px;">
               <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Изменение</div>
               <div style="font-size:17px;font-weight:700;color:${color};line-height:1;">${sign}${impactPct.toFixed(2)}%</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${impactRub >= 0 ? '+' : '−'}${fmtRub(impactRub)} ₽</div>
             </div>
-            <div style="flex:1;background:var(--bg-card-secondary, rgba(148,163,184,.06));border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+            <div style="flex:1 1 130px;min-width:130px;background:var(--bg-card-secondary, rgba(148,163,184,.06));border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
               <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Новая стоимость</div>
               <div style="font-size:17px;font-weight:700;color:var(--text-primary);line-height:1;">${Math.round(newVal).toLocaleString('ru')} ₽</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">было ${Math.round(portfolioVal).toLocaleString('ru')} ₽</div>
@@ -4301,6 +4313,12 @@
         const emptyEl = document.getElementById('chart-empty');
         if (!canvas) return;
         const data    = calculateMonthlyIncome(rows);
+        // Toggle: hide principal (maturity payouts) when checkbox is off
+        const principalCb = document.getElementById('cashflow-show-principal');
+        const showPrincipal = !principalCb || principalCb.checked;
+        if (!showPrincipal) {
+          data.forEach(d => { d.principal = 0; d.hasMaturity = false; d.maturingBonds = []; });
+        }
         const hasData = data.some(d => d.income > 0 || d.principal > 0);
         canvas.style.display = hasData ? 'block' : 'none';
         emptyEl.style.display = hasData ? 'none' : 'block';
