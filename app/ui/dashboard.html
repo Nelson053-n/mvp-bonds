@@ -1044,15 +1044,82 @@
               <h2 class="card-title">Динамика стоимости</h2>
               <div id="analytics-history-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
             </div>
-            <div style="display:flex;gap:6px;">
-              <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
-              <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
-              <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
-              <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div id="analytics-history-return" style="display:none;text-align:right;line-height:1.15;">
+                <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
+                <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
+                <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
+                <button class="analytics-period-btn" data-days="90" onclick="loadAnalyticsHistory(90)">90 дн</button>
+                <button class="analytics-period-btn" data-days="365" onclick="loadAnalyticsHistory(365)">1 год</button>
+              </div>
             </div>
           </div>
           <div style="padding:12px 16px 16px;">
             <canvas id="analytics-history-chart" height="220" style="display:block;width:100%;"></canvas>
+          </div>
+        </div>
+
+        <!-- Bond-specific analytics row 1: Duration + Maturity ladder -->
+        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
+          <div class="card" id="duration-card">
+            <div class="card-header"><h2 class="card-title">Процентный риск (Duration)</h2></div>
+            <div id="duration-body" style="padding:16px 18px;">
+              <div style="color:var(--text-muted);font-size:13px;">—</div>
+            </div>
+          </div>
+          <div class="card" id="maturity-ladder-card">
+            <div class="card-header"><h2 class="card-title">Срочная структура</h2></div>
+            <div style="padding:12px 16px 16px;">
+              <canvas id="maturity-ladder-chart" height="160" style="display:block;width:100%;"></canvas>
+              <div id="maturity-ladder-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о датах погашения</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bond-specific analytics row 2: Ratings + Currencies -->
+        <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
+          <div class="card" id="ratings-card">
+            <div class="card-header"><h2 class="card-title">Кредитные рейтинги</h2></div>
+            <div style="padding:12px 16px 16px;">
+              <canvas id="ratings-chart" height="160" style="display:block;width:100%;"></canvas>
+              <div id="ratings-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о рейтингах</div>
+            </div>
+          </div>
+          <div class="card" id="currency-card">
+            <div class="card-header"><h2 class="card-title">По валютам</h2></div>
+            <div style="padding:12px 16px;display:flex;align-items:center;gap:16px;">
+              <canvas id="currency-chart" width="140" height="140" style="flex-shrink:0;"></canvas>
+              <div id="currency-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;"></div>
+            </div>
+            <div id="currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
+          </div>
+        </div>
+
+        <!-- Bond-specific analytics row 3: Fixed vs Floater -->
+        <div class="card" id="coupon-type-card">
+          <div class="card-header"><h2 class="card-title">Тип купона</h2></div>
+          <div style="padding:14px 18px 18px;">
+            <div id="coupon-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:14px 0;">В портфеле нет облигаций</div>
+            <div id="coupon-type-bar" style="display:none;">
+              <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--table-border);">
+                <div id="coupon-type-fixed-fill" style="height:100%;background:#2563eb;transition:width .25s;"></div>
+                <div id="coupon-type-float-fill" style="height:100%;background:#f59e0b;transition:width .25s;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text-secondary);gap:12px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0;"></span>
+                  <span id="coupon-type-fixed-label">Фиксированный — 0%</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+                  <span id="coupon-type-float-label">Плавающий — 0%</span>
+                </div>
+              </div>
+              <div id="coupon-type-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;"></div>
+            </div>
           </div>
         </div>
 
@@ -2688,6 +2755,307 @@
         };
         renderPerformers('analytics-top-gain', sorted);
         renderPerformers('analytics-top-loss', [...sorted].reverse());
+
+        // Bond-specific analytics
+        renderDurationCard(rows);
+        renderMaturityLadder(rows);
+        renderRatingsChart(rows);
+        renderCurrencyChart(rows);
+        renderCouponTypeBar(rows);
+      }
+
+      // ── BOND ANALYTICS: Duration ─────────────────────────────────
+      function _bondMaturityYears(row, now) {
+        // Effective maturity = nearest of offer/buyback/maturity (что наступит первым)
+        const candidates = [row.maturity_date, row.buyback_date, row.offer_date]
+          .filter(Boolean)
+          .map(d => parseLocalDate(d))
+          .filter(d => !isNaN(d.getTime()) && d > now);
+        if (!candidates.length) return null;
+        const nearest = new Date(Math.min(...candidates.map(d => d.getTime())));
+        return (nearest - now) / (365.25 * 24 * 3600e3);
+      }
+
+      function renderDurationCard(rows) {
+        const body = document.getElementById('duration-body');
+        if (!body) return;
+        const now = new Date();
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        const withMat = bonds
+          .map(r => ({ r, yrs: _bondMaturityYears(r, now) }))
+          .filter(x => x.yrs != null && x.yrs > 0);
+        if (!withMat.length) {
+          body.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Нет данных для расчёта</div>';
+          return;
+        }
+        const totalVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
+        // Macaulay duration ≈ weighted average time to nearest cashflow (упрощение)
+        const macaulay = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totalVal;
+        // Modified duration ≈ Macaulay / (1 + y), где y = средневзвешенная YTM (в долях)
+        const withYtm = bonds.filter(r => r.market_yield != null && r.market_yield > 0 && r.current_value > 0);
+        const ytmTotal = withYtm.reduce((s, r) => s + r.current_value, 0);
+        const avgYtm = ytmTotal > 0
+          ? withYtm.reduce((s, r) => s + r.market_yield * r.current_value, 0) / ytmTotal / 100
+          : 0.1;
+        const modDur = macaulay / (1 + avgYtm);
+        // Impact on portfolio value for +/-1pp shift in rates
+        const upPct = -modDur * 1;
+        const dnPct =  modDur * 1;
+        const portfolioVal = bonds.reduce((s, r) => s + r.current_value, 0);
+        const upRub = portfolioVal * upPct / 100;
+        const dnRub = portfolioVal * dnPct / 100;
+        const macStr = macaulay.toFixed(2);
+        const modStr = modDur.toFixed(2);
+        body.innerHTML = `
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
+            <div style="font-size:30px;font-weight:700;color:var(--text-primary);line-height:1;">${macStr}</div>
+            <div style="font-size:13px;color:var(--text-muted);">года · Macaulay duration</div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Modified Duration: <b style="color:var(--text-secondary);">${modStr}</b></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;font-weight:600;">Если ключевая ставка изменится на 1 п.п.:</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:var(--radius);padding:10px 12px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">+1 п.п.</div>
+              <div style="font-size:15px;font-weight:700;color:var(--red-400);">${upPct.toFixed(2)}%</div>
+              <div style="font-size:11px;color:var(--text-muted);">≈ ${Math.round(upRub).toLocaleString('ru')} ₽</div>
+            </div>
+            <div style="flex:1;min-width:140px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);border-radius:var(--radius);padding:10px 12px;">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">−1 п.п.</div>
+              <div style="font-size:15px;font-weight:700;color:var(--green-400);">+${dnPct.toFixed(2)}%</div>
+              <div style="font-size:11px;color:var(--text-muted);">≈ +${Math.round(dnRub).toLocaleString('ru')} ₽</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:10px;line-height:1.4;">Упрощённая оценка по сроку до ближайшего события (погашение/оферта). Не учитывает выпуклость и индивидуальные YTM.</div>
+        `;
+      }
+
+      // ── BOND ANALYTICS: Maturity ladder ──────────────────────────
+      function renderMaturityLadder(rows) {
+        const canvas = document.getElementById('maturity-ladder-chart');
+        const emptyEl = document.getElementById('maturity-ladder-empty');
+        if (!canvas) return;
+        const now = new Date();
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        const buckets = [
+          { label: '<1 года', min: 0, max: 1, value: 0 },
+          { label: '1-3 г',   min: 1, max: 3, value: 0 },
+          { label: '3-5 л',   min: 3, max: 5, value: 0 },
+          { label: '5+ лет',  min: 5, max: Infinity, value: 0 },
+        ];
+        let placed = 0;
+        bonds.forEach(r => {
+          const yrs = _bondMaturityYears(r, now);
+          if (yrs == null || yrs <= 0) return;
+          const b = buckets.find(b => yrs >= b.min && yrs < b.max);
+          if (b) { b.value += r.current_value; placed++; }
+        });
+        if (!placed) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+        _drawHorizontalBars(canvas, buckets, '#2563eb');
+      }
+
+      // ── BOND ANALYTICS: Ratings distribution ─────────────────────
+      function renderRatingsChart(rows) {
+        const canvas = document.getElementById('ratings-chart');
+        const emptyEl = document.getElementById('ratings-empty');
+        if (!canvas) return;
+        const norm = r => {
+          if (!r || r === '—' || r === 'N/A') return null;
+          const s = String(r).toUpperCase().replace(/^RU/, '');
+          if (s.startsWith('AAA')) return 'AAA';
+          if (s.startsWith('AA'))  return 'AA';
+          if (s.startsWith('A'))   return 'A';
+          if (s.startsWith('BBB')) return 'BBB';
+          if (s.startsWith('BB'))  return 'BB';
+          if (s.startsWith('B'))   return 'B';
+          if (s.startsWith('C') || s.startsWith('D')) return 'C/D';
+          return null;
+        };
+        const buckets = [
+          { label: 'AAA',  value: 0, color: '#16a34a' },
+          { label: 'AA',   value: 0, color: '#22c55e' },
+          { label: 'A',    value: 0, color: '#84cc16' },
+          { label: 'BBB',  value: 0, color: '#eab308' },
+          { label: 'BB',   value: 0, color: '#f59e0b' },
+          { label: 'B',    value: 0, color: '#f97316' },
+          { label: 'C/D',  value: 0, color: '#dc2626' },
+          { label: 'Без рейтинга', value: 0, color: '#64748b' },
+        ];
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        if (!bonds.length) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        bonds.forEach(r => {
+          const cat = norm(r.company_rating);
+          if (cat) {
+            const b = buckets.find(b => b.label === cat);
+            if (b) b.value += r.current_value;
+          } else {
+            buckets[buckets.length - 1].value += r.current_value;
+          }
+        });
+        const nonZero = buckets.filter(b => b.value > 0);
+        if (!nonZero.length) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+        _drawHorizontalBars(canvas, nonZero, null);
+      }
+
+      // ── BOND ANALYTICS: Currency pie ─────────────────────────────
+      function renderCurrencyChart(rows) {
+        const canvas = document.getElementById('currency-chart');
+        const legend = document.getElementById('currency-legend');
+        const emptyEl = document.getElementById('currency-empty');
+        if (!canvas || !legend) return;
+        const byCcy = {};
+        rows.forEach(r => {
+          let ccy = (r.face_unit || 'SUR').toUpperCase();
+          if (ccy === 'SUR' || ccy === '') ccy = 'RUB';
+          byCcy[ccy] = (byCcy[ccy] || 0) + (r.current_value || 0);
+        });
+        // Add free cash from autosync (only if some cash exists)
+        const cashRub = Number(window.cashTotalRub || 0);
+        if (cashRub > 0) byCcy['RUB'] = (byCcy['RUB'] || 0) + cashRub;
+        const data = Object.entries(byCcy)
+          .filter(([_, v]) => v > 0)
+          .map(([label, value]) => ({ label, value }))
+          .sort((a, b) => b.value - a.value);
+        if (!data.length) {
+          canvas.style.display = 'none';
+          legend.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        canvas.style.display = 'block';
+        legend.style.display = 'flex';
+        if (emptyEl) emptyEl.style.display = 'none';
+        const ccyColors = { RUB: '#2563eb', USD: '#16a34a', EUR: '#8b5cf6', CNY: '#f59e0b', GBP: '#dc2626', CHF: '#0ea5e9', HKD: '#ec4899' };
+        const palette = data.map(d => ccyColors[d.label] || '#64748b');
+        drawPieChart('currency-chart', data, palette);
+        const total = data.reduce((s, d) => s + d.value, 0);
+        legend.innerHTML = '';
+        data.forEach((d, i) => {
+          const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0';
+          const valStr = d.value >= 1000 ? Math.round(d.value/1000).toLocaleString('ru') + ' тыс. ₽' : Math.round(d.value) + ' ₽';
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+          row.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${palette[i]};flex-shrink:0;"></span>
+            <span style="color:var(--slate-600);"><b>${d.label}</b> — ${pct}% · ${valStr}</span>`;
+          legend.appendChild(row);
+        });
+      }
+
+      // ── BOND ANALYTICS: Coupon type bar ──────────────────────────
+      function renderCouponTypeBar(rows) {
+        const wrap = document.getElementById('coupon-type-bar');
+        const empty = document.getElementById('coupon-type-empty');
+        if (!wrap || !empty) return;
+        const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
+        if (!bonds.length) {
+          wrap.style.display = 'none';
+          empty.style.display = 'block';
+          return;
+        }
+        const total = bonds.reduce((s, r) => s + r.current_value, 0);
+        const floatVal = bonds.filter(r => r.is_floater).reduce((s, r) => s + r.current_value, 0);
+        const fixedVal = total - floatVal;
+        const fixedPct = total > 0 ? (fixedVal / total) * 100 : 0;
+        const floatPct = total > 0 ? (floatVal / total) * 100 : 0;
+        wrap.style.display = 'block';
+        empty.style.display = 'none';
+        document.getElementById('coupon-type-fixed-fill').style.width = fixedPct.toFixed(1) + '%';
+        document.getElementById('coupon-type-float-fill').style.width = floatPct.toFixed(1) + '%';
+        document.getElementById('coupon-type-fixed-label').textContent = `Фиксированный — ${fixedPct.toFixed(0)}%`;
+        document.getElementById('coupon-type-float-label').textContent = `Плавающий — ${floatPct.toFixed(0)}%`;
+        const hint = document.getElementById('coupon-type-hint');
+        if (hint) {
+          if (floatPct >= 70) hint.textContent = 'Портфель в основном из флоатеров — выигрывает при росте ставки, проигрывает при снижении.';
+          else if (floatPct >= 30) hint.textContent = 'Смешанный профиль — баланс между фиксированной доходностью и защитой от роста ставки.';
+          else if (floatPct > 0) hint.textContent = 'Доля флоатеров мала — портфель чувствителен к снижению ставки.';
+          else hint.textContent = 'Все купоны фиксированные — портфель выиграет от снижения ставки ЦБ.';
+        }
+      }
+
+      // ── Shared: horizontal bar chart helper ──────────────────────
+      function _drawHorizontalBars(canvas, buckets, fixedColor) {
+        const parent = canvas.parentElement;
+        const dpr = window.devicePixelRatio || 1;
+        const W = (parent ? parent.clientWidth : 0) || 400;
+        const H = Math.max(140, 24 * buckets.length + 30);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, W, H);
+        const st = getComputedStyle(document.documentElement);
+        const labelClr = st.getPropertyValue('--text-secondary').trim() || '#475569';
+        const mutedClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
+        const trackClr = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.15)';
+        const labelW = 76;
+        const valW = 90;
+        const padR = 8;
+        const barX = labelW + 6;
+        const barW = Math.max(40, W - labelW - valW - padR - 6);
+        const rowH = 22;
+        const total = buckets.reduce((s, b) => s + b.value, 0) || 1;
+        const maxV = Math.max(...buckets.map(b => b.value), 1);
+        buckets.forEach((b, i) => {
+          const y = 10 + i * (rowH + 4);
+          // label
+          ctx.fillStyle = labelClr;
+          ctx.font = '600 11px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(b.label, 4, y + rowH / 2);
+          // track
+          ctx.fillStyle = trackClr;
+          const trackR = Math.min(4, rowH / 2);
+          _roundRect(ctx, barX, y, barW, rowH, trackR);
+          ctx.fill();
+          // fill
+          const w = b.value > 0 ? (b.value / maxV) * barW : 0;
+          if (w > 0) {
+            ctx.fillStyle = fixedColor || b.color || '#2563eb';
+            _roundRect(ctx, barX, y, w, rowH, trackR);
+            ctx.fill();
+          }
+          // value
+          const pct = ((b.value / total) * 100).toFixed(0) + '%';
+          const valStr = b.value >= 1000000
+            ? (b.value / 1000000).toFixed(1) + ' М ₽'
+            : b.value >= 1000
+              ? Math.round(b.value / 1000) + ' к ₽'
+              : Math.round(b.value) + ' ₽';
+          ctx.fillStyle = mutedClr;
+          ctx.font = '500 11px Inter, system-ui, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${valStr} · ${pct}`, W - padR, y + rowH / 2);
+        });
+      }
+
+      function _roundRect(ctx, x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
       }
 
       async function loadAnalyticsHistory(days = 90) {
@@ -2711,10 +3079,14 @@
             return;
           }
           const meta = document.getElementById('analytics-history-meta');
+          const retBox = document.getElementById('analytics-history-return');
+          const retAbs = document.getElementById('analytics-history-return-abs');
+          const retPct = document.getElementById('analytics-history-return-pct');
           if (!snapshots || snapshots.length < 2) {
             if (meta) meta.textContent = snapshots && snapshots.length === 1
               ? `1 точка данных · ${snapshots[0].date}`
               : 'Нет данных · обновляется каждые 15 мин';
+            if (retBox) retBox.style.display = 'none';
             if (canvas) { canvas._snapshots = null; const es = snapshots && snapshots.length === 1 ? snapshots[0] : null; canvas._emptySnap = es; drawHistoryChartEmpty(canvas, es); }
             return;
           }
@@ -2723,6 +3095,19 @@
             const lastVal = snapshots[snapshots.length-1].total_value;
             const fmt = lastVal >= 1000 ? (lastVal/1000).toFixed(1) + ' тыс. ₽' : lastVal.toFixed(0) + ' ₽';
             meta.textContent = `${snapshots.length} точек · ${first} — ${last} · последняя: ${fmt}`;
+          }
+          if (retBox && retAbs && retPct) {
+            const firstVal = Number(snapshots[0].total_value || 0);
+            const lastVal  = Number(snapshots[snapshots.length-1].total_value || 0);
+            const diff = lastVal - firstVal;
+            const pct  = firstVal > 0 ? (diff / firstVal) * 100 : 0;
+            const sign = diff >= 0 ? '+' : '−';
+            const absDiff = Math.abs(diff);
+            const color = diff > 0 ? 'var(--green-400)' : diff < 0 ? 'var(--red-400)' : 'var(--text-primary)';
+            retAbs.style.color = color;
+            retAbs.textContent = `${sign}${Math.round(absDiff).toLocaleString('ru')} ₽`;
+            retPct.textContent = `${diff >= 0 ? '+' : ''}${pct.toFixed(2)}% за ${days} дн.`;
+            retBox.style.display = '';
           }
           if (canvas) { canvas._snapshots = snapshots; }
           drawHistoryChart(canvas, snapshots);
@@ -3045,14 +3430,13 @@
         const slots = [];
         for (let i = 0; i < months; i++) {
           const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, hasOffer: false, bonds: [] });
+          slots.push({ year: d.getFullYear(), month: d.getMonth(), income: 0, principal: 0, hasOffer: false, bonds: [] });
         }
         for (const row of rows) {
           if (row.type !== 'bond') continue;
           const coupon  = Number(row.coupon || 0);
           const qty     = Number(row.quantity || 0);
           const period  = Number(row.coupon_period || 0);
-          if (!row.next_coupon_date || period <= 0 || coupon <= 0 || qty <= 0) continue;
 
           // Дата погашения — после неё купоны не платятся
           let matDate = null;
@@ -3061,16 +3445,17 @@
             if (isNaN(matDate.getTime())) matDate = null;
           }
 
-          const payDates = generatePaymentDates(row.next_coupon_date, period, start, rangeEnd);
-          for (const pd of payDates) {
-            // Пропускаем выплаты после погашения
-            if (matDate && pd >= matDate) continue;
-            for (const slot of slots) {
-              if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
-                const amount = coupon * qty;
-                slot.income += amount;
-                slot.bonds.push({ name: row.name || row.ticker, ticker: row.ticker, coupon, qty, amount });
-                break;
+          if (row.next_coupon_date && period > 0 && coupon > 0 && qty > 0) {
+            const payDates = generatePaymentDates(row.next_coupon_date, period, start, rangeEnd);
+            for (const pd of payDates) {
+              if (matDate && pd >= matDate) continue;
+              for (const slot of slots) {
+                if (pd.getFullYear() === slot.year && pd.getMonth() === slot.month) {
+                  const amount = coupon * qty;
+                  slot.income += amount;
+                  slot.bonds.push({ name: row.name || row.ticker, ticker: row.ticker, coupon, qty, amount });
+                  break;
+                }
               }
             }
           }
@@ -3085,13 +3470,21 @@
               }
             }
           }
-          // Погашение — отмечаем месяц
+          // Погашение — отмечаем месяц + сумма возврата номинала (RUB)
           if (matDate) {
             for (const slot of slots) {
               if (matDate.getFullYear() === slot.year && matDate.getMonth() === slot.month) {
                 slot.hasMaturity = true;
                 if (!slot.maturingBonds) slot.maturingBonds = [];
-                slot.maturingBonds.push({ name: row.name || row.ticker, ticker: row.ticker });
+                const cv = Number(row.current_value || 0);
+                const aciVal = Number(row.aci || 0) * qty;
+                const principalRub = Math.max(0, cv - aciVal);
+                slot.principal += principalRub;
+                slot.maturingBonds.push({
+                  name: row.name || row.ticker,
+                  ticker: row.ticker,
+                  principal: principalRub,
+                });
                 break;
               }
             }
@@ -3105,7 +3498,7 @@
         const emptyEl = document.getElementById('chart-empty');
         if (!canvas) return;
         const data    = calculateMonthlyIncome(rows);
-        const hasData = data.some(d => d.income > 0);
+        const hasData = data.some(d => d.income > 0 || d.principal > 0);
         canvas.style.display = hasData ? 'block' : 'none';
         emptyEl.style.display = hasData ? 'none' : 'block';
         if (!hasData) return;
@@ -3129,13 +3522,14 @@
         const chartH = H - PAD_T - PAD_B;
         const slotW  = chartW / data.length;
         const barW   = slotW * 0.58;
-        const maxInc = Math.max(...data.map(d => d.income), 1);
+        const maxInc = Math.max(...data.map(d => (d.income || 0) + (d.principal || 0)), 1);
 
         const stM = getComputedStyle(document.documentElement);
         const mGridClr  = stM.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.1)';
         const mLabelClr = stM.getPropertyValue('--text-muted').trim() || '#64748b';
         const mBgClr    = stM.getPropertyValue('--bg-card').trim() || 'rgba(255,255,255,.03)';
         const mBarClr   = stM.getPropertyValue('--blue-400').trim() || '#60a5fa';
+        const mPrincClr = stM.getPropertyValue('--green-400').trim() || '#4ade80';
         const mYAxisClr = stM.getPropertyValue('--border').trim() || 'rgba(148,163,184,.15)';
 
         // Background
@@ -3163,30 +3557,57 @@
           return Math.round(v) + ' ₽';
         };
 
-        // Bars
+        // Bars (stacked: coupons bottom, principal top)
         const bottomBase = H - PAD_B; // baseline for text rows at bottom
         data.forEach((d, i) => {
           const x    = PAD_L + i * slotW + (slotW - barW) / 2;
-          const barH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
-          const y    = PAD_T + chartH - barH;
-          const cx   = x + barW / 2;
+          const couponH = d.income > 0 ? (d.income / maxInc) * chartH : 0;
+          const princH  = d.principal > 0 ? (d.principal / maxInc) * chartH : 0;
+          const barH   = couponH + princH;
+          const y      = PAD_T + chartH - barH;
+          const cx     = x + barW / 2;
 
           if (barH > 0) {
-            ctx.fillStyle = d.hasOffer ? '#f59e0b' : mBarClr;
-            const radius = Math.min(4, barH / 2);
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + barW - radius, y);
-            ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
-            ctx.lineTo(x + barW, y + barH);
-            ctx.lineTo(x, y + barH);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
+            // Coupon part (bottom) — blue (or orange if offer)
+            if (couponH > 0) {
+              ctx.fillStyle = d.hasOffer ? '#f59e0b' : mBarClr;
+              const couponY = PAD_T + chartH - couponH;
+              if (princH > 0) {
+                // square top corners when principal stacks on top
+                ctx.fillRect(x, couponY, barW, couponH);
+              } else {
+                const radius = Math.min(4, couponH / 2);
+                ctx.beginPath();
+                ctx.moveTo(x + radius, couponY);
+                ctx.lineTo(x + barW - radius, couponY);
+                ctx.quadraticCurveTo(x + barW, couponY, x + barW, couponY + radius);
+                ctx.lineTo(x + barW, couponY + couponH);
+                ctx.lineTo(x, couponY + couponH);
+                ctx.lineTo(x, couponY + radius);
+                ctx.quadraticCurveTo(x, couponY, x + radius, couponY);
+                ctx.closePath();
+                ctx.fill();
+              }
+            }
+            // Principal part (top) — green, rounded top
+            if (princH > 0) {
+              ctx.fillStyle = mPrincClr;
+              const radius = Math.min(4, princH / 2);
+              ctx.beginPath();
+              ctx.moveTo(x + radius, y);
+              ctx.lineTo(x + barW - radius, y);
+              ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
+              ctx.lineTo(x + barW, y + princH);
+              ctx.lineTo(x, y + princH);
+              ctx.lineTo(x, y + radius);
+              ctx.quadraticCurveTo(x, y, x + radius, y);
+              ctx.closePath();
+              ctx.fill();
+            }
 
-            // Income label: inside bar if tall enough, else above bar
-            const incLabel = fmtBarVal(d.income);
+            // Total label above bar
+            const totalAmt = d.income + d.principal;
+            const totLabel = fmtBarVal(totalAmt);
             if (barH >= 18) {
               // Inside bar — white text
               ctx.fillStyle = 'rgba(255,255,255,0.92)';
@@ -3197,18 +3618,18 @@
                 ctx.translate(cx, y + barH / 2);
                 ctx.rotate(-Math.PI / 2);
                 ctx.textAlign = 'center';
-                ctx.fillText(incLabel, 0, 3);
+                ctx.fillText(totLabel, 0, 3);
                 ctx.restore();
               } else {
                 ctx.textAlign = 'center';
-                ctx.fillText(incLabel, cx, y + Math.min(barH / 2 + 4, barH - 4));
+                ctx.fillText(totLabel, cx, y + Math.min(barH / 2 + 4, barH - 4));
               }
             } else {
               // Above bar — colored text
-              ctx.fillStyle = d.hasOffer ? '#b45309' : '#2563eb';
+              ctx.fillStyle = d.principal > 0 ? '#16a34a' : (d.hasOffer ? '#b45309' : '#2563eb');
               ctx.font      = 'bold 8.5px Inter, system-ui, sans-serif';
               ctx.textAlign = 'center';
-              ctx.fillText(incLabel, cx, y - 4);
+              ctx.fillText(totLabel, cx, y - 4);
             }
           }
 
@@ -3286,19 +3707,19 @@
           let found = null;
           data.forEach((d, i) => {
             const x = PAD_L + i * slotW + (slotW - barW) / 2;
-            const barH2 = d.income > 0 ? (d.income / maxInc) * chartH : 0;
-            const y2 = PAD_T + chartH - barH2;
+            const totH = ((d.income || 0) + (d.principal || 0)) > 0 ? (((d.income || 0) + (d.principal || 0)) / maxInc) * chartH : 0;
+            const y2 = PAD_T + chartH - totH;
             if (mx >= x - 4 && mx <= x + barW + 4 && my >= PAD_T && my <= H - PAD_B) {
               found = { d, x, barY: y2, cx: x + barW / 2 };
             }
           });
-          if (!found || (!found.d.income && !found.d.hasMaturity && !found.d.hasOffer)) {
+          if (!found || (!found.d.income && !found.d.principal && !found.d.hasMaturity && !found.d.hasOffer)) {
             _chartTooltip.style.display = 'none';
             return;
           }
           const { d } = found;
           const monthName = getMonthNames()[d.month] + (d.year !== new Date().getFullYear() ? ' ' + d.year : '');
-          const total = d.income;
+          const totalAll = (d.income || 0) + (d.principal || 0);
           const sorted = [...d.bonds].sort((a, b) => b.amount - a.amount);
           let rows_html = sorted.map(b => {
             const shortName = b.name.length > 22 ? b.name.substring(0, 21) + '…' : b.name;
@@ -3310,19 +3731,22 @@
           let matHtml = '';
           if (d.hasMaturity && d.maturingBonds && d.maturingBonds.length) {
             const matLabel = window._lang === 'en' ? 'Maturing' : 'Погашение';
-            matHtml = `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(239,68,68,.25);">
-              <div style="font-weight:600;font-size:11px;color:#ef4444;margin-bottom:3px;">${matLabel}:</div>
-              ${d.maturingBonds.map(b => `<div style="font-size:11px;color:var(--text-secondary,#94a3b8);padding:1px 0;">${esc(b.name || b.ticker)}</div>`).join('')}
+            matHtml = `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(34,197,94,.25);">
+              <div style="font-weight:600;font-size:11px;color:#16a34a;margin-bottom:3px;">${matLabel}: +${Math.round(d.principal || 0).toLocaleString('ru')} ₽</div>
+              ${d.maturingBonds.map(b => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--text-secondary,#94a3b8);padding:1px 0;">
+                <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(b.name || b.ticker)}</span>
+                ${b.principal > 0 ? `<span style="font-weight:600;color:#16a34a;white-space:nowrap;">+${Math.round(b.principal).toLocaleString('ru')} ₽</span>` : ''}
+              </div>`).join('')}
             </div>`;
           }
           _chartTooltip.innerHTML = `
             <div style="font-weight:700;font-size:13px;margin-bottom:7px;color:var(--text-primary,#f1f5f9);">${monthName}</div>
             ${rows_html}
-            ${total > 0 ? `<div style="display:flex;justify-content:space-between;gap:12px;padding-top:6px;margin-top:2px;font-weight:700;">
+            ${matHtml}
+            ${totalAll > 0 ? `<div style="display:flex;justify-content:space-between;gap:12px;padding-top:6px;margin-top:6px;border-top:1px solid var(--border,rgba(148,163,184,.15));font-weight:700;">
               <span>${window._lang === 'en' ? 'Total' : 'Итого'}</span>
-              <span style="color:var(--green-400,#4ade80);">+${Math.round(total).toLocaleString('ru')} ₽</span>
-            </div>` : ''}
-            ${matHtml}`;
+              <span style="color:var(--green-400,#4ade80);">+${Math.round(totalAll).toLocaleString('ru')} ₽</span>
+            </div>` : ''}`;
           // Position tooltip near cursor, keep within viewport
           const TW = 264, TH = _chartTooltip.offsetHeight || 120;
           let tx = e.clientX + 14;
@@ -4403,6 +4827,11 @@
       });
 
       // ── RESIZE: redraw chart ──────────────────────────────────────
+      const _redrawBondAnalytics = () => {
+        if (typeof tableRows === 'undefined' || !tableRows.length) return;
+        renderMaturityLadder(tableRows);
+        renderRatingsChart(tableRows);
+      };
       if (typeof ResizeObserver !== 'undefined') {
         const chartCard = document.getElementById('chart-card');
         new ResizeObserver(() => drawMonthlyChart(tableRows)).observe(chartCard);
@@ -4412,11 +4841,16 @@
           if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
           else if (c) drawHistoryChartEmpty(c, c._emptySnap || null);
         }).observe(historyCard);
+        const mlCard = document.getElementById('maturity-ladder-card');
+        if (mlCard) new ResizeObserver(_redrawBondAnalytics).observe(mlCard);
+        const rtCard = document.getElementById('ratings-card');
+        if (rtCard) new ResizeObserver(_redrawBondAnalytics).observe(rtCard);
       } else {
         window.addEventListener('resize', () => {
           drawMonthlyChart(tableRows);
           const c = document.getElementById('analytics-history-chart');
           if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
+          _redrawBondAnalytics();
         });
       }
 
@@ -7730,10 +8164,10 @@
           'stat.sub.ofValue': '% от стоимости',
           'stat.sub.noYtm': 'в пустом портфеле',
           'stat.sub.avgYtm': 'средневзвешенная YTM',
-          'chart.title': 'Купонный доход по месяцам',
+          'chart.title': 'Cashflow по месяцам',
           'chart.offer': 'оферта',
           'chart.noData': 'Нет данных по купонным выплатам',
-          'chart.yLabel': 'Купонный доход, ₽',
+          'chart.yLabel': 'Cashflow, ₽',
           'chart.yearAhead': 'На год вперёд',
           'chart.maturity': 'погашение',
           'auth.enterCreds': 'Введите логин и пароль',
@@ -8132,10 +8566,10 @@
           'stat.sub.ofValue': '% of value',
           'stat.sub.noYtm': 'empty portfolio',
           'stat.sub.avgYtm': 'weighted avg YTM',
-          'chart.title': 'Coupon Income by Month',
+          'chart.title': 'Monthly Cashflow',
           'chart.offer': 'offer',
           'chart.noData': 'No coupon payment data',
-          'chart.yLabel': 'Coupon Income, ₽',
+          'chart.yLabel': 'Cashflow, ₽',
           'chart.yearAhead': 'Year ahead',
           'chart.maturity': 'maturity',
           'auth.enterCreds': 'Enter username and password',
