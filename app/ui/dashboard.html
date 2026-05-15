@@ -1128,10 +1128,11 @@
           </div>
         </div>
         <style>
-          /* Equal-height cards inside the row */
+          /* Equal-height cards in the row: flex-column so wrapper takes any
+             extra space; canvas keeps its own height (set in JS) so circles
+             stay round. */
           #history-ytm-row .card { display: flex; flex-direction: column; }
-          #history-ytm-row .card > div:last-child { flex: 1; display: flex; flex-direction: column; }
-          #history-ytm-row .card canvas { flex: 1; min-height: 240px; }
+          #history-ytm-row .card > div:last-child { flex: 1; }
           @media (max-width: 1024px) {
             #history-ytm-row { grid-template-columns: 1fr !important; }
             #duration-stress-row { grid-template-columns: 1fr !important; }
