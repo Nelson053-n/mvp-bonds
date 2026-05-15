@@ -5632,7 +5632,10 @@
       const _redrawBondAnalytics = () => {
         if (_redrawScheduled) return;
         _redrawScheduled = true;
-        requestAnimationFrame(() => {
+        // Double rAF: gives the browser one frame to finish CSS-driven layout
+        // (e.g., mobile-mode class toggle, grid → 1col collapse) before we
+        // measure parent widths.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
           _redrawScheduled = false;
           if (typeof tableRows === 'undefined' || !tableRows.length) return;
           renderIssuerBars(tableRows);
@@ -5642,8 +5645,27 @@
           renderRatingsChart(tableRows);
           renderCouponTypeBar(tableRows);
           renderYTMCurve(tableRows);
-        });
+        }));
       };
+
+      // Full analytics refresh — used after mobile-mode toggle. Includes
+      // HTML-based panels (events / cash-to-reinvest / anomalies / top
+      // performers / sell-first), not just canvases.
+      const _redrawAllAnalytics = () => {
+        if (typeof tableRows === 'undefined' || !tableRows.length) return;
+        // HTML-based: re-render performers, sell-first
+        try { renderAnalytics(tableRows); } catch (_) {}
+        // HTML-based: extras (events 30d, cash-to-reinvest, anomalies)
+        const extra = window._analyticsExtra;
+        if (extra) {
+          try { renderAnomaliesBanner(extra.anomalies || []); } catch (_) {}
+          try { renderCashReinvestCard(extra); } catch (_) {}
+          try { renderEventsCard(extra.events || []); } catch (_) {}
+        }
+        // Canvas: forces redraw (also covers _redrawBondAnalytics targets)
+        _redrawBondAnalytics();
+      };
+
       if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(_redrawBondAnalytics);
         ['structure-card', 'ytm-curve-card'].forEach(id => {
@@ -5665,6 +5687,21 @@
           if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
           _redrawBondAnalytics();
         });
+      }
+
+      // ── Mobile-mode toggle hook: refresh everything (canvases + HTML) ─
+      // ResizeObserver catches canvas-card width changes, but HTML lists
+      // (events, top performers, sell-first) don't reflow on body class
+      // toggle — re-render them explicitly.
+      if (typeof MutationObserver !== 'undefined') {
+        let _lastMobile = document.body.classList.contains('mobile-mode');
+        new MutationObserver(() => {
+          const isMobile = document.body.classList.contains('mobile-mode');
+          if (isMobile === _lastMobile) return;
+          _lastMobile = isMobile;
+          // 2 rAFs to let CSS-driven layout settle before re-measuring
+          requestAnimationFrame(() => requestAnimationFrame(() => _redrawAllAnalytics()));
+        }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
       }
 
       // ── SYNC ─────────────────────────────────────────────────────
