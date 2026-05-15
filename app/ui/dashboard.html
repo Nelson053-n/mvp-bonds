@@ -1098,7 +1098,7 @@
           </div>
         </div>
 
-        <!-- Bond analytics row 2: Portfolio structure (4-pane combined, horizontal bars) -->
+        <!-- Bond analytics: unified Portfolio structure (6 panes, horizontal bars) -->
         <div class="card" id="structure-card">
           <div class="card-header"><h2 class="card-title">Структура портфеля</h2></div>
           <div class="structure-grid">
@@ -1122,6 +1122,17 @@
               <canvas id="structure-type-chart" style="display:block;width:100%;"></canvas>
               <div id="structure-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных</div>
             </div>
+            <div id="structure-pane-ratings" class="structure-pane">
+              <div class="structure-pane-title">Кредитные рейтинги</div>
+              <canvas id="ratings-chart" style="display:block;width:100%;"></canvas>
+              <div id="ratings-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о рейтингах</div>
+            </div>
+            <div id="structure-pane-coupon-type" class="structure-pane">
+              <div class="structure-pane-title">Тип купона</div>
+              <canvas id="coupon-type-chart" style="display:block;width:100%;"></canvas>
+              <div id="coupon-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">В портфеле нет облигаций</div>
+              <div id="coupon-type-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
+            </div>
           </div>
         </div>
         <style>
@@ -1133,9 +1144,9 @@
           #structure-card .structure-pane {
             padding: 14px 16px;
           }
-          /* Internal dividers: right border for left column, bottom border for top row */
+          /* Internal dividers in 2×3 grid: right border on odd panes, bottom border on first 4 (rows 1-2) */
           #structure-card .structure-pane:nth-child(odd) { border-right: 1px solid var(--table-border); }
-          #structure-card .structure-pane:nth-child(-n+2) { border-bottom: 1px solid var(--table-border); }
+          #structure-card .structure-pane:nth-child(-n+4) { border-bottom: 1px solid var(--table-border); }
           #structure-card .structure-pane-title {
             font-size: 11px;
             color: var(--text-muted);
@@ -1147,43 +1158,8 @@
             #structure-card .structure-grid { grid-template-columns: 1fr; }
             #structure-card .structure-pane { border-right: none !important; border-bottom: 1px solid var(--table-border); }
             #structure-card .structure-pane:last-child { border-bottom: none; }
-            #ratings-coupon-card .panel-cols { grid-template-columns: 1fr !important; }
-            #ratings-coupon-card #ratings-pane { border-right: none; border-bottom: 1px solid var(--table-border); }
           }
         </style>
-
-        <!-- Bond analytics row 3: Ratings + Coupon type (combined) -->
-        <div class="card" id="ratings-coupon-card">
-          <div class="card-header"><h2 class="card-title">Кредитное качество и тип купона</h2></div>
-          <div class="panel-cols" style="grid-template-columns:1fr 1fr;gap:0;padding:0;">
-            <div id="ratings-pane" style="padding:14px 16px;border-right:1px solid var(--table-border);">
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Кредитные рейтинги</div>
-              <canvas id="ratings-chart" height="160" style="display:block;width:100%;"></canvas>
-              <div id="ratings-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о рейтингах</div>
-            </div>
-            <div id="coupon-type-pane" style="padding:14px 16px;">
-              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Тип купона</div>
-              <div id="coupon-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">В портфеле нет облигаций</div>
-              <div id="coupon-type-bar" style="display:none;">
-                <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--table-border);">
-                  <div id="coupon-type-fixed-fill" style="height:100%;background:#2563eb;transition:width .25s;"></div>
-                  <div id="coupon-type-float-fill" style="height:100%;background:#f59e0b;transition:width .25s;"></div>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text-secondary);gap:12px;flex-wrap:wrap;">
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0;"></span>
-                    <span id="coupon-type-fixed-label">Фиксированный — 0%</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
-                    <span id="coupon-type-float-label">Плавающий — 0%</span>
-                  </div>
-                </div>
-                <div id="coupon-type-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Bond analytics row 4: YTM curve + Stress test -->
         <div class="panel-cols" style="grid-template-columns:1fr 1fr;">
@@ -3240,32 +3216,32 @@
 
       // ── BOND ANALYTICS: Coupon type bar ──────────────────────────
       function renderCouponTypeBar(rows) {
-        const wrap = document.getElementById('coupon-type-bar');
+        const canvas = document.getElementById('coupon-type-chart');
         const empty = document.getElementById('coupon-type-empty');
-        if (!wrap || !empty) return;
+        const hint = document.getElementById('coupon-type-hint');
+        if (!canvas) return;
         const bonds = rows.filter(r => r.type === 'bond' && r.current_value > 0);
         if (!bonds.length) {
-          wrap.style.display = 'none';
-          empty.style.display = 'block';
+          canvas.style.display = 'none';
+          if (empty) empty.style.display = 'block';
+          if (hint) hint.textContent = '';
           return;
         }
         const total = bonds.reduce((s, r) => s + r.current_value, 0);
         const floatVal = bonds.filter(r => r.is_floater).reduce((s, r) => s + r.current_value, 0);
         const fixedVal = total - floatVal;
-        const fixedPct = total > 0 ? (fixedVal / total) * 100 : 0;
         const floatPct = total > 0 ? (floatVal / total) * 100 : 0;
-        wrap.style.display = 'block';
-        empty.style.display = 'none';
-        document.getElementById('coupon-type-fixed-fill').style.width = fixedPct.toFixed(1) + '%';
-        document.getElementById('coupon-type-float-fill').style.width = floatPct.toFixed(1) + '%';
-        document.getElementById('coupon-type-fixed-label').textContent = `Фиксированный — ${fixedPct.toFixed(0)}%`;
-        document.getElementById('coupon-type-float-label').textContent = `Плавающий — ${floatPct.toFixed(0)}%`;
-        const hint = document.getElementById('coupon-type-hint');
+        const buckets = [];
+        if (fixedVal > 0) buckets.push({ label: 'Фиксированный', value: fixedVal, color: '#2563eb' });
+        if (floatVal > 0) buckets.push({ label: 'Плавающий', value: floatVal, color: '#f59e0b' });
+        canvas.style.display = 'block';
+        if (empty) empty.style.display = 'none';
+        _drawHorizontalBars(canvas, buckets, null);
         if (hint) {
-          if (floatPct >= 70) hint.textContent = 'Портфель в основном из флоатеров — выигрывает при росте ставки, проигрывает при снижении.';
-          else if (floatPct >= 30) hint.textContent = 'Смешанный профиль — баланс между фиксированной доходностью и защитой от роста ставки.';
-          else if (floatPct > 0) hint.textContent = 'Доля флоатеров мала — портфель чувствителен к снижению ставки.';
-          else hint.textContent = 'Все купоны фиксированные — портфель выиграет от снижения ставки ЦБ.';
+          if (floatPct >= 70) hint.textContent = 'В основном флоатеры — выигрывает при росте ставки, проигрывает при снижении.';
+          else if (floatPct >= 30) hint.textContent = 'Смешанный профиль — баланс между фиксом и защитой от роста ставки.';
+          else if (floatPct > 0) hint.textContent = 'Флоатеров мало — портфель чувствителен к снижению ставки.';
+          else hint.textContent = 'Все купоны фиксированные — выиграет от снижения ставки ЦБ.';
         }
       }
 
@@ -5664,12 +5640,13 @@
           renderCurrencyChart(tableRows);
           renderTypeBars(tableRows);
           renderRatingsChart(tableRows);
+          renderCouponTypeBar(tableRows);
           renderYTMCurve(tableRows);
         });
       };
       if (typeof ResizeObserver !== 'undefined') {
         const ro = new ResizeObserver(_redrawBondAnalytics);
-        ['structure-card', 'ratings-coupon-card', 'ytm-curve-card'].forEach(id => {
+        ['structure-card', 'ytm-curve-card'].forEach(id => {
           const el = document.getElementById(id);
           if (el) ro.observe(el);
         });
