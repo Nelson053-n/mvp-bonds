@@ -91,7 +91,8 @@ class TBankService:
         """Return (positions, cash) from GetPortfolio.
 
         cash is a list of {currency, amount} extracted from positions with
-        instrumentType=='currency'. Currency code is uppercased ISO (RUB/USD/...).
+        instrumentType=='currency'. Currency code is parsed from ticker prefix
+        (T-Bank uses RUB000UTSTOM / USD000UTSTOM / EUR_RUB__TOM / CNYRUB_TOM …).
         """
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
@@ -107,8 +108,11 @@ class TBankService:
             if pos.get("instrumentType") != "currency":
                 continue
             amount = _quotation(pos.get("quantity"))
-            currency = (pos.get("currency") or "").upper()
-            if not currency or amount == 0:
+            if amount == 0:
+                continue
+            ticker = (pos.get("ticker") or "").upper()
+            currency = ticker[:3] if len(ticker) >= 3 else ""
+            if not currency:
                 continue
             cash.append({"currency": currency, "amount": round(amount, 2)})
         return positions, cash
