@@ -2542,15 +2542,13 @@
         const el = document.getElementById('stat-cash');
         const sub = document.getElementById('stat-cash-sub');
         const badge = document.getElementById('autosync-badge');
-        console.log('[cash] updateCashWidget pid=', pid, 'card?', !!card, 'badge?', !!badge);
         if (!card || !el) return;
-        const hide = (why) => { console.log('[cash] hide:', why); card.style.display = 'none'; if (badge) badge.style.display = 'none'; };
-        if (!pid) return hide('no pid');
+        const hide = () => { card.style.display = 'none'; if (badge) badge.style.display = 'none'; };
+        if (!pid) return hide();
         try {
           const r = await apiFetch('/tbank/sync/status?portfolio_id=' + pid);
-          if (!r.ok) return hide('fetch !ok ' + r.status);
+          if (!r.ok) return hide();
           const s = await r.json();
-          console.log('[cash] status:', s);
           if (badge) badge.style.display = s.enabled ? '' : 'none';
           const cash = (s.cash || []).filter(c => c.amount > 0);
           if (!s.enabled || cash.length === 0) { card.style.display = 'none'; return; }
@@ -2560,10 +2558,16 @@
             return (sym[c.currency] || c.currency) + ' ' + amt;
           };
           el.textContent = cash.map(fmt).join(' · ');
-          if (sub) sub.textContent = s.cash_updated_at ? 'обновлено ' + _relativeTime(s.cash_updated_at) : '';
+          if (sub && s.cash_updated_at) {
+            const diff = Math.floor((Date.now() - new Date(s.cash_updated_at).getTime()) / 1000);
+            const rel = diff < 60 ? 'только что'
+              : diff < 3600 ? Math.floor(diff / 60) + ' мин назад'
+              : diff < 86400 ? Math.floor(diff / 3600) + ' ч назад'
+              : Math.floor(diff / 86400) + ' д назад';
+            sub.textContent = 'обновлено ' + rel;
+          } else if (sub) sub.textContent = '';
           card.style.display = '';
-          console.log('[cash] shown cash.length=', cash.length);
-        } catch (e) { hide('exception: ' + e.message); }
+        } catch (_) { hide(); }
       }
 
       function updateLastUpdateTime() {
