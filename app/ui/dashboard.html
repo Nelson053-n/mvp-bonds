@@ -3376,36 +3376,36 @@
         if (!row || !body) return;
         const freeCash = Number(extra?.free_cash_rub || window.cashTotalRub || 0);
         const events = extra?.events || [];
-        const now = new Date();
-        const horizon = new Date(now.getTime() + 30 * 86400000);
-        const incomingCoupons = events
-          .filter(e => e.type === 'coupon' && new Date(e.date) <= horizon)
-          .reduce((s, e) => s + (e.amount || 0), 0);
-        const incomingMaturity = events
-          .filter(e => e.type === 'maturity' && new Date(e.date) <= horizon)
-          .reduce((s, e) => s + (e.amount || 0), 0);
+        // Strictly future: today's events исключаем, чтобы не дублировать с freeCash
+        // (купон, выплаченный сегодня, скорее всего уже зачислен брокером).
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const horizonStr = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+        const futureCoupons = events.filter(e => e.type === 'coupon' && e.date > todayStr && e.date <= horizonStr);
+        const futureMaturity = events.filter(e => e.type === 'maturity' && e.date > todayStr && e.date <= horizonStr);
+        const incomingCoupons = futureCoupons.reduce((s, e) => s + (e.amount || 0), 0);
+        const incomingMaturity = futureMaturity.reduce((s, e) => s + (e.amount || 0), 0);
         const totalAvailable = freeCash + incomingCoupons + incomingMaturity;
-        // Скрываем строку (карточку с кэшем + события), если в портфеле нет ни одного из источников
         const hasAnything = freeCash > 0 || incomingCoupons > 0 || incomingMaturity > 0 || events.length > 0;
         row.style.display = hasAnything ? '' : 'none';
         const fmtRub = v => Math.round(v).toLocaleString('ru');
         body.innerHTML = `
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-            <div style="font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;">${fmtRub(totalAvailable)} ₽</div>
-            <div style="font-size:12px;color:var(--text-muted);">доступно за 30 дней</div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+            <div style="font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;" title="Свободные деньги на счёте + купоны и погашения, которые поступят в ближайшие 30 дней (не считая сегодняшних — они скорее всего уже зачислены)">${fmtRub(totalAvailable)} ₽</div>
+            <div style="font-size:12px;color:var(--text-muted);">доступно к реинвесту</div>
           </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;line-height:1.4;">Свободно сейчас + поступления за 30 дней (без сегодняшних)</div>
           <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
             <div style="display:flex;justify-content:space-between;gap:8px;">
-              <span style="color:var(--text-secondary);">Свободно сейчас</span>
+              <span style="color:var(--text-secondary);" title="Деньги, уже зачисленные брокером на счёт (включая ранее полученные купоны)">Свободно сейчас</span>
               <span style="font-weight:600;">${fmtRub(freeCash)} ₽</span>
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;">
-              <span style="color:var(--text-secondary);">Купоны 30 дн.</span>
-              <span style="font-weight:600;color:var(--green-400);">+${fmtRub(incomingCoupons)} ₽</span>
+              <span style="color:var(--text-secondary);" title="Купоны с датой выплаты строго после сегодняшней (в течение 30 дней)">Купоны впереди</span>
+              <span style="font-weight:600;color:${incomingCoupons > 0 ? 'var(--green-400)' : 'var(--text-muted)'};">${incomingCoupons > 0 ? '+' : ''}${fmtRub(incomingCoupons)} ₽</span>
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;">
-              <span style="color:var(--text-secondary);">Погашения 30 дн.</span>
-              <span style="font-weight:600;color:var(--green-400);">+${fmtRub(incomingMaturity)} ₽</span>
+              <span style="color:var(--text-secondary);" title="Возврат номинала по облигациям с погашением в ближайшие 30 дней">Погашения впереди</span>
+              <span style="font-weight:600;color:${incomingMaturity > 0 ? 'var(--green-400)' : 'var(--text-muted)'};">${incomingMaturity > 0 ? '+' : ''}${fmtRub(incomingMaturity)} ₽</span>
             </div>
           </div>
           ${totalAvailable > 1000 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.4;">Совет: проверьте раздел «Рекомендации для диверсификации» ниже — есть бумаги, которые усилят портфель.</div>' : ''}
