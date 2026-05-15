@@ -3270,7 +3270,11 @@
         const labelClr = st.getPropertyValue('--text-secondary').trim() || '#475569';
         const mutedClr = st.getPropertyValue('--text-muted').trim() || '#64748b';
         const trackClr = st.getPropertyValue('--table-border').trim() || 'rgba(148,163,184,.15)';
-        const labelW = 76;
+        // Measure widest label dynamically — hardcoded width clipped long
+        // labels like "Фиксированный". Clamp so labels don't eat the bar.
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        const measured = Math.max(...buckets.map(b => ctx.measureText(b.label).width));
+        const labelW = Math.min(Math.max(72, Math.ceil(measured) + 8), Math.floor(W * 0.45));
         const valW = 90;
         const padR = 8;
         const barX = labelW + 6;
