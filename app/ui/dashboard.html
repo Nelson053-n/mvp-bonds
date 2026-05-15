@@ -685,6 +685,8 @@
 
       /* ── MONTHLY CHART ───────────────────────────────────────── */
       #monthly-chart { width: 100%; display: block; border-radius: var(--radius-sm); }
+      /* Safety net: prevent any canvas from inflating its parent's width when window is resized down */
+      canvas { max-width: 100%; }
       .chart-empty { text-align: center; padding: 32px; color: var(--slate-400); font-size: 13px; }
 
       /* ── DIVIDER ─────────────────────────────────────────────── */
@@ -1096,36 +1098,29 @@
           </div>
         </div>
 
-        <!-- Bond analytics row 2: Portfolio structure (4-pane combined) -->
+        <!-- Bond analytics row 2: Portfolio structure (4-pane combined, horizontal bars) -->
         <div class="card" id="structure-card">
           <div class="card-header"><h2 class="card-title">Структура портфеля</h2></div>
           <div class="structure-grid">
             <div id="structure-pane-issuers" class="structure-pane">
               <div class="structure-pane-title">Эмитенты (топ-5)</div>
-              <div style="display:flex;align-items:center;gap:14px;">
-                <canvas id="analytics-issuer-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
-                <div id="analytics-issuer-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
-              </div>
+              <canvas id="structure-issuer-chart" style="display:block;width:100%;"></canvas>
+              <div id="structure-issuer-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет позиций</div>
             </div>
             <div id="structure-pane-maturity" class="structure-pane">
               <div class="structure-pane-title">Срочная структура</div>
-              <canvas id="maturity-ladder-chart" height="160" style="display:block;width:100%;"></canvas>
+              <canvas id="maturity-ladder-chart" style="display:block;width:100%;"></canvas>
               <div id="maturity-ladder-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных о датах погашения</div>
             </div>
             <div id="structure-pane-currency" class="structure-pane">
               <div class="structure-pane-title">По валютам</div>
-              <div style="display:flex;align-items:center;gap:14px;">
-                <canvas id="currency-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
-                <div id="currency-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
-              </div>
-              <div id="currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
+              <canvas id="structure-currency-chart" style="display:block;width:100%;"></canvas>
+              <div id="structure-currency-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по валютам</div>
             </div>
             <div id="structure-pane-types" class="structure-pane">
               <div class="structure-pane-title">По типам</div>
-              <div style="display:flex;align-items:center;gap:14px;">
-                <canvas id="analytics-type-chart" width="120" height="120" style="flex-shrink:0;"></canvas>
-                <div id="analytics-type-legend" style="font-size:12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary);flex:1;min-width:0;"></div>
-              </div>
+              <canvas id="structure-type-chart" style="display:block;width:100%;"></canvas>
+              <div id="structure-type-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных</div>
             </div>
           </div>
         </div>
@@ -2908,34 +2903,10 @@
       function renderAnalytics(rows) {
         if (!rows || rows.length === 0) return;
 
-        // By type
-        const byType = {};
-        rows.forEach(r => {
-          const t = r.type === 'bond' ? 'Облигации' : 'Акции';
-          byType[t] = (byType[t] || 0) + (r.current_value || 0);
-        });
-        const typeData = Object.entries(byType).map(([label, value]) => ({ label, value }));
-        const typeColors = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626'];
-        drawPieChart('analytics-type-chart', typeData, typeColors);
-        const typeTotal = typeData.reduce((s, d) => s + d.value, 0);
-        buildLegend('analytics-type-legend', typeData, typeColors, typeTotal);
-
-        // By issuer (top 5)
-        const byIssuer = {};
-        rows.forEach(r => {
-          const name = (r.name || r.ticker || '?').substring(0, 20);
-          byIssuer[name] = (byIssuer[name] || 0) + (r.current_value || 0);
-        });
-        const issuerSorted = Object.entries(byIssuer)
-          .map(([label, value]) => ({ label, value }))
-          .sort((a, b) => b.value - a.value);
-        const top5 = issuerSorted.slice(0, 5);
-        const otherVal = issuerSorted.slice(5).reduce((s, d) => s + d.value, 0);
-        if (otherVal > 0) top5.push({ label: 'Другие', value: otherVal });
-        const issuerColors = ['#2563eb','#16a34a','#f59e0b','#dc2626','#8b5cf6','#64748b'];
-        drawPieChart('analytics-issuer-chart', top5, issuerColors);
-        const issuerTotal = top5.reduce((s, d) => s + d.value, 0);
-        buildLegend('analytics-issuer-legend', top5, issuerColors, issuerTotal);
+        // By type (horizontal bars)
+        renderTypeBars(rows);
+        // By issuer top-5 (horizontal bars)
+        renderIssuerBars(rows);
 
 
         // Top/loss performers
@@ -3185,48 +3156,86 @@
         _drawHorizontalBars(canvas, nonZero, null);
       }
 
-      // ── BOND ANALYTICS: Currency pie ─────────────────────────────
+      // ── STRUCTURE: by currency (horizontal bars) ─────────────────
       function renderCurrencyChart(rows) {
-        const canvas = document.getElementById('currency-chart');
-        const legend = document.getElementById('currency-legend');
-        const emptyEl = document.getElementById('currency-empty');
-        if (!canvas || !legend) return;
+        const canvas = document.getElementById('structure-currency-chart');
+        const emptyEl = document.getElementById('structure-currency-empty');
+        if (!canvas) return;
         const byCcy = {};
         rows.forEach(r => {
           let ccy = (r.face_unit || 'SUR').toUpperCase();
           if (ccy === 'SUR' || ccy === '') ccy = 'RUB';
           byCcy[ccy] = (byCcy[ccy] || 0) + (r.current_value || 0);
         });
-        // Add free cash from autosync (only if some cash exists)
         const cashRub = Number(window.cashTotalRub || 0);
         if (cashRub > 0) byCcy['RUB'] = (byCcy['RUB'] || 0) + cashRub;
-        const data = Object.entries(byCcy)
+        const ccyColors = { RUB: '#2563eb', USD: '#16a34a', EUR: '#8b5cf6', CNY: '#f59e0b', GBP: '#dc2626', CHF: '#0ea5e9', HKD: '#ec4899' };
+        const buckets = Object.entries(byCcy)
           .filter(([_, v]) => v > 0)
-          .map(([label, value]) => ({ label, value }))
+          .map(([label, value]) => ({ label, value, color: ccyColors[label] || '#64748b' }))
           .sort((a, b) => b.value - a.value);
-        if (!data.length) {
+        if (!buckets.length) {
           canvas.style.display = 'none';
-          legend.style.display = 'none';
           if (emptyEl) emptyEl.style.display = 'block';
           return;
         }
         canvas.style.display = 'block';
-        legend.style.display = 'flex';
         if (emptyEl) emptyEl.style.display = 'none';
-        const ccyColors = { RUB: '#2563eb', USD: '#16a34a', EUR: '#8b5cf6', CNY: '#f59e0b', GBP: '#dc2626', CHF: '#0ea5e9', HKD: '#ec4899' };
-        const palette = data.map(d => ccyColors[d.label] || '#64748b');
-        drawPieChart('currency-chart', data, palette);
-        const total = data.reduce((s, d) => s + d.value, 0);
-        legend.innerHTML = '';
-        data.forEach((d, i) => {
-          const pct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0';
-          const valStr = d.value >= 1000 ? Math.round(d.value/1000).toLocaleString('ru') + ' тыс. ₽' : Math.round(d.value) + ' ₽';
-          const row = document.createElement('div');
-          row.style.cssText = 'display:flex;align-items:center;gap:6px;';
-          row.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${palette[i]};flex-shrink:0;"></span>
-            <span style="color:var(--slate-600);"><b>${d.label}</b> — ${pct}% · ${valStr}</span>`;
-          legend.appendChild(row);
+        _drawHorizontalBars(canvas, buckets, null);
+      }
+
+      // ── STRUCTURE: by instrument type (horizontal bars) ──────────
+      function renderTypeBars(rows) {
+        const canvas = document.getElementById('structure-type-chart');
+        const emptyEl = document.getElementById('structure-type-empty');
+        if (!canvas) return;
+        const typeMeta = {
+          bond:  { label: 'Облигации', color: '#2563eb' },
+          stock: { label: 'Акции',     color: '#16a34a' },
+          etf:   { label: 'Фонды',     color: '#f59e0b' },
+        };
+        const byType = {};
+        rows.forEach(r => {
+          const meta = typeMeta[r.type] || { label: r.type || 'Прочее', color: '#64748b' };
+          if (!byType[meta.label]) byType[meta.label] = { label: meta.label, value: 0, color: meta.color };
+          byType[meta.label].value += (r.current_value || 0);
         });
+        const buckets = Object.values(byType).filter(b => b.value > 0).sort((a, b) => b.value - a.value);
+        if (!buckets.length) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+        _drawHorizontalBars(canvas, buckets, null);
+      }
+
+      // ── STRUCTURE: by issuer top-5 + Other (horizontal bars) ─────
+      function renderIssuerBars(rows) {
+        const canvas = document.getElementById('structure-issuer-chart');
+        const emptyEl = document.getElementById('structure-issuer-empty');
+        if (!canvas) return;
+        const byIssuer = {};
+        rows.forEach(r => {
+          const name = (r.name || r.ticker || '?').substring(0, 20);
+          byIssuer[name] = (byIssuer[name] || 0) + (r.current_value || 0);
+        });
+        const sorted = Object.entries(byIssuer)
+          .map(([label, value]) => ({ label, value }))
+          .sort((a, b) => b.value - a.value);
+        const palette = ['#2563eb','#0ea5e9','#16a34a','#84cc16','#f59e0b'];
+        const top5 = sorted.slice(0, 5).map((d, i) => ({ ...d, color: palette[i] }));
+        const otherVal = sorted.slice(5).reduce((s, d) => s + d.value, 0);
+        if (otherVal > 0) top5.push({ label: 'Другие', value: otherVal, color: '#64748b' });
+        if (!top5.length) {
+          canvas.style.display = 'none';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        canvas.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'none';
+        _drawHorizontalBars(canvas, top5, null);
       }
 
       // ── BOND ANALYTICS: Coupon type bar ──────────────────────────
@@ -3260,11 +3269,19 @@
         }
       }
 
+      // Reset canvas inline-width so it doesn't keep its parent inflated,
+      // then measure actual available width from the parent. Returns int px.
+      function _measureCanvasParent(canvas, fallback) {
+        canvas.style.width = '0px';
+        const parent = canvas.parentElement;
+        const w = parent ? parent.clientWidth : 0;
+        return w > 0 ? w : (fallback || 400);
+      }
+
       // ── Shared: horizontal bar chart helper ──────────────────────
       function _drawHorizontalBars(canvas, buckets, fixedColor) {
-        const parent = canvas.parentElement;
+        const W = _measureCanvasParent(canvas, 400);
         const dpr = window.devicePixelRatio || 1;
-        const W = (parent ? parent.clientWidth : 0) || 400;
         const H = Math.max(140, 24 * buckets.length + 30);
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
@@ -3444,9 +3461,8 @@
         canvas.style.display = 'block';
         if (emptyEl) emptyEl.style.display = 'none';
 
+        const W = _measureCanvasParent(canvas, 400);
         const dpr = window.devicePixelRatio || 1;
-        const parent = canvas.parentElement;
-        const W = (parent ? parent.clientWidth : 0) || 400;
         const H = 240;
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
@@ -3863,8 +3879,7 @@
 
       function drawHistoryChartEmpty(canvas, oneSnapshot) {
         if (!canvas) return;
-        const parent = canvas.parentElement;
-        const W = (parent ? parent.clientWidth : 0) || canvas.offsetWidth || 600;
+        const W = _measureCanvasParent(canvas, 600);
         const H = 200;
         canvas.width = W;
         canvas.height = H;
@@ -3922,8 +3937,9 @@
       function drawHistoryChart(canvas, snapshots, skipAnimation) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const W = canvas.offsetWidth || 600;
+        const W = _measureCanvasParent(canvas, 600);
         canvas.width = W;
+        canvas.style.width = '100%';
         const H = canvas.height || 220;
         const values = snapshots.map(s => s.total_value);
         const costs  = snapshots.map(s => s.total_cost);
@@ -4299,8 +4315,8 @@
         emptyEl.style.display = hasData ? 'none' : 'block';
         if (!hasData) return;
 
+        const W    = _measureCanvasParent(canvas, 800);
         const dpr  = window.devicePixelRatio || 1;
-        const W    = canvas.parentElement.clientWidth || 800;
         const H    = 260;
         canvas.style.width  = W + 'px';
         canvas.style.height = H + 'px';
@@ -5622,28 +5638,38 @@
         });
       });
 
-      // ── RESIZE: redraw chart ──────────────────────────────────────
+      // ── RESIZE: redraw all canvas-based analytics ─────────────────
+      // Debounced redraw — multiple panes resize in quick succession,
+      // so we batch into a single rAF tick to avoid spam.
+      let _redrawScheduled = false;
       const _redrawBondAnalytics = () => {
-        if (typeof tableRows === 'undefined' || !tableRows.length) return;
-        renderMaturityLadder(tableRows);
-        renderRatingsChart(tableRows);
-        renderYTMCurve(tableRows);
+        if (_redrawScheduled) return;
+        _redrawScheduled = true;
+        requestAnimationFrame(() => {
+          _redrawScheduled = false;
+          if (typeof tableRows === 'undefined' || !tableRows.length) return;
+          renderIssuerBars(tableRows);
+          renderMaturityLadder(tableRows);
+          renderCurrencyChart(tableRows);
+          renderTypeBars(tableRows);
+          renderRatingsChart(tableRows);
+          renderYTMCurve(tableRows);
+        });
       };
       if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(_redrawBondAnalytics);
+        ['structure-card', 'ratings-coupon-card', 'ytm-curve-card'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) ro.observe(el);
+        });
         const chartCard = document.getElementById('chart-card');
-        new ResizeObserver(() => drawMonthlyChart(tableRows)).observe(chartCard);
+        if (chartCard) new ResizeObserver(() => drawMonthlyChart(tableRows)).observe(chartCard);
         const historyCard = document.getElementById('analytics-history-card');
         if (historyCard) new ResizeObserver(() => {
           const c = document.getElementById('analytics-history-chart');
           if (c && c._snapshots) drawHistoryChart(c, c._snapshots, true);
           else if (c) drawHistoryChartEmpty(c, c._emptySnap || null);
         }).observe(historyCard);
-        const mlCard = document.getElementById('maturity-ladder-card');
-        if (mlCard) new ResizeObserver(_redrawBondAnalytics).observe(mlCard);
-        const rtCard = document.getElementById('ratings-card');
-        if (rtCard) new ResizeObserver(_redrawBondAnalytics).observe(rtCard);
-        const ytmCard = document.getElementById('ytm-curve-card');
-        if (ytmCard) new ResizeObserver(_redrawBondAnalytics).observe(ytmCard);
       } else {
         window.addEventListener('resize', () => {
           drawMonthlyChart(tableRows);
