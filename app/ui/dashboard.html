@@ -1093,7 +1093,7 @@
           <div class="card" id="ytm-curve-card">
             <div class="card-header">
               <h2 class="card-title" style="display:inline-flex;align-items:center;gap:6px;">
-                YTM-кривая
+                Рыночная доходность
                 <span class="th-info" data-tip="ytm" title="YTM (Yield to Maturity) — доходность облигации к погашению. Показывает реальную годовую доходность, если держать бумагу до даты погашения с реинвестированием купонов по той же ставке. Включает купонный доход + изменение цены до номинала.">i</span>
               </h2>
             </div>
@@ -3486,13 +3486,18 @@
         canvas.style.display = 'block';
         if (emptyEl) emptyEl.style.display = 'none';
 
-        const W = _measureCanvasParent(canvas, 400);
         const dpr = window.devicePixelRatio || 1;
         // Fixed canvas height — grid stretch syncs card outer heights, while
         // canvas itself stays at a stable visual size to keep dots round.
         const H = 240;
-        canvas.style.width = W + 'px';
+        // Two-step width: set 100% first so global `canvas { max-width: 100% }`
+        // and parent padding don't squish us after the fact; then read the
+        // real CSS width, lock it as inline px and match canvas.width to
+        // that × dpr so 1 logical px = 1 CSS px in both axes.
+        canvas.style.width = '100%';
         canvas.style.height = H + 'px';
+        const W = Math.max(200, Math.round(canvas.getBoundingClientRect().width) || _measureCanvasParent(canvas, 400));
+        canvas.style.width = W + 'px';
         canvas.width = W * dpr;
         canvas.height = H * dpr;
         const ctx = canvas.getContext('2d');
@@ -3680,24 +3685,27 @@
           const couponLine = r.coupon_rate ? `Купон: ${r.coupon_rate.toFixed(1)}%/год` : '';
           const sharePct = (p.share * 100).toFixed(1);
           const cv = Math.round(r.current_value).toLocaleString('ru');
+          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          const primaryClr = isLight ? '#0f172a' : '#f1f5f9';
+          const mutedClr   = isLight ? '#64748b' : '#94a3b8';
+          const labelClrT  = isLight ? '#475569' : '#cbd5e1';
           tip.innerHTML = `
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
               <span style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></span>
-              <span style="font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.name || r.ticker)}">${esc((r.name || r.ticker).substring(0, 28))}</span>
+              <span style="font-weight:700;font-size:12px;color:${primaryClr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.name || r.ticker)}">${esc((r.name || r.ticker).substring(0, 28))}</span>
             </div>
-            <div style="display:grid;grid-template-columns:auto auto;gap:4px 10px;font-size:11px;color:#cbd5e1;">
-              <span>YTM:</span><span style="text-align:right;font-weight:700;color:#fff;">${r.market_yield.toFixed(2)}%</span>
-              <span>Срок:</span><span style="text-align:right;color:#fff;">${p.yrs.toFixed(2)} г</span>
-              <span>Доля:</span><span style="text-align:right;color:#fff;">${sharePct}% (${cv} ₽)</span>
+            <div style="display:grid;grid-template-columns:auto auto;gap:4px 10px;font-size:11px;color:${labelClrT};">
+              <span>YTM:</span><span style="text-align:right;font-weight:700;color:${primaryClr};">${r.market_yield.toFixed(2)}%</span>
+              <span>Срок:</span><span style="text-align:right;color:${primaryClr};">${p.yrs.toFixed(2)} г</span>
+              <span>Доля:</span><span style="text-align:right;color:${primaryClr};">${sharePct}% (${cv} ₽)</span>
               <span>Рейтинг:</span><span style="text-align:right;color:${p.color};font-weight:600;">${ratingLabel}</span>
-              ${couponLine ? `<span>Купон:</span><span style="text-align:right;color:#fff;">${r.coupon_rate.toFixed(2)}%</span>` : ''}
+              ${couponLine ? `<span>Купон:</span><span style="text-align:right;color:${primaryClr};">${r.coupon_rate.toFixed(2)}%</span>` : ''}
             </div>
-            ${dateLine ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.18);font-size:10px;color:#94a3b8;">${dateLine}</div>` : ''}
+            ${dateLine ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.18);font-size:10px;color:${mutedClr};">${dateLine}</div>` : ''}
           `;
           tip.style.display = 'block';
-          const isLight = document.documentElement.getAttribute('data-theme') === 'light';
           tip.style.background = isLight ? '#ffffff' : '#1e293b';
-          tip.style.color = isLight ? '#0f172a' : '#f1f5f9';
+          tip.style.color = primaryClr;
           tip.style.border = isLight ? '1px solid #e2e8f0' : '1px solid rgba(148,163,184,.2)';
           const TW = tip.offsetWidth || 200, TH = tip.offsetHeight || 100;
           let tx = e.clientX + 14;
@@ -3970,8 +3978,34 @@
         const H = canvas.height || 220;
         const values = snapshots.map(s => s.total_value);
         const costs  = snapshots.map(s => s.total_cost);
-        const maxV = Math.max(...values, ...costs);
-        const minV = Math.min(...values, ...costs) * 0.98;
+        // Pre-compute normalized RGBI series (if present) so we can include
+        // it in min/max range — otherwise its line could fall outside the
+        // visible chart area and the toggle would appear to "do nothing".
+        let _rgbiNorm = null;
+        const _rgbi = canvas._rgbi;
+        if (_rgbi && _rgbi.length >= 2) {
+          const rgbiByDate = {};
+          _rgbi.forEach(p => { rgbiByDate[p.date] = p.value; });
+          const rgbiSorted = [..._rgbi].sort((a, b) => a.date.localeCompare(b.date));
+          const aligned = snapshots.map(s => {
+            if (rgbiByDate[s.date] != null) return rgbiByDate[s.date];
+            let candidate = null;
+            for (const p of rgbiSorted) {
+              if (p.date <= s.date) candidate = p.value; else break;
+            }
+            return candidate;
+          });
+          const firstIdx = aligned.findIndex(v => v != null);
+          if (firstIdx >= 0 && values[firstIdx] > 0) {
+            const baseRgbi = aligned[firstIdx];
+            const baseVal = values[firstIdx];
+            _rgbiNorm = aligned.map(v => v != null ? (v / baseRgbi) * baseVal : null);
+          }
+        }
+        const rgbiOnly = _rgbiNorm ? _rgbiNorm.filter(v => v != null) : [];
+        const allVals = [...values, ...costs, ...rgbiOnly];
+        const maxV = Math.max(...allVals);
+        const minV = Math.min(...allVals) * 0.98;
         const pad = { t: 16, r: 16, b: 32, l: 56 };
         const chartW = W - pad.l - pad.r;
         const chartH = H - pad.t - pad.b;
@@ -4047,55 +4081,27 @@
           }
           ctx.stroke();
 
-          // RGBI overlay (normalized to portfolio's first point) — second line
-          const rgbi = canvas._rgbi;
-          if (rgbi && rgbi.length >= 2) {
-            // Map RGBI points by date; align to snapshots[i].date
-            const rgbiByDate = {};
-            rgbi.forEach(p => { rgbiByDate[p.date] = p.value; });
-            // Build aligned series: for each snapshot date, find nearest RGBI value
-            const rgbiSorted = [...rgbi].sort((a, b) => a.date.localeCompare(b.date));
-            const alignedRgbi = snapshots.map(s => {
-              if (rgbiByDate[s.date] != null) return rgbiByDate[s.date];
-              // Find nearest earlier RGBI date
-              let candidate = null;
-              for (const p of rgbiSorted) {
-                if (p.date <= s.date) candidate = p.value;
-                else break;
-              }
-              return candidate;
-            });
-            // Normalize: first non-null aligned value = first portfolio value
-            const firstIdx = alignedRgbi.findIndex(v => v != null);
-            if (firstIdx >= 0 && values[firstIdx] > 0) {
-              const baseRgbi = alignedRgbi[firstIdx];
-              const baseVal = values[firstIdx];
-              const normRgbi = alignedRgbi.map(v => v != null ? (v / baseRgbi) * baseVal : null);
-              ctx.save();
-              ctx.strokeStyle = '#f59e0b';
-              ctx.lineWidth = 2;
-              ctx.setLineDash([6, 4]);
-              ctx.beginPath();
-              let started = false;
-              for (let i = 0; i <= Math.floor(maxIdx); i++) {
-                const v = normRgbi[i];
-                if (v == null) continue;
-                const x = xScale(i), y = yScale(v);
-                if (!started) { ctx.moveTo(x, y); started = true; }
-                else ctx.lineTo(x, y);
-              }
-              if (maxIdx > Math.floor(maxIdx)) {
-                const v = interpPoint(normRgbi.filter(x => x != null), Math.min(maxIdx, normRgbi.length - 1));
-                if (!isNaN(v)) ctx.lineTo(xScale(maxIdx), yScale(v));
-              }
-              ctx.stroke();
-              ctx.restore();
-              // Legend
-              ctx.fillStyle = '#f59e0b';
-              ctx.font = 'bold 9px Inter, sans-serif';
-              ctx.textAlign = 'left';
-              ctx.fillText('— Индекс ОФЗ (норм.)', pad.l + 4, pad.t + 10);
+          // RGBI overlay (already normalized above) — second dashed line
+          if (_rgbiNorm) {
+            ctx.save();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i <= Math.floor(maxIdx); i++) {
+              const v = _rgbiNorm[i];
+              if (v == null) continue;
+              const x = xScale(i), y = yScale(v);
+              if (!started) { ctx.moveTo(x, y); started = true; }
+              else ctx.lineTo(x, y);
             }
+            ctx.stroke();
+            ctx.restore();
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = 'bold 9px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('— Индекс ОФЗ (норм.)', pad.l + 4, pad.t + 10);
           }
 
           // X labels — show all (static)
@@ -4487,10 +4493,10 @@
             ctx.fillText(t('chart.offer'), cx, labelY);
           }
 
-          // "Погашение/Maturity" marker — red dot under the bar
+          // "Погашение/Maturity" marker — same green as principal segment
           if (d.hasMaturity) {
             const mLabelY = barH > 0 && !d.hasOffer ? y - (barH >= 18 ? 18 : 16) : PAD_T - (d.hasOffer ? 14 : 5);
-            ctx.fillStyle  = '#ef4444';
+            ctx.fillStyle  = '#16a34a';
             ctx.font       = 'bold 8px Inter, system-ui, sans-serif';
             ctx.textAlign  = 'center';
             ctx.fillText(t('chart.maturity'), cx, mLabelY);
