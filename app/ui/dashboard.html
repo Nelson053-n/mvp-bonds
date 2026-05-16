@@ -8839,13 +8839,22 @@
 
         const cards = [];
         const shownIssuers = new Set();
-        // Also block issuers already in portfolio
-        tableRows.forEach(r => shownIssuers.add(_issuerKey(r)));
+        // Soft-block issuers already in portfolio (used only when alternatives exist)
+        const portfolioIssuers = new Set();
+        tableRows.forEach(r => portfolioIssuers.add(_issuerKey(r)));
 
         results.forEach((res, i) => {
           if (res.status !== 'fulfilled') return;
           const items = (res.value.bonds || res.value.suggestions || []).filter(s => !existingTickers.has(s.ticker));
-          const item = items.find(s => !shownIssuers.has(_issuerKey(s)));
+          if (!items.length) return;
+          // 1st choice: not in portfolio AND not already shown in another card
+          let item = items.find(s => !portfolioIssuers.has(_issuerKey(s)) && !shownIssuers.has(_issuerKey(s)));
+          // 2nd: not in portfolio (but may duplicate another card's issuer)
+          if (!item) item = items.find(s => !portfolioIssuers.has(_issuerKey(s)));
+          // 3rd: not shown yet (may be portfolio issuer — different bond at least)
+          if (!item) item = items.find(s => !shownIssuers.has(_issuerKey(s)));
+          // 4th: any remaining bond
+          if (!item) item = items[0];
           if (!item) return;
           shownIssuers.add(_issuerKey(item));
           cards.push({ ...item, rationale: top4[i].rationale, risk: top4[i].risk });
