@@ -481,6 +481,7 @@ _HTML_PAGES: dict[str, Path] = {
     "/privacy": _ui_dir / "privacy.html",
     "/terms":   _ui_dir / "terms.html",
     "/app":     dashboard_path,
+    "/all":     dashboard_path,
 }
 
 for _page_url, _page_path in _HTML_PAGES.items():

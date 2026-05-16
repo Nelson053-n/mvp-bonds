@@ -849,6 +849,17 @@
       body.read-only-mode #mobile-portfolio-wrap { display: none !important; }
       body.read-only-mode #mobile-nav [data-panel="panel-table"] { display: none !important; }
 
+      /* /all summary view: hide per-portfolio actions and the portfolio table */
+      body.all-mode #portfolio-table-card { display: none !important; }
+      body.all-mode .btn-add-instrument { display: none !important; }
+      body.all-mode #sold-banner { display: none !important; }
+      body.all-mode #tbank-sync-status-box { display: none !important; }
+      body.all-mode #tbank-sync-now-btn { display: none !important; }
+      body.all-mode #btn-share-portfolio { display: none !important; }
+      body.all-mode #autosync-badge { display: none !important; }
+      body.all-mode #autosync-cash { display: none !important; }
+      body.all-mode .io-portfolio-actions { display: none !important; }
+
       /* Mobile nav drawer */
       body.mobile-mode .mobile-nav {
         display: flex !important;
@@ -996,7 +1007,7 @@
           </div>
         </div>
 
-        <div class="card" style="padding: 0;">
+        <div id="portfolio-table-card" class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
             <h2 class="card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span>Портфель</span>
@@ -2291,6 +2302,7 @@
       let isReadOnly = false;
       let shareToken = null;
       let sharePassword = null;
+      const isAllMode = window.location.pathname === '/all';
 
       // ── PARSE URL ────────────────────────────────────────────────
       function parseShareUrl() {
@@ -2606,7 +2618,7 @@
         animateCounter(sv, isEmpty ? 0 : displayTotal, v => fmt(roundTo2(v)) + ' ₽');
         const posText = n + ' ' + t('stat.sub.positions') + posSuffix;
         const cashText = cashRub > 0 ? '<br><span style="color:var(--text-muted)">в т.ч. свободно: ' + fmt(roundTo2(cashRub)) + ' ₽</span>' : '';
-        const totalText = (portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '<br><span style="color:var(--blue-500);font-weight:600">Всего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽</span>' : '';
+        const totalText = (!isAllMode && portfolios.length > 1 && allPortfoliosTotalValue > 0) ? '<br><span style="color:var(--blue-500);font-weight:600">Всего: ' + fmt(roundTo2(allPortfoliosTotalValue)) + ' ₽</span>' : '';
         svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + cashText + totalText);
         svs.style.whiteSpace = 'pre-wrap';
 
@@ -3887,6 +3899,9 @@
             if (sharePassword) headers['X-Share-Password'] = sharePassword;
             const r = await fetch(`/share/${shareToken}/snapshots?days=${days}`, { headers });
             if (!r.ok) throw new Error('fetch failed');
+            snapshots = await r.json();
+          } else if (isAllMode) {
+            const r = await apiFetch(`/portfolios/all/snapshots?days=${days}`);
             snapshots = await r.json();
           } else if (portfolioId) {
             const r = await apiFetch(`/portfolios/${portfolioId}/snapshots?days=${days}`);
@@ -5795,6 +5810,8 @@
         let url;
         if (isReadOnly && shareToken) {
           url = `/share/${shareToken}/table?ts=${Date.now()}`;
+        } else if (isAllMode) {
+          url = `/portfolios/all/table?ts=${Date.now()}`;
         } else {
           if (!portfolioId) throw new Error('Портфель не выбран.');
           url = `/portfolios/${portfolioId}/table?ts=${Date.now()}`;
@@ -5829,7 +5846,7 @@
         renderTable();
         scheduleAnalytics();
         // Update total portfolios value after sync
-        if (!isReadOnly) {
+        if (!isReadOnly && !isAllMode) {
           calculateAllPortfoliosTotal().then(val => {
             allPortfoliosTotalValue = val;
             const summary = calculateSummary(tableRows);
@@ -6418,7 +6435,12 @@
             portfolioId = portfolios[0].id;
             localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
           }
-          if (portfolioId) {
+          if (isAllMode) {
+            updatePortfolioSelector();
+            const titleEl = document.getElementById('topbar-portfolio-name');
+            if (titleEl) { titleEl.textContent = 'Все портфели'; titleEl.style.display = ''; }
+            await syncTableFromServer();
+          } else if (portfolioId) {
             updatePortfolioSelector();
             await syncTableFromServer();
             // Показать онбординг для новых пользователей
@@ -7046,11 +7068,18 @@
         const selector = document.getElementById('portfolio-selector');
         if (!selector) return;
         selector.innerHTML = '';
+        if (portfolios.length > 1 || isAllMode) {
+          const allOpt = document.createElement('option');
+          allOpt.value = '__all__';
+          allOpt.textContent = '📊 Все портфели';
+          allOpt.selected = isAllMode;
+          selector.appendChild(allOpt);
+        }
         for (const p of portfolios) {
           const option = document.createElement('option');
           option.value = String(p.id);
           option.textContent = p.name;
-          option.selected = p.id === portfolioId;
+          option.selected = !isAllMode && p.id === portfolioId;
           selector.appendChild(option);
         }
         // «+ Добавить портфель» в конце списка
@@ -7063,9 +7092,14 @@
         // Update portfolio name in topbar
         const nameEl = document.getElementById('topbar-portfolio-name');
         if (nameEl) {
-          const active = portfolios.find(p => p.id === portfolioId);
-          nameEl.textContent = active ? active.name : '';
-          nameEl.style.display = active ? '' : 'none';
+          if (isAllMode) {
+            nameEl.textContent = 'Все портфели';
+            nameEl.style.display = '';
+          } else {
+            const active = portfolios.find(p => p.id === portfolioId);
+            nameEl.textContent = active ? active.name : '';
+            nameEl.style.display = active ? '' : 'none';
+          }
         }
         // Size to longest name
         if (portfolios.length) {
@@ -7082,11 +7116,18 @@
         const mobileWrap = document.getElementById('mobile-portfolio-wrap');
         if (mobileSel && mobileWrap) {
           mobileSel.innerHTML = '';
+          if (portfolios.length > 1 || isAllMode) {
+            const allOpt = document.createElement('option');
+            allOpt.value = '__all__';
+            allOpt.textContent = '📊 Все портфели';
+            allOpt.selected = isAllMode;
+            mobileSel.appendChild(allOpt);
+          }
           for (const p of portfolios) {
             const opt = document.createElement('option');
             opt.value = String(p.id);
             opt.textContent = p.name;
-            opt.selected = p.id === portfolioId;
+            opt.selected = !isAllMode && p.id === portfolioId;
             mobileSel.appendChild(opt);
           }
           const mobileAddOpt = document.createElement('option');
@@ -7120,8 +7161,17 @@
         if (mobileSel) {
           mobileSel.addEventListener('change', (e) => {
             if (e.target.value === '__new__') {
-              e.target.value = String(portfolioId);
+              e.target.value = isAllMode ? '__all__' : String(portfolioId);
               openCreatePortfolioModal();
+              return;
+            }
+            if (e.target.value === '__all__') {
+              if (!isAllMode) window.location.href = '/all';
+              return;
+            }
+            if (isAllMode) {
+              localStorage.setItem('mvp_active_portfolio_id', String(Number(e.target.value)));
+              window.location.href = '/app';
               return;
             }
             const newId = Number(e.target.value);
@@ -7158,8 +7208,17 @@
             sel.addEventListener('change', (e) => {
               if (e.target.value === '__new__') {
                 // Сбросить выбор обратно на активный портфель
-                e.target.value = String(portfolioId);
+                e.target.value = isAllMode ? '__all__' : String(portfolioId);
                 openCreatePortfolioModal();
+                return;
+              }
+              if (e.target.value === '__all__') {
+                if (!isAllMode) window.location.href = '/all';
+                return;
+              }
+              if (isAllMode) {
+                localStorage.setItem('mvp_active_portfolio_id', String(Number(e.target.value)));
+                window.location.href = '/app';
                 return;
               }
               const newId = Number(e.target.value);
@@ -7634,6 +7693,9 @@
 
       // ── INIT ─────────────────────────────────────────────────────
       (async () => {
+        if (isAllMode) {
+          document.body.classList.add('all-mode');
+        }
         if (parseShareUrl()) {
           // Read-only shared view
           isReadOnly = true;
@@ -7705,7 +7767,7 @@
           initAuth().then(() => {
             loadNotifSettings();
             setInterval(() => {
-              if (!portfolioId) return;
+              if (!isAllMode && !portfolioId) return;
               if (window._wizardBusy) return;
               syncTableFromServer().catch(() => {});
             }, SYNC_INTERVAL_MS);
@@ -8619,11 +8681,15 @@
       }
 
       async function loadExtraAnalytics() {
-        if (!portfolioId || shareToken) return; // share-mode не имеет этих endpoint-ов
+        if (shareToken) return; // share-mode не имеет этих endpoint-ов
+        if (!isAllMode && !portfolioId) return;
         try {
+          const extraUrl = isAllMode
+            ? '/portfolios/all/analytics-extra'
+            : `/portfolios/${portfolioId}/analytics-extra`;
           const [keyRateR, extraR] = await Promise.all([
             apiFetch('/portfolios/meta/key-rate').then(r => r.ok ? r.json() : null).catch(() => null),
-            apiFetch(`/portfolios/${portfolioId}/analytics-extra`).then(r => r.ok ? r.json() : null).catch(() => null),
+            apiFetch(extraUrl).then(r => r.ok ? r.json() : null).catch(() => null),
           ]);
           if (keyRateR && keyRateR.key_rate) window._keyRate = keyRateR.key_rate;
           if (extraR) {
