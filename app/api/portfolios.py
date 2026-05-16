@@ -217,6 +217,255 @@ async def import_all_portfolios(
     return {"added": added, "errors": len(errors), "error_details": errors}
 
 
+# ── Aggregated endpoints across all user's portfolios ───────────────────────
+# IMPORTANT: must be declared BEFORE /{portfolio_id}/* routes — FastAPI returns
+# 422 (not "skip and try next") when "all" fails int validation on
+# /{portfolio_id}/snapshots and /{portfolio_id}/analytics-extra.
+
+
+async def _collect_all_user_rows(user_id: int) -> tuple[list, list[dict], dict]:
+    """Fetch tables for every portfolio owned by user.
+
+    Returns (rows, portfolios, origin) where origin maps row id() → (portfolio_id, portfolio_name).
+    """
+    portfolios_data = storage_service.get_portfolios(user_id)
+    all_rows: list = []
+    origin: dict = {}
+    for p in portfolios_data:
+        try:
+            rows = await portfolio_service.get_table(p["id"])
+        except Exception:
+            continue
+        for r in rows:
+            origin[id(r)] = (p["id"], p["name"])
+            all_rows.append(r)
+    return all_rows, portfolios_data, origin
+
+
+@router.get("/all/table")
+async def get_all_table(current_user: dict = Depends(get_current_user)) -> dict:
+    """Aggregated table: union of items across all user's portfolios with rebalanced weights."""
+    user_id = current_user["sub"]
+    rows, _portfolios, origin = await _collect_all_user_rows(user_id)
+
+    total_value = sum(float(r.current_value or 0) for r in rows) or 1.0
+    items: list[dict] = []
+    for r in rows:
+        d = r.model_dump() if hasattr(r, "model_dump") else dict(r.__dict__)
+        d["weight"] = round(float(r.current_value or 0) / total_value * 100, 2)
+        pid, pname = origin.get(id(r), (None, None))
+        d["portfolio_id"] = pid
+        d["portfolio_name"] = pname
+        items.append(d)
+    return {"items": items}
+
+
+@router.get("/all/snapshots")
+async def get_all_snapshots(
+    days: int = 90,
+    current_user: dict = Depends(get_current_user),
+) -> list[dict]:
+    """Sum daily snapshots across all user's portfolios."""
+    if days not in (7, 30, 90, 365):
+        days = 90
+    user_id = current_user["sub"]
+    portfolios_data = storage_service.get_portfolios(user_id)
+
+    agg: dict[str, dict[str, float]] = {}
+    for p in portfolios_data:
+        snaps = storage_service.get_portfolio_snapshots(p["id"], days)
+        for s in snaps:
+            d = s["date"]
+            if d not in agg:
+                agg[d] = {"total_value": 0.0, "total_cost": 0.0}
+            agg[d]["total_value"] += float(s.get("total_value") or 0)
+            agg[d]["total_cost"] += float(s.get("total_cost") or 0)
+
+    return [
+        {"date": d, "total_value": round(v["total_value"], 2), "total_cost": round(v["total_cost"], 2)}
+        for d, v in sorted(agg.items())
+    ]
+
+
+@router.get("/all/analytics-extra")
+async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)) -> dict:
+    """Aggregated analytics-extra across all user's portfolios."""
+    from datetime import date, datetime, timedelta
+
+    user_id = current_user["sub"]
+    rows, portfolios_data, _origin = await _collect_all_user_rows(user_id)
+    portfolio_ids = [p["id"] for p in portfolios_data]
+    today = date.today()
+
+    # 1) Upcoming events (30 days)
+    events: list[dict] = []
+    horizon = today + timedelta(days=30)
+    for r in rows:
+        if r.type != "bond":
+            continue
+        ticker = r.ticker
+        name = r.name or ticker
+        qty = float(r.quantity or 0)
+        coupon = float(r.coupon or 0)
+        period = int(r.coupon_period or 0)
+        if r.next_coupon_date and period > 0 and coupon > 0 and qty > 0:
+            d = r.next_coupon_date
+            mat = r.maturity_date
+            while d <= horizon:
+                if mat and d >= mat:
+                    break
+                if today <= d <= horizon:
+                    events.append({
+                        "date": d.isoformat(),
+                        "type": "coupon",
+                        "ticker": ticker,
+                        "name": name,
+                        "amount": round(coupon * qty, 2),
+                    })
+                d = d + timedelta(days=period)
+        if r.maturity_date and today <= r.maturity_date <= horizon:
+            cv = float(r.current_value or 0)
+            aci_total = float(r.aci or 0) * qty
+            principal = max(0.0, cv - aci_total)
+            events.append({
+                "date": r.maturity_date.isoformat(),
+                "type": "maturity",
+                "ticker": ticker,
+                "name": name,
+                "amount": round(principal, 2),
+            })
+        for fld in ("offer_date", "buyback_date"):
+            d = getattr(r, fld, None)
+            if d and today <= d <= horizon:
+                events.append({
+                    "date": d.isoformat(),
+                    "type": "offer" if fld == "offer_date" else "buyback",
+                    "ticker": ticker,
+                    "name": name,
+                    "amount": 0.0,
+                })
+    events.sort(key=lambda e: (e["date"], e["type"]))
+
+    # 2) Anomalies
+    anomalies: list[dict] = []
+    try:
+        cutoff = (datetime.utcnow() - timedelta(days=14)).isoformat()
+        with storage_service._connect() as conn:
+            tickers = list({r.ticker for r in rows if r.type == "bond"})
+            if tickers:
+                placeholders = ",".join("?" * len(tickers))
+                cursor = conn.execute(
+                    f"SELECT ticker, rating, source, recorded_at FROM rating_history "
+                    f"WHERE ticker IN ({placeholders}) AND recorded_at >= ? "
+                    f"ORDER BY ticker, recorded_at ASC",
+                    (*tickers, cutoff),
+                )
+                from app.services.rating_utils import rating_worsened
+                history_by_ticker: dict[str, list[tuple[str, str]]] = {}
+                for tkr, rating, _src, ts in cursor.fetchall():
+                    history_by_ticker.setdefault(tkr, []).append((rating, ts))
+                for tkr, hist in history_by_ticker.items():
+                    if len(hist) >= 2 and rating_worsened(hist[0][0], hist[-1][0]):
+                        anomalies.append({
+                            "type": "rating_downgrade",
+                            "ticker": tkr,
+                            "text": f"{tkr}: рейтинг снижен {hist[0][0]} → {hist[-1][0]}",
+                            "severity": "high",
+                        })
+    except Exception:
+        pass
+
+    try:
+        with storage_service._connect() as conn:
+            seen_drop: set[str] = set()
+            for r in rows:
+                if r.type != "bond" or not r.current_price or r.ticker in seen_drop:
+                    continue
+                cursor = conn.execute(
+                    "SELECT price FROM price_snapshots WHERE ticker = ? "
+                    "ORDER BY recorded_at DESC LIMIT 5",
+                    (r.ticker,),
+                )
+                prev_rows = cursor.fetchall()
+                if len(prev_rows) >= 2:
+                    prev = prev_rows[1][0]
+                    if prev and prev > 0:
+                        diff_pct = (r.current_price - prev) / prev * 100
+                        if diff_pct <= -3:
+                            anomalies.append({
+                                "type": "price_drop",
+                                "ticker": r.ticker,
+                                "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
+                                "severity": "medium",
+                            })
+                            seen_drop.add(r.ticker)
+    except Exception:
+        pass
+
+    soon = today + timedelta(days=7)
+    seen_event: set[tuple[str, str]] = set()
+    for r in rows:
+        if r.type != "bond":
+            continue
+        for fld, label in (("maturity_date", "погашение"), ("offer_date", "оферта"), ("buyback_date", "buyback")):
+            d = getattr(r, fld, None)
+            if d and today < d <= soon and (r.ticker, fld) not in seen_event:
+                anomalies.append({
+                    "type": "imminent_event",
+                    "ticker": r.ticker,
+                    "text": f"{r.ticker}: {label} через {(d - today).days} дн.",
+                    "severity": "medium",
+                })
+                seen_event.add((r.ticker, fld))
+
+    # 3) Realized coupons across all portfolios
+    realized_coupons = 0.0
+    if portfolio_ids:
+        try:
+            with storage_service._connect() as conn:
+                placeholders = ",".join("?" * len(portfolio_ids))
+                cursor = conn.execute(
+                    f"SELECT SUM(amount) FROM coupon_notifications "
+                    f"WHERE portfolio_id IN ({placeholders}) AND amount IS NOT NULL",
+                    tuple(portfolio_ids),
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    realized_coupons = float(row[0])
+        except Exception:
+            pass
+
+    # 4) Free cash across all portfolios
+    free_cash_rub = 0.0
+    for p in portfolios_data:
+        try:
+            cfg = storage_service.get_sync_config(p["id"])
+            if cfg and cfg.get("cash_balance"):
+                import json as _json
+                cash_list = _json.loads(cfg["cash_balance"])
+                from app.services.moex_service import moex_service as _moex
+                for c in cash_list:
+                    ccy = (c.get("currency") or "").upper()
+                    amt = float(c.get("amount") or 0)
+                    if ccy in ("RUB", "SUR", ""):
+                        rate = 1.0
+                    else:
+                        rate = await _moex._get_fx_rate(ccy) or 0.0
+                    free_cash_rub += amt * rate
+        except Exception:
+            continue
+
+    key_rate = await cbr_service.get_key_rate()
+
+    return {
+        "events": events,
+        "anomalies": anomalies,
+        "realized_coupons": round(realized_coupons, 2),
+        "free_cash_rub": round(free_cash_rub, 2),
+        "key_rate": key_rate,
+    }
+
+
 @router.get("/{portfolio_id}", response_model=PortfolioResponse)
 async def get_portfolio(
     portfolio_id: int,
@@ -543,247 +792,3 @@ async def get_analytics_extra(
     }
 
 
-# ── Aggregated endpoints across all user's portfolios ───────────────────────
-
-
-async def _collect_all_user_rows(user_id: int) -> tuple[list, list[dict], dict]:
-    """Fetch tables for every portfolio owned by user.
-
-    Returns (rows, portfolios, origin) where origin maps row id() → (portfolio_id, portfolio_name).
-    """
-    portfolios_data = storage_service.get_portfolios(user_id)
-    all_rows: list = []
-    origin: dict = {}
-    for p in portfolios_data:
-        try:
-            rows = await portfolio_service.get_table(p["id"])
-        except Exception:
-            continue
-        for r in rows:
-            origin[id(r)] = (p["id"], p["name"])
-            all_rows.append(r)
-    return all_rows, portfolios_data, origin
-
-
-@router.get("/all/table")
-async def get_all_table(current_user: dict = Depends(get_current_user)) -> dict:
-    """Aggregated table: union of items across all user's portfolios with rebalanced weights."""
-    user_id = current_user["sub"]
-    rows, _portfolios, origin = await _collect_all_user_rows(user_id)
-
-    total_value = sum(float(r.current_value or 0) for r in rows) or 1.0
-    items: list[dict] = []
-    for r in rows:
-        d = r.model_dump() if hasattr(r, "model_dump") else dict(r.__dict__)
-        d["weight"] = round(float(r.current_value or 0) / total_value * 100, 2)
-        pid, pname = origin.get(id(r), (None, None))
-        d["portfolio_id"] = pid
-        d["portfolio_name"] = pname
-        items.append(d)
-    return {"items": items}
-
-
-@router.get("/all/snapshots")
-async def get_all_snapshots(
-    days: int = 90,
-    current_user: dict = Depends(get_current_user),
-) -> list[dict]:
-    """Sum daily snapshots across all user's portfolios."""
-    if days not in (7, 30, 90, 365):
-        days = 90
-    user_id = current_user["sub"]
-    portfolios_data = storage_service.get_portfolios(user_id)
-
-    agg: dict[str, dict[str, float]] = {}
-    for p in portfolios_data:
-        snaps = storage_service.get_portfolio_snapshots(p["id"], days)
-        for s in snaps:
-            d = s["date"]
-            if d not in agg:
-                agg[d] = {"total_value": 0.0, "total_cost": 0.0}
-            agg[d]["total_value"] += float(s.get("total_value") or 0)
-            agg[d]["total_cost"] += float(s.get("total_cost") or 0)
-
-    return [
-        {"date": d, "total_value": round(v["total_value"], 2), "total_cost": round(v["total_cost"], 2)}
-        for d, v in sorted(agg.items())
-    ]
-
-
-@router.get("/all/analytics-extra")
-async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)) -> dict:
-    """Aggregated analytics-extra across all user's portfolios."""
-    from datetime import date, datetime, timedelta
-
-    user_id = current_user["sub"]
-    rows, portfolios_data, _origin = await _collect_all_user_rows(user_id)
-    portfolio_ids = [p["id"] for p in portfolios_data]
-    today = date.today()
-
-    # 1) Upcoming events (30 days)
-    events: list[dict] = []
-    horizon = today + timedelta(days=30)
-    for r in rows:
-        if r.type != "bond":
-            continue
-        ticker = r.ticker
-        name = r.name or ticker
-        qty = float(r.quantity or 0)
-        coupon = float(r.coupon or 0)
-        period = int(r.coupon_period or 0)
-        if r.next_coupon_date and period > 0 and coupon > 0 and qty > 0:
-            d = r.next_coupon_date
-            mat = r.maturity_date
-            while d <= horizon:
-                if mat and d >= mat:
-                    break
-                if today <= d <= horizon:
-                    events.append({
-                        "date": d.isoformat(),
-                        "type": "coupon",
-                        "ticker": ticker,
-                        "name": name,
-                        "amount": round(coupon * qty, 2),
-                    })
-                d = d + timedelta(days=period)
-        if r.maturity_date and today <= r.maturity_date <= horizon:
-            cv = float(r.current_value or 0)
-            aci_total = float(r.aci or 0) * qty
-            principal = max(0.0, cv - aci_total)
-            events.append({
-                "date": r.maturity_date.isoformat(),
-                "type": "maturity",
-                "ticker": ticker,
-                "name": name,
-                "amount": round(principal, 2),
-            })
-        for fld in ("offer_date", "buyback_date"):
-            d = getattr(r, fld, None)
-            if d and today <= d <= horizon:
-                events.append({
-                    "date": d.isoformat(),
-                    "type": "offer" if fld == "offer_date" else "buyback",
-                    "ticker": ticker,
-                    "name": name,
-                    "amount": 0.0,
-                })
-    events.sort(key=lambda e: (e["date"], e["type"]))
-
-    # 2) Anomalies
-    anomalies: list[dict] = []
-    try:
-        cutoff = (datetime.utcnow() - timedelta(days=14)).isoformat()
-        with storage_service._connect() as conn:
-            tickers = list({r.ticker for r in rows if r.type == "bond"})
-            if tickers:
-                placeholders = ",".join("?" * len(tickers))
-                cursor = conn.execute(
-                    f"SELECT ticker, rating, source, recorded_at FROM rating_history "
-                    f"WHERE ticker IN ({placeholders}) AND recorded_at >= ? "
-                    f"ORDER BY ticker, recorded_at ASC",
-                    (*tickers, cutoff),
-                )
-                from app.services.rating_utils import rating_worsened
-                history_by_ticker: dict[str, list[tuple[str, str]]] = {}
-                for tkr, rating, _src, ts in cursor.fetchall():
-                    history_by_ticker.setdefault(tkr, []).append((rating, ts))
-                for tkr, hist in history_by_ticker.items():
-                    if len(hist) >= 2 and rating_worsened(hist[0][0], hist[-1][0]):
-                        anomalies.append({
-                            "type": "rating_downgrade",
-                            "ticker": tkr,
-                            "text": f"{tkr}: рейтинг снижен {hist[0][0]} → {hist[-1][0]}",
-                            "severity": "high",
-                        })
-    except Exception:
-        pass
-
-    try:
-        with storage_service._connect() as conn:
-            seen_drop: set[str] = set()
-            for r in rows:
-                if r.type != "bond" or not r.current_price or r.ticker in seen_drop:
-                    continue
-                cursor = conn.execute(
-                    "SELECT price FROM price_snapshots WHERE ticker = ? "
-                    "ORDER BY recorded_at DESC LIMIT 5",
-                    (r.ticker,),
-                )
-                prev_rows = cursor.fetchall()
-                if len(prev_rows) >= 2:
-                    prev = prev_rows[1][0]
-                    if prev and prev > 0:
-                        diff_pct = (r.current_price - prev) / prev * 100
-                        if diff_pct <= -3:
-                            anomalies.append({
-                                "type": "price_drop",
-                                "ticker": r.ticker,
-                                "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
-                                "severity": "medium",
-                            })
-                            seen_drop.add(r.ticker)
-    except Exception:
-        pass
-
-    soon = today + timedelta(days=7)
-    seen_event: set[tuple[str, str]] = set()
-    for r in rows:
-        if r.type != "bond":
-            continue
-        for fld, label in (("maturity_date", "погашение"), ("offer_date", "оферта"), ("buyback_date", "buyback")):
-            d = getattr(r, fld, None)
-            if d and today < d <= soon and (r.ticker, fld) not in seen_event:
-                anomalies.append({
-                    "type": "imminent_event",
-                    "ticker": r.ticker,
-                    "text": f"{r.ticker}: {label} через {(d - today).days} дн.",
-                    "severity": "medium",
-                })
-                seen_event.add((r.ticker, fld))
-
-    # 3) Realized coupons across all portfolios
-    realized_coupons = 0.0
-    if portfolio_ids:
-        try:
-            with storage_service._connect() as conn:
-                placeholders = ",".join("?" * len(portfolio_ids))
-                cursor = conn.execute(
-                    f"SELECT SUM(amount) FROM coupon_notifications "
-                    f"WHERE portfolio_id IN ({placeholders}) AND amount IS NOT NULL",
-                    tuple(portfolio_ids),
-                )
-                row = cursor.fetchone()
-                if row and row[0]:
-                    realized_coupons = float(row[0])
-        except Exception:
-            pass
-
-    # 4) Free cash across all portfolios
-    free_cash_rub = 0.0
-    for p in portfolios_data:
-        try:
-            cfg = storage_service.get_sync_config(p["id"])
-            if cfg and cfg.get("cash_balance"):
-                import json as _json
-                cash_list = _json.loads(cfg["cash_balance"])
-                from app.services.moex_service import moex_service as _moex
-                for c in cash_list:
-                    ccy = (c.get("currency") or "").upper()
-                    amt = float(c.get("amount") or 0)
-                    if ccy in ("RUB", "SUR", ""):
-                        rate = 1.0
-                    else:
-                        rate = await _moex._get_fx_rate(ccy) or 0.0
-                    free_cash_rub += amt * rate
-        except Exception:
-            continue
-
-    key_rate = await cbr_service.get_key_rate()
-
-    return {
-        "events": events,
-        "anomalies": anomalies,
-        "realized_coupons": round(realized_coupons, 2),
-        "free_cash_rub": round(free_cash_rub, 2),
-        "key_rate": key_rate,
-    }
