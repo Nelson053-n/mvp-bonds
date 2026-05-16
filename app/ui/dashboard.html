@@ -3795,51 +3795,81 @@
           if (a.type === 'rating_downgrade') downgradeSet.add(a.ticker);
         });
         const scored = rows.map(r => {
-          let score = 0;
-          const cv = r.current_value || 0;
+          const breakdown = []; // { label, points, reasonShort }
           const cost = (r.purchase_price || 0) * (r.quantity || 0);
           // 1. Loss
           if (cost > 0) {
             const pnlPct = (r.profit || 0) / cost * 100;
-            if (pnlPct < -5) score += Math.min(5, -pnlPct / 5);
+            if (pnlPct < -5) {
+              const pts = Math.min(5, -pnlPct / 5);
+              breakdown.push({ label: `Убыток ${pnlPct.toFixed(1)}%`, points: pts, reasonShort: 'убыток' });
+            }
           }
-          // 2. Imminent offer (<60 days)
+          // 2. Imminent offer / buyback (<60 days)
           for (const fld of ['offer_date', 'buyback_date']) {
             const d = r[fld] ? new Date(r[fld]) : null;
             if (d && d > now) {
-              const days = (d - now) / 86400000;
-              if (days < 60) score += 2;
+              const days = Math.round((d - now) / 86400000);
+              if (days < 60) {
+                breakdown.push({
+                  label: `${fld === 'offer_date' ? 'Оферта' : 'Buyback'} через ${days} дн.`,
+                  points: 2,
+                  reasonShort: fld === 'offer_date' ? 'скоро оферта' : 'скоро buyback',
+                });
+              }
             }
           }
           // 3. Downgrade in last 14 days
-          if (downgradeSet.has(r.ticker)) score += 3;
+          if (downgradeSet.has(r.ticker)) {
+            breakdown.push({ label: 'Понижен рейтинг за 14 дн.', points: 3, reasonShort: 'downgrade' });
+          }
           // 4. Low YTM vs key rate
           if (r.type === 'bond' && keyRate > 0 && r.market_yield > 0 && r.market_yield < keyRate - 1) {
-            score += 1;
+            breakdown.push({
+              label: `YTM ${r.market_yield.toFixed(1)}% ниже ставки ЦБ (${keyRate.toFixed(1)}%)`,
+              points: 1,
+              reasonShort: 'низкий YTM',
+            });
           }
-          return { r, score };
+          const score = breakdown.reduce((s, b) => s + b.points, 0);
+          return { r, score, breakdown };
         }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
         if (!scored.length) {
           el.innerHTML = '<div style="padding:14px 16px;color:var(--text-muted);font-size:13px;">Все позиции в порядке — продавать ничего не нужно.</div>';
           return;
         }
+        // Severity threshold (visual intensity of the score badge)
+        const sevColor = score =>
+          score >= 5 ? 'var(--red-400)' :
+          score >= 3 ? '#f97316' :          /* orange */
+          score >= 1.5 ? '#f59e0b' :        /* amber */
+          'var(--text-muted)';
         el.innerHTML = '';
-        scored.slice(0, 5).forEach(({ r, score }) => {
+        scored.slice(0, 5).forEach(({ r, score, breakdown }) => {
           const row = document.createElement('div');
           row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--table-border);';
-          const reasons = [];
-          if ((r.profit || 0) < 0) reasons.push('убыток');
-          const offerD = r.offer_date || r.buyback_date;
-          if (offerD && new Date(offerD) > now && (new Date(offerD) - now) / 86400000 < 60) reasons.push('скоро оферта');
-          if (downgradeSet.has(r.ticker)) reasons.push('downgrade');
-          if (r.type === 'bond' && keyRate > 0 && r.market_yield > 0 && r.market_yield < keyRate - 1) reasons.push('низкий YTM');
+          const reasons = breakdown.map(b => b.reasonShort);
+          // Build native title tooltip with per-factor breakdown
+          const tooltip = [
+            `${r.name || r.ticker} — скор ${score.toFixed(1)}`,
+            '',
+            ...breakdown.map(b => `+${b.points.toFixed(1)}  ${b.label}`),
+            '',
+            'Чем выше скор, тем больше факторов против бумаги.',
+          ].join('\n');
+          const clr = sevColor(score);
           row.innerHTML = `<div style="min-width:0;flex:1;">
               <div style="font-size:13px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.name || r.ticker)}</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${reasons.join(' · ')}</div>
             </div>
-            <div style="font-size:13px;font-weight:600;color:var(--red-400);margin-left:8px;flex-shrink:0;">${score.toFixed(1)}</div>`;
+            <div title="${esc(tooltip)}" style="font-size:13px;font-weight:700;color:${clr};margin-left:8px;flex-shrink:0;cursor:help;padding:2px 8px;border-radius:10px;background:rgba(148,163,184,.08);">${score.toFixed(1)}</div>`;
           el.appendChild(row);
         });
+        // Footer explanation
+        const footer = document.createElement('div');
+        footer.style.cssText = 'padding:8px 16px 10px;font-size:10px;color:var(--text-muted);line-height:1.4;border-top:1px solid var(--table-border);';
+        footer.innerHTML = 'Композитный скор (чем выше — тем выше приоритет продажи): убыток &gt;5% (до +5), оферта &lt;60 дн (+2), понижение рейтинга (+3), YTM ниже ставки ЦБ (+1). Наведите на цифру для разбивки.';
+        el.appendChild(footer);
       }
 
       async function loadAnalyticsHistory(days = 90) {
