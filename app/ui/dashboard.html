@@ -1084,8 +1084,12 @@
           </div>
         </div>
 
-        <!-- Row: YTM curve + Events (50/50, equal height) -->
+        <!-- Row: Events + YTM curve (50/50, equal height) -->
         <div class="panel-cols" id="ytm-events-row" style="grid-template-columns:1fr 1fr;display:none;">
+          <div class="card" id="events-card">
+            <div class="card-header"><h2 class="card-title" id="events-card-title">События до конца месяца</h2></div>
+            <div id="events-body" style="padding:6px 0;overflow-y:auto;flex:1;"></div>
+          </div>
           <div class="card" id="ytm-curve-card">
             <div class="card-header">
               <h2 class="card-title" style="display:inline-flex;align-items:center;gap:6px;">
@@ -1098,10 +1102,6 @@
               <div id="ytm-curve-empty" style="display:none;color:var(--text-muted);font-size:13px;text-align:center;padding:24px 0;">Нет данных по YTM и срокам</div>
               <div id="ytm-curve-hint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.4;"></div>
             </div>
-          </div>
-          <div class="card" id="events-card">
-            <div class="card-header"><h2 class="card-title" id="events-card-title">События до конца месяца</h2></div>
-            <div id="events-body" style="padding:6px 0;overflow-y:auto;flex:1;"></div>
           </div>
         </div>
 
@@ -3485,7 +3485,24 @@
 
         const W = _measureCanvasParent(canvas, 400);
         const dpr = window.devicePixelRatio || 1;
-        const H = 240;
+        // Match height of sibling card (Events) when present, so the row
+        // looks evenly-sized. Fall back to 240px if measurement fails.
+        let H = 240;
+        const eventsCard = document.getElementById('events-card');
+        const ytmCard = document.getElementById('ytm-curve-card');
+        if (eventsCard && ytmCard && eventsCard.offsetHeight > 0) {
+          const target = eventsCard.offsetHeight;
+          const header = ytmCard.querySelector('.card-header');
+          const headerH = header ? header.offsetHeight : 0;
+          const hint = ytmCard.querySelector('#ytm-curve-hint');
+          const hintH = hint ? hint.offsetHeight : 0;
+          // wrapper has padding 12px 16px 16px → 28px vertical
+          const wrapperPad = 28;
+          // gap between canvas and hint = 8px (margin-top on hint)
+          const gap = hintH > 0 ? 8 : 0;
+          const computed = target - headerH - wrapperPad - hintH - gap;
+          if (computed >= 200) H = computed;
+        }
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
         canvas.width = W * dpr;
