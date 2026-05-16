@@ -1121,14 +1121,17 @@
           </div>
         </div>
         <style>
-          /* Equal-height cards in YTM/Events row: flex-column so events list
-             scrolls inside the wrapper, matching YTM canvas height. */
+          /* Events list scrolls inside its card — natural height capped so
+             it doesn't stretch the row when there are many events. YTM
+             card stays at its natural height (canvas 240 + chrome), and
+             grid stretch equalises both heights. */
           #ytm-events-row .card { display: flex; flex-direction: column; }
-          #ytm-events-row .card > div:last-child { flex: 1; min-height: 0; }
-          #ytm-events-row #events-body { max-height: none; }
+          #ytm-events-row .card > div:last-child { flex: 1; min-height: 0; overflow: hidden; }
+          #ytm-events-row #events-body { max-height: 280px; }
           @media (max-width: 1024px) {
             #ytm-events-row { grid-template-columns: 1fr !important; }
             #duration-stress-row { grid-template-columns: 1fr !important; }
+            #ytm-events-row #events-body { max-height: 240px; }
           }
         </style>
 
@@ -3485,24 +3488,9 @@
 
         const W = _measureCanvasParent(canvas, 400);
         const dpr = window.devicePixelRatio || 1;
-        // Match height of sibling card (Events) when present, so the row
-        // looks evenly-sized. Fall back to 240px if measurement fails.
-        let H = 240;
-        const eventsCard = document.getElementById('events-card');
-        const ytmCard = document.getElementById('ytm-curve-card');
-        if (eventsCard && ytmCard && eventsCard.offsetHeight > 0) {
-          const target = eventsCard.offsetHeight;
-          const header = ytmCard.querySelector('.card-header');
-          const headerH = header ? header.offsetHeight : 0;
-          const hint = ytmCard.querySelector('#ytm-curve-hint');
-          const hintH = hint ? hint.offsetHeight : 0;
-          // wrapper has padding 12px 16px 16px → 28px vertical
-          const wrapperPad = 28;
-          // gap between canvas and hint = 8px (margin-top on hint)
-          const gap = hintH > 0 ? 8 : 0;
-          const computed = target - headerH - wrapperPad - hintH - gap;
-          if (computed >= 200) H = computed;
-        }
+        // Fixed canvas height — grid stretch syncs card outer heights, while
+        // canvas itself stays at a stable visual size to keep dots round.
+        const H = 240;
         canvas.style.width = W + 'px';
         canvas.style.height = H + 'px';
         canvas.width = W * dpr;
