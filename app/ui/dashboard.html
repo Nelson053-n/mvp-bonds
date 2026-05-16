@@ -2729,7 +2729,7 @@
           if (withMat.length) {
             const totVal = withMat.reduce((s, x) => s + x.r.current_value, 0);
             const mac = withMat.reduce((s, x) => s + x.yrs * x.r.current_value, 0) / totVal;
-            parts.push(`<span style="font-size:10px;color:var(--text-muted);" title="Macaulay duration — средневзвешенный срок до погашения. Чем больше — тем чувствительнее портфель к ставке ЦБ.">дюрация: ${mac.toFixed(1)} г</span>`);
+            parts.push(`<span style="font-size:10px;color:var(--text-muted);" title="Средневзвешенный срок до погашения (Macaulay duration). Чем больше — тем чувствительнее портфель к ставке ЦБ.">дюрация: ${mac.toFixed(1)} г</span>`);
           }
           sub.innerHTML = parts.join('<br>');
         }
@@ -3022,9 +3022,9 @@
         body.innerHTML = `
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
             <div style="font-size:28px;font-weight:700;color:var(--text-primary);line-height:1;">${macStr}</div>
-            <div style="font-size:13px;color:var(--text-muted);">года · Macaulay duration</div>
+            <div style="font-size:13px;color:var(--text-muted);" title="Средневзвешенный срок до погашения (Macaulay duration). Чем больше — тем чувствительнее портфель к изменению ставки ЦБ.">года · средний срок до погашения</div>
           </div>
-          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Modified Duration: <b style="color:var(--text-secondary);">${modStr}</b></div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;" title="Модифицированная дюрация (Modified Duration). Показывает, на сколько процентов изменится стоимость портфеля при изменении ставки на 1 п.п.">Модиф. дюрация: <b style="color:var(--text-secondary);">${modStr}</b></div>
 
           <div style="margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -8633,6 +8633,12 @@
             renderAnomaliesBanner(extraR.anomalies || []);
             renderCashReinvestCard(extraR);
             renderEventsCard(extraR.events || []);
+          }
+          // Re-render YTM curve with key-rate line (sell-first too — its scoring
+          // uses keyRate). Both rendered initially before extra arrived.
+          if (tableRows.length) {
+            if (typeof renderYTMCurve === 'function') renderYTMCurve(tableRows);
+            if (typeof renderSellFirst === 'function') renderSellFirst(tableRows);
           }
         } catch (e) { /* silent */ }
       }
