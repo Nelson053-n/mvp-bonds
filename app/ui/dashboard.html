@@ -1211,7 +1211,7 @@
           <div class="card">
             <div class="card-header">
               <h2 class="card-title">Что продать первым</h2>
-              <span style="font-size:11px;color:var(--text-muted);" title="Композитный скор: убыток + близость оферты + ухудшение рейтинга + низкий YTM к ставке ЦБ">i</span>
+              <span style="font-size:11px;color:var(--text-muted);" title="Сводная оценка: убыток + близость оферты + ухудшение рейтинга + низкий YTM к ставке ЦБ">i</span>
             </div>
             <div id="analytics-sell-first" style="padding:0;"></div>
           </div>
@@ -2657,7 +2657,7 @@
             if (divObj && divObj.score >= 0) {
               const lbl = divObj.score >= 70 ? 'отличная' : divObj.score >= 50 ? 'хорошая' : divObj.score >= 30 ? 'средняя' : 'слабая';
               const col = divObj.score >= 70 ? 'var(--green-400)' : divObj.score >= 50 ? 'var(--text-secondary)' : divObj.score >= 30 ? '#f59e0b' : 'var(--red-400)';
-              parts.push('<span style="font-size:10px;color:var(--text-muted);" title="Композитный показатель диверсификации (0-100). Учитывает разброс по эмитентам, рейтингам, срокам, валютам и типу купона.">диверсификация: <span style="color:' + col + ';">' + divObj.score + '/100</span> · ' + lbl + '</span>');
+              parts.push('<span style="font-size:10px;color:var(--text-muted);" title="Сводная оценка диверсификации (0-100). Учитывает разброс по эмитентам, рейтингам, срокам, валютам и типу купона.">диверсификация: <span style="color:' + col + ';">' + divObj.score + '/100</span> · ' + lbl + '</span>');
             }
             srs.innerHTML = parts.join('<br>');
           }
@@ -3851,7 +3851,7 @@
           const reasons = breakdown.map(b => b.reasonShort);
           // Build native title tooltip with per-factor breakdown
           const tooltip = [
-            `${r.name || r.ticker} — скор ${score.toFixed(1)}`,
+            `${r.name || r.ticker} — оценка ${score.toFixed(1)}`,
             '',
             ...breakdown.map(b => `+${b.points.toFixed(1)}  ${b.label}`),
             '',
@@ -3868,7 +3868,7 @@
         // Footer explanation
         const footer = document.createElement('div');
         footer.style.cssText = 'padding:8px 16px 10px;font-size:10px;color:var(--text-muted);line-height:1.4;border-top:1px solid var(--table-border);';
-        footer.innerHTML = 'Композитный скор (чем выше — тем выше приоритет продажи): убыток &gt;5% (до +5), оферта &lt;60 дн (+2), понижение рейтинга (+3), YTM ниже ставки ЦБ (+1). Наведите на цифру для разбивки.';
+        footer.innerHTML = 'Сводная оценка (чем выше — тем выше приоритет продажи): убыток &gt;5% (до +5), оферта &lt;60 дн (+2), понижение рейтинга (+3), YTM ниже ставки ЦБ (+1). Наведите на цифру для разбивки.';
         el.appendChild(footer);
       }
 
