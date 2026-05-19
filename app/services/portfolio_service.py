@@ -342,6 +342,13 @@ class PortfolioService:
                             (clean_price - item.purchase_price)
                             * item.quantity
                         )
+                        # Day P&L: change in clean price vs previous session close × qty
+                        day_profit_val: float | None = None
+                        prev_close_value: float | None = None
+                        if snapshot.prev_close_percent is not None:
+                            prev_clean = (snapshot.prev_close_percent / 100.0) * nominal
+                            day_profit_val = (clean_price - prev_clean) * item.quantity
+                            prev_close_value = (prev_clean + (snapshot.aci or 0.0)) * item.quantity
                         return InstrumentMetrics(
                             id=item.id,
                             type="bond",
@@ -352,6 +359,8 @@ class PortfolioService:
                             quantity=item.quantity,
                             current_value=round(current_value, 2),
                             profit=round(profit, 2),
+                            day_profit=round(day_profit_val, 2) if day_profit_val is not None else None,
+                            prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
                             company_rating=snapshot.company_rating or item.company_rating,
                             is_qual=snapshot.is_qual,
@@ -398,6 +407,11 @@ class PortfolioService:
                             (current_price - item.purchase_price)
                             * item.quantity
                         )
+                        day_profit_val: float | None = None
+                        prev_close_value: float | None = None
+                        if snapshot.prev_close_price is not None:
+                            day_profit_val = (current_price - snapshot.prev_close_price) * item.quantity
+                            prev_close_value = snapshot.prev_close_price * item.quantity
                         return InstrumentMetrics(
                             id=item.id,
                             type="stock",
@@ -408,6 +422,8 @@ class PortfolioService:
                             quantity=item.quantity,
                             current_value=round(current_value, 2),
                             profit=round(profit, 2),
+                            day_profit=round(day_profit_val, 2) if day_profit_val is not None else None,
+                            prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
                             company_rating=snapshot.company_rating or item.company_rating,
                             dividend_yield=snapshot.dividend_yield,

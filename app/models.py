@@ -42,6 +42,8 @@ class InstrumentMetrics(BaseModel):
     quantity: float
     current_value: float
     profit: float
+    day_profit: float | None = None  # P&L vs. previous trading session close (RUB)
+    prev_close_value: float | None = None  # Position value at prev close (RUB)
     weight: float
     company_rating: str | None = None
     is_qual: bool = False
@@ -76,6 +78,7 @@ class BondSnapshot(BaseModel):
     ticker: str
     name: str
     clean_price_percent: float
+    prev_close_percent: float | None = None  # Closing price of previous trading session, % of face
     nominal: float | None = None
     coupon: float | None = None
     coupon_period: int | None = None
@@ -98,5 +101,6 @@ class StockSnapshot(BaseModel):
     ticker: str
     name: str
     current_price: float
+    prev_close_price: float | None = None  # Previous trading session close (RUB)
     dividend_yield: float | None = None
     company_rating: str | None = None

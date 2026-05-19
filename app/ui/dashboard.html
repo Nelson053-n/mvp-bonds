@@ -1027,7 +1027,7 @@
                   <th data-sort-key="quantity" data-i18n="tbl.qty">Кол-во</th>
                   <th data-sort-key="purchase_price" class="wrap" style="min-width:52px;" data-i18n-html="tbl.buyPrice">Цена<br>покупки</th>
                   <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость<span class="th-info" data-tip="current_value">i</span></th>
-                  <th data-sort-key="profit" data-i18n="tbl.profit">Прибыль<span class="th-info" data-tip="profit">i</span></th>
+                  <th id="th-profit" data-sort-key="profit"><span class="th-profit-label" data-i18n="tbl.profit">Прибыль</span><span id="th-profit-toggle" title="Переключить: всего / за день" style="display:inline-block;margin-left:4px;cursor:pointer;font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);color:var(--text-muted);user-select:none;">⇄</span><span class="th-info" data-tip="profit">i</span></th>
                   <th data-sort-key="weight" data-i18n="tbl.weight">Доля</th>
                   <th data-sort-key="coupon" style="max-width:48px;" data-i18n="tbl.coupon">Купон<span class="th-info" data-tip="coupon">i</span></th>
                   <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.couponPct">Купон<br>%<span class="th-info" data-tip="coupon_rate">i</span></th>
@@ -2518,8 +2518,27 @@
         const as = String(a ?? '').toLowerCase(), bs = String(b ?? '').toLowerCase();
         return as < bs ? -1 : as > bs ? 1 : 0;
       }
+      window._profitMode = localStorage.getItem('mvp_profit_mode') === 'day' ? 'day' : 'total';
+      function setProfitMode(m) {
+        window._profitMode = (m === 'day') ? 'day' : 'total';
+        localStorage.setItem('mvp_profit_mode', window._profitMode);
+        const th = document.getElementById('th-profit');
+        if (th) {
+          const lbl = th.querySelector('.th-profit-label');
+          if (lbl) lbl.textContent = window._profitMode === 'day' ? 'За день' : (TRANSLATIONS[window._lang]?.['tbl.profit'] || 'Прибыль');
+          const toggle = document.getElementById('th-profit-toggle');
+          if (toggle) {
+            toggle.style.borderColor = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--border)';
+            toggle.style.color = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--text-muted)';
+          }
+        }
+      }
       function getSortValue(row, key) {
         if (key === 'company_rating') { const s = ratingToScore(parseRating(row.company_rating)); return s === null ? -1 : s; }
+        if (key === 'profit' && window._profitMode === 'day') {
+          const v = row.day_profit;
+          return (v === null || v === undefined) ? -Infinity : v;
+        }
         return row[key] ?? '';
       }
       function computeSortFields(row) {
@@ -2563,6 +2582,17 @@
       function calculateSummary(rows) {
         const totalAssets  = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
         const totalProfit  = rows.reduce((s, r) => s + Number(r.profit || 0), 0);
+        // Day P&L: sum across rows that have day_profit. Day base = sum of prev_close_value
+        // ONLY for those same rows (so the percentage uses a comparable denominator).
+        let dayProfit = 0, dayBase = 0, dayCount = 0;
+        for (const r of rows) {
+          if (r.day_profit !== null && r.day_profit !== undefined) {
+            dayProfit += Number(r.day_profit);
+            dayBase += Number(r.prev_close_value || 0);
+            dayCount++;
+          }
+        }
+        const hasDayData = dayCount > 0;
         let annualIncome = 0, weightedYield = 0, bondWeightSum = 0;
         let weightedCouponRate = 0, couponRateWeightSum = 0;
         for (const row of rows) {
@@ -2579,7 +2609,8 @@
         const annualYield    = totalAssets > 0 ? (annualIncome / totalAssets) * 100 : 0;
         const totalBondYield = bondWeightSum > 0 ? weightedYield / bondWeightSum : 0;
         const avgCouponRate  = couponRateWeightSum > 0 ? weightedCouponRate / couponRateWeightSum : 0;
-        return { totalAssets, totalProfit, annualIncome, annualYield, totalBondYield, avgCouponRate };
+        return { totalAssets, totalProfit, dayProfit, dayBase, hasDayData,
+                 annualIncome, annualYield, totalBondYield, avgCouponRate };
       }
 
       // ── UPDATE STAT CARDS ────────────────────────────────────────
@@ -2639,7 +2670,18 @@
           const breakdown = parts.length
             ? '<br><span style="font-size:10px;color:var(--text-muted);">' + parts.join(' · ') + '</span>'
             : '';
-          sps.innerHTML = pctOfPortfolio + breakdown;
+          let dayLine = '';
+          if (summary.hasDayData) {
+            const dp = summary.dayProfit;
+            const dpct = summary.dayBase > 0 ? (dp / summary.dayBase) * 100 : 0;
+            const color = dp > 0 ? 'var(--green-600)' : (dp < 0 ? 'var(--red-600)' : 'var(--text-muted)');
+            const sign = dp >= 0 ? '+' : '';
+            const pctSign = dpct >= 0 ? '+' : '';
+            dayLine = '<br><span style="font-size:11px;color:' + color + ';font-weight:500;">'
+              + 'За день: ' + sign + fmt(roundTo2(dp)) + ' ₽ ('
+              + pctSign + dpct.toFixed(2) + '%)</span>';
+          }
+          sps.innerHTML = pctOfPortfolio + breakdown + dayLine;
         }
 
         sc.className = 'stat-value';
@@ -5561,16 +5603,26 @@
           tr.appendChild(createEditableCell(row, 'purchase_price', ''));
           addCell(tr, fmt(row.current_value));
 
-          // Profit (use server-calculated row.profit which accounts for dirty price / ACI)
-          const profitVal = Number(row.profit || 0);
+          // Profit cell — total or day P&L depending on global mode
+          const profitTotal = Number(row.profit || 0);
+          const dayRaw = row.day_profit;
+          const dayMode = window._profitMode === 'day';
+          const profitVal = dayMode
+            ? (dayRaw === null || dayRaw === undefined ? null : Number(dayRaw))
+            : profitTotal;
           const profitTd = document.createElement('td');
-          profitTd.textContent = fmt(profitVal);
-          if (profitVal > 0) profitTd.classList.add('profit-positive');
-          else if (profitVal < 0) profitTd.classList.add('profit-negative');
+          if (profitVal === null) {
+            profitTd.textContent = '—';
+            profitTd.style.color = 'var(--text-muted)';
+          } else {
+            profitTd.textContent = (profitVal >= 0 ? '+' : '') + fmt(profitVal);
+            if (profitVal > 0) profitTd.classList.add('profit-positive');
+            else if (profitVal < 0) profitTd.classList.add('profit-negative');
+          }
           tr.appendChild(profitTd);
-          // Цветовая индикация строки по прибыли
-          if (profitVal > 0) tr.style.setProperty('--row-profit-color', 'rgba(22,163,74,0.04)');
-          else if (profitVal < 0) tr.style.setProperty('--row-profit-color', 'rgba(220,38,38,0.04)');
+          // Цветовая индикация строки по прибыли (всегда по total — стабильнее)
+          if (profitTotal > 0) tr.style.setProperty('--row-profit-color', 'rgba(22,163,74,0.04)');
+          else if (profitTotal < 0) tr.style.setProperty('--row-profit-color', 'rgba(220,38,38,0.04)');
 
           addCell(tr, fmt(row.weight) + '%');
           tr.appendChild(createCouponCell(row));
@@ -5700,13 +5752,39 @@
       }
 
       // ── SORT HEADERS ─────────────────────────────────────────────
+      // Profit-mode toggle (⇄ icon in "Прибыль" header)
+      const profitToggleBtn = document.getElementById('th-profit-toggle');
+      if (profitToggleBtn) {
+        profitToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setProfitMode(window._profitMode === 'day' ? 'total' : 'day');
+          renderTable();
+        });
+      }
+      // Apply initial mode label/color
+      setProfitMode(window._profitMode);
       document.querySelectorAll('th[data-sort-key]').forEach(th => {
-        th.addEventListener('click', () => {
+        th.addEventListener('click', (e) => {
+          if (e.target && e.target.id === 'th-profit-toggle') return;
           const key = th.dataset.sortKey;
           if (sortState.key === key) sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
           else { sortState.key = key; sortState.direction = 'asc'; }
           document.querySelectorAll('th[data-sort-key]').forEach(h => {
             const arrow = h.dataset.sortKey === key ? (sortState.direction === 'asc' ? ' ↑' : ' ↓') : '';
+            // Special-case for the "Прибыль" header: it has complex inner HTML
+            // (label span + toggle button), so we only refresh the arrow inside
+            // a dedicated suffix span and never rewrite the whole th.
+            if (h.id === 'th-profit') {
+              let arrowEl = h.querySelector('.th-sort-arrow');
+              if (!arrowEl) {
+                arrowEl = document.createElement('span');
+                arrowEl.className = 'th-sort-arrow';
+                arrowEl.style.fontStyle = 'normal';
+                h.appendChild(arrowEl);
+              }
+              arrowEl.textContent = arrow;
+              return;
+            }
             // Always use current-language label for translated headers
             const i18nHtmlKey = h.dataset.i18nHtml;
             if (i18nHtmlKey) {
@@ -10249,6 +10327,7 @@
           if (typeof drawMonthlyChart === 'function' && typeof tableRows !== 'undefined') {
             drawMonthlyChart(tableRows);
           }
+          if (typeof setProfitMode === 'function') setProfitMode(window._profitMode);
         } catch(e) {}
         // Re-render settings portfolios table (risk labels are dynamic, only in authenticated view)
         if (!isReadOnly) {

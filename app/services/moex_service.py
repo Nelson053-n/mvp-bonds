@@ -250,10 +250,20 @@ class MOEXService:
             raise PriceNotFoundError(secid, "акция")
         company_rating = await self._get_credit_rating(secid)
 
+        # Previous trading session close. If LAST is present, LCLOSE is yesterday's close.
+        # If LAST is missing and we fell back to LCLOSE as current, prev close is unknown.
+        prev_close = None
+        if md_row.get("LAST") is not None and md_row.get("LCLOSE") is not None:
+            try:
+                prev_close = float(md_row.get("LCLOSE"))
+            except (TypeError, ValueError):
+                prev_close = None
+
         snapshot = StockSnapshot(
             ticker=secid,
             name=str(name),
             current_price=float(current_price),
+            prev_close_price=prev_close,
             dividend_yield=None,
             company_rating=company_rating,
         )
@@ -344,6 +354,23 @@ class MOEXService:
             logger.error("Не удалось получить цену облигации %s", secid)
             raise PriceNotFoundError(secid, "облигация")
 
+        # Previous trading session close % of face. Only meaningful when we have
+        # today's LAST — otherwise current price already IS the prev close.
+        prev_close_percent: float | None = None
+        if md_row.get("LAST") is not None:
+            for cand in (
+                sec_row.get("PREVLEGALCLOSEPRICE"),
+                sec_row.get("PREVPRICE"),
+                sec_row.get("PREVWAPRICE"),
+                md_row.get("LCLOSE"),
+            ):
+                if cand is not None:
+                    try:
+                        prev_close_percent = float(cand)
+                        break
+                    except (TypeError, ValueError):
+                        continue
+
         nominal = sec_row.get("FACEVALUE")
         coupon = sec_row.get("COUPONVALUE")
         coupon_period = sec_row.get("COUPONPERIOD")
@@ -421,6 +448,7 @@ class MOEXService:
             ticker=secid,
             name=str(name),
             clean_price_percent=float(clean_price_percent),
+            prev_close_percent=prev_close_percent,
             nominal=nominal_rub,
             coupon=coupon_rub,
             coupon_period=(
