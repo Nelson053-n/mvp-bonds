@@ -2521,16 +2521,23 @@
       window._profitMode = localStorage.getItem('mvp_profit_mode') === 'day' ? 'day' : 'total';
       function setProfitMode(m) {
         window._profitMode = (m === 'day') ? 'day' : 'total';
-        localStorage.setItem('mvp_profit_mode', window._profitMode);
+        try { localStorage.setItem('mvp_profit_mode', window._profitMode); } catch(e) {}
         const th = document.getElementById('th-profit');
-        if (th) {
-          const lbl = th.querySelector('.th-profit-label');
-          if (lbl) lbl.textContent = window._profitMode === 'day' ? 'За день' : (TRANSLATIONS[window._lang]?.['tbl.profit'] || 'Прибыль');
-          const toggle = document.getElementById('th-profit-toggle');
-          if (toggle) {
-            toggle.style.borderColor = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--border)';
-            toggle.style.color = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--text-muted)';
-          }
+        if (!th) return;
+        const lbl = th.querySelector('.th-profit-label');
+        if (lbl) {
+          let totalLabel = 'Прибыль';
+          try {
+            if (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[window._lang]) {
+              totalLabel = TRANSLATIONS[window._lang]['tbl.profit'] || totalLabel;
+            }
+          } catch(e) {}
+          lbl.textContent = window._profitMode === 'day' ? 'За день' : totalLabel;
+        }
+        const toggle = document.getElementById('th-profit-toggle');
+        if (toggle) {
+          toggle.style.borderColor = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--border)';
+          toggle.style.color = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--text-muted)';
         }
       }
       function getSortValue(row, key) {
