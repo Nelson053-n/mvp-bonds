@@ -326,7 +326,7 @@
 
       /* ── STATUS ──────────────────────────────────────────────── */
       .status { font-size: 12px; min-height: 16px; margin-top: 8px; font-weight: 500; }
-      .status.error { color: var(--red-600); }
+      .status.error { color: var(--red-400); }
       .status.ok    { color: var(--green-600); }
 
       /* ── FORMS ───────────────────────────────────────────────── */
@@ -2681,7 +2681,7 @@
           if (summary.hasDayData) {
             const dp = summary.dayProfit;
             const dpct = summary.dayBase > 0 ? (dp / summary.dayBase) * 100 : 0;
-            const color = dp > 0 ? 'var(--green-600)' : (dp < 0 ? 'var(--red-600)' : 'var(--text-muted)');
+            const color = dp > 0 ? 'var(--green-400)' : (dp < 0 ? 'var(--red-400)' : 'var(--text-muted)');
             const sign = dp >= 0 ? '+' : '';
             const pctSign = dpct >= 0 ? '+' : '';
             dayLine = '<br><span style="font-size:11px;color:' + color + ';font-weight:500;">'
@@ -7749,7 +7749,7 @@
           setTimeout(() => { statusEl.textContent = ''; }, 3000);
         } catch (err) {
           statusEl.textContent = t('error.prefix') + (err.message || '');
-          statusEl.style.color = 'var(--red-600)';
+          statusEl.style.color = 'var(--red-400)';
         }
       }
 
@@ -7771,7 +7771,7 @@
           setTimeout(() => { statusEl.textContent = ''; }, 3000);
         } catch (err) {
           statusEl.textContent = t('error.prefix') + (err.message || '');
-          statusEl.style.color = 'var(--red-600)';
+          statusEl.style.color = 'var(--red-400)';
         }
       }
 
@@ -8119,7 +8119,7 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = `<tr><td colspan="11" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="11" style="color:var(--red-400);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 
@@ -8177,7 +8177,7 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red-600);text-align:center;">${t('adm.loadError')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red-400);text-align:center;">${t('adm.loadError')}</td></tr>`;
         }
       }
 
@@ -8316,7 +8316,7 @@
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--red-400);text-align:center;">Ошибка загрузки</td></tr>';
         }
       }
 
@@ -8404,7 +8404,7 @@
             tbody.appendChild(tr);
           });
         } catch(err) {
-          tbody.innerHTML = '<tr><td colspan="8" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="color:var(--red-400);text-align:center;">Ошибка загрузки</td></tr>';
         }
       }
 
@@ -8589,7 +8589,7 @@
           });
         } catch(e) {
           console.error('settingsLoadPortfolios error:', e);
-          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-600);text-align:center;">Ошибка загрузки</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red-400);text-align:center;">Ошибка загрузки</td></tr>';
         }
       }
 
