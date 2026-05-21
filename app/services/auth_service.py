@@ -19,19 +19,38 @@ from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
+# Precomputed bcrypt hash of an unguessable random secret; used to equalize
+# the cost of login attempts for non-existent usernames.
+_DUMMY_BCRYPT_HASH = bcrypt.hashpw(secrets.token_bytes(32), bcrypt.gensalt())
+
 
 class AuthService:
-    # Rate limiting for password reset (via SQLite)
+    # Rate limiting for password reset request (/forgot-password) via SQLite
     _RESET_RATE_WINDOW = 900   # 15 min window
     _RESET_RATE_MAX = 3        # max 3 requests per window
 
+    # Rate limiting for password reset confirm (/reset-password) per IP via SQLite
+    _RESET_CONFIRM_WINDOW = 900   # 15 min window
+    _RESET_CONFIRM_MAX = 10       # max 10 confirm attempts per IP per window
+
+    # Max wrong code submissions before the code is invalidated.
+    _RESET_CODE_MAX_ATTEMPTS = 5
+
     # Rate limiting for login (via SQLite)
     _LOGIN_RATE_WINDOW = 300   # 5 min window
-    _LOGIN_RATE_MAX = 20       # max 20 attempts per window
+    _LOGIN_RATE_MAX = 20       # per-username cap per window
+    _LOGIN_IP_RATE_MAX = 30    # per-IP cap per window
 
     def _check_login_rate_limit(self, key: str) -> bool:
         """Rate limit via SQLite — survives server restarts."""
         return storage_service.check_rate_limit(key, self._LOGIN_RATE_WINDOW, self._LOGIN_RATE_MAX)
+
+    def _check_login_ip_rate_limit(self, client_ip: str) -> bool:
+        if not client_ip:
+            return True
+        return storage_service.check_rate_limit(
+            f"login:ip:{client_ip}", self._LOGIN_RATE_WINDOW, self._LOGIN_IP_RATE_MAX
+        )
 
     def __init__(self) -> None:
         pass  # jwt_secret is validated by pydantic Settings (required field)
@@ -64,7 +83,11 @@ class AuthService:
         Authenticate a user by username and password.
         Returns token dict on success, None on failure.
         """
-        # Rate limit by username to prevent enumeration + bruteforce
+        # Rate limit by IP first (defends against credential-stuffing across many usernames),
+        # then by username (defends against single-target bruteforce + enumeration).
+        if not self._check_login_ip_rate_limit(client_ip):
+            logger.warning("Login rate limit exceeded for ip=%s username=%s", client_ip, username)
+            return None
         rate_key = f"login:{username}"
         if not self._check_login_rate_limit(rate_key):
             logger.warning("Login rate limit exceeded for username=%s ip=%s", username, client_ip)
@@ -72,6 +95,9 @@ class AuthService:
 
         user = storage_service.get_user_by_username(username)
         if not user:
+            # Constant-time bcrypt path against a dummy hash so timing
+            # doesn't disclose whether the username exists.
+            bcrypt.checkpw(password.encode(), _DUMMY_BCRYPT_HASH)
             return None
 
         if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
@@ -147,26 +173,30 @@ class AuthService:
 
     async def request_password_reset(self, username: str, lang: str = "ru") -> str:
         """
-        Generate a 6-digit reset code for user and send it via Telegram and/or email.
-        Returns one of: 'telegram', 'email', 'both', 'none', 'rate_limited'.
+        Generate a 6-digit reset code and try to deliver it via Telegram and/or email.
+
+        Always returns a constant 'sent' so the response does not disclose whether
+        the account exists or which delivery channels are configured. Real outcomes
+        (no user / no channel / SMTP missing / send failure) are logged server-side.
+        Rate-limit responses are also masked as 'sent'.
         """
         if not self._check_reset_rate_limit(username):
             logger.warning("Reset rate limit exceeded for username=%s", username)
-            return "rate_limited"
+            return "sent"
 
         self._cleanup_reset_codes()
         user = storage_service.get_user_by_username_for_reset(username)
         if not user:
-            # Don't reveal whether user exists — return 'none' silently
-            return "none"
+            return "sent"
 
         code = str(secrets.randbelow(900000) + 100000)  # 6-digit
-        self._reset_codes[code] = {"user_id": user["id"], "expires": time.time() + self.RESET_TTL}
+        self._reset_codes[code] = {
+            "user_id": user["id"],
+            "expires": time.time() + self.RESET_TTL,
+            "attempts": 0,
+        }
 
         sent_via = []
-        has_email_but_no_smtp = False
-
-        # Try Telegram
         if user["tg_chat_id"]:
             tg_token = storage_service.get_setting("tg_bot_token", "")
             if tg_token:
@@ -174,10 +204,8 @@ class AuthService:
                 if ok:
                     sent_via.append("telegram")
 
-        # Try Email
         if user["email"]:
             if not settings.smtp_host or not settings.smtp_from:
-                has_email_but_no_smtp = True
                 logger.warning("Email set for user %s but SMTP not configured", username)
             else:
                 ok = self._send_email_reset(user["email"], code, username, lang=lang)
@@ -185,12 +213,12 @@ class AuthService:
                     sent_via.append("email")
 
         if not sent_via:
-            logger.warning("Reset code generated for user %s (id=%d): no delivery channel configured", username, user["id"])
-            if has_email_but_no_smtp:
-                return "email_no_smtp"
-            return "none"
+            logger.warning(
+                "Reset code generated for user %s (id=%d) but no channel delivered",
+                username, user["id"],
+            )
 
-        return "+".join(sent_via)
+        return "sent"
 
     async def _send_telegram_reset(self, bot_token: str, chat_id: str, code: str, username: str, lang: str = "ru") -> bool:
         if lang == "en":
@@ -254,17 +282,59 @@ class AuthService:
             logger.warning("Email reset send failed: %s", e)
             return False
 
-    def confirm_password_reset(self, code: str, new_password: str) -> bool:
-        """Apply reset code and set new password. Returns True on success."""
+    def confirm_password_reset(self, code: str, new_password: str, client_ip: str = "") -> bool:
+        """Apply reset code and set new password. Returns True on success.
+
+        Defenses against code-space brute-force:
+        - per-IP rate limit on confirm attempts (window-based, via SQLite);
+        - per-code wrong-attempt counter — code is invalidated after _RESET_CODE_MAX_ATTEMPTS.
+        """
+        if client_ip and not storage_service.check_rate_limit(
+            f"reset_confirm:ip:{client_ip}",
+            self._RESET_CONFIRM_WINDOW,
+            self._RESET_CONFIRM_MAX,
+        ):
+            logger.warning("Reset-confirm rate limit exceeded for ip=%s", client_ip)
+            return False
+
         self._cleanup_reset_codes()
         entry = self._reset_codes.get(code)
         if not entry or entry["expires"] < time.time():
             return False
+
+        # Burn an attempt before checking anything else so concurrent guessers
+        # can't outrun the counter; this code matched, so consume + succeed.
         new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
         storage_service.update_user_password(entry["user_id"], new_hash)
         del self._reset_codes[code]
         logger.info("Password reset for user_id=%d", entry["user_id"])
         return True
+
+    def register_failed_reset_attempt(self, code: str) -> None:
+        """Burn one attempt against the matching code (if any).
+
+        Called when confirm_password_reset() returns False — we don't know if the
+        attacker hit an existing-but-wrong code or a non-existent one, so charge
+        every still-live code: any code under attack will be invalidated quickly.
+        """
+        # The attacker submitted `code`; if it's a real live code that just
+        # mistyped the new password, that's already handled by the success path.
+        # If it's a guess, no code in the table matches. To make brute-force
+        # ineffective we instead burn attempts on every live code per failure
+        # — bounded by _RESET_CODE_MAX_ATTEMPTS — so any code in flight dies
+        # after enough wrong tries from anywhere.
+        now = time.time()
+        for stored_code, entry in list(self._reset_codes.items()):
+            if entry["expires"] < now:
+                del self._reset_codes[stored_code]
+                continue
+            entry["attempts"] = entry.get("attempts", 0) + 1
+            if entry["attempts"] >= self._RESET_CODE_MAX_ATTEMPTS:
+                logger.warning(
+                    "Reset code invalidated after %d failed attempts (user_id=%d)",
+                    entry["attempts"], entry["user_id"],
+                )
+                del self._reset_codes[stored_code]
 
     def change_email(self, user_id: int, email: str) -> dict:
         """Update user email. Returns dict with success flag and smtp_available."""

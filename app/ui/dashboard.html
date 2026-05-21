@@ -6974,25 +6974,12 @@
                   method: 'POST', headers: {'Content-Type': 'application/json'},
                   body: JSON.stringify({ username, lang: window._lang || 'ru' })
                 });
-                const d = await r.json();
-                if (d.method === 'email_no_smtp') {
-                  msg.textContent = window._lang === 'en'
-                    ? 'Email is saved but SMTP is not configured on the server. Add your Telegram Chat ID in Settings for recovery.'
-                    : 'Email указан, но SMTP не настроен на сервере. Добавьте Telegram Chat ID в Настройках для восстановления.';
-                  msg.className = 'auth-msg error';
-                } else if (d.method === 'none') {
-                  msg.textContent = window._lang === 'en'
-                    ? 'No recovery method set. Add Telegram Chat ID or Email in Settings > Account.'
-                    : 'Нет способа восстановления. Укажите Telegram Chat ID или email в Настройках > Аккаунт.';
-                  msg.className = 'auth-msg error';
-                } else {
-                  const ch = d.method.includes('telegram') ? 'Telegram' : 'Email';
-                  msg.textContent = window._lang === 'en'
-                    ? `Code sent to ${ch}. Enter it below.`
-                    : `Код отправлен в ${ch}. Введите его ниже.`;
-                  msg.className = 'auth-msg success';
-                  document.getElementById('forgot-code-wrap').style.display = 'block';
-                }
+                await r.json().catch(() => ({}));
+                msg.textContent = window._lang === 'en'
+                  ? 'If an account with that username exists and has a recovery channel (Telegram / Email), a code has been sent. Enter it below.'
+                  : 'Если пользователь существует и у него есть канал восстановления (Telegram / Email), код отправлен. Введите его ниже.';
+                msg.className = 'auth-msg success';
+                document.getElementById('forgot-code-wrap').style.display = 'block';
               } catch(e) {
                 msg.textContent = 'Ошибка соединения';
                 msg.className = 'auth-msg error';

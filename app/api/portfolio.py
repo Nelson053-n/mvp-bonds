@@ -401,7 +401,10 @@ async def get_item_alerts(
 ) -> dict:
     """Get price alerts for an instrument."""
     await get_portfolio_or_403(portfolio_id, current_user)
-    alerts = storage_service.get_price_alerts_for_item(item_id)
+    item = storage_service.get_item(item_id, portfolio_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Инструмент не найден")
+    alerts = storage_service.get_price_alerts_for_item(item_id, current_user["sub"])
     return {"alerts": alerts}
 
 

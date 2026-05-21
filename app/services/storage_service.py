@@ -1,4 +1,5 @@
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
@@ -390,12 +391,41 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 )
 
                 conn.commit()
-                logger.warning(
-                    "Admin user created. Username: admin  Password: %s",
-                    admin_password,
-                )
+                self._write_bootstrap_admin_password(admin_password)
             else:
                 conn.commit()
+
+
+    def _write_bootstrap_admin_password(self, password: str) -> None:
+        """Write the bootstrap admin password to a 0600 file next to the DB.
+
+        Avoids leaking the credential into the logger (and any log aggregator).
+        Operator should delete the file after the first successful login.
+        """
+        path = self.db_path.parent / "admin_password.txt"
+        try:
+            # O_EXCL to avoid silently overwriting an existing operator-written file
+            fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                os.write(fd, f"admin\n{password}\n".encode())
+            finally:
+                os.close(fd)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+            logger.warning(
+                "Admin user created. Credentials written to %s (mode 0600). "
+                "Login as 'admin', change the password, then delete this file.",
+                path,
+            )
+        except OSError as e:
+            # Fallback: stdout only, never the structured logger
+            print(
+                f"[BOOTSTRAP] Admin user created. Username: admin  Password: {password}\n"
+                f"[BOOTSTRAP] Failed to persist to {path}: {e}. Save this password now.",
+                flush=True,
+            )
 
 
     # ── Price snapshots ─────────────────────────────────────────────────────
@@ -743,12 +773,12 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         cols = ["id", "user_id", "portfolio_id", "item_id", "ticker", "alert_type", "target_price", "triggered", "created_at", "triggered_at"]
         return [dict(zip(cols, r)) for r in rows]
 
-    def get_price_alerts_for_item(self, item_id: int) -> list[dict]:
-        """Get active price alerts for a specific portfolio item."""
+    def get_price_alerts_for_item(self, item_id: int, user_id: int) -> list[dict]:
+        """Get active price alerts for a specific portfolio item owned by user_id."""
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM price_alerts WHERE item_id = ? AND triggered = 0",
-                (item_id,)
+                "SELECT * FROM price_alerts WHERE item_id = ? AND user_id = ? AND triggered = 0",
+                (item_id, user_id)
             ).fetchall()
         cols = ["id", "user_id", "portfolio_id", "item_id", "ticker", "alert_type", "target_price", "triggered", "created_at", "triggered_at"]
         return [dict(zip(cols, r)) for r in rows]

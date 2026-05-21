@@ -169,17 +169,30 @@ class ResetPasswordInput(BaseModel):
 
 
 @router.post("/forgot-password")
-async def forgot_password(payload: ForgotPasswordInput) -> dict:
-    """Request password reset. Sends 6-digit code via Telegram and/or email."""
+async def forgot_password(payload: ForgotPasswordInput, request: Request) -> dict:
+    """Request password reset. Sends 6-digit code via Telegram and/or email.
+
+    Response intentionally does not disclose whether the username exists.
+    """
+    client_ip = request.client.host if request.client else ""
+    # Cap forgot-password requests per IP to slow username enumeration sweeps.
+    if client_ip and not storage_service.check_rate_limit(
+        f"forgot:ip:{client_ip}", 900, 20
+    ):
+        logger.warning("forgot-password rate limit exceeded ip=%s", client_ip)
+        return {"method": "sent"}
     method = await auth_service.request_password_reset(payload.username, lang=payload.lang)
     return {"method": method}
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
-async def reset_password(payload: ResetPasswordInput) -> None:
+async def reset_password(payload: ResetPasswordInput, request: Request) -> None:
     """Apply reset code and set a new password."""
-    ok = auth_service.confirm_password_reset(payload.code, payload.new_password)
+    client_ip = request.client.host if request.client else ""
+    ok = auth_service.confirm_password_reset(payload.code, payload.new_password, client_ip)
     if not ok:
+        # Burn an attempt against any live code so brute-force can't survive.
+        auth_service.register_failed_reset_attempt(payload.code)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Неверный или просроченный код",

@@ -72,12 +72,15 @@ async def get_portfolio_or_403(portfolio_id: int, current_user: dict) -> dict:
 
 
 def get_shared_portfolio(
+    request: Request,
     share_token: str,
     x_share_password: str | None = Header(None),
 ) -> dict:
     """Validate shared portfolio token, expiry, and password.
 
     Reusable dependency for all /share/{token}/... endpoints.
+    Rate-limits password attempts per (share_token, client_ip) to make
+    bcrypt-checked passwords infeasible to brute-force online.
     """
     portfolio = storage_service.get_portfolio_by_share_token(share_token)
     if not portfolio:
@@ -89,6 +92,12 @@ def get_shared_portfolio(
     if portfolio["share_password_hash"]:
         if not x_share_password:
             raise HTTPException(status_code=403, detail="Требуется пароль")
+        client_ip = request.client.host if request.client else ""
+        # 10 attempts per 15 min per (token, ip)
+        if client_ip and not storage_service.check_rate_limit(
+            f"share_pw:{share_token}:{client_ip}", 900, 10
+        ):
+            raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте позже")
         if not bcrypt.checkpw(x_share_password.encode(), portfolio["share_password_hash"].encode()):
             raise HTTPException(status_code=403, detail="Неверный пароль")
 

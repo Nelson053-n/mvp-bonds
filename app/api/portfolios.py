@@ -44,7 +44,7 @@ class PortfoliosListResponse(BaseModel):
 
 
 class SharePortfolioInput(BaseModel):
-    password: str | None = Field(None, min_length=1, max_length=100)
+    password: str | None = Field(None, min_length=8, max_length=100)
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
 
 
