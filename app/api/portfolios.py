@@ -260,6 +260,36 @@ async def get_all_table(current_user: dict = Depends(get_current_user)) -> dict:
     return {"items": items}
 
 
+@router.get("/all/totals")
+async def get_all_totals(current_user: dict = Depends(get_current_user)) -> dict:
+    """Per-portfolio totals across all of user's portfolios in one round-trip.
+
+    Replaces N parallel /portfolios/{id}/table calls the SPA used to do just to
+    sum current_value. Reads from portfolio_service which is backed by the
+    background MOEX cache, so this is cheap.
+    """
+    user_id = current_user["sub"]
+    portfolios_data = storage_service.get_portfolios(user_id)
+    totals: list[dict] = []
+    grand_value = 0.0
+    for p in portfolios_data:
+        try:
+            rows = await portfolio_service.get_table(p["id"])
+        except Exception:
+            rows = []
+        p_value = sum(float(getattr(r, "current_value", 0) or 0) for r in rows)
+        totals.append({
+            "id": p["id"],
+            "name": p["name"],
+            "total_value": round(p_value, 2),
+        })
+        grand_value += p_value
+    return {
+        "totals": totals,
+        "grand_total_value": round(grand_value, 2),
+    }
+
+
 @router.get("/all/snapshots")
 async def get_all_snapshots(
     days: int = 90,

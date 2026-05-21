@@ -7117,23 +7117,33 @@
         }
       }
 
+      // Cached & coalesced: one /all/totals call replaces N parallel /table calls.
+      // TTL keeps the stat-card "Все портфели" fresh enough without hammering the API
+      // when the user switches panels or syncs back-to-back.
+      let _allTotalsCache = { value: null, at: 0, inflight: null };
+      const ALL_TOTALS_TTL_MS = 30 * 1000;
+
       async function calculateAllPortfoliosTotal() {
-        try {
-          const results = await Promise.all(portfolios.map(async p => {
-            try {
-              const res = await apiFetch(`/portfolios/${p.id}/table`);
-              if (res.ok) {
-                const data = await res.json();
-                return (data.items || []).reduce((sum, item) => sum + Number(item.current_value || 0), 0);
-              }
-            } catch(e) {}
-            return 0;
-          }));
-          return results.reduce((a, b) => a + b, 0);
-        } catch (err) {
-          console.error('Failed to calculate total portfolios value:', err);
-          return 0;
+        const now = Date.now();
+        if (_allTotalsCache.value !== null && now - _allTotalsCache.at < ALL_TOTALS_TTL_MS) {
+          return _allTotalsCache.value;
         }
+        if (_allTotalsCache.inflight) return _allTotalsCache.inflight;
+        _allTotalsCache.inflight = (async () => {
+          try {
+            const res = await apiFetch('/portfolios/all/totals');
+            if (!res.ok) return _allTotalsCache.value ?? 0;
+            const data = await res.json();
+            const v = Number(data.grand_total_value || 0);
+            _allTotalsCache = { value: v, at: Date.now(), inflight: null };
+            return v;
+          } catch (err) {
+            console.error('Failed to load /all/totals:', err);
+            _allTotalsCache.inflight = null;
+            return _allTotalsCache.value ?? 0;
+          }
+        })();
+        return _allTotalsCache.inflight;
       }
 
       function updatePortfolioSelector() {
