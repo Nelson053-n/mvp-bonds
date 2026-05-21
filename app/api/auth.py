@@ -190,10 +190,18 @@ async def reset_password(payload: ResetPasswordInput, request: Request) -> None:
     """Apply reset code and set a new password."""
     client_ip = request.client.host if request.client else ""
     ok = auth_service.confirm_password_reset(payload.code, payload.new_password, client_ip)
-    if not ok:
-        # Burn an attempt against any live code so brute-force can't survive.
-        auth_service.register_failed_reset_attempt(payload.code)
+    if ok:
+        return None
+    # On failure: charge IP window AND burn an attempt against every live code.
+    # Order matters — check IP limit first so an attacker who already burned
+    # the window can't keep spending live-code attempts for free.
+    if auth_service.is_reset_confirm_rate_limited(client_ip):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Неверный или просроченный код",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много попыток. Попробуйте позже",
         )
+    auth_service.register_failed_reset_attempt()
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Неверный или просроченный код",
+    )

@@ -157,15 +157,7 @@ class AuthService:
 
     # ── Password Reset ────────────────────────────────────────────
 
-    # In-memory store: code -> {user_id, expires}
-    _reset_codes: dict[str, dict] = {}
     RESET_TTL = 900  # 15 minutes
-
-    def _cleanup_reset_codes(self) -> None:
-        now = time.time()
-        expired = [k for k, v in self._reset_codes.items() if v["expires"] < now]
-        for k in expired:
-            del self._reset_codes[k]
 
     def _check_reset_rate_limit(self, username: str) -> bool:
         key = f"reset:{username}"
@@ -184,17 +176,13 @@ class AuthService:
             logger.warning("Reset rate limit exceeded for username=%s", username)
             return "sent"
 
-        self._cleanup_reset_codes()
         user = storage_service.get_user_by_username_for_reset(username)
         if not user:
             return "sent"
 
         code = str(secrets.randbelow(900000) + 100000)  # 6-digit
-        self._reset_codes[code] = {
-            "user_id": user["id"],
-            "expires": time.time() + self.RESET_TTL,
-            "attempts": 0,
-        }
+        expires_at = int(time.time() + self.RESET_TTL)
+        storage_service.insert_password_reset_code(code, user["id"], expires_at)
 
         sent_via = []
         if user["tg_chat_id"]:
@@ -286,55 +274,58 @@ class AuthService:
         """Apply reset code and set new password. Returns True on success.
 
         Defenses against code-space brute-force:
-        - per-IP rate limit on confirm attempts (window-based, via SQLite);
-        - per-code wrong-attempt counter — code is invalidated after _RESET_CODE_MAX_ATTEMPTS.
+        - per-IP rate limit on FAILED confirm attempts (window-based, via SQLite) —
+          successful resets do not consume the window, so a legitimate user can
+          always reset even if an attacker has exhausted the IP they share;
+        - per-code wrong-attempt counter — every live code dies after
+          _RESET_CODE_MAX_ATTEMPTS guesses from any source.
+
+        State lives in SQLite (password_reset_codes table) so it is shared
+        across workers and survives restarts.
         """
-        if client_ip and not storage_service.check_rate_limit(
+        now_ts = int(time.time())
+        user_id = storage_service.consume_password_reset_code(code, now_ts)
+        if user_id is None:
+            return False
+
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        storage_service.update_user_password(user_id, new_hash)
+        logger.info("Password reset for user_id=%d", user_id)
+        return True
+
+    def is_reset_confirm_rate_limited(self, client_ip: str) -> bool:
+        """Charge one failure window slot for client_ip; True if blocked.
+
+        Called from the route on EVERY failed /reset-password (only fails count).
+        """
+        if not client_ip:
+            return False
+        allowed = storage_service.check_rate_limit(
             f"reset_confirm:ip:{client_ip}",
             self._RESET_CONFIRM_WINDOW,
             self._RESET_CONFIRM_MAX,
-        ):
+        )
+        if not allowed:
             logger.warning("Reset-confirm rate limit exceeded for ip=%s", client_ip)
-            return False
+        return not allowed
 
-        self._cleanup_reset_codes()
-        entry = self._reset_codes.get(code)
-        if not entry or entry["expires"] < time.time():
-            return False
+    def register_failed_reset_attempt(self) -> None:
+        """Burn one attempt against every still-live code.
 
-        # Burn an attempt before checking anything else so concurrent guessers
-        # can't outrun the counter; this code matched, so consume + succeed.
-        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-        storage_service.update_user_password(entry["user_id"], new_hash)
-        del self._reset_codes[code]
-        logger.info("Password reset for user_id=%d", entry["user_id"])
-        return True
-
-    def register_failed_reset_attempt(self, code: str) -> None:
-        """Burn one attempt against the matching code (if any).
-
-        Called when confirm_password_reset() returns False — we don't know if the
-        attacker hit an existing-but-wrong code or a non-existent one, so charge
-        every still-live code: any code under attack will be invalidated quickly.
+        Called when confirm_password_reset() returns False. Because the attacker
+        doesn't get to pick which code their guess matches, charging every live
+        code per failure means any code under brute-force dies after
+        _RESET_CODE_MAX_ATTEMPTS tries from any source.
         """
-        # The attacker submitted `code`; if it's a real live code that just
-        # mistyped the new password, that's already handled by the success path.
-        # If it's a guess, no code in the table matches. To make brute-force
-        # ineffective we instead burn attempts on every live code per failure
-        # — bounded by _RESET_CODE_MAX_ATTEMPTS — so any code in flight dies
-        # after enough wrong tries from anywhere.
-        now = time.time()
-        for stored_code, entry in list(self._reset_codes.items()):
-            if entry["expires"] < now:
-                del self._reset_codes[stored_code]
-                continue
-            entry["attempts"] = entry.get("attempts", 0) + 1
-            if entry["attempts"] >= self._RESET_CODE_MAX_ATTEMPTS:
-                logger.warning(
-                    "Reset code invalidated after %d failed attempts (user_id=%d)",
-                    entry["attempts"], entry["user_id"],
-                )
-                del self._reset_codes[stored_code]
+        now_ts = int(time.time())
+        invalidated = storage_service.burn_password_reset_attempts(
+            self._RESET_CODE_MAX_ATTEMPTS, now_ts
+        )
+        if invalidated:
+            logger.warning(
+                "Reset code(s) invalidated after %d failed attempts: count=%d",
+                self._RESET_CODE_MAX_ATTEMPTS, invalidated,
+            )
 
     def change_email(self, user_id: int, email: str) -> dict:
         """Update user email. Returns dict with success flag and smtp_available."""

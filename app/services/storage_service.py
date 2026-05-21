@@ -278,6 +278,23 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                     UNIQUE(benchmark, snapshot_date)
                 )
             """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_codes (
+                    code TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """)
+            try:
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_password_reset_codes_expires "
+                    "ON password_reset_codes(expires_at)"
+                )
+            except sqlite3.OperationalError:
+                pass
             try:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_benchmark_snapshots_lookup "
@@ -517,6 +534,54 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             conn.commit()
             return True
+
+    # ── Password reset codes ────────────────────────────────────────────────
+
+    def insert_password_reset_code(self, code: str, user_id: int, expires_at: int) -> None:
+        """Store a fresh reset code; overwrites any prior code with the same value."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO password_reset_codes (code, user_id, expires_at, attempts) "
+                "VALUES (?, ?, ?, 0)",
+                (code, user_id, expires_at),
+            )
+            conn.commit()
+
+    def consume_password_reset_code(self, code: str, now_ts: int) -> int | None:
+        """Atomically consume a valid (non-expired) code. Returns user_id or None.
+
+        Single-use: row is deleted on success so concurrent confirms can't reuse it.
+        """
+        with self._connect() as conn:
+            # Opportunistic GC of expired codes
+            conn.execute("DELETE FROM password_reset_codes WHERE expires_at < ?", (now_ts,))
+            row = conn.execute(
+                "DELETE FROM password_reset_codes WHERE code = ? AND expires_at >= ? "
+                "RETURNING user_id",
+                (code, now_ts),
+            ).fetchone()
+            conn.commit()
+            return int(row[0]) if row else None
+
+    def burn_password_reset_attempts(self, max_attempts: int, now_ts: int) -> int:
+        """Increment attempts on every live code; delete any that hit max_attempts.
+
+        Returns number of codes invalidated by this call. Used after a failed
+        /reset-password to make brute-force ineffective: any in-flight code
+        dies after enough wrong tries from any source.
+        """
+        with self._connect() as conn:
+            conn.execute("DELETE FROM password_reset_codes WHERE expires_at < ?", (now_ts,))
+            conn.execute(
+                "UPDATE password_reset_codes SET attempts = attempts + 1 WHERE expires_at >= ?",
+                (now_ts,),
+            )
+            cur = conn.execute(
+                "DELETE FROM password_reset_codes WHERE attempts >= ?",
+                (max_attempts,),
+            )
+            conn.commit()
+            return cur.rowcount or 0
 
     # ── Admin ───────────────────────────────────────────────────────────────
 
