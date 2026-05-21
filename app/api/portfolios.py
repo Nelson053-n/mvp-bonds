@@ -465,27 +465,39 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
         except Exception:
             pass
 
-    # 4) Free cash across all portfolios
-    free_cash_rub = 0.0
-    for p in portfolios_data:
-        try:
-            cfg = storage_service.get_sync_config(p["id"])
-            if cfg and cfg.get("cash_balance"):
-                import json as _json
-                cash_list = _json.loads(cfg["cash_balance"])
-                from app.services.moex_service import moex_service as _moex
-                for c in cash_list:
+    # 4) Free cash across all portfolios — gather distinct FX rates concurrently,
+    #    then fold cash totals; key_rate runs alongside via asyncio.gather.
+    async def _compute_free_cash_all() -> float:
+        import json as _json
+        from app.services.moex_service import moex_service as _moex
+
+        all_cash: list[tuple[str, float]] = []
+        for p in portfolios_data:
+            try:
+                cfg = storage_service.get_sync_config(p["id"])
+                if not cfg or not cfg.get("cash_balance"):
+                    continue
+                for c in _json.loads(cfg["cash_balance"]):
                     ccy = (c.get("currency") or "").upper()
                     amt = float(c.get("amount") or 0)
-                    if ccy in ("RUB", "SUR", ""):
-                        rate = 1.0
-                    else:
-                        rate = await _moex._get_fx_rate(ccy) or 0.0
-                    free_cash_rub += amt * rate
-        except Exception:
-            continue
+                    all_cash.append((ccy, amt))
+            except Exception:
+                continue
 
-    key_rate = await cbr_service.get_key_rate()
+        non_rub = {ccy for ccy, _ in all_cash if ccy not in ("RUB", "SUR", "")}
+        import asyncio as _aio
+        fx_rates = dict(zip(non_rub, await _aio.gather(*(_moex._get_fx_rate(ccy) for ccy in non_rub))))
+        total = 0.0
+        for ccy, amt in all_cash:
+            rate = 1.0 if ccy in ("RUB", "SUR", "") else (fx_rates.get(ccy) or 0.0)
+            total += amt * rate
+        return total
+
+    import asyncio as _asyncio
+    free_cash_rub, key_rate = await _asyncio.gather(
+        _compute_free_cash_all(),
+        cbr_service.get_key_rate(),
+    )
 
     return {
         "events": events,
@@ -791,27 +803,39 @@ async def get_analytics_extra(
     except Exception:
         pass
 
-    # 4) Free cash (RUB equivalent) — from portfolio_sync
-    free_cash_rub = 0.0
-    try:
-        cfg = storage_service.get_sync_config(portfolio_id)
-        if cfg and cfg.get("cash_balance"):
+    # 4) Free cash (RUB equivalent) — from portfolio_sync.
+    #    FX rates are fetched in parallel; key_rate runs alongside via asyncio.gather.
+    async def _compute_free_cash() -> float:
+        try:
+            cfg = storage_service.get_sync_config(portfolio_id)
+            if not cfg or not cfg.get("cash_balance"):
+                return 0.0
             import json as _json
             cash_list = _json.loads(cfg["cash_balance"])
             from app.services.moex_service import moex_service as _moex
+            # Gather distinct non-RUB FX rates concurrently.
+            non_rub = {
+                (c.get("currency") or "").upper()
+                for c in cash_list
+                if (c.get("currency") or "").upper() not in ("RUB", "SUR", "")
+            }
+            import asyncio as _aio
+            fx_rates = dict(zip(non_rub, await _aio.gather(*(_moex._get_fx_rate(ccy) for ccy in non_rub))))
+            total = 0.0
             for c in cash_list:
                 ccy = (c.get("currency") or "").upper()
                 amt = float(c.get("amount") or 0)
-                if ccy in ("RUB", "SUR", ""):
-                    rate = 1.0
-                else:
-                    rate = await _moex._get_fx_rate(ccy) or 0.0
-                free_cash_rub += amt * rate
-    except Exception:
-        pass
+                rate = 1.0 if ccy in ("RUB", "SUR", "") else (fx_rates.get(ccy) or 0.0)
+                total += amt * rate
+            return total
+        except Exception:
+            return 0.0
 
-    # 5) Key rate
-    key_rate = await cbr_service.get_key_rate()
+    import asyncio as _asyncio
+    free_cash_rub, key_rate = await _asyncio.gather(
+        _compute_free_cash(),
+        cbr_service.get_key_rate(),
+    )
 
     return {
         "events": events,
