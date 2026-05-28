@@ -1139,6 +1139,7 @@
           #ytm-events-row .card { display: flex; flex-direction: column; }
           #ytm-events-row .card > div:last-child { flex: 1; min-height: 0; overflow: hidden; }
           #ytm-events-row #events-body { max-height: 280px; }
+          #share-dynamics-row { grid-template-columns: 1fr 1fr; }
           @media (max-width: 1024px) {
             #ytm-events-row { grid-template-columns: 1fr !important; }
             #duration-stress-row { grid-template-columns: 1fr !important; }
@@ -7835,7 +7836,6 @@
             const dynRow = document.createElement('div');
             dynRow.className = 'panel-cols';
             dynRow.id = 'share-dynamics-row';
-            dynRow.style.gridTemplateColumns = '1fr 1fr';
             histCard.parentNode.insertBefore(dynRow, histCard);
             dynRow.appendChild(histCard);
             dynRow.appendChild(ytmEventsRow);
