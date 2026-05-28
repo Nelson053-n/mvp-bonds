@@ -349,6 +349,18 @@ class PortfolioService:
                             prev_clean = (snapshot.prev_close_percent / 100.0) * nominal
                             day_profit_val = (clean_price - prev_clean) * item.quantity
                             prev_close_value = (prev_clean + (snapshot.aci or 0.0)) * item.quantity
+                        # For floaters a live exchange coupon always wins over a
+                        # stale manual entry; manual stays only as fallback.
+                        floater_coupon_known = (
+                            snapshot.is_floater
+                            and snapshot.coupon is not None
+                            and snapshot.coupon > 0
+                        )
+                        floater_rate_known = (
+                            snapshot.is_floater
+                            and snapshot.coupon_rate is not None
+                            and snapshot.coupon_rate > 0
+                        )
                         return InstrumentMetrics(
                             id=item.id,
                             type="bond",
@@ -368,24 +380,20 @@ class PortfolioService:
                             nominal=nominal,
                             coupon=(
                                 snapshot.coupon
-                                if snapshot.is_floater and snapshot.coupon is not None and snapshot.coupon > 0
+                                if floater_coupon_known
                                 else (item.manual_coupon if item.manual_coupon is not None else snapshot.coupon)
                             ),
                             coupon_period=snapshot.coupon_period,
                             coupon_rate=(
                                 snapshot.coupon_rate
-                                if snapshot.is_floater and snapshot.coupon_rate is not None and snapshot.coupon_rate > 0
+                                if floater_rate_known
                                 else (item.manual_coupon_rate if item.manual_coupon_rate is not None else snapshot.coupon_rate)
                             ),
                             manual_coupon_set=(
-                                False
-                                if snapshot.is_floater and snapshot.coupon is not None and snapshot.coupon > 0
-                                else item.manual_coupon is not None
+                                False if floater_coupon_known else item.manual_coupon is not None
                             ),
                             manual_coupon_rate_set=(
-                                False
-                                if snapshot.is_floater and snapshot.coupon_rate is not None and snapshot.coupon_rate > 0
-                                else item.manual_coupon_rate is not None
+                                False if floater_rate_known else item.manual_coupon_rate is not None
                             ),
                             is_floater=snapshot.is_floater,
                             maturity_date=snapshot.maturity_date,

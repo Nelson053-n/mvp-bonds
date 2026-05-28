@@ -377,13 +377,17 @@ class MOEXService:
         coupon_rate = sec_row.get("COUPONPERCENT")  # Ставка купона в %
         bond_type = sec_row.get("BONDTYPE", "")  # "Флоатер" for floaters
 
-        # For floaters MOEX sets COUPONVALUE=0 — fetch last known coupon from bondization
+        # Floater detection by bond type — independent of whether MOEX
+        # currently reports a coupon (it may already know the announced one).
         is_floater = (
-            (coupon is None or float(coupon) == 0)
-            and (coupon_rate is None or float(coupon_rate) == 0)
-            and ("флоатер" in (bond_type or "").lower() or "float" in (bond_type or "").lower())
+            "флоатер" in (bond_type or "").lower()
+            or "float" in (bond_type or "").lower()
         )
-        if is_floater:
+        # When MOEX has no coupon yet (COUPONVALUE=0) fetch last known from bondization
+        coupon_unknown = (coupon is None or float(coupon) == 0) and (
+            coupon_rate is None or float(coupon_rate) == 0
+        )
+        if is_floater and coupon_unknown:
             last_coupon = await self.get_last_known_coupon(secid)
             if last_coupon:
                 coupon = last_coupon["value"]
