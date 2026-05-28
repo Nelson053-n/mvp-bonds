@@ -7815,11 +7815,17 @@
           // Hide RGBI toggle and actionable row in share mode
           const rgbiLbl = document.getElementById('rgbi-toggle-label');
           if (rgbiLbl) rgbiLbl.style.display = 'none';
-          // hide events card and cash-reinvest card in share mode
+          // hide events card and cash-reinvest card in share mode (their data
+          // comes from the private analytics-extra endpoint) and reflow the
+          // grids so neighbours fill the freed space — no empty cells.
           const eventsCard = document.getElementById('events-card');
           if (eventsCard) eventsCard.style.display = 'none';
+          const ytmEventsRow = document.getElementById('ytm-events-row');
+          if (ytmEventsRow) ytmEventsRow.style.gridTemplateColumns = '1fr';
           const cashCard = document.getElementById('cash-reinvest-card');
           if (cashCard) cashCard.style.display = 'none';
+          const performersRow = document.getElementById('performers-row');
+          if (performersRow) performersRow.style.gridTemplateColumns = 'repeat(3,1fr)';
 
           // Make brand logo link to bondai.ru in share view
           const brand = document.querySelector('.topbar-brand');
