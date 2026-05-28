@@ -3443,6 +3443,13 @@
         banner.style.display = '';
       }
 
+      // Месяц в родительном падеже для фраз «до конца …»
+      const _MONTHS_GENITIVE = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+      function monthGenitive(date) { return _MONTHS_GENITIVE[date.getMonth()]; }
+      // Месяц в предложном падеже для фраз «в …»
+      const _MONTHS_PREPOSITIONAL = ['январе','феврале','марте','апреле','мае','июне','июле','августе','сентябре','октябре','ноябре','декабре'];
+      function monthPrepositional(date) { return _MONTHS_PREPOSITIONAL[date.getMonth()]; }
+
       // ── CASH-TO-REINVEST CARD ────────────────────────────────────
       function renderCashReinvestCard(extra) {
         const card = document.getElementById('cash-reinvest-card');
@@ -3464,7 +3471,7 @@
         const hasAnything = freeCash > 0 || incomingCoupons > 0 || incomingMaturity > 0 || events.length > 0;
         card.style.display = hasAnything ? '' : 'none';
         const fmtRub = v => Math.round(v).toLocaleString('ru');
-        const monthName = endOfMonth.toLocaleDateString('ru', { month: 'long' });
+        const monthName = monthGenitive(endOfMonth);
         const daysLeftLbl = daysLeft === 0 ? 'сегодня последний день' : daysLeft === 1 ? 'остался 1 день' : (daysLeft < 5 ? `осталось ${daysLeft} дня` : `осталось ${daysLeft} дней`);
         body.innerHTML = `
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
@@ -3498,18 +3505,15 @@
         const today = new Date();
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         const endStr = endOfMonth.toISOString().slice(0, 10);
-        const monthName = endOfMonth.toLocaleDateString('ru', { month: 'long' });
+        const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+        const endNextStr = endOfNextMonth.toISOString().slice(0, 10);
+        const monthName = monthGenitive(endOfMonth);
         if (titleEl) titleEl.textContent = `События до конца ${monthName}`;
-        const filtered = events.filter(e => e.date <= endStr);
-        if (!filtered.length) {
-          body.innerHTML = `<div style="padding:14px 18px;color:var(--text-muted);font-size:13px;text-align:center;">Нет событий до конца ${monthName}</div>`;
-          return;
-        }
         const typeIcon = { coupon: '💰', maturity: '🟢', offer: '📋', buyback: '📋' };
         const typeColor = { coupon: 'var(--blue-500)', maturity: 'var(--green-400)', offer: '#f59e0b', buyback: '#f59e0b' };
         const typeLabel = { coupon: 'купон', maturity: 'погашение', offer: 'оферта', buyback: 'buyback' };
         const todayMid = new Date(); todayMid.setHours(0,0,0,0);
-        body.innerHTML = filtered.map(e => {
+        const renderRow = e => {
           const d = new Date(e.date);
           const diff = Math.round((d - todayMid) / 86400000);
           const dStr = d.toLocaleDateString('ru', { day: 'numeric', month: 'short' });
@@ -3523,7 +3527,21 @@
             </div>
             ${amtStr ? `<div style="font-size:12px;font-weight:600;color:${typeColor[e.type]};white-space:nowrap;">${amtStr}</div>` : ''}
           </div>`;
-        }).join('');
+        };
+        const filtered = events.filter(e => e.date <= endStr);
+        if (filtered.length) {
+          body.innerHTML = filtered.map(renderRow).join('');
+          return;
+        }
+        // Нет событий до конца месяца — показываем заглушку и события следующего месяца
+        const nextMonthName = monthPrepositional(endOfNextMonth);
+        const nextEvents = events.filter(e => e.date > endStr && e.date <= endNextStr);
+        let html = `<div style="padding:14px 18px;color:var(--text-muted);font-size:13px;text-align:center;">Нет событий до конца ${monthName}</div>`;
+        if (nextEvents.length) {
+          html += `<div style="padding:8px 16px 4px;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;">Дальше — в ${nextMonthName}</div>`;
+          html += nextEvents.map(renderRow).join('');
+        }
+        body.innerHTML = html;
       }
 
       // ── YTM CURVE (scatter) ──────────────────────────────────────
