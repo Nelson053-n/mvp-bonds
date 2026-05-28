@@ -1142,6 +1142,7 @@
           @media (max-width: 1024px) {
             #ytm-events-row { grid-template-columns: 1fr !important; }
             #duration-stress-row { grid-template-columns: 1fr !important; }
+            #share-dynamics-row { grid-template-columns: 1fr !important; }
             #ytm-events-row #events-body { max-height: 240px; }
           }
         </style>
@@ -7826,6 +7827,19 @@
           if (cashCard) cashCard.style.display = 'none';
           const performersRow = document.getElementById('performers-row');
           if (performersRow) performersRow.style.gridTemplateColumns = 'repeat(3,1fr)';
+
+          // Put «Динамика стоимости» and «Рыночная доходность» (YTM) side by
+          // side (50/50) in share view; стекаются в столбик на ≤1024px.
+          const histCard = document.getElementById('analytics-history-card');
+          if (histCard && ytmEventsRow && histCard.parentNode) {
+            const dynRow = document.createElement('div');
+            dynRow.className = 'panel-cols';
+            dynRow.id = 'share-dynamics-row';
+            dynRow.style.gridTemplateColumns = '1fr 1fr';
+            histCard.parentNode.insertBefore(dynRow, histCard);
+            dynRow.appendChild(histCard);
+            dynRow.appendChild(ytmEventsRow);
+          }
 
           // Make brand logo link to bondai.ru in share view
           const brand = document.querySelector('.topbar-brand');
