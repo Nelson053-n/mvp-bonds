@@ -2534,7 +2534,9 @@
         return fallback;
       }
       (function initProfitMode() {
-        const stored = localStorage.getItem('mvp_profit_mode');
+        // New key (v2): the legacy 'mvp_profit_mode' held the old total/day default
+        // and would pin T-Bank users to 'total', hiding the new full-profit default.
+        const stored = localStorage.getItem('mvp_profit_mode2');
         window._profitMode = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'full';
       })();
       function setProfitMode(m) {
@@ -2542,7 +2544,7 @@
         if (m !== 'day' && m !== 'total' && m !== 'full') m = supportsFull ? 'full' : 'total';
         if (m === 'full' && !supportsFull) m = 'total';
         window._profitMode = m;
-        try { localStorage.setItem('mvp_profit_mode', window._profitMode); } catch(e) {}
+        try { localStorage.setItem('mvp_profit_mode2', window._profitMode); } catch(e) {}
         const th = document.getElementById('th-profit');
         if (!th) return;
         const lbl = th.querySelector('.th-profit-label');
