@@ -5808,10 +5808,13 @@
         const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = t('table.total'); sumRow.appendChild(lbl);
         // col 7: Стоимость
         addCell(sumRow, fmt(roundTo2(summary.totalAssets)) + ' ₽');
-        // col 8: Прибыль
+        // col 8: Прибыль — follows the active profit-column mode (full / day / total)
+        const sumProfit = window._profitMode === 'full' ? summary.totalFullProfit
+                        : window._profitMode === 'day'  ? summary.dayProfit
+                        : summary.totalProfit;
         const p2 = document.createElement('td');
-        p2.textContent = (summary.totalProfit >= 0 ? '+' : '') + fmt(roundTo2(summary.totalProfit)) + ' ₽';
-        p2.className   = summary.totalProfit > 0 ? 'sum-positive' : summary.totalProfit < 0 ? 'sum-negative' : '';
+        p2.textContent = (sumProfit >= 0 ? '+' : '') + fmt(roundTo2(sumProfit)) + ' ₽';
+        p2.className   = sumProfit > 0 ? 'sum-positive' : sumProfit < 0 ? 'sum-negative' : '';
         sumRow.appendChild(p2);
         // cols 9-10: Доля + Купон (empty)
         const c1 = document.createElement('td'); c1.colSpan = 2; c1.textContent = ''; sumRow.appendChild(c1);

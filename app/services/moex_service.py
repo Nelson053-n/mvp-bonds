@@ -250,14 +250,27 @@ class MOEXService:
             raise PriceNotFoundError(secid, "акция")
         company_rating = await self._get_credit_rating(secid)
 
-        # Previous trading session close. If LAST is present, LCLOSE is yesterday's close.
-        # If LAST is missing and we fell back to LCLOSE as current, prev close is unknown.
+        # Previous trading session close, for the "day P&L" mode.
+        #   • current = LAST (intraday)        → prev = LCLOSE (yesterday's close)
+        #   • current = LCLOSE (today's close) → prev = yesterday via PREV* fields
+        #   • neither / no prev source         → prev = current ⇒ zero day change
         prev_close = None
-        if md_row.get("LAST") is not None and md_row.get("LCLOSE") is not None:
+        has_last = md_row.get("LAST") is not None
+        if has_last and md_row.get("LCLOSE") is not None:
             try:
                 prev_close = float(md_row.get("LCLOSE"))
             except (TypeError, ValueError):
                 prev_close = None
+        if prev_close is None:
+            for cand in (sec_row.get("PREVLEGALCLOSEPRICE"), sec_row.get("PREVPRICE")):
+                if cand is not None:
+                    try:
+                        prev_close = float(cand)
+                        break
+                    except (TypeError, ValueError):
+                        continue
+        if prev_close is None:
+            prev_close = float(current_price)
 
         snapshot = StockSnapshot(
             ticker=secid,
@@ -354,22 +367,36 @@ class MOEXService:
             logger.error("Не удалось получить цену облигации %s", secid)
             raise PriceNotFoundError(secid, "облигация")
 
-        # Previous trading session close % of face. Only meaningful when we have
-        # today's LAST — otherwise current price already IS the prev close.
+        # Previous trading session close % of face, for the "day P&L" mode.
+        # The previous-close source depends on WHERE the current price came from,
+        # so we never compare a price with itself:
+        #   • current = LAST (intraday)        → prev = yesterday's close (PREV* fields)
+        #   • current = LCLOSE (today's close) → prev = yesterday's close (PREV* fields)
+        #   • current = PREV* (no trades today)→ prev = current ⇒ day change is 0
         prev_close_percent: float | None = None
-        if md_row.get("LAST") is not None:
-            for cand in (
+        has_last = md_row.get("LAST") is not None
+        has_lclose = md_row.get("LCLOSE") is not None
+        if has_last or has_lclose:
+            # Yesterday's close candidates. LCLOSE (today's close) is a valid
+            # "yesterday" reference only while current = LAST (intraday); when
+            # current already IS LCLOSE we must skip it to avoid self-comparison.
+            cands = [
                 sec_row.get("PREVLEGALCLOSEPRICE"),
                 sec_row.get("PREVPRICE"),
                 sec_row.get("PREVWAPRICE"),
-                md_row.get("LCLOSE"),
-            ):
+            ]
+            if has_last:
+                cands.append(md_row.get("LCLOSE"))
+            for cand in cands:
                 if cand is not None:
                     try:
                         prev_close_percent = float(cand)
                         break
                     except (TypeError, ValueError):
                         continue
+        if prev_close_percent is None:
+            # No trades today (current price IS a previous close) → zero day change.
+            prev_close_percent = float(clean_price_percent)
 
         nominal = sec_row.get("FACEVALUE")
         coupon = sec_row.get("COUPONVALUE")
