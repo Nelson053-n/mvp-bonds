@@ -2591,6 +2591,7 @@
       function calculateSummary(rows) {
         const totalAssets  = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
         const totalProfit  = rows.reduce((s, r) => s + Number(r.profit || 0), 0);
+        const totalInvested = rows.reduce((s, r) => s + Number(r.purchase_price || 0) * Number(r.quantity || 0), 0);
         // Day P&L: sum across rows that have day_profit. Day base = sum of prev_close_value
         // ONLY for those same rows (so the percentage uses a comparable denominator).
         let dayProfit = 0, dayBase = 0, dayCount = 0;
@@ -2618,7 +2619,7 @@
         const annualYield    = totalAssets > 0 ? (annualIncome / totalAssets) * 100 : 0;
         const totalBondYield = bondWeightSum > 0 ? weightedYield / bondWeightSum : 0;
         const avgCouponRate  = couponRateWeightSum > 0 ? weightedCouponRate / couponRateWeightSum : 0;
-        return { totalAssets, totalProfit, dayProfit, dayBase, hasDayData,
+        return { totalAssets, totalProfit, totalInvested, dayProfit, dayBase, hasDayData,
                  annualIncome, annualYield, totalBondYield, avgCouponRate };
       }
 
@@ -2668,8 +2669,8 @@
         if (isEmpty) {
           sps.textContent = t('stat.sub.addItems');
         } else {
-          const pctOfPortfolio = summary.totalAssets > 0
-            ? ((summary.totalProfit / summary.totalAssets) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
+          const pctOfPortfolio = summary.totalInvested > 0
+            ? ((summary.totalProfit / summary.totalInvested) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
             : '\u00a0';
           const realizedCoupons = Number((window._analyticsExtra && window._analyticsExtra.realized_coupons) || 0);
           const aciTotal = tableRows.reduce((s, r) => s + (Number(r.aci || 0) * Number(r.quantity || 0)), 0);
@@ -9324,7 +9325,7 @@
           'stat.sub.positions': 'позиц',
           'stat.sub.pos1': 'ия', 'stat.sub.pos2': 'ии', 'stat.sub.pos5': 'ий',
           'stat.sub.addItems': 'добавьте бумаги',
-          'stat.sub.ofPortfolio': '% от портфеля',
+          'stat.sub.ofPortfolio': '% к вложенному',
           'stat.sub.noCoupons': 'нечего ждать',
           'stat.sub.ofValue': '% от стоимости',
           'stat.sub.noYtm': 'в пустом портфеле',
@@ -9726,7 +9727,7 @@
           'stat.sub.positions': 'position',
           'stat.sub.pos1': '', 'stat.sub.pos2': 's', 'stat.sub.pos5': 's',
           'stat.sub.addItems': 'add securities',
-          'stat.sub.ofPortfolio': '% of portfolio',
+          'stat.sub.ofPortfolio': '% on invested',
           'stat.sub.noCoupons': 'no coupons yet',
           'stat.sub.ofValue': '% of value',
           'stat.sub.noYtm': 'empty portfolio',
