@@ -21,6 +21,39 @@ from app.services.storage_service import storage_service
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
+# Yields above this (% annual) are almost always yield-to-offer/buyback distorted
+# by an imminent put date, not a meaningful YTM — flag them so the huge number
+# in the «Рыночная доходность» column is explained rather than looking broken.
+_YIELD_ANOMALY_THRESHOLD = 100.0
+_MONTHS_RU = ["", "января", "февраля", "марта", "апреля", "мая", "июня",
+              "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def _yield_to_offer_anomaly(r, today) -> dict | None:
+    """If a bond shows an absurdly high yield caused by a near offer/buyback,
+    return an anomaly explaining it is yield-to-offer (with the date)."""
+    my = getattr(r, "market_yield", None)
+    if not my or my <= _YIELD_ANOMALY_THRESHOLD:
+        return None
+    # Find the nearest future put-style date that explains the distortion.
+    near = None
+    for fld in ("offer_date", "buyback_date"):
+        d = getattr(r, fld, None)
+        if d and d >= today and (near is None or d < near):
+            near = d
+    if near is None:
+        return None
+    date_str = f"{near.day} {_MONTHS_RU[near.month]} {near.year}"
+    return {
+        "type": "yield_to_offer",
+        "ticker": r.ticker,
+        "text": (
+            f"{r.ticker}: доходность {my:.0f}% — это доходность к оферте "
+            f"{date_str}, а не к погашению"
+        ),
+        "severity": "medium",
+    }
+
 
 class CreatePortfolioInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -447,6 +480,9 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                     "severity": "medium",
                 })
                 seen_event.add((r.ticker, fld))
+        ytm_anom = _yield_to_offer_anomaly(r, today)
+        if ytm_anom:
+            anomalies.append(ytm_anom)
 
     # 3) Realized coupons across all portfolios
     realized_coupons = 0.0
@@ -785,6 +821,9 @@ async def get_analytics_extra(
                     "text": f"{r.ticker}: {label} через {(d - today).days} дн.",
                     "severity": "medium",
                 })
+        ytm_anom = _yield_to_offer_anomaly(r, today)
+        if ytm_anom:
+            anomalies.append(ytm_anom)
 
     # 3) Realized coupons approximation: from past coupon_notifications if available
     realized_coupons = 0.0
