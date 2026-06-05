@@ -5610,7 +5610,9 @@
 
       function renderTable() {
         // Re-validate profit mode against current data (full mode needs T-Bank rows).
-        if (typeof setProfitMode === 'function') setProfitMode(window._profitMode);
+        // Pass the DESIRED mode, not the (possibly degraded) effective one — otherwise a
+        // 'full'→'total' degradation during loading would persist as the saved choice.
+        if (typeof setProfitMode === 'function') setProfitMode(window._profitModeDesired);
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
         tableBody.innerHTML = '';
@@ -5843,7 +5845,7 @@
         });
       }
       // Apply initial mode label/color
-      setProfitMode(window._profitMode);
+      setProfitMode(window._profitModeDesired);
       document.querySelectorAll('th[data-sort-key]').forEach(th => {
         th.addEventListener('click', (e) => {
           if (e.target && e.target.id === 'th-profit-toggle') return;
@@ -10427,7 +10429,7 @@
           if (typeof drawMonthlyChart === 'function' && typeof tableRows !== 'undefined') {
             drawMonthlyChart(tableRows);
           }
-          if (typeof setProfitMode === 'function') setProfitMode(window._profitMode);
+          if (typeof setProfitMode === 'function') setProfitMode(window._profitModeDesired);
         } catch(e) {}
         // Re-render settings portfolios table (risk labels are dynamic, only in authenticated view)
         if (!isReadOnly) {
