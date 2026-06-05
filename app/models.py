@@ -60,6 +60,8 @@ class InstrumentMetrics(BaseModel):
     next_coupon_date: date | None = None
     nominal: float | None = None
     aci: float | None = None
+    realized_coupons: float | None = None  # Σ coupons paid since purchase (RUB), T-Bank only
+    full_profit: float | None = None  # revaluation + aci×qty + realized_coupons (RUB)
     market_yield: float | None = None
     dividend_yield: float | None = None
     face_unit: str | None = None  # Валюта номинала (SUR, CNY, USD, EUR, CHF)

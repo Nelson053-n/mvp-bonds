@@ -97,6 +97,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ("portfolio_id", "INTEGER"),
                 ("snapshot_coupon_rate", "REAL"),  # MOEX market coupon rate for risk calc
                 ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
+                ("figi", "TEXT"),  # T-Bank instrument id, links position to operations journal
             ]:
                 try:
                     conn.execute(
@@ -257,6 +258,17 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             """)
 
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS tbank_coupons (
+                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                    figi TEXT NOT NULL,
+                    coupons_total REAL NOT NULL DEFAULT 0,
+                    first_buy_date TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (portfolio_id, figi)
+                )
+            """)
+
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS admin_audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -318,6 +330,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             for col, col_def in [
                 ("cash_balance", "TEXT"),
                 ("cash_updated_at", "TEXT"),
+                ("last_operations_sync_at", "TEXT"),  # last GetOperations fetch (ISO)
             ]:
                 try:
                     conn.execute(
@@ -956,7 +969,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, ticker, instrument_type, quantity, purchase_price
+                SELECT id, ticker, instrument_type, quantity, purchase_price, figi
                 FROM portfolio_items
                 WHERE portfolio_id = ? AND source = 'tbank' AND deleted_at IS NULL
                 ORDER BY id ASC
@@ -970,6 +983,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 "instrument_type": row[2],
                 "quantity": float(row[3]),
                 "purchase_price": float(row[4]),
+                "figi": row[5],
             }
             for row in rows
         ]
@@ -1005,7 +1019,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 """
                 SELECT id, portfolio_id, tbank_token_enc, tbank_token_prefix,
                        tbank_account_id, bonds_only, sync_enabled, last_sync_at, last_sync_error,
-                       cash_balance, cash_updated_at
+                       cash_balance, cash_updated_at, last_operations_sync_at
                 FROM portfolio_sync
                 WHERE portfolio_id = ?
                 """,
@@ -1025,6 +1039,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             "last_sync_error": row[8],
             "cash_balance": row[9],
             "cash_updated_at": row[10],
+            "last_operations_sync_at": row[11],
         }
 
     def update_sync_cash(self, portfolio_id: int, cash_json: str) -> None:
@@ -1036,6 +1051,51 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 (cash_json, now, portfolio_id),
             )
             conn.commit()
+
+    def update_operations_sync_at(self, portfolio_id: int, ts: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_sync SET last_operations_sync_at = ? WHERE portfolio_id = ?",
+                (ts, portfolio_id),
+            )
+            conn.commit()
+
+    def upsert_tbank_coupons(
+        self,
+        portfolio_id: int,
+        figi: str,
+        coupons_total: float,
+        first_buy_date: str | None,
+    ) -> None:
+        """Store aggregated realized coupons (RUB) per T-Bank position (by figi)."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO tbank_coupons
+                    (portfolio_id, figi, coupons_total, first_buy_date, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(portfolio_id, figi) DO UPDATE SET
+                    coupons_total = excluded.coupons_total,
+                    first_buy_date = COALESCE(excluded.first_buy_date, tbank_coupons.first_buy_date),
+                    updated_at = excluded.updated_at
+                """,
+                (portfolio_id, figi, float(coupons_total), first_buy_date, now),
+            )
+            conn.commit()
+
+    def get_tbank_coupons(self, portfolio_id: int) -> dict[str, dict]:
+        """Return {figi: {coupons_total, first_buy_date}} for a portfolio."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT figi, coupons_total, first_buy_date FROM tbank_coupons WHERE portfolio_id = ?",
+                (portfolio_id,),
+            ).fetchall()
+        return {
+            row[0]: {"coupons_total": float(row[1]), "first_buy_date": row[2]}
+            for row in rows
+        }
 
     def set_sync_enabled(self, portfolio_id: int, enabled: bool) -> None:
         with self._connect() as conn:

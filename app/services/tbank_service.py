@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 _BASE = "https://invest-public-api.tinkoff.ru/rest"
 _ACCOUNTS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts"
 _PORTFOLIO_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio"
+_OPERATIONS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetOperations"
 
 # T-Bank REST API returns lowercase instrument types
 _TYPE_MAP = {
@@ -117,6 +118,54 @@ class TBankService:
             cash.append({"currency": currency, "amount": round(amount, 2)})
         return positions, cash
 
+    async def get_operations(self, account_id: str, from_date: str, to_date: str) -> list[dict]:
+        """Return executed operations in [from_date, to_date] (RFC3339).
+
+        Each item: {figi, date, operation_type, payment}. payment is signed RUB
+        (MoneyValue units/nano); coupons come back positive.
+        """
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                _OPERATIONS_URL,
+                json={
+                    "accountId": account_id,
+                    "from": from_date,
+                    "to": to_date,
+                    "state": "OPERATION_STATE_EXECUTED",
+                },
+                headers=self._headers,
+            )
+        self._check_response(resp)
+        out: list[dict] = []
+        for op in resp.json().get("operations", []):
+            out.append({
+                "figi": op.get("figi") or "",
+                "date": op.get("date") or "",
+                "operation_type": op.get("operationType") or "",
+                "payment": _money_value(op.get("payment")),
+            })
+        return out
+
+    @staticmethod
+    def _operations_to_coupons_and_buys(operations: list[dict]) -> dict[str, dict]:
+        """Aggregate operations by figi → {coupons: Σ coupon payments, first_buy: min buy date}."""
+        agg: dict[str, dict] = {}
+        for op in operations:
+            figi = op.get("figi")
+            if not figi:
+                continue
+            entry = agg.setdefault(figi, {"coupons": 0.0, "first_buy": None})
+            otype = op.get("operation_type", "")
+            if otype == "OPERATION_TYPE_COUPON":
+                entry["coupons"] += float(op.get("payment") or 0.0)
+            elif otype in ("OPERATION_TYPE_BUY", "OPERATION_TYPE_BUY_CARD"):
+                d = op.get("date") or ""
+                if d and (entry["first_buy"] is None or d < entry["first_buy"]):
+                    entry["first_buy"] = d
+        for entry in agg.values():
+            entry["coupons"] = round(entry["coupons"], 2)
+        return agg
+
     @staticmethod
     def _positions_to_items(positions: list[dict]) -> list[dict]:
         """Convert raw T-Bank positions into importable items."""
@@ -147,6 +196,7 @@ class TBankService:
                 "instrument_type": instrument_type,
                 "quantity": quantity,
                 "purchase_price": round(purchase_price, 2),
+                "figi": pos.get("figi") or None,
             })
         return items
 
@@ -225,18 +275,21 @@ class TBankService:
                         purchase_price=api_item["purchase_price"],
                         portfolio_id=portfolio_id,
                         source="tbank",
+                        figi=api_item.get("figi"),
                     )
                     added += 1
                 elif (
                     abs(db_item["quantity"] - api_item["quantity"]) > 1e-6
                     or abs(db_item["purchase_price"] - api_item["purchase_price"]) > 0.01
+                    or (not db_item.get("figi") and api_item.get("figi"))
                 ):
-                    # Quantity or average price changed — sync both from API
+                    # Quantity / price changed, or figi not yet stored — sync from API
                     storage.update_item(
                         item_id=db_item["id"],
                         portfolio_id=portfolio_id,
                         quantity=api_item["quantity"],
                         purchase_price=api_item["purchase_price"],
+                        figi=api_item.get("figi"),
                     )
                     updated += 1
             except Exception as exc:
@@ -247,6 +300,28 @@ class TBankService:
         for key, db_item in db_map.items():
             if key not in api_map:
                 removed_candidates.append(db_item["ticker"])
+
+        # Realized coupons from operations journal (best-effort, never fail the sync)
+        try:
+            from datetime import datetime, timezone
+            now_dt = datetime.now(timezone.utc)
+            # Always re-fetch the full window: coupon totals are absolute sums per figi,
+            # and the window is bounded (T-Bank keeps ~3 years of operations).
+            from_date = now_dt.replace(year=now_dt.year - 5).isoformat()
+            to_date = now_dt.isoformat()
+            operations = await self.get_operations(account_id, from_date, to_date)
+            agg = self._operations_to_coupons_and_buys(operations)
+            for figi, data in agg.items():
+                storage.upsert_tbank_coupons(
+                    portfolio_id, figi, data["coupons"], data.get("first_buy")
+                )
+            storage.update_operations_sync_at(portfolio_id, to_date)
+            cache_service.invalidate(portfolio_id)
+        except Exception as exc:
+            logger.warning(
+                "sync_portfolio: operations journal fetch failed for portfolio_id=%d: %s",
+                portfolio_id, exc,
+            )
 
         if added > 0 or updated > 0:
             cache_service.invalidate(portfolio_id)

@@ -1027,7 +1027,7 @@
                   <th data-sort-key="quantity" data-i18n="tbl.qty">Кол-во</th>
                   <th data-sort-key="purchase_price" class="wrap" style="min-width:52px;" data-i18n-html="tbl.buyPrice">Цена<br>покупки</th>
                   <th data-sort-key="current_value" data-i18n="tbl.value">Стоимость<span class="th-info" data-tip="current_value">i</span></th>
-                  <th id="th-profit" data-sort-key="profit"><span class="th-profit-label" data-i18n="tbl.profit">Прибыль</span><span id="th-profit-toggle" title="Переключить: всего / за день" style="display:inline-block;margin-left:4px;cursor:pointer;font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);color:var(--text-muted);user-select:none;">⇄</span><span class="th-info" data-tip="profit">i</span></th>
+                  <th id="th-profit" data-sort-key="profit"><span class="th-profit-label" data-i18n="tbl.profit">Прибыль</span><span id="th-profit-toggle" title="Переключить режим: полная / от покупки / за день" style="display:inline-block;margin-left:4px;cursor:pointer;font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);color:var(--text-muted);user-select:none;">⇄</span><span class="th-info" data-tip="profit">i</span></th>
                   <th data-sort-key="weight" data-i18n="tbl.weight">Доля</th>
                   <th data-sort-key="coupon" style="max-width:48px;" data-i18n="tbl.coupon">Купон<span class="th-info" data-tip="coupon">i</span></th>
                   <th data-sort-key="coupon_yield" class="wrap" style="min-width:52px;" data-i18n="tbl.couponPct">Купон<br>%<span class="th-info" data-tip="coupon_rate">i</span></th>
@@ -2520,32 +2520,68 @@
         const as = String(a ?? '').toLowerCase(), bs = String(b ?? '').toLowerCase();
         return as < bs ? -1 : as > bs ? 1 : 0;
       }
-      window._profitMode = localStorage.getItem('mvp_profit_mode') === 'day' ? 'day' : 'total';
+      // True if the portfolio has full-profit data (T-Bank synced: НКД + coupons).
+      function portfolioSupportsFull() {
+        try { return (tableRows || []).some(r => r.full_profit !== null && r.full_profit !== undefined); }
+        catch(e) { return false; }
+      }
+      function _tProfit(key, fallback) {
+        try {
+          if (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[window._lang]) {
+            return TRANSLATIONS[window._lang][key] || fallback;
+          }
+        } catch(e) {}
+        return fallback;
+      }
+      (function initProfitMode() {
+        const stored = localStorage.getItem('mvp_profit_mode');
+        window._profitMode = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'full';
+      })();
       function setProfitMode(m) {
-        window._profitMode = (m === 'day') ? 'day' : 'total';
+        const supportsFull = portfolioSupportsFull();
+        if (m !== 'day' && m !== 'total' && m !== 'full') m = supportsFull ? 'full' : 'total';
+        if (m === 'full' && !supportsFull) m = 'total';
+        window._profitMode = m;
         try { localStorage.setItem('mvp_profit_mode', window._profitMode); } catch(e) {}
         const th = document.getElementById('th-profit');
         if (!th) return;
         const lbl = th.querySelector('.th-profit-label');
         if (lbl) {
-          let totalLabel = 'Прибыль';
-          try {
-            if (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[window._lang]) {
-              totalLabel = TRANSLATIONS[window._lang]['tbl.profit'] || totalLabel;
-            }
-          } catch(e) {}
-          lbl.textContent = window._profitMode === 'day' ? 'За день' : totalLabel;
+          const labels = {
+            full:  _tProfit('tbl.profitFull', 'Полная'),
+            total: _tProfit('tbl.profit', 'Прибыль'),
+            day:   _tProfit('tbl.profitDay', 'За день'),
+          };
+          lbl.textContent = labels[window._profitMode] || labels.total;
         }
         const toggle = document.getElementById('th-profit-toggle');
         if (toggle) {
-          toggle.style.borderColor = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--border)';
-          toggle.style.color = window._profitMode === 'day' ? 'var(--blue-500)' : 'var(--text-muted)';
+          // Hide toggle entirely on manual portfolios that have no full mode AND
+          // are showing the default 'total' (still allow total⇄day there).
+          toggle.style.display = '';
+          const special = window._profitMode !== 'total';
+          toggle.style.borderColor = special ? 'var(--blue-500)' : 'var(--border)';
+          toggle.style.color = special ? 'var(--blue-500)' : 'var(--text-muted)';
         }
+      }
+      function nextProfitMode() {
+        const order = portfolioSupportsFull() ? ['full', 'total', 'day'] : ['total', 'day'];
+        const idx = order.indexOf(window._profitMode);
+        return order[(idx + 1) % order.length];
+      }
+      function profitValueFor(row) {
+        if (window._profitMode === 'day') return row.day_profit;
+        if (window._profitMode === 'full') return (row.full_profit ?? row.profit);
+        return row.profit;
       }
       function getSortValue(row, key) {
         if (key === 'company_rating') { const s = ratingToScore(parseRating(row.company_rating)); return s === null ? -1 : s; }
         if (key === 'profit' && window._profitMode === 'day') {
           const v = row.day_profit;
+          return (v === null || v === undefined) ? -Infinity : v;
+        }
+        if (key === 'profit' && window._profitMode === 'full') {
+          const v = (row.full_profit ?? row.profit);
           return (v === null || v === undefined) ? -Infinity : v;
         }
         return row[key] ?? '';
@@ -2592,6 +2628,9 @@
         const totalAssets  = rows.reduce((s, r) => s + Number(r.current_value || 0), 0);
         const totalProfit  = rows.reduce((s, r) => s + Number(r.profit || 0), 0);
         const totalInvested = rows.reduce((s, r) => s + Number(r.purchase_price || 0) * Number(r.quantity || 0), 0);
+        const totalFullProfit = rows.reduce((s, r) => s + Number((r.full_profit ?? r.profit) || 0), 0);
+        const totalRealizedCoupons = rows.reduce((s, r) => s + Number(r.realized_coupons || 0), 0);
+        const hasFullData = rows.some(r => r.full_profit !== null && r.full_profit !== undefined);
         // Day P&L: sum across rows that have day_profit. Day base = sum of prev_close_value
         // ONLY for those same rows (so the percentage uses a comparable denominator).
         let dayProfit = 0, dayBase = 0, dayCount = 0;
@@ -2619,7 +2658,8 @@
         const annualYield    = totalAssets > 0 ? (annualIncome / totalAssets) * 100 : 0;
         const totalBondYield = bondWeightSum > 0 ? weightedYield / bondWeightSum : 0;
         const avgCouponRate  = couponRateWeightSum > 0 ? weightedCouponRate / couponRateWeightSum : 0;
-        return { totalAssets, totalProfit, totalInvested, dayProfit, dayBase, hasDayData,
+        return { totalAssets, totalProfit, totalInvested, totalFullProfit, totalRealizedCoupons,
+                 hasFullData, dayProfit, dayBase, hasDayData,
                  annualIncome, annualYield, totalBondYield, avgCouponRate };
       }
 
@@ -2663,16 +2703,21 @@
         svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + cashText + totalText);
         svs.style.whiteSpace = 'pre-wrap';
 
-        sp.className = 'stat-value ' + (isEmpty ? '' : summary.totalProfit > 0 ? 'positive' : summary.totalProfit < 0 ? 'negative' : '');
-        animateCounter(sp, isEmpty ? 0 : roundTo2(summary.totalProfit),
+        // For T-Bank portfolios show full profit (revaluation + НКД + coupons) as the headline.
+        const useFull = summary.hasFullData;
+        const headlineProfit = useFull ? summary.totalFullProfit : summary.totalProfit;
+        sp.className = 'stat-value ' + (isEmpty ? '' : headlineProfit > 0 ? 'positive' : headlineProfit < 0 ? 'negative' : '');
+        animateCounter(sp, isEmpty ? 0 : roundTo2(headlineProfit),
           v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
         if (isEmpty) {
           sps.textContent = t('stat.sub.addItems');
         } else {
           const pctOfPortfolio = summary.totalInvested > 0
-            ? ((summary.totalProfit / summary.totalInvested) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
+            ? ((headlineProfit / summary.totalInvested) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
             : '\u00a0';
-          const realizedCoupons = Number((window._analyticsExtra && window._analyticsExtra.realized_coupons) || 0);
+          const realizedCoupons = useFull
+            ? Number(summary.totalRealizedCoupons || 0)
+            : Number((window._analyticsExtra && window._analyticsExtra.realized_coupons) || 0);
           const aciTotal = tableRows.reduce((s, r) => s + (Number(r.aci || 0) * Number(r.quantity || 0)), 0);
           const parts = [];
           if (realizedCoupons > 0) parts.push('купоны: ' + Math.round(realizedCoupons).toLocaleString('ru') + ' ₽');
@@ -5559,6 +5604,8 @@
       }
 
       function renderTable() {
+        // Re-validate profit mode against current data (full mode needs T-Bank rows).
+        if (typeof setProfitMode === 'function') setProfitMode(window._profitMode);
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
         tableBody.innerHTML = '';
@@ -5633,11 +5680,9 @@
 
           // Profit cell — total or day P&L depending on global mode
           const profitTotal = Number(row.profit || 0);
-          const dayRaw = row.day_profit;
-          const dayMode = window._profitMode === 'day';
-          const profitVal = dayMode
-            ? (dayRaw === null || dayRaw === undefined ? null : Number(dayRaw))
-            : profitTotal;
+          const rawProfitVal = profitValueFor(row);
+          const profitVal = (rawProfitVal === null || rawProfitVal === undefined)
+            ? null : Number(rawProfitVal);
           const profitTd = document.createElement('td');
           if (profitVal === null) {
             profitTd.textContent = '—';
@@ -5785,8 +5830,11 @@
       if (profitToggleBtn) {
         profitToggleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          setProfitMode(window._profitMode === 'day' ? 'total' : 'day');
+          setProfitMode(nextProfitMode());
           renderTable();
+          if (typeof updateStatCards === 'function' && typeof calculateSummary === 'function') {
+            try { updateStatCards(calculateSummary(tableRows)); } catch(err) {}
+          }
         });
       }
       // Apply initial mode label/color
@@ -9361,6 +9409,8 @@
           'tbl.buyPrice': 'Цена<br>покупки',
           'tbl.value': 'Стоимость',
           'tbl.profit': 'Прибыль',
+          'tbl.profitFull': 'Полная',
+          'tbl.profitDay': 'За день',
           'tbl.weight': 'Доля',
           'tbl.coupon': 'Купон',
           'tbl.couponPct': 'Купон %',
@@ -9763,6 +9813,8 @@
           'tbl.buyPrice': 'Buy<br>Price',
           'tbl.value': 'Value',
           'tbl.profit': 'Profit',
+          'tbl.profitFull': 'Total',
+          'tbl.profitDay': 'Day',
           'tbl.weight': 'Weight',
           'tbl.coupon': 'Coupon',
           'tbl.couponPct': 'Coupon %',
@@ -10665,7 +10717,7 @@
         rating:        { title: 'Рейтинг', text: 'Кредитный рейтинг от АКРА/Эксперт РА. AAA — максимальная надёжность, D — дефолт. Инвестиционный уровень: BBB и выше.' },
         clean_price:   { title: 'Текущая цена (чистая)', text: 'Рыночная цена без НКД. Именно её вы видите в котировках на бирже. При покупке к ней добавляется НКД.' },
         current_value: { title: 'Стоимость позиции', text: 'Рассчитывается по грязной цене (чистая + НКД) × количество. Отражает реальную рыночную стоимость вашей позиции.' },
-        profit:        { title: 'Прибыль / Убыток', text: '(Текущая грязная цена − Цена покупки) × Количество. Учитывает текущий НКД, поэтому со временем незначительно меняется.' },
+        profit:        { title: 'Прибыль / Убыток', text: 'Кнопка ⇄ переключает режимы. <b>Полная</b> (для портфелей Т-Банка) — переоценка тела + текущий НКД + купоны, полученные с момента покупки. <b>От покупки</b> — (текущая чистая цена − цена покупки) × количество. <b>За день</b> — изменение за последнюю торговую сессию.' },
         coupon:        { title: 'Купон, ₽', text: 'Размер одной купонной выплаты на одну облигацию в рублях.' },
         coupon_rate:   { title: 'Купонная ставка, %', text: 'Годовой купон в процентах от номинала (1000 ₽). Например, 8.5% = 85 ₽ в год на бумагу.' },
         annual_coupon: { title: 'Годовой купон по позиции', text: 'Купон × Количество облигаций × Частота выплат в год. Ваш ожидаемый годовой купонный доход от этой бумаги.' },

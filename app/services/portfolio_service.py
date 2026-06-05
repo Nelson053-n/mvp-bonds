@@ -37,6 +37,7 @@ class PortfolioItem:
     purchase_price: float
     manual_coupon: float | None
     manual_coupon_rate: float | None
+    figi: str | None = None
 
     @classmethod
     def from_dict(cls, item: dict) -> "PortfolioItem":
@@ -52,6 +53,7 @@ class PortfolioItem:
             manual_coupon_rate=(
                 float(item["manual_coupon_rate"]) if item.get("manual_coupon_rate") is not None else None
             ),
+            figi=item.get("figi"),
         )
 
 
@@ -319,6 +321,9 @@ class PortfolioService:
             for item in storage_service.get_items(portfolio_id)
         ]
 
+        # Realized coupons per figi (T-Bank synced portfolios only; empty otherwise)
+        coupons_map = storage_service.get_tbank_coupons(portfolio_id)
+
         # Limit concurrent MOEX requests to avoid rate-limits/timeouts
         semaphore = asyncio.Semaphore(8)
 
@@ -361,6 +366,16 @@ class PortfolioService:
                             and snapshot.coupon_rate is not None
                             and snapshot.coupon_rate > 0
                         )
+                        # Full profit (T-Bank only): revaluation + current ACI + realized coupons.
+                        # Coupons are stored per position (summed by figi), so no ×quantity.
+                        realized = (
+                            coupons_map.get(item.figi, {}).get("coupons_total", 0.0)
+                            if item.figi else 0.0
+                        )
+                        full_profit_val = (
+                            profit + (snapshot.aci or 0.0) * item.quantity + realized
+                            if item.figi in coupons_map else None
+                        )
                         return InstrumentMetrics(
                             id=item.id,
                             type="bond",
@@ -401,6 +416,8 @@ class PortfolioService:
                             offer_date=snapshot.offer_date,
                             next_coupon_date=snapshot.next_coupon_date,
                             aci=snapshot.aci,
+                            realized_coupons=round(realized, 2) if item.figi in coupons_map else None,
+                            full_profit=round(full_profit_val, 2) if full_profit_val is not None else None,
                             market_yield=snapshot.market_yield,
                             face_unit=snapshot.face_unit,
                             ai_comment="",
