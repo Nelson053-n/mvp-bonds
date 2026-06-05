@@ -666,10 +666,15 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     def _prune_backups(self) -> None:
         try:
-            keep = int(self.get_setting("backup_keep_count", "10"))
+            keep = int(self.get_setting("backup_keep_count", "30"))
         except ValueError:
-            keep = 10
-        backups = sorted(self._backup_dir().glob("portfolio_*.db"))
+            keep = 30
+        # Prune only daily/manual backups; startup backups rotate separately
+        # (see _backup_db_on_startup) and must not be evicted here.
+        backups = sorted(
+            b for b in self._backup_dir().glob("portfolio_*.db")
+            if not b.name.endswith("_startup.db")
+        )
         for old in backups[:-keep]:
             old.unlink()
             logger.info("Old backup removed: %s", old.name)

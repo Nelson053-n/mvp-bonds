@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, Request
@@ -266,7 +267,12 @@ async def _daily_backup_loop():
 
 
 def _backup_db_on_startup() -> None:
-    """Create a rolling backup of the SQLite database on startup. Keeps 3 most recent."""
+    """Create a rolling backup of the SQLite database on startup. Keeps 3 most recent.
+
+    Startup backups are tagged with a `_startup` suffix and rotated independently
+    from the daily `_auto` / manual backups, so frequent restarts can never evict
+    the longer-lived daily history.
+    """
     import shutil
     from datetime import datetime, timezone
 
@@ -276,35 +282,83 @@ def _backup_db_on_startup() -> None:
     backup_dir = db_path.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    dst = backup_dir / f"portfolio_{stamp}.db"
+    dst = backup_dir / f"portfolio_{stamp}_startup.db"
     try:
         shutil.copy2(db_path, dst)
         logger.info("DB backup created: %s", dst)
-        backups = sorted(backup_dir.glob("portfolio_*.db"))
+        # Rotate ONLY startup backups (keep 3); never touch _auto/_manual ones.
+        backups = sorted(backup_dir.glob("portfolio_*_startup.db"))
         for old in backups[:-3]:
             old.unlink()
-            logger.info("Old backup removed: %s", old)
+            logger.info("Old startup backup removed: %s", old)
     except Exception:
         logger.exception("Failed to create DB backup")
 
 
 # ── Application ─────────────────────────────────────────────────────────────
 
+def _acquire_leader_lock() -> bool:
+    """Try to become the single 'leader' worker for DB-writing background tasks.
+
+    With uvicorn --workers N, the lifespan runs in every worker. Tasks that write
+    to the shared SQLite DB (snapshots, notifications, backups, …) must run in
+    exactly one worker. We elect a leader via an atomic O_CREAT|O_EXCL lock file;
+    the lock is re-acquired on each fresh start (a stale file from a crashed
+    leader is reclaimed if its PID is no longer alive).
+    """
+    lock_path = Path(storage_service.db_path).parent / ".leader.lock"
+
+    def _try_create() -> bool:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            return True
+        except FileExistsError:
+            return False
+
+    if _try_create():
+        return True
+    # Lock exists — reclaim it if the holder process is gone.
+    try:
+        holder = int(lock_path.read_text().strip() or "0")
+        os.kill(holder, 0)  # raises if PID not alive
+        return False  # holder alive → we are a follower
+    except (ValueError, ProcessLookupError, PermissionError, FileNotFoundError):
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass
+        return _try_create()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up application")
-    _backup_db_on_startup()
+    # Per-process cache warms in EVERY worker (it serves that worker's requests).
     cache_service.start_background()
-    asyncio.create_task(_cleanup_shares_loop())
-    asyncio.create_task(_snapshot_loop())
-    asyncio.create_task(_notification_loop())
-    asyncio.create_task(_rating_refresh_loop())
-    asyncio.create_task(_tbank_sync_loop())
-    asyncio.create_task(_daily_backup_loop())
-    asyncio.create_task(_benchmark_snapshot_loop())
+
+    is_leader = _acquire_leader_lock()
+    if is_leader:
+        logger.info("This worker is the background-task leader (pid=%s)", os.getpid())
+        _backup_db_on_startup()
+        asyncio.create_task(_cleanup_shares_loop())
+        asyncio.create_task(_snapshot_loop())
+        asyncio.create_task(_notification_loop())
+        asyncio.create_task(_rating_refresh_loop())
+        asyncio.create_task(_tbank_sync_loop())
+        asyncio.create_task(_daily_backup_loop())
+        asyncio.create_task(_benchmark_snapshot_loop())
+    else:
+        logger.info("This worker is a follower — DB-writing background tasks skipped")
     yield
     logger.info("Shutting down application")
     cache_service.stop_background()
+    if is_leader:
+        try:
+            (Path(storage_service.db_path).parent / ".leader.lock").unlink()
+        except FileNotFoundError:
+            pass
     try:
         storage_service.checkpoint()
         logger.info("WAL checkpoint completed")
