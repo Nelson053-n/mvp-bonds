@@ -2534,17 +2534,20 @@
         return fallback;
       }
       (function initProfitMode() {
-        // New key (v2): the legacy 'mvp_profit_mode' held the old total/day default
-        // and would pin T-Bank users to 'total', hiding the new full-profit default.
+        // _profitModeDesired = what the user picked (persisted); _profitMode = what we
+        // render right now. They differ only while data is still loading: a 'full'
+        // desire degrades to 'total' for display without overwriting the saved choice,
+        // so an early render with an empty table can't clobber the full-profit default.
         const stored = localStorage.getItem('mvp_profit_mode2');
-        window._profitMode = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'full';
+        window._profitModeDesired = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'full';
+        window._profitMode = window._profitModeDesired;
       })();
       function setProfitMode(m) {
-        const supportsFull = portfolioSupportsFull();
-        if (m !== 'day' && m !== 'total' && m !== 'full') m = supportsFull ? 'full' : 'total';
-        if (m === 'full' && !supportsFull) m = 'total';
-        window._profitMode = m;
-        try { localStorage.setItem('mvp_profit_mode2', window._profitMode); } catch(e) {}
+        if (m !== 'day' && m !== 'total' && m !== 'full') m = 'full';
+        // Persist the user's intent; degrade to total only for display when full has no data yet.
+        window._profitModeDesired = m;
+        try { localStorage.setItem('mvp_profit_mode2', m); } catch(e) {}
+        window._profitMode = (m === 'full' && !portfolioSupportsFull()) ? 'total' : m;
         const th = document.getElementById('th-profit');
         if (!th) return;
         const lbl = th.querySelector('.th-profit-label');
@@ -2568,7 +2571,7 @@
       }
       function nextProfitMode() {
         const order = portfolioSupportsFull() ? ['full', 'total', 'day'] : ['total', 'day'];
-        const idx = order.indexOf(window._profitMode);
+        const idx = order.indexOf(window._profitModeDesired);
         return order[(idx + 1) % order.length];
       }
       function profitValueFor(row) {
