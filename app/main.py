@@ -297,21 +297,37 @@ def _backup_db_on_startup() -> None:
 
 # ── Application ─────────────────────────────────────────────────────────────
 
+def _proc_cmdline(pid: int) -> str | None:
+    """Return /proc/<pid>/cmdline as a string, or None if unavailable (non-Linux,
+    no permission, or process gone)."""
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            return f.read().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
+        return None
+
+
+# Marker identifying our own server process — used to detect PID reuse: a live PID
+# whose cmdline doesn't look like ours is a recycled PID, not the old leader.
+_LEADER_MARKER = "uvicorn"
+
+
 def _acquire_leader_lock() -> bool:
     """Try to become the single 'leader' worker for DB-writing background tasks.
 
     With uvicorn --workers N, the lifespan runs in every worker. Tasks that write
     to the shared SQLite DB (snapshots, notifications, backups, …) must run in
     exactly one worker. We elect a leader via an atomic O_CREAT|O_EXCL lock file;
-    the lock is re-acquired on each fresh start (a stale file from a crashed
-    leader is reclaimed if its PID is no longer alive).
+    a stale file from a crashed leader is reclaimed when its PID is dead OR the
+    PID is alive but has been recycled by an unrelated process (verified via
+    /proc/<pid>/cmdline, so a reused PID can't permanently block leadership).
     """
     lock_path = Path(storage_service.db_path).parent / ".leader.lock"
 
     def _try_create() -> bool:
         try:
             fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-            os.write(fd, str(os.getpid()).encode())
+            os.write(fd, f"{os.getpid()}:{_LEADER_MARKER}".encode())
             os.close(fd)
             return True
         except FileExistsError:
@@ -319,17 +335,57 @@ def _acquire_leader_lock() -> bool:
 
     if _try_create():
         return True
-    # Lock exists — reclaim it if the holder process is gone.
+
+    # Lock exists — decide whether the holder is genuinely still alive.
+    def _holder_alive() -> bool:
+        try:
+            raw = lock_path.read_text().strip()
+        except FileNotFoundError:
+            return False  # vanished — treat as free
+        pid_str = raw.split(":", 1)[0]
+        try:
+            holder = int(pid_str)
+        except ValueError:
+            return False  # malformed lock → reclaimable
+        try:
+            os.kill(holder, 0)  # raises if PID not alive
+        except (ProcessLookupError, ValueError):
+            return False  # dead PID
+        except PermissionError:
+            # PID alive but owned by another user → almost certainly recycled,
+            # not our worker. Confirm via cmdline when possible.
+            cmd = _proc_cmdline(holder)
+            return cmd is not None and _LEADER_MARKER in cmd
+        # PID alive and signalable. Guard against PID reuse: if we can read the
+        # cmdline and it isn't one of ours, the PID was recycled → reclaim.
+        cmd = _proc_cmdline(holder)
+        if cmd is not None and _LEADER_MARKER not in cmd and "python" not in cmd:
+            return False
+        return True
+
+    if _holder_alive():
+        return False  # genuine leader present → we are a follower
+    # Stale or recycled — reclaim.
     try:
-        holder = int(lock_path.read_text().strip() or "0")
-        os.kill(holder, 0)  # raises if PID not alive
-        return False  # holder alive → we are a follower
-    except (ValueError, ProcessLookupError, PermissionError, FileNotFoundError):
+        lock_path.unlink()
+    except FileNotFoundError:
+        pass
+    return _try_create()
+
+
+def _release_leader_lock() -> None:
+    """Remove the lock on graceful shutdown — but only if it still holds OUR pid,
+    so we never delete a lock another worker may have legitimately taken over."""
+    lock_path = Path(storage_service.db_path).parent / ".leader.lock"
+    try:
+        raw = lock_path.read_text().strip()
+    except FileNotFoundError:
+        return
+    if raw.split(":", 1)[0] == str(os.getpid()):
         try:
             lock_path.unlink()
         except FileNotFoundError:
             pass
-        return _try_create()
 
 
 @asynccontextmanager
@@ -355,10 +411,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down application")
     cache_service.stop_background()
     if is_leader:
-        try:
-            (Path(storage_service.db_path).parent / ".leader.lock").unlink()
-        except FileNotFoundError:
-            pass
+        _release_leader_lock()
     try:
         storage_service.checkpoint()
         logger.info("WAL checkpoint completed")
