@@ -11,6 +11,7 @@ Commands:
     coupons <pid>          Realized coupons stored per figi
     syncs                  List all enabled T-Bank sync configs
     snapshot-check         Find duplicate portfolio_snapshots (should be none)
+    backups                Backup inventory by type (startup/auto/manual) + freshness
     anomalies <pid>        Analytics anomalies for a portfolio (yield-to-offer, etc.)
     token <user_id>        Mint a JWT for a user (debugging APIs)
     user <email>           Look up user id + their portfolios
@@ -109,6 +110,52 @@ async def cmd_anomalies(pid: int):
         _p(f"  [{a.get('severity')}] {a.get('text')}")
 
 
+def cmd_backups():
+    from app.services.storage_service import storage_service
+    backups = storage_service.get_backups()  # newest first
+    if not backups:
+        _p("⚠ бэкапов нет")
+        return
+
+    def kind(fn: str) -> str:
+        if fn.endswith("_startup.db"):
+            return "startup"
+        if fn.endswith("_auto.db"):
+            return "auto"
+        if fn.endswith("_manual.db"):
+            return "manual"
+        return "legacy"
+
+    by_kind: dict[str, list] = {}
+    for b in backups:
+        by_kind.setdefault(kind(b["filename"]), []).append(b)
+
+    total_mb = sum(b["size"] for b in backups) / 1024 / 1024
+    keep = storage_service.get_setting("backup_keep_count", "30")
+    hour = storage_service.get_setting("backup_daily_hour", "2")
+    _p(f"всего {len(backups)} бэкапов, {total_mb:.1f} МБ | keep_count={keep} | daily в {hour}:00 UTC")
+    for k in ("auto", "startup", "manual", "legacy"):
+        lst = by_kind.get(k)
+        if not lst:
+            continue
+        newest = lst[0]["filename"]
+        _p(f"  {k:8s}: {len(lst):2d} шт | свежий {newest}")
+    # warn if no fresh daily backup in the last ~26h
+    import datetime
+    autos = by_kind.get("auto", [])
+    if autos:
+        try:
+            ts = autos[0]["created_at"]  # YYYYMMDD_HHMMSS
+            dt = datetime.datetime.strptime(ts, "%Y%m%d_%H%M%S").replace(tzinfo=datetime.timezone.utc)
+            age_h = (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() / 3600
+            mark = "⚠ устарел" if age_h > 26 else "OK"
+            _p(f"  daily-бэкап: {age_h:.1f} ч назад  {mark}")
+        except Exception:
+            pass
+    else:
+        _p("  ⚠ daily (_auto) бэкапов ещё нет — первый создастся в daily-час")
+
+
 def cmd_token(user_id: int):
     from app.services.auth_service import auth_service
     from app.services.storage_service import storage_service
@@ -146,6 +193,8 @@ def main():
         cmd_syncs()
     elif cmd == "snapshot-check":
         cmd_snapshot_check()
+    elif cmd == "backups":
+        cmd_backups()
     elif cmd == "anomalies":
         asyncio.run(cmd_anomalies(int(rest[0])))
     elif cmd == "token":
