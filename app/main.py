@@ -543,6 +543,12 @@ async def sitemap_xml():
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.3</priority>\n"
         "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/uchebnik</loc>\n"
+        "    <lastmod>2026-06-08</lastmod>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.7</priority>\n"
+        "  </url>\n"
         "</urlset>\n"
     )
     return Response(content, media_type="application/xml")
@@ -560,6 +566,7 @@ async def llms_txt():
         "## Продукт\n"
         "\n"
         "- [Главная страница](https://bondai.ru/): Управление портфелем облигаций с AI-аналитикой и данными MOEX в реальном времени\n"
+        "- [Учебник по облигациям](https://bondai.ru/uchebnik): Что такое YTM (доходность к погашению), НКД, оферта, виды облигаций (ОФЗ, корпоративные, ВДО), флоатеры и риски — образовательный материал для инвесторов\n"
         "- [Политика конфиденциальности](https://bondai.ru/privacy): Обработка персональных данных по ФЗ-152\n"
         "- [Условия использования](https://bondai.ru/terms): Условия использования сервиса\n"
         "\n"
@@ -588,6 +595,7 @@ _PUBLIC_HTML_PAGES: dict[str, Path] = {
     "/landing": landing_path,
     "/privacy": _ui_dir / "privacy.html",
     "/terms":   _ui_dir / "terms.html",
+    "/uchebnik": _ui_dir / "uchebnik.html",
 }
 # Private app shells — never cache (per-user data is fetched client-side).
 _PRIVATE_HTML_PAGES: dict[str, Path] = {
