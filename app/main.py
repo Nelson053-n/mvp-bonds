@@ -582,19 +582,27 @@ async def llms_txt():
 
 # ── HTML pages ──────────────────────────────────────────────────────────────
 
-_HTML_PAGES: dict[str, Path] = {
+# Public, static marketing/legal pages — cacheable at the edge (improves GEO/crawl).
+_PUBLIC_HTML_PAGES: dict[str, Path] = {
     "/":        landing_path,
     "/landing": landing_path,
     "/privacy": _ui_dir / "privacy.html",
     "/terms":   _ui_dir / "terms.html",
+}
+# Private app shells — never cache (per-user data is fetched client-side).
+_PRIVATE_HTML_PAGES: dict[str, Path] = {
     "/app":     dashboard_path,
     "/all":     dashboard_path,
 }
+# 1h public cache: short enough that deploys propagate quickly, long enough to
+# let CDNs/AI crawlers serve the landing without hitting the origin every time.
+_PUBLIC_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 
-for _page_url, _page_path in _HTML_PAGES.items():
-    def _make_page_handler(fp: Path = _page_path):
+for _page_url, _page_path in {**_PUBLIC_HTML_PAGES, **_PRIVATE_HTML_PAGES}.items():
+    _headers = _PUBLIC_CACHE_HEADERS if _page_url in _PUBLIC_HTML_PAGES else _NO_CACHE_HEADERS
+    def _make_page_handler(fp: Path = _page_path, hdrs: dict = _headers):
         async def handler() -> HTMLResponse:
-            return HTMLResponse(fp.read_text(encoding="utf-8"), headers=_NO_CACHE_HEADERS)
+            return HTMLResponse(fp.read_text(encoding="utf-8"), headers=hdrs)
         return handler
     app.get(_page_url, response_class=HTMLResponse)(_make_page_handler())
 
