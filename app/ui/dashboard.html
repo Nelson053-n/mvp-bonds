@@ -2936,6 +2936,10 @@
         const badge = document.getElementById('autosync-badge');
         const cashRow = document.getElementById('autosync-cash');
         if (!badge) return;
+        // В all-режиме свободные средства — сумма по всем счетам, её ставит
+        // loadExtraAnalytics() из free_cash_rub. Здесь не трогаем cashTotalRub,
+        // иначе он перетрётся остатком одного (последнего) портфеля.
+        if (isAllMode) { badge.style.display = 'none'; if (cashRow) cashRow.style.display = 'none'; return; }
         const hide = () => {
           badge.style.display = 'none';
           if (cashRow) { cashRow.style.display = 'none'; cashRow.textContent = ''; }
@@ -8873,6 +8877,15 @@
           if (keyRateR && keyRateR.key_rate) window._keyRate = keyRateR.key_rate;
           if (extraR) {
             window._analyticsExtra = extraR;
+            // В all-режиме «свободно» = сумма по всем счетам (free_cash_rub с бэка),
+            // а не остаток последнего просмотренного портфеля.
+            if (isAllMode) {
+              const allCash = Number(extraR.free_cash_rub || 0);
+              if (allCash !== Number(window.cashTotalRub || 0)) {
+                window.cashTotalRub = allCash;
+                renderTable();
+              }
+            }
             if (typeof updateStatCards === 'function' && tableRows.length) {
               updateStatCards(calculateSummary(tableRows));
               updateYTMWidget(tableRows);
