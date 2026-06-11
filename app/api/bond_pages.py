@@ -95,67 +95,88 @@ def _cache_put(secid: str, html: str) -> None:
 
 _CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--blue-400:#60a5fa;--blue-500:#3b82f6;--blue-600:#2563eb;
+:root{--blue-400:#60a5fa;--blue-500:#3b82f6;--blue-600:#2563eb;--indigo-500:#6366f1;
 --green-400:#4ade80;--red-400:#f87171;--yellow-400:#fbbf24;
---slate-400:#94a3b8;--slate-500:#64748b;--slate-600:#475569;
+--slate-300:#cbd5e1;--slate-400:#94a3b8;--slate-500:#64748b;--slate-600:#475569;
 --slate-700:#334155;--slate-800:#1e293b;--slate-900:#0f172a;
---radius:8px;--radius-lg:12px}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#020817;color:#e2e8f0;
-line-height:1.65;-webkit-font-smoothing:antialiased}
-a{color:var(--blue-400);text-decoration:none}
-a:hover{text-decoration:underline}
-.wrap{max-width:920px;margin:0 auto;padding:0 20px}
-header{border-bottom:1px solid var(--slate-800);padding:14px 0}
-.nav{display:flex;align-items:center;gap:18px}
-.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;color:#fff}
-.logo-badge{width:26px;height:26px;border-radius:7px;background:var(--blue-600);color:#fff;
-display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
-.nav-links{display:flex;gap:16px;margin-left:auto;align-items:center;font-size:14px}
-.nav-links a{color:var(--slate-400)}
-.btn{display:inline-block;background:var(--blue-600);color:#fff!important;padding:9px 18px;
-border-radius:var(--radius);font-weight:600;font-size:14px}
-.btn:hover{background:var(--blue-500);text-decoration:none}
-.crumbs{font-size:13px;color:var(--slate-500);margin:22px 0 8px}
-.crumbs a{color:var(--slate-400)}
-h1{font-size:26px;font-weight:800;color:#fff;line-height:1.3;margin:4px 0 6px}
-.sub{font-size:14px;color:var(--slate-400);margin-bottom:22px}
+--radius-sm:6px;--radius:8px;--radius-lg:12px}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#020817;color:var(--slate-400);
+line-height:1.65;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--blue-400);text-decoration:none;transition:color .15s}
+a:hover{color:var(--blue-500)}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px;width:100%}
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:12px;
+padding:0 32px;height:56px;background:rgba(2,8,23,.85);
+backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+border-bottom:1px solid rgba(148,163,184,.08)}
+.topbar-logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-sq{width:30px;height:30px;background:linear-gradient(135deg,#2563eb,#4f46e5);
+border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;
+font-weight:800;font-size:15px;color:#fff;letter-spacing:-.5px;box-shadow:0 0 14px rgba(37,99,235,.45)}
+.logo-text{font-weight:700;font-size:15px;color:#fff;letter-spacing:-.2px}
+.topbar-spacer{flex:1}
+.topbar-nav{display:flex;align-items:center;gap:18px}
+.topbar-nav a.nav-link{font-size:13px;font-weight:600;color:var(--slate-500)}
+.topbar-nav a.nav-link:hover{color:var(--blue-400)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+font-family:inherit;font-size:13px;font-weight:600;border-radius:var(--radius-sm);
+padding:7px 14px;cursor:pointer;transition:all .15s ease;text-decoration:none;
+border:1.5px solid transparent;white-space:nowrap}
+.btn-ghost{background:transparent;border-color:rgba(148,163,184,.2);color:var(--slate-300)}
+.btn-ghost:hover{border-color:rgba(148,163,184,.4);color:#fff;background:rgba(255,255,255,.05)}
+.btn-primary{background:linear-gradient(135deg,#2563eb,#4f46e5);border-color:transparent;
+color:#fff!important;box-shadow:0 0 20px rgba(37,99,235,.35)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 24px rgba(37,99,235,.55);filter:brightness(1.08)}
+main.wrap{flex:1;padding-top:36px;padding-bottom:72px}
+.crumbs{font-size:13px;color:var(--slate-600);margin:0 0 22px}
+.crumbs a{color:var(--slate-500)}
+h1{font-size:clamp(26px,4.5vw,36px);font-weight:800;color:#fff;letter-spacing:-.8px;
+line-height:1.15;margin:0 0 10px}
+.sub{font-size:15px;color:var(--slate-400);margin-bottom:28px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:26px}
-.kpi{background:var(--slate-900);border:1px solid var(--slate-800);border-radius:var(--radius-lg);padding:14px 16px}
+.kpi{background:var(--slate-900);border:1px solid rgba(148,163,184,.1);border-radius:var(--radius-lg);padding:14px 16px}
 .kpi-label{font-size:12px;color:var(--slate-500);margin-bottom:4px}
 .kpi-value{font-size:19px;font-weight:700;color:#fff;white-space:nowrap}
 .kpi-value.green{color:var(--green-400)}.kpi-value.red{color:var(--red-400)}
 .kpi-sub{font-size:12px;color:var(--slate-500);margin-top:2px}
-h2{font-size:19px;font-weight:700;color:#fff;margin:30px 0 12px}
-p{margin-bottom:12px;color:#cbd5e1;font-size:15px}
+h2{font-size:clamp(19px,3vw,24px);font-weight:800;color:#fff;letter-spacing:-.4px;
+margin:36px 0 16px;padding-bottom:10px;border-bottom:1px solid rgba(148,163,184,.1)}
+p{font-size:15px;color:var(--slate-400);line-height:1.8;margin-bottom:14px}
+p strong,p b{color:var(--slate-300)}
 table.params{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px}
-table.params td{padding:9px 12px;border-bottom:1px solid var(--slate-800)}
-table.params td:first-child{color:var(--slate-400);width:46%}
+table.params td{padding:10px 12px;border-bottom:1px solid rgba(148,163,184,.08)}
+table.params td:first-child{color:var(--slate-500);width:46%}
 table.params td:last-child{color:#e2e8f0;font-weight:500}
 .note{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);
 border-radius:var(--radius);padding:12px 16px;font-size:14px;color:#fcd34d;margin:14px 0}
-.faq-item{margin-bottom:14px}
-.faq-item h3{font-size:15px;font-weight:600;color:#fff;margin-bottom:4px}
-.faq-item p{font-size:14px;color:var(--slate-400);margin:0}
+.faq-item{padding:16px 0;border-bottom:1px solid rgba(148,163,184,.08)}
+.faq-item:last-of-type{border-bottom:none}
+.faq-item h3{font-size:16px;font-weight:700;color:#fff;margin-bottom:8px}
+.faq-item p{font-size:14px;color:var(--slate-400);line-height:1.75;margin:0}
 .related{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.rel-card{background:var(--slate-900);border:1px solid var(--slate-800);border-radius:var(--radius);
-padding:12px 14px;display:block}
-.rel-card:hover{border-color:var(--slate-600);text-decoration:none}
+.rel-card{background:var(--slate-900);border:1px solid rgba(148,163,184,.1);border-radius:var(--radius);
+padding:12px 14px;display:block;transition:border-color .15s}
+.rel-card:hover{border-color:rgba(148,163,184,.3)}
 .rel-name{font-size:13px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rel-meta{font-size:12px;color:var(--slate-500);margin-top:3px}
 .rel-meta b{color:var(--green-400);font-weight:600}
-.cta-box{background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(37,99,235,.05));
-border:1px solid rgba(59,130,246,.35);border-radius:var(--radius-lg);padding:24px;margin:34px 0;text-align:center}
-.cta-box h2{margin:0 0 8px}
-.cta-box p{font-size:14px;color:var(--slate-400);margin-bottom:16px}
-footer{border-top:1px solid var(--slate-800);margin-top:40px;padding:22px 0 30px;
-font-size:12px;color:var(--slate-600)}
-footer p{font-size:12px;color:var(--slate-600);margin-bottom:6px}
+.cta-box{background:linear-gradient(135deg,rgba(37,99,235,.14),rgba(99,102,241,.1));
+border:1px solid rgba(37,99,235,.25);border-radius:var(--radius-lg);padding:28px 24px;margin:44px 0;text-align:center}
+.cta-box h2{font-size:22px;border:none;padding:0;margin:0 0 8px}
+.cta-box p{font-size:15px;color:var(--slate-400);margin-bottom:18px}
+.cta-box .btn{font-size:15px;font-weight:700;padding:11px 28px;border-radius:var(--radius)}
+footer{border-top:1px solid rgba(148,163,184,.07);padding:24px 32px;text-align:center}
+footer p{font-size:12px;color:var(--slate-600);line-height:1.8;margin-bottom:4px}
+footer a{color:var(--slate-500)}
+footer a:hover{color:var(--blue-400)}
+.footer-sep{margin:0 6px;color:var(--slate-700)}
 .cat-table{width:100%;border-collapse:collapse;font-size:14px}
 .cat-table th{text-align:left;padding:8px 10px;color:var(--slate-500);font-size:12px;
-border-bottom:1px solid var(--slate-700)}
-.cat-table td{padding:8px 10px;border-bottom:1px solid var(--slate-800)}
+border-bottom:1px solid rgba(148,163,184,.15)}
+.cat-table td{padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.08)}
 .cat-table td.num{text-align:right;white-space:nowrap}
-@media(max-width:640px){h1{font-size:21px}.nav-links a.ghost{display:none}}
+@media(max-width:680px){.topbar{padding:0 16px}.topbar-nav{gap:10px}
+.topbar-nav a.nav-link{display:none}.btn-ghost{display:none}}
 """
 
 
@@ -192,23 +213,25 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
 <style>{_CSS}</style>
 </head>
 <body>
-<header><div class="wrap nav">
-  <a class="logo" href="/"><span class="logo-badge">B</span>Bond AI</a>
-  <nav class="nav-links">
-    <a class="ghost" href="/bond">Облигации</a>
-    <a class="ghost" href="/calc">Калькуляторы</a>
-    <a class="ghost" href="/uchebnik">Учебник</a>
-    <a href="/app?auth=login">Войти</a>
-    <a class="btn" href="/app?auth=register">Начать бесплатно</a>
+<header class="topbar">
+  <a href="/" class="topbar-logo"><div class="logo-sq">B</div><span class="logo-text">Bond AI</span></a>
+  <div class="topbar-spacer"></div>
+  <nav class="topbar-nav">
+    <a class="nav-link" href="/bond">Облигации</a>
+    <a class="nav-link" href="/calc">Калькуляторы</a>
+    <a class="nav-link" href="/uchebnik">Учебник</a>
+    <a class="btn btn-ghost" href="/app?auth=login">Войти</a>
+    <a class="btn btn-primary" href="/app?auth=register">Попробовать бесплатно</a>
   </nav>
-</div></header>
+</header>
 <main class="wrap">
 {body}
 </main>
-<footer><div class="wrap">
-<p>Данные — Московская биржа (MOEX ISS), обновляются в течение торгового дня. Информация носит справочный характер и не является индивидуальной инвестиционной рекомендацией.</p>
-<p>© Bond AI · <a href="/privacy">Конфиденциальность</a> · <a href="/terms">Условия</a> · <a href="/uchebnik">Учебник по облигациям</a></p>
-</div></footer>
+<footer>
+<p>&copy; 2025 Bond AI<span class="footer-sep">&middot;</span><a href="/bond">Облигации</a><span class="footer-sep">&middot;</span><a href="/calc">Калькуляторы</a><span class="footer-sep">&middot;</span><a href="/uchebnik">Учебник по облигациям</a><span class="footer-sep">&middot;</span><a href="/privacy">Конфиденциальность</a><span class="footer-sep">&middot;</span><a href="/terms">Условия использования</a></p>
+<p>Данные предоставлены Московской биржей. Информация носит справочный характер и не является индивидуальной инвестиционной рекомендацией.</p>
+<p><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color:var(--blue-400);">Откройте счёт в Т-Инвестициях и получите акции на 2000 &#8381; &rarr;</a></p>
+</footer>
 </body>
 </html>"""
 

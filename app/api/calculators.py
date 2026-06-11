@@ -15,28 +15,29 @@ _CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 
 # Extra styles for calculator forms (on top of the shared shell CSS).
 _CALC_CSS = """<style>
-.calc-card{background:var(--slate-900);border:1px solid var(--slate-800);
+.calc-card{background:var(--slate-900);border:1px solid rgba(148,163,184,.1);
 border-radius:var(--radius-lg);padding:22px;margin:18px 0}
-.calc-card h2{margin:0 0 14px;font-size:17px}
+.calc-card h2{margin:0 0 16px;font-size:17px;border:none;padding:0}
 .calc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-.field label{display:block;font-size:12px;color:var(--slate-500);margin-bottom:5px}
-.field input,.field select{width:100%;background:#0b1424;border:1px solid var(--slate-700);
-border-radius:var(--radius);color:#e2e8f0;padding:9px 11px;font-size:14px;font-family:inherit}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--slate-500);margin-bottom:5px}
+.field input,.field select{width:100%;background:rgba(2,8,23,.6);border:1px solid rgba(148,163,184,.18);
+border-radius:var(--radius);color:#e2e8f0;padding:9px 11px;font-size:14px;font-family:inherit;
+transition:border-color .15s}
 .field input:focus,.field select:focus{outline:none;border-color:var(--blue-500)}
-.calc-result{margin-top:16px;padding:14px 16px;background:rgba(37,99,235,.08);
-border:1px solid rgba(59,130,246,.3);border-radius:var(--radius);font-size:14px}
-.calc-result .big{font-size:24px;font-weight:800;color:var(--green-400)}
+.calc-result{margin-top:16px;padding:16px 18px;background:rgba(37,99,235,.07);
+border:1px solid rgba(37,99,235,.2);border-radius:var(--radius);font-size:14px}
+.calc-result .big{font-size:26px;font-weight:800;color:var(--green-400);letter-spacing:-.5px}
 .calc-result .row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;color:var(--slate-400)}
 .calc-result .row b{color:#e2e8f0;font-weight:600;white-space:nowrap}
-.formula{background:var(--slate-900);border-left:3px solid var(--blue-500);
-padding:10px 14px;border-radius:var(--radius);font-size:14px;color:#cbd5e1;margin:12px 0;
+.formula{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.2);
+padding:14px 18px;border-radius:var(--radius);font-size:14px;color:var(--slate-300);margin:16px 0;
 font-family:ui-monospace,monospace}
 .calc-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:18px 0}
-.calc-links a{display:block;background:var(--slate-900);border:1px solid var(--slate-800);
-border-radius:var(--radius-lg);padding:18px}
-.calc-links a:hover{border-color:var(--slate-600);text-decoration:none}
+.calc-links a{display:block;background:var(--slate-900);border:1px solid rgba(148,163,184,.1);
+border-radius:var(--radius-lg);padding:20px;transition:border-color .15s}
+.calc-links a:hover{border-color:rgba(148,163,184,.3)}
 .calc-links .t{font-size:15px;font-weight:700;color:#fff;margin-bottom:4px}
-.calc-links .d{font-size:13px;color:var(--slate-400)}
+.calc-links .d{font-size:13px;color:var(--slate-400);line-height:1.6}
 </style>"""
 
 _FOOT_LINKS = ('<p>Смотрите также: <a href="/bond">каталог облигаций MOEX</a> с готовым НКД и доходностью '
