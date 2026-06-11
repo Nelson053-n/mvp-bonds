@@ -36,7 +36,10 @@ _notfound_cache: dict[str, float] = {}
 _catalog_cache: tuple[str, float] | None = None
 _sitemap_cache: tuple[str, float] | None = None
 
-_PUBLIC_CACHE = {"Cache-Control": "public, max-age=900"}
+# Short freshness so deploys propagate in minutes; SWR keeps repeat views instant
+# while the browser revalidates in the background. Origin cost is covered by the
+# in-memory page cache, so the short max-age doesn't add MOEX load.
+_PUBLIC_CACHE = {"Cache-Control": "public, max-age=300, stale-while-revalidate=86400"}
 
 _MONTHS_GEN = ["", "января", "февраля", "марта", "апреля", "мая", "июня",
                "июля", "августа", "сентября", "октября", "ноября", "декабря"]

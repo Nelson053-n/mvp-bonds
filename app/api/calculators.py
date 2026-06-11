@@ -11,7 +11,7 @@ from app.api.bond_pages import _BASE_URL, _page_shell
 
 router = APIRouter(tags=["public-calculators"])
 
-_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
+_CACHE_HEADERS = {"Cache-Control": "public, max-age=300, stale-while-revalidate=86400"}
 
 # Extra styles for calculator forms (on top of the shared shell CSS).
 _CALC_CSS = """<style>

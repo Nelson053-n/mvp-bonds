@@ -634,9 +634,10 @@ _PRIVATE_HTML_PAGES: dict[str, Path] = {
     "/app":     dashboard_path,
     "/all":     dashboard_path,
 }
-# 1h public cache: short enough that deploys propagate quickly, long enough to
-# let CDNs/AI crawlers serve the landing without hitting the origin every time.
-_PUBLIC_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
+# 5min freshness + day-long stale-while-revalidate: deploys propagate in minutes,
+# repeat views render instantly from cache while the browser revalidates in the
+# background. (Plain max-age=3600 made redesigns invisible for up to an hour.)
+_PUBLIC_CACHE_HEADERS = {"Cache-Control": "public, max-age=300, stale-while-revalidate=86400"}
 
 for _page_url, _page_path in {**_PUBLIC_HTML_PAGES, **_PRIVATE_HTML_PAGES}.items():
     _headers = _PUBLIC_CACHE_HEADERS if _page_url in _PUBLIC_HTML_PAGES else _NO_CACHE_HEADERS
