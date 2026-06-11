@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from app.api.auth import router as auth_router
 from app.api.bond_pages import router as bond_pages_router
 from app.api.bonds import router as bonds_router
+from app.api.calculators import router as calculators_router
 from app.api.pdf import router as pdf_router
 from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
@@ -465,6 +466,7 @@ async def add_security_headers(request: Request, call_next) -> Response:
 app.include_router(auth_router)
 app.include_router(bond_pages_router)
 app.include_router(bonds_router)
+app.include_router(calculators_router)
 app.include_router(pdf_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
@@ -558,6 +560,24 @@ async def sitemap_xml():
         "    <changefreq>daily</changefreq>\n"
         "    <priority>0.8</priority>\n"
         "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/calc</loc>\n"
+        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.6</priority>\n"
+        "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/calc/nkd</loc>\n"
+        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.7</priority>\n"
+        "  </url>\n"
+        "  <url>\n"
+        "    <loc>https://bondai.ru/calc/ytm</loc>\n"
+        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <changefreq>monthly</changefreq>\n"
+        "    <priority>0.7</priority>\n"
+        "  </url>\n"
         "</urlset>\n"
     )
     return Response(content, media_type="application/xml")
@@ -577,6 +597,8 @@ async def llms_txt():
         "- [Главная страница](https://bondai.ru/): Управление портфелем облигаций с AI-аналитикой и данными MOEX в реальном времени\n"
         "- [Учебник по облигациям](https://bondai.ru/uchebnik): Что такое YTM (доходность к погашению), НКД, оферта, виды облигаций (ОФЗ, корпоративные, ВДО), флоатеры и риски — образовательный материал для инвесторов\n"
         "- [Каталог облигаций MOEX](https://bondai.ru/bond): Все торгуемые облигации Московской биржи (ОФЗ и корпоративные) — у каждой бумаги своя страница /bond/{тикер} с ценой, доходностью YTM, купонами, офертой и кредитным рейтингом\n"
+        "- [Калькулятор НКД](https://bondai.ru/calc/nkd): Онлайн-расчёт накопленного купонного дохода облигации по ставке или размеру купона\n"
+        "- [Калькулятор доходности YTM](https://bondai.ru/calc/ytm): Онлайн-расчёт эффективной, простой и текущей доходности облигации к погашению\n"
         "- [Политика конфиденциальности](https://bondai.ru/privacy): Обработка персональных данных по ФЗ-152\n"
         "- [Условия использования](https://bondai.ru/terms): Условия использования сервиса\n"
         "\n"

@@ -196,6 +196,7 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
   <a class="logo" href="/"><span class="logo-badge">B</span>Bond AI</a>
   <nav class="nav-links">
     <a class="ghost" href="/bond">Облигации</a>
+    <a class="ghost" href="/calc">Калькуляторы</a>
     <a class="ghost" href="/uchebnik">Учебник</a>
     <a href="/app?auth=login">Войти</a>
     <a class="btn" href="/app?auth=register">Начать бесплатно</a>
