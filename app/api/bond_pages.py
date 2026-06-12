@@ -480,7 +480,7 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
   <h2>Следите за {e(s.name)} в своём портфеле</h2>
   <p>Bond AI бесплатно отслеживает цены, купоны и доходность ваших облигаций: купонный календарь,
   Telegram-уведомления о выплатах, импорт портфеля из Т-Банка.</p>
-  <a class="btn" href="/app?auth=register">Создать портфель бесплатно</a>
+  <a class="btn btn-primary" href="/app?auth=register">Создать портфель бесплатно</a>
 </div>
 {related_html}
 """
@@ -540,50 +540,193 @@ def _render_404() -> HTMLResponse:
 
 # ── Catalog ──────────────────────────────────────────────────────────────────
 
+_CATALOG_CSS = """<style>
+.cat-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+.chips{display:flex;gap:6px}
+.chip{font-size:13px;font-weight:600;color:var(--slate-400);background:var(--slate-900);
+border:1px solid rgba(148,163,184,.15);border-radius:999px;padding:6px 14px;cursor:pointer;
+transition:all .15s;font-family:inherit}
+.chip:hover{border-color:rgba(148,163,184,.35);color:#fff}
+.chip.active{background:linear-gradient(135deg,#2563eb,#4f46e5);border-color:transparent;color:#fff}
+.cat-search{flex:1;min-width:180px;background:rgba(2,8,23,.6);border:1px solid rgba(148,163,184,.18);
+border-radius:var(--radius);color:#e2e8f0;padding:8px 12px;font-size:13px;font-family:inherit}
+.cat-search:focus{outline:none;border-color:var(--blue-500)}
+.yield-box{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--slate-500)}
+.yield-box input{width:64px;background:rgba(2,8,23,.6);border:1px solid rgba(148,163,184,.18);
+border-radius:var(--radius);color:#e2e8f0;padding:8px 8px;font-size:13px;font-family:inherit}
+.yield-box input:focus{outline:none;border-color:var(--blue-500)}
+.cat-count{font-size:12px;color:var(--slate-600);margin:0 0 8px}
+.table-scroll{overflow-x:auto;border:1px solid rgba(148,163,184,.1);border-radius:var(--radius-lg)}
+.cat-table{min-width:880px;font-size:13px}
+.cat-table thead th{position:sticky;top:0;background:#0a1326;cursor:pointer;user-select:none;
+white-space:nowrap;padding:10px}
+.cat-table thead th:hover{color:var(--slate-300)}
+.cat-table thead th .dir{color:var(--blue-400);font-size:10px;margin-left:3px}
+.cat-table tbody tr:hover{background:rgba(148,163,184,.04)}
+.cat-table td{white-space:nowrap}
+.cat-table td.idx{color:var(--slate-600);font-size:12px}
+.cat-table td.y{color:var(--green-400);font-weight:600}
+.rating-pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;
+background:rgba(96,165,250,.12);color:var(--blue-400)}
+</style>"""
+
+_CATALOG_JS = """<script>
+(function(){
+  var tbody=document.getElementById('cat-body');
+  var rows=Array.prototype.slice.call(tbody.rows);
+  var search=document.getElementById('cat-search');
+  var ymin=document.getElementById('y-min'), ymax=document.getElementById('y-max');
+  var count=document.getElementById('cat-count');
+  var board='all', sortCol=-1, sortDir=1;
+
+  function apply(){
+    var q=(search.value||'').toLowerCase().trim();
+    var lo=parseFloat(ymin.value), hi=parseFloat(ymax.value);
+    var shown=0;
+    rows.forEach(function(tr){
+      var ok=(board==='all'||tr.dataset.board===board);
+      if(ok&&q) ok=tr.dataset.search.indexOf(q)!==-1;
+      if(ok&&!isNaN(lo)) ok=parseFloat(tr.dataset.yield||'')>=lo;
+      if(ok&&!isNaN(hi)) ok=parseFloat(tr.dataset.yield||'')<=hi;
+      tr.style.display=ok?'':'none';
+      if(ok){shown++;tr.cells[0].textContent=shown;}
+    });
+    count.textContent='Показано '+shown+' из '+rows.length;
+  }
+  document.querySelectorAll('.chip').forEach(function(ch){
+    ch.addEventListener('click',function(){
+      document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('active');});
+      ch.classList.add('active');board=ch.dataset.board;apply();
+    });
+  });
+  search.addEventListener('input',apply);
+  ymin.addEventListener('input',apply);ymax.addEventListener('input',apply);
+
+  document.querySelectorAll('#cat-table thead th[data-col]').forEach(function(th){
+    th.addEventListener('click',function(){
+      var col=parseInt(th.dataset.col,10);
+      sortDir=(sortCol===col)?-sortDir:1;sortCol=col;
+      document.querySelectorAll('#cat-table thead .dir').forEach(function(d){d.textContent='';});
+      th.querySelector('.dir').textContent=sortDir===1?'\\u25b2':'\\u25bc';
+      rows.sort(function(a,b){
+        var av=a.cells[col].dataset.v, bv=b.cells[col].dataset.v;
+        var an=parseFloat(av), bn=parseFloat(bv);
+        var aEmpty=(av===''||av===undefined), bEmpty=(bv===''||bv===undefined);
+        if(aEmpty&&bEmpty) return 0;
+        if(aEmpty) return 1;
+        if(bEmpty) return -1;
+        if(!isNaN(an)&&!isNaN(bn)) return (an-bn)*sortDir;
+        return String(av).localeCompare(String(bv))*sortDir;
+      });
+      rows.forEach(function(r){tbody.appendChild(r);});
+      apply();
+    });
+  });
+  apply();
+})();
+</script>"""
+
+
 @router.get("/bond", response_class=HTMLResponse)
 async def bonds_catalog() -> HTMLResponse:
-    """Public catalog of all traded MOEX bonds — crawl entry point for /bond/{secid}."""
+    """Public catalog of all traded MOEX bonds — crawl entry point for /bond/{secid}.
+
+    Smart-lab-style structure: type tabs (chips), search, yield range filter and
+    client-side sortable columns over a single server-rendered table.
+    """
     global _catalog_cache
     now = time.time()
     if _catalog_cache and now - _catalog_cache[1] < _CATALOG_TTL:
         return HTMLResponse(_catalog_cache[0], headers=_PUBLIC_CACHE)
 
     bonds = await _catalog_bonds()
+    today = date.today()
     ofz = sorted((b for b in bonds if b["board"] == "TQOB"), key=lambda b: b.get("maturity") or "")
     corp = sorted((b for b in bonds if b["board"] != "TQOB"), key=lambda b: b["name"])
+    ordered = ofz + corp
 
-    def _section(title: str, items: list[dict]) -> str:
-        if not items:
-            return ""
-        rows = "".join(
-            f'<tr><td><a href="/bond/{e(b["ticker"])}">{e(b["name"])}</a></td>'
-            f'<td>{e(b["ticker"])}</td>'
-            f'<td class="num">{_fmt_money(b["price"])}%</td>'
-            f'<td class="num">{_fmt_money(b.get("market_yield")) or "—"}%</td>'
-            f'<td class="num">{e(b.get("maturity") or "—")}</td></tr>'
-            for b in items
+    def _dmy(iso: str | None) -> tuple[str, str]:
+        """(display dd.mm.yyyy, sort key iso) or em-dash."""
+        if not iso:
+            return "—", ""
+        try:
+            d = date.fromisoformat(iso)
+            return f"{d.day:02d}.{d.month:02d}.{d.year}", iso
+        except ValueError:
+            return "—", ""
+
+    rows_html: list[str] = []
+    for i, b in enumerate(ordered, 1):
+        mat_disp, mat_key = _dmy(b.get("maturity"))
+        off_disp, off_key = _dmy(b.get("offer_date"))
+        years_disp, years_key = "—", ""
+        if mat_key:
+            yrs = (date.fromisoformat(mat_key) - today).days / 365
+            years_disp, years_key = f"{yrs:.1f}".replace(".", ","), f"{yrs:.2f}"
+        my = b.get("market_yield")
+        rating = b.get("rating")
+        rows_html.append(
+            f'<tr data-board="{e(b["board"])}" data-yield="{my if my is not None else ""}"'
+            f' data-search="{e((b["name"] + " " + b["ticker"]).lower())}">'
+            f'<td class="idx num" data-v="{i}">{i}</td>'
+            f'<td data-v="{e(b["name"])}"><a href="/bond/{e(b["ticker"])}">{e(b["name"])}</a></td>'
+            f'<td class="num" data-v="{years_key}">{years_disp}</td>'
+            f'<td class="num y" data-v="{my if my is not None else ""}">{_fmt_money(my) or "—"}</td>'
+            f'<td class="num" data-v="{b.get("coupon_percent") or ""}">{_fmt_money(b.get("coupon_percent")) or "—"}</td>'
+            f'<td class="num" data-v="{b.get("coupon_frequency") or ""}">{b.get("coupon_frequency") or "—"}</td>'
+            f'<td class="num" data-v="{b["price"]}">{_fmt_money(b["price"])}</td>'
+            f'<td data-v="{e(rating or "")}">{f"<span class=\'rating-pill\'>{e(rating)}</span>" if rating else "—"}</td>'
+            f'<td class="num" data-v="{mat_key}">{mat_disp}</td>'
+            f'<td class="num" data-v="{off_key}">{off_disp}</td>'
+            "</tr>"
         )
-        return (f"<h2>{e(title)} ({len(items)})</h2>"
-                f'<table class="cat-table"><thead><tr><th>Облигация</th><th>Тикер</th>'
-                f"<th>Цена</th><th>Доходность</th><th>Погашение</th></tr></thead>"
-                f"<tbody>{rows}</tbody></table>")
 
-    today_str = _fmt_date(date.today())
-    body = f"""
+    today_str = _fmt_date(today)
+    body = f"""{_CATALOG_CSS}
 <nav class="crumbs"><a href="/">Главная</a> / Облигации</nav>
 <h1>Облигации Московской биржи: цены и доходность</h1>
-<p class="sub">{len(bonds)} торгуемых выпусков · данные MOEX на {e(today_str or "")}</p>
-<p>Каталог облигаций, торгующихся на Московской бирже: ОФЗ и корпоративные выпуски с текущей ценой,
-доходностью к погашению и датой погашения. Откройте страницу облигации, чтобы увидеть купонный календарь,
-ставку купона, НКД, оферту и кредитный рейтинг. Незнакомые термины — в
-<a href="/uchebnik">учебнике по облигациям</a>.</p>
+<p class="sub">{len(bonds)} торгуемых выпусков · ОФЗ и корпоративные облигации · данные MOEX на {e(today_str or "")}</p>
+<div class="cat-toolbar">
+  <div class="chips">
+    <button class="chip active" data-board="all">Все</button>
+    <button class="chip" data-board="TQOB">ОФЗ</button>
+    <button class="chip" data-board="TQCB">Корпоративные</button>
+  </div>
+  <input class="cat-search" id="cat-search" type="search" placeholder="Поиск по названию или тикеру…">
+  <div class="yield-box">Доходность, %:
+    <input id="y-min" type="number" placeholder="от" step="any">
+    <input id="y-max" type="number" placeholder="до" step="any">
+  </div>
+</div>
+<div class="cat-count" id="cat-count"></div>
+<div class="table-scroll">
+<table class="cat-table" id="cat-table">
+<thead><tr>
+  <th>№</th>
+  <th data-col="1">Название<span class="dir"></span></th>
+  <th data-col="2">Лет до погаш.<span class="dir"></span></th>
+  <th data-col="3">Доходность, %<span class="dir"></span></th>
+  <th data-col="4">Купон, %<span class="dir"></span></th>
+  <th data-col="5">Выплат/год<span class="dir"></span></th>
+  <th data-col="6">Цена, %<span class="dir"></span></th>
+  <th data-col="7">Рейтинг<span class="dir"></span></th>
+  <th data-col="8">Погашение<span class="dir"></span></th>
+  <th data-col="9">Оферта<span class="dir"></span></th>
+</tr></thead>
+<tbody id="cat-body">{"".join(rows_html)}</tbody>
+</table>
+</div>
+<p style="margin-top:18px">Каталог облигаций, торгующихся на Московской бирже: ОФЗ и корпоративные облигации
+с текущей ценой, доходностью к погашению, купоном и датами погашения и оферты. Сортируйте таблицу кликом
+по заголовку колонки, фильтруйте по типу и доходности. На странице каждой бумаги — купонный календарь,
+НКД, рейтинг и FAQ. Незнакомые термины — в <a href="/uchebnik">учебнике по облигациям</a>,
+посчитать самостоятельно — в <a href="/calc">калькуляторах НКД и YTM</a>.</p>
 <div class="cta-box">
   <h2>Соберите портфель из этих облигаций</h2>
   <p>Bond AI бесплатно посчитает доходность, покажет купонный календарь и предупредит об офертах.</p>
-  <a class="btn" href="/app?auth=register">Начать бесплатно</a>
+  <a class="btn btn-primary" href="/app?auth=register">Начать бесплатно</a>
 </div>
-{_section("ОФЗ — облигации федерального займа", ofz)}
-{_section("Корпоративные облигации", corp)}
+{_CATALOG_JS}
 """
     jsonld = [{
         "@context": "https://schema.org",

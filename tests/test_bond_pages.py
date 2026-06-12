@@ -138,7 +138,11 @@ async def test_catalog_page(client):
     assert "ОФЗ 26238" in html
     assert "ТестКорп БО-1" in html
     assert "/bond/RU000A106K43" in html
-    assert "Корпоративные облигации" in html
+    # smart-lab-style controls: type chips, search, sortable headers
+    assert 'data-board="TQOB"' in html
+    assert 'id="cat-search"' in html
+    assert 'data-col="3"' in html
+    assert "Лет до погаш." in html
 
 
 async def test_sitemap_bonds(client):
