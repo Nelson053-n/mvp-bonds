@@ -665,6 +665,7 @@ async def bonds_catalog() -> HTMLResponse:
             years_disp, years_key = f"{yrs:.1f}".replace(".", ","), f"{yrs:.2f}"
         my = b.get("market_yield")
         rating = b.get("rating")
+        rating_html = f'<span class="rating-pill">{e(rating)}</span>' if rating else "—"
         rows_html.append(
             f'<tr data-board="{e(b["board"])}" data-yield="{my if my is not None else ""}"'
             f' data-search="{e((b["name"] + " " + b["ticker"]).lower())}">'
@@ -675,7 +676,7 @@ async def bonds_catalog() -> HTMLResponse:
             f'<td class="num" data-v="{b.get("coupon_percent") or ""}">{_fmt_money(b.get("coupon_percent")) or "—"}</td>'
             f'<td class="num" data-v="{b.get("coupon_frequency") or ""}">{b.get("coupon_frequency") or "—"}</td>'
             f'<td class="num" data-v="{b["price"]}">{_fmt_money(b["price"])}</td>'
-            f'<td data-v="{e(rating or "")}">{f"<span class=\'rating-pill\'>{e(rating)}</span>" if rating else "—"}</td>'
+            f'<td data-v="{e(rating or "")}">{rating_html}</td>'
             f'<td class="num" data-v="{mat_key}">{mat_disp}</td>'
             f'<td class="num" data-v="{off_key}">{off_disp}</td>'
             "</tr>"
