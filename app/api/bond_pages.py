@@ -105,6 +105,23 @@ _CSS = """
 --radius-sm:6px;--radius:8px;--radius-lg:12px}
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#020817;color:var(--slate-400);
 line-height:1.65;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+.mesh-bg{position:fixed;inset:0;pointer-events:none;z-index:0;
+background-image:linear-gradient(rgba(148,163,184,.04) 1px,transparent 1px),
+linear-gradient(90deg,rgba(148,163,184,.04) 1px,transparent 1px);background-size:44px 44px}
+.orbs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);will-change:transform}
+.orb-1{width:700px;height:700px;top:-200px;left:-150px;
+background:radial-gradient(circle,rgba(37,99,235,.45) 0%,rgba(37,99,235,.14) 45%,transparent 70%);
+animation:orbDrift1 13s ease-in-out infinite}
+.orb-2{width:600px;height:600px;bottom:-120px;right:-120px;
+background:radial-gradient(circle,rgba(99,102,241,.4) 0%,rgba(99,102,241,.12) 45%,transparent 70%);
+animation:orbDrift2 17s ease-in-out infinite}
+@keyframes orbDrift1{0%,100%{transform:translate(0,0) scale(1)}
+33%{transform:translate(50px,40px) scale(1.06)}66%{transform:translate(-30px,60px) scale(.96)}}
+@keyframes orbDrift2{0%,100%{transform:translate(0,0) scale(1)}
+40%{transform:translate(-60px,-40px) scale(1.08)}70%{transform:translate(40px,-15px) scale(.94)}}
+@media(prefers-reduced-motion:reduce){.orb{animation:none}}
+.topbar,main.wrap,footer{position:relative;z-index:1}
 a{color:var(--blue-400);text-decoration:none;transition:color .15s}
 a:hover{color:var(--blue-500)}
 .wrap{max-width:920px;margin:0 auto;padding:0 24px;width:100%}
@@ -216,6 +233,8 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
 <style>{_CSS}</style>
 </head>
 <body>
+<div class="mesh-bg"></div>
+<div class="orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
 <header class="topbar">
   <a href="/" class="topbar-logo"><div class="logo-sq">B</div><span class="logo-text">Bond AI</span></a>
   <div class="topbar-spacer"></div>
