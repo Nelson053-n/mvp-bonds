@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bond-ai-v52';
+const CACHE_NAME = 'bond-ai-v53';
 const STATIC_ASSETS = [
   '/manifest.json',
 ];
@@ -33,10 +33,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets, network-first for HTML
+  // Network-first for HTML; {cache:'no-cache'} revalidates with the server so a
+  // stale browser HTTP-cache entry (public pages have max-age) can't pin old HTML.
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/app') || caches.match('/'))
+      fetch(event.request, { cache: 'no-cache' })
+        .catch(() => caches.match('/app') || caches.match('/'))
     );
     return;
   }
