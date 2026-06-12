@@ -145,6 +145,42 @@ async def test_catalog_page(client):
     assert "Лет до погаш." in html
 
 
+async def test_catalog_yield_map(client):
+    resp = await client.get("/bond")
+    assert resp.status_code == 200
+    html = resp.text
+    # yield map: canvas, group chips, embedded data points
+    assert 'id="ymap"' in html
+    assert 'id="map-chips"' in html
+    assert "Карта доходности" in html
+    assert 'id="map-data"' in html
+    import json as _json
+    payload = html.split('<script id="map-data" type="application/json">')[1].split("</script>")[0]
+    points = _json.loads(payload)
+    # OFZ bonds (group 0) and corp (group 1) from _FAKE_BONDS with positive duration
+    groups = {p[4] for p in points}
+    assert 0 in groups and 1 in groups
+    assert all(len(p) == 7 for p in points)  # [secid, name, ytm, dur, group, years, rating_bucket]
+    assert all(p[3] > 0 for p in points)  # duration
+    # dohod-style extras: axis toggle, strategy presets, duration + rate-risk columns
+    assert 'id="x-chips"' in html
+    assert 'id="strat-chips"' in html
+    assert "Дюрация" in html
+    assert "При +2% ставки" in html
+
+
+def test_macaulay_duration():
+    # zero-coupon: duration == maturity
+    d = bond_pages._macaulay_duration(0, 2, 5.0, 10.0)
+    assert d == pytest.approx(5.0, abs=0.3)
+    # coupon bond: duration < maturity
+    d = bond_pages._macaulay_duration(10.0, 2, 10.0, 15.0)
+    assert d is not None and 3.0 < d < 8.0
+    # invalid inputs
+    assert bond_pages._macaulay_duration(10.0, 2, 0, 15.0) is None
+    assert bond_pages._macaulay_duration(10.0, 2, 5.0, None) is None
+
+
 async def test_sitemap_bonds(client):
     resp = await client.get("/sitemap-bonds.xml")
     assert resp.status_code == 200

@@ -72,6 +72,45 @@ def _freq_text(period_days: int | None) -> str | None:
     return "1 раз в год"
 
 
+def _rating_bucket(rating: str | None, board: str) -> int:
+    """Credit-quality bucket for the yield map / strategy presets:
+    0 = AAA/AA (incl. sovereign), 1 = A/BBB, 2 = BB and below, 3 = unrated."""
+    if board == "TQOB":
+        return 0
+    if not rating:
+        return 3
+    r = rating.upper()
+    if r.startswith("AA"):
+        return 0
+    if r.startswith("A") or r.startswith("BBB"):
+        return 1
+    return 2
+
+
+def _macaulay_duration(coupon_pct: float | None, freq: int | None,
+                       years: float, ytm_pct: float | None) -> float | None:
+    """Approximate Macaulay duration (years) from coupon rate, payment frequency,
+    time to maturity/offer and market yield. Good enough for the yield map."""
+    if not years or years <= 0 or not ytm_pct or ytm_pct <= 0:
+        return None
+    f = freq if freq and freq > 0 else 2
+    y = ytm_pct / 100.0
+    n = max(1, round(years * f))
+    c = (coupon_pct or 0.0) / 100.0 / f
+    v = 1.0 / (1.0 + y / f)
+    pv = 0.0
+    wt = 0.0
+    df = 1.0
+    for k in range(1, n + 1):
+        df *= v
+        cf = c + (1.0 if k == n else 0.0)
+        pv += cf * df
+        wt += (k / f) * cf * df
+    if pv <= 0:
+        return None
+    return wt / pv
+
+
 async def _catalog_bonds() -> list[dict]:
     """All traded bonds (TQOB + TQCB) from the shared hourly cache in app.api.bonds."""
     from app.api import bonds as bonds_api
@@ -557,7 +596,7 @@ border-radius:var(--radius);color:#e2e8f0;padding:8px 8px;font-size:13px;font-fa
 .yield-box input:focus{outline:none;border-color:var(--blue-500)}
 .cat-count{font-size:12px;color:var(--slate-600);margin:0 0 8px}
 .table-scroll{overflow-x:auto;border:1px solid rgba(148,163,184,.1);border-radius:var(--radius-lg)}
-.cat-table{min-width:880px;font-size:13px}
+.cat-table{min-width:1020px;font-size:13px}
 .cat-table thead th{position:sticky;top:0;background:#0a1326;cursor:pointer;user-select:none;
 white-space:nowrap;padding:10px}
 .cat-table thead th:hover{color:var(--slate-300)}
@@ -568,7 +607,173 @@ white-space:nowrap;padding:10px}
 .cat-table td.y{color:var(--green-400);font-weight:600}
 .rating-pill{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;
 background:rgba(96,165,250,.12);color:var(--blue-400)}
+.cat-table td.risk{color:var(--red-400)}
+.strat-label{font-size:12px;color:var(--slate-500)}
+.chip.mini{font-size:11px;padding:4px 10px}
+.ymap-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--slate-500)}
+.ymap-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.ymap-box{background:var(--slate-900);border:1px solid rgba(148,163,184,.1);
+border-radius:var(--radius-lg);padding:18px 18px 12px;margin:0 0 26px}
+.ymap-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:4px}
+.ymap-box h2{font-size:18px;margin:0;padding:0;border:none;flex:1}
+.ymap-sub{font-size:13px;color:var(--slate-500);margin:0 0 12px}
+.ymap-wrap{position:relative}
+#ymap{display:block;width:100%;height:420px;cursor:crosshair}
+#ymap-tip{position:absolute;display:none;pointer-events:none;z-index:5;
+background:#0a1326;border:1px solid rgba(148,163,184,.25);border-radius:var(--radius);
+padding:8px 11px;font-size:12px;color:var(--slate-300);box-shadow:0 8px 24px rgba(0,0,0,.5);
+white-space:nowrap}
+#ymap-tip b{color:#fff;display:block;margin-bottom:2px}
+#ymap-tip .ty{color:var(--green-400);font-weight:600}
+.ymap-note{font-size:12px;color:var(--slate-600);margin-top:8px}
+@media(max-width:680px){#ymap{height:300px}}
 </style>"""
+
+_MAP_JS = """<script>
+(function(){
+  var data=JSON.parse(document.getElementById('map-data').textContent);
+  var canvas=document.getElementById('ymap');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var tip=document.getElementById('ymap-tip');
+  var note=document.getElementById('ymap-note');
+  var RB_COLORS=['#60a5fa','#4ade80','#fbbf24','#94a3b8'];
+  var group=0,xmode=0,pts=[],hover=-1,geom=null;
+
+  function quantile(sorted,q){
+    if(!sorted.length)return 0;
+    var pos=(sorted.length-1)*q,lo=Math.floor(pos),hi=Math.ceil(pos);
+    return sorted[lo]+(sorted[hi]-sorted[lo])*(pos-lo);
+  }
+  function niceStep(range,target){
+    var raw=range/target,mag=Math.pow(10,Math.floor(Math.log(raw)/Math.LN10));
+    var c=[1,2,2.5,5,10],best=c[0]*mag;
+    for(var i=0;i<c.length;i++){if(c[i]*mag>=raw){best=c[i]*mag;break;}}
+    return best;
+  }
+
+  function build(){
+    var rows=data.filter(function(r){return r[4]===group;});
+    var ys=rows.map(function(r){return r[2];}).sort(function(a,b){return a-b;});
+    var hi=ys.length?Math.min(quantile(ys,0.99)*1.25,60):60;
+    var hidden=0;
+    pts=[];
+    rows.forEach(function(r){
+      if(r[2]>hi){hidden++;return;}
+      pts.push({t:r[0],n:r[1],y:r[2],d:r[3],yr:r[5],rb:r[6]});
+    });
+    note.textContent=pts.length+' бумаг · точка = выпуск, наведите для деталей, клик — страница облигации'
+      +(hidden?' · скрыто аномалий: '+hidden:'');
+    hover=-1;draw();
+  }
+
+  function draw(){
+    var w=canvas.clientWidth,h=canvas.clientHeight,dpr=window.devicePixelRatio||1;
+    canvas.width=w*dpr;canvas.height=h*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    if(!pts.length){ctx.fillStyle='#64748b';ctx.font='13px Inter,sans-serif';
+      ctx.fillText('Нет данных',w/2-30,h/2);geom=null;return;}
+    var padL=46,padR=14,padT=14,padB=32;
+    function xv(p){return xmode?p.yr:p.d;}
+    var xs=pts.map(xv),yv=pts.map(function(p){return p.y;});
+    var xmax=Math.max.apply(null,xs),ymin=Math.min.apply(null,yv),ymax=Math.max.apply(null,yv);
+    xmax=Math.max(1,Math.ceil(xmax+0.3));
+    var ypad=Math.max(0.4,(ymax-ymin)*0.07);ymin=Math.max(0,ymin-ypad);ymax+=ypad;
+    var pw=w-padL-padR,ph=h-padT-padB;
+    function X(d){return padL+d/xmax*pw;}
+    function Y(y){return padT+(1-(y-ymin)/(ymax-ymin))*ph;}
+    geom={X:X,Y:Y};
+    ctx.font='11px Inter,sans-serif';
+    var ystep=niceStep(ymax-ymin,6);
+    for(var y=Math.ceil(ymin/ystep)*ystep;y<=ymax+1e-9;y+=ystep){
+      var py=Y(y);
+      ctx.strokeStyle='rgba(148,163,184,.08)';ctx.beginPath();
+      ctx.moveTo(padL,py);ctx.lineTo(w-padR,py);ctx.stroke();
+      ctx.fillStyle='#64748b';ctx.textAlign='right';
+      ctx.fillText((Math.round(y*10)/10)+'%',padL-7,py+4);
+    }
+    var xstep=niceStep(xmax,8);
+    for(var x=0;x<=xmax+1e-9;x+=xstep){
+      var px=X(x);
+      ctx.strokeStyle='rgba(148,163,184,.06)';ctx.beginPath();
+      ctx.moveTo(px,padT);ctx.lineTo(px,h-padB);ctx.stroke();
+      ctx.fillStyle='#64748b';ctx.textAlign='center';
+      ctx.fillText(Math.round(x*10)/10,px,h-padB+16);
+    }
+    ctx.textAlign='left';ctx.fillStyle='#94a3b8';
+    ctx.fillText(xmode?'Срок, лет':'Дюрация, лет',w-padR-78,h-6);
+    ctx.save();ctx.translate(11,padT+86);ctx.rotate(-Math.PI/2);
+    ctx.fillText('Доходность, %',0,0);ctx.restore();
+    var labels=pts.length<=120;
+    var r=labels?4:3;
+    pts.forEach(function(p,i){
+      p.px=X(xv(p));p.py=Y(p.y);
+      ctx.beginPath();ctx.arc(p.px,p.py,i===hover?r+2:r,0,Math.PI*2);
+      ctx.fillStyle=i===hover?'#fff':RB_COLORS[p.rb]||RB_COLORS[3];
+      ctx.globalAlpha=labels?0.95:0.65;ctx.fill();ctx.globalAlpha=1;
+    });
+    if(labels){
+      ctx.font='10px Inter,sans-serif';ctx.fillStyle='rgba(148,163,184,.85)';
+      pts.forEach(function(p){
+        var lbl=p.n.replace(/^ОФЗ\\s*/,'');
+        ctx.fillText(lbl,p.px+6,p.py-5);
+      });
+    }
+  }
+
+  function nearest(mx,my){
+    var best=-1,bd=144;
+    pts.forEach(function(p,i){
+      var dx=p.px-mx,dy=p.py-my,d2=dx*dx+dy*dy;
+      if(d2<bd){bd=d2;best=i;}
+    });
+    return best;
+  }
+  canvas.addEventListener('mousemove',function(ev){
+    var rect=canvas.getBoundingClientRect();
+    var i=nearest(ev.clientX-rect.left,ev.clientY-rect.top);
+    if(i!==hover){hover=i;draw();}
+    if(i>=0){
+      var p=pts[i];
+      tip.innerHTML='<b></b><span class="ty"></span> · дюрация <span class="td"></span> лет · срок <span class="tm"></span> лет';
+      tip.querySelector('b').textContent=p.n;
+      tip.querySelector('.ty').textContent=p.y.toFixed(2).replace('.',',')+'%';
+      tip.querySelector('.td').textContent=p.d.toFixed(1).replace('.',',');
+      tip.querySelector('.tm').textContent=p.yr.toFixed(1).replace('.',',');
+      tip.style.display='block';
+      var tx=p.px+14,ty=p.py-14;
+      if(tx+tip.offsetWidth>canvas.clientWidth-4)tx=p.px-tip.offsetWidth-14;
+      if(ty<0)ty=p.py+14;
+      tip.style.left=tx+'px';tip.style.top=ty+'px';
+      canvas.style.cursor='pointer';
+    }else{tip.style.display='none';canvas.style.cursor='crosshair';}
+  });
+  canvas.addEventListener('mouseleave',function(){
+    hover=-1;tip.style.display='none';draw();
+  });
+  canvas.addEventListener('click',function(){
+    if(hover>=0)location.href='/bond/'+encodeURIComponent(pts[hover].t);
+  });
+  document.querySelectorAll('#map-chips .chip').forEach(function(ch){
+    ch.addEventListener('click',function(){
+      document.querySelectorAll('#map-chips .chip').forEach(function(c){c.classList.remove('active');});
+      ch.classList.add('active');group=parseInt(ch.dataset.g,10);build();
+    });
+  });
+  document.querySelectorAll('#x-chips .chip').forEach(function(ch){
+    ch.addEventListener('click',function(){
+      document.querySelectorAll('#x-chips .chip').forEach(function(c){c.classList.remove('active');});
+      ch.classList.add('active');xmode=parseInt(ch.dataset.x,10);hover=-1;draw();
+    });
+  });
+  var rt;
+  window.addEventListener('resize',function(){
+    clearTimeout(rt);rt=setTimeout(draw,120);
+  });
+  build();
+})();
+</script>"""
 
 _CATALOG_JS = """<script>
 (function(){
@@ -577,14 +782,32 @@ _CATALOG_JS = """<script>
   var search=document.getElementById('cat-search');
   var ymin=document.getElementById('y-min'), ymax=document.getElementById('y-max');
   var count=document.getElementById('cat-count');
-  var board='all', sortCol=-1, sortDir=1;
+  var board='all', sortCol=-1, sortDir=1, strat='';
 
+  // High-yield threshold: OFZ median yield + 4pp (computed from the yield-map data)
+  var hyMin=18;
+  try{
+    var mp=JSON.parse(document.getElementById('map-data').textContent);
+    var ofzY=mp.filter(function(r){return r[4]===0;}).map(function(r){return r[2];}).sort(function(a,b){return a-b;});
+    if(ofzY.length) hyMin=ofzY[Math.floor(ofzY.length/2)]+4;
+  }catch(e){}
+
+  function stratOk(tr){
+    if(!strat) return true;
+    var rb=parseInt(tr.dataset.rb,10), yr=parseFloat(tr.dataset.years||'');
+    var y=parseFloat(tr.dataset.yield||'');
+    if(strat==='deposit') return rb===0&&yr>=1&&yr<=3;
+    if(strat==='balanced') return rb<=1&&yr>=1&&yr<=5;
+    if(strat==='hy') return rb===2&&y>=hyMin;
+    return true;
+  }
   function apply(){
     var q=(search.value||'').toLowerCase().trim();
     var lo=parseFloat(ymin.value), hi=parseFloat(ymax.value);
     var shown=0;
     rows.forEach(function(tr){
       var ok=(board==='all'||tr.dataset.board===board);
+      if(ok) ok=stratOk(tr);
       if(ok&&q) ok=tr.dataset.search.indexOf(q)!==-1;
       if(ok&&!isNaN(lo)) ok=parseFloat(tr.dataset.yield||'')>=lo;
       if(ok&&!isNaN(hi)) ok=parseFloat(tr.dataset.yield||'')<=hi;
@@ -593,9 +816,17 @@ _CATALOG_JS = """<script>
     });
     count.textContent='Показано '+shown+' из '+rows.length;
   }
-  document.querySelectorAll('.chip').forEach(function(ch){
+  document.querySelectorAll('#strat-chips .chip').forEach(function(ch){
     ch.addEventListener('click',function(){
-      document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('active');});
+      var on=ch.classList.contains('active');
+      document.querySelectorAll('#strat-chips .chip').forEach(function(c){c.classList.remove('active');});
+      if(on){strat='';}else{ch.classList.add('active');strat=ch.dataset.strat;}
+      apply();
+    });
+  });
+  document.querySelectorAll('#cat-chips .chip').forEach(function(ch){
+    ch.addEventListener('click',function(){
+      document.querySelectorAll('#cat-chips .chip').forEach(function(c){c.classList.remove('active');});
       ch.classList.add('active');board=ch.dataset.board;apply();
     });
   });
@@ -656,6 +887,9 @@ async def bonds_catalog() -> HTMLResponse:
             return "—", ""
 
     rows_html: list[str] = []
+    # Yield map points: [secid, name, ytm, duration, group, years, rating_bucket]
+    # group: 0 = ОФЗ, 1 = corporate RUB, 2 = FX-denominated (замещающие и юаневые)
+    map_points: list[list] = []
     for i, b in enumerate(ordered, 1):
         mat_disp, mat_key = _dmy(b.get("maturity"))
         off_disp, off_key = _dmy(b.get("offer_date"))
@@ -665,30 +899,100 @@ async def bonds_catalog() -> HTMLResponse:
             years_disp, years_key = f"{yrs:.1f}".replace(".", ","), f"{yrs:.2f}"
         my = b.get("market_yield")
         rating = b.get("rating")
+        rb = _rating_bucket(rating, b["board"])
         rating_html = f'<span class="rating-pill">{e(rating)}</span>' if rating else "—"
+
+        # Duration to the nearest event (offer if sooner than maturity), like the yield map
+        horizon_yrs = None
+        for iso_key in (off_key, mat_key):
+            if iso_key:
+                d_evt = date.fromisoformat(iso_key)
+                if d_evt > today:
+                    h = (d_evt - today).days / 365
+                    if horizon_yrs is None or h < horizon_yrs:
+                        horizon_yrs = h
+        dur = None
+        if my and 0 < my <= 100 and horizon_yrs:
+            dur = _macaulay_duration(b.get("coupon_percent"), b.get("coupon_frequency"),
+                                     horizon_yrs, my)
+        dur_disp, dur_key = "—", ""
+        risk_disp, risk_key = "—", ""
+        if dur is not None:
+            dur_disp, dur_key = f"{dur:.1f}".replace(".", ","), f"{dur:.2f}"
+            # price change at +2pp rates ≈ −modified duration × 2
+            risk = -dur / (1 + my / 100.0) * 2
+            risk_disp, risk_key = f"{risk:.1f}".replace(".", ","), f"{risk:.2f}"
+            # FX first: CNY sovereign bonds live on TQOB but belong on the FX map
+            if (b.get("face_unit") or "SUR") not in ("SUR", "RUB"):
+                g = 2
+            elif b["board"] == "TQOB":
+                g = 0
+            else:
+                g = 1
+            map_points.append([b["ticker"], b["name"], round(float(my), 2),
+                               round(dur, 2), g, round(horizon_yrs, 2), rb])
+
         rows_html.append(
             f'<tr data-board="{e(b["board"])}" data-yield="{my if my is not None else ""}"'
+            f' data-years="{years_key}" data-rb="{rb}"'
             f' data-search="{e((b["name"] + " " + b["ticker"]).lower())}">'
             f'<td class="idx num" data-v="{i}">{i}</td>'
             f'<td data-v="{e(b["name"])}"><a href="/bond/{e(b["ticker"])}">{e(b["name"])}</a></td>'
             f'<td class="num" data-v="{years_key}">{years_disp}</td>'
+            f'<td class="num" data-v="{dur_key}">{dur_disp}</td>'
             f'<td class="num y" data-v="{my if my is not None else ""}">{_fmt_money(my) or "—"}</td>'
             f'<td class="num" data-v="{b.get("coupon_percent") or ""}">{_fmt_money(b.get("coupon_percent")) or "—"}</td>'
             f'<td class="num" data-v="{b.get("coupon_frequency") or ""}">{b.get("coupon_frequency") or "—"}</td>'
             f'<td class="num" data-v="{b["price"]}">{_fmt_money(b["price"])}</td>'
+            f'<td class="num risk" data-v="{risk_key}">{risk_disp}</td>'
             f'<td data-v="{e(rating or "")}">{rating_html}</td>'
             f'<td class="num" data-v="{mat_key}">{mat_disp}</td>'
             f'<td class="num" data-v="{off_key}">{off_disp}</td>'
             "</tr>"
         )
+    map_json = json.dumps(map_points, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
     today_str = _fmt_date(today)
     body = f"""{_CATALOG_CSS}
 <nav class="crumbs"><a href="/">Главная</a> / Облигации</nav>
-<h1>Облигации Московской биржи: цены и доходность</h1>
-<p class="sub">{len(bonds)} торгуемых выпусков · ОФЗ и корпоративные облигации · данные MOEX на {e(today_str or "")}</p>
+<h1>Облигации Московской биржи: цены, доходность и карта доходности</h1>
+<p class="sub">{len(bonds)} торгуемых выпусков · ОФЗ, корпоративные и валютные облигации · данные MOEX на {e(today_str or "")}</p>
+<section class="ymap-box">
+  <div class="ymap-head">
+    <h2>Карта доходности облигаций</h2>
+    <div class="chips" id="map-chips">
+      <button class="chip active" data-g="0">ОФЗ</button>
+      <button class="chip" data-g="1">Корпоративные</button>
+      <button class="chip" data-g="2">Валютные</button>
+    </div>
+    <div class="chips" id="x-chips">
+      <button class="chip mini active" data-x="0">Дюрация</button>
+      <button class="chip mini" data-x="1">Срок</button>
+    </div>
+  </div>
+  <p class="ymap-sub">Рыночная доходность к погашению (YTM) по дюрации или сроку: каждая точка — выпуск
+  облигации, цвет — кредитный рейтинг. Карта доходности ОФЗ показывает кривую госбумаг, корпоративные
+  торгуются с премией к ней, валютные (замещающие и юаневые) — в своей шкале доходности.</p>
+  <div class="ymap-wrap"><canvas id="ymap"></canvas><div id="ymap-tip"></div></div>
+  <div class="ymap-legend">
+    <span><i style="background:#60a5fa"></i>AAA–AA и ОФЗ</span>
+    <span><i style="background:#4ade80"></i>A–BBB</span>
+    <span><i style="background:#fbbf24"></i>BB и ниже</span>
+    <span><i style="background:#94a3b8"></i>без рейтинга</span>
+  </div>
+  <div class="ymap-note" id="ymap-note"></div>
+</section>
+<script id="map-data" type="application/json">{map_json}</script>
+<div class="cat-toolbar" style="margin-bottom:8px">
+  <span class="strat-label">Стратегии:</span>
+  <div class="chips" id="strat-chips">
+    <button class="chip" data-strat="deposit" title="Надёжные бумаги (ОФЗ и рейтинг AAA–AA) со сроком 1–3 года">Альтернатива депозиту</button>
+    <button class="chip" data-strat="balanced" title="Рейтинг BBB и выше, срок 1–5 лет">Сбалансированная</button>
+    <button class="chip" data-strat="hy" title="Высокая доходность, рейтинг BB и ниже — повышенный риск">High Yield (ВДО)</button>
+  </div>
+</div>
 <div class="cat-toolbar">
-  <div class="chips">
+  <div class="chips" id="cat-chips">
     <button class="chip active" data-board="all">Все</button>
     <button class="chip" data-board="TQOB">ОФЗ</button>
     <button class="chip" data-board="TQCB">Корпоративные</button>
@@ -706,13 +1010,15 @@ async def bonds_catalog() -> HTMLResponse:
   <th>№</th>
   <th data-col="1">Название<span class="dir"></span></th>
   <th data-col="2">Лет до погаш.<span class="dir"></span></th>
-  <th data-col="3">Доходность, %<span class="dir"></span></th>
-  <th data-col="4">Купон, %<span class="dir"></span></th>
-  <th data-col="5">Выплат/год<span class="dir"></span></th>
-  <th data-col="6">Цена, %<span class="dir"></span></th>
-  <th data-col="7">Рейтинг<span class="dir"></span></th>
-  <th data-col="8">Погашение<span class="dir"></span></th>
-  <th data-col="9">Оферта<span class="dir"></span></th>
+  <th data-col="3" title="Дюрация Маколея к ближайшему событию (оферта или погашение)">Дюрация<span class="dir"></span></th>
+  <th data-col="4">Доходность, %<span class="dir"></span></th>
+  <th data-col="5">Купон, %<span class="dir"></span></th>
+  <th data-col="6">Выплат/год<span class="dir"></span></th>
+  <th data-col="7">Цена, %<span class="dir"></span></th>
+  <th data-col="8" title="Примерное изменение цены при росте ключевой ставки на 2 п.п. (рыночный риск)">При +2% ставки<span class="dir"></span></th>
+  <th data-col="9">Рейтинг<span class="dir"></span></th>
+  <th data-col="10">Погашение<span class="dir"></span></th>
+  <th data-col="11">Оферта<span class="dir"></span></th>
 </tr></thead>
 <tbody id="cat-body">{"".join(rows_html)}</tbody>
 </table>
@@ -722,24 +1028,29 @@ async def bonds_catalog() -> HTMLResponse:
 по заголовку колонки, фильтруйте по типу и доходности. На странице каждой бумаги — купонный календарь,
 НКД, рейтинг и FAQ. Незнакомые термины — в <a href="/uchebnik">учебнике по облигациям</a>,
 посчитать самостоятельно — в <a href="/calc">калькуляторах НКД и YTM</a>.</p>
+<p>Карта доходности облигаций выше строится по рыночной доходности (YTM) и расчётной дюрации каждого
+выпуска: отдельно карта доходности ОФЗ, корпоративных и валютных облигаций (замещающие и юаневые выпуски).
+Чем правее точка — тем дольше срок и выше чувствительность цены к ставке; чем выше — тем больше доходность.
+Выпуски с аномальной доходностью к близкой оферте на карте не показываются.</p>
 <div class="cta-box">
   <h2>Соберите портфель из этих облигаций</h2>
   <p>Bond AI бесплатно посчитает доходность, покажет купонный календарь и предупредит об офертах.</p>
   <a class="btn btn-primary" href="/app?auth=register">Начать бесплатно</a>
 </div>
 {_CATALOG_JS}
+{_MAP_JS}
 """
     jsonld = [{
         "@context": "https://schema.org",
         "@type": "CollectionPage",
-        "name": "Облигации Московской биржи: каталог с ценами и доходностью",
+        "name": "Облигации Московской биржи: каталог и карта доходности",
         "url": _BASE_URL + "/bond",
-        "description": "Каталог торгуемых облигаций MOEX: ОФЗ и корпоративные выпуски — цены, доходность к погашению, купоны и даты погашения.",
+        "description": "Каталог торгуемых облигаций MOEX с картой доходности: ОФЗ, корпоративные и валютные выпуски — цены, доходность к погашению по дюрации, купоны и даты погашения.",
         "inLanguage": "ru",
     }]
     html = _page_shell(
-        "Облигации MOEX: каталог с ценами и доходностью | Bond AI",
-        f"Каталог из {len(bonds)} облигаций Московской биржи: ОФЗ и корпоративные — текущие цены, доходность к погашению (YTM), купоны, оферты и рейтинги.",
+        "Облигации MOEX: каталог и карта доходности | Bond AI",
+        f"Карта доходности облигаций (ОФЗ, корпоративные, валютные) и каталог из {len(bonds)} выпусков Московской биржи: цены, доходность к погашению (YTM) по дюрации, купоны, оферты и рейтинги.",
         _BASE_URL + "/bond", jsonld, body,
     )
     if bonds:
