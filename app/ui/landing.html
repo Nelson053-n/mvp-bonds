@@ -191,6 +191,12 @@
     }
     .topbar-spacer { flex: 1; }
     .topbar-nav { display: flex; align-items: center; gap: 8px; }
+    .topbar-link {
+      font-size: 13px; font-weight: 600; color: var(--slate-400);
+      text-decoration: none; transition: color .15s; margin-right: 8px;
+    }
+    .topbar-link:hover { color: #fff; }
+    @media (max-width: 768px) { .topbar-link { display: none; } }
 
     /* ─── BUTTONS ────────────────────────────────────────────── */
     .btn {
@@ -445,6 +451,13 @@
     }
     .feature-card p { font-size: 14px; color: var(--slate-500); line-height: 1.7; }
 
+    /* ─── FREE TOOLS (public pages) ─────────────────────────── */
+    .tools-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 1024px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px)  { .tools-grid { grid-template-columns: 1fr; } }
+    a.tool-card { display: block; text-decoration: none; }
+    .tool-arrow { margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--blue-400); }
+
     /* ─── HOW AI WORKS ────────────────────────────────────────── */
     .ai-steps-grid {
       display: grid;
@@ -477,10 +490,12 @@
       display: flex; align-items: center; justify-content: center;
       position: relative; z-index: 1;
     }
-    .ai-icon-1 { background: rgba(37,99,235,.12); border: 1px solid rgba(37,99,235,.2); box-shadow: 0 0 24px rgba(37,99,235,.12); }
-    .ai-icon-2 { background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.2); box-shadow: 0 0 24px rgba(99,102,241,.12); }
-    .ai-icon-3 { background: rgba(168,85,247,.12); border: 1px solid rgba(168,85,247,.2); box-shadow: 0 0 24px rgba(168,85,247,.12); }
-    .ai-icon-4 { background: rgba(22,163,74,.12); border: 1px solid rgba(22,163,74,.2); box-shadow: 0 0 24px rgba(22,163,74,.12); }
+    /* Opaque backgrounds (tint over page bg): the ::before connector line must
+       pass BETWEEN tiles, not show through their translucent fill. */
+    .ai-icon-1 { background: linear-gradient(rgba(37,99,235,.12), rgba(37,99,235,.12)), #020817; border: 1px solid rgba(37,99,235,.2); box-shadow: 0 0 24px rgba(37,99,235,.12); }
+    .ai-icon-2 { background: linear-gradient(rgba(99,102,241,.12), rgba(99,102,241,.12)), #020817; border: 1px solid rgba(99,102,241,.2); box-shadow: 0 0 24px rgba(99,102,241,.12); }
+    .ai-icon-3 { background: linear-gradient(rgba(168,85,247,.12), rgba(168,85,247,.12)), #020817; border: 1px solid rgba(168,85,247,.2); box-shadow: 0 0 24px rgba(168,85,247,.12); }
+    .ai-icon-4 { background: linear-gradient(rgba(22,163,74,.12), rgba(22,163,74,.12)), #020817; border: 1px solid rgba(22,163,74,.2); box-shadow: 0 0 24px rgba(22,163,74,.12); }
     .ai-step-arrow {
       position: absolute;
       top: 36px; right: -8px;
@@ -1370,6 +1385,9 @@
     </a>
     <div class="topbar-spacer"></div>
     <nav class="topbar-nav">
+      <a href="/bond" class="topbar-link">Облигации</a>
+      <a href="/calc" class="topbar-link">Калькуляторы</a>
+      <a href="/uchebnik" class="topbar-link">Учебник</a>
       <button class="btn btn-ghost" onclick="landingAuthOpen('login')">Войти</button>
       <button class="btn btn-primary" onclick="wizOpen()">Попробовать бесплатно</button>
     </nav>
@@ -1962,6 +1980,51 @@
     </div>
   </section>
 
+  <!-- ═══ FREE TOOLS ════════════════════════════════════════ -->
+  <section>
+    <div class="container">
+      <div class="section-head centered reveal">
+        <div class="section-eyebrow">Бесплатно и без регистрации</div>
+        <h2 class="section-title">Каталог облигаций, калькуляторы и учебник</h2>
+        <p class="section-sub">Открытые инструменты Bond AI — данные MOEX по каждой бумаге, расчёты и теория. Аккаунт не нужен.</p>
+      </div>
+      <div class="tools-grid reveal">
+        <a class="feature-card tool-card" href="/bond">
+          <div class="feature-icon-wrap fi-blue">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </div>
+          <h3>Каталог облигаций</h3>
+          <p>1600+ выпусков MOEX: цена, доходность, купоны, оферта и рейтинг — отдельная страница по каждой бумаге.</p>
+          <div class="tool-arrow">Открыть каталог →</div>
+        </a>
+        <a class="feature-card tool-card" href="/calc/nkd">
+          <div class="feature-icon-wrap fi-green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          </div>
+          <h3>Калькулятор НКД</h3>
+          <p>Накопленный купонный доход по ставке или размеру купона — сколько вы доплатите при покупке облигации.</p>
+          <div class="tool-arrow">Рассчитать НКД →</div>
+        </a>
+        <a class="feature-card tool-card" href="/calc/ytm">
+          <div class="feature-icon-wrap fi-cyan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          </div>
+          <h3>Калькулятор доходности</h3>
+          <p>Эффективная YTM, простая и текущая доходность облигации к погашению по цене покупки.</p>
+          <div class="tool-arrow">Посчитать YTM →</div>
+        </a>
+        <a class="feature-card tool-card" href="/uchebnik">
+          <div class="feature-icon-wrap fi-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <h3>Учебник по облигациям</h3>
+          <p>YTM, НКД, оферта, виды облигаций, флоатеры и риски — простым языком, с примерами и глоссарием.</p>
+          <div class="tool-arrow">Читать учебник →</div>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ CTA ═══════════════════════════════════════════════ -->
   <section class="cta-section">
     <div class="cta-glow"></div>
@@ -2122,6 +2185,10 @@
   <footer class="footer">
     <p>
       &copy; 2025 Bond AI
+      <span class="footer-sep">&middot;</span>
+      <a href="/bond" class="footer-link">Каталог облигаций</a>
+      <span class="footer-sep">&middot;</span>
+      <a href="/calc" class="footer-link">Калькуляторы</a>
       <span class="footer-sep">&middot;</span>
       <a href="/uchebnik" class="footer-link">Учебник по облигациям</a>
       <span class="footer-sep">&middot;</span>
