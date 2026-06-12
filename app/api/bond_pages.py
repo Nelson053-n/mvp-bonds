@@ -705,21 +705,14 @@ _MAP_JS = """<script>
     ctx.fillText(xmode?'Срок, лет':'Дюрация, лет',w-padR-78,h-6);
     ctx.save();ctx.translate(11,padT+86);ctx.rotate(-Math.PI/2);
     ctx.fillText('Доходность, %',0,0);ctx.restore();
-    var labels=pts.length<=120;
-    var r=labels?4:3;
+    var few=pts.length<=120;
+    var r=few?4:3;
     pts.forEach(function(p,i){
       p.px=X(xv(p));p.py=Y(p.y);
       ctx.beginPath();ctx.arc(p.px,p.py,i===hover?r+2:r,0,Math.PI*2);
       ctx.fillStyle=i===hover?'#fff':RB_COLORS[p.rb]||RB_COLORS[3];
-      ctx.globalAlpha=labels?0.95:0.65;ctx.fill();ctx.globalAlpha=1;
+      ctx.globalAlpha=few?0.95:0.65;ctx.fill();ctx.globalAlpha=1;
     });
-    if(labels){
-      ctx.font='10px Inter,sans-serif';ctx.fillStyle='rgba(148,163,184,.85)';
-      pts.forEach(function(p){
-        var lbl=p.n.replace(/^ОФЗ\\s*/,'');
-        ctx.fillText(lbl,p.px+6,p.py-5);
-      });
-    }
   }
 
   function nearest(mx,my){
