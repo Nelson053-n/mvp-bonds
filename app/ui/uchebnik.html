@@ -110,7 +110,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --blue-400: #60a5fa; --blue-500: #3b82f6; --blue-600: #2563eb;
-      --green-400: #4ade80; --green-600: #16a34a;
+      --green-400: #4ade80; --green-500: #22c55e; --green-600: #16a34a;
       --yellow-400: #fbbf24; --red-400: #f87171;
       --slate-400: #94a3b8; --slate-500: #64748b; --slate-600: #475569;
       --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
@@ -243,6 +243,29 @@
     .edu-section ul li { font-size: 15px; color: var(--text); line-height: 1.7; padding-left: 20px; position: relative; }
     .edu-section ul li::before { content: ''; position: absolute; left: 0; top: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--link); }
 
+    /* ── FIGURES (inline SVG schemes) ── */
+    .edu-fig {
+      background: var(--panel); border: 1px solid var(--line-2);
+      border-radius: var(--radius-lg); padding: 20px 22px 16px; margin: 20px 0;
+    }
+    .edu-fig svg { display: block; width: 100%; height: auto; }
+    .edu-fig figcaption { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 12px; text-align: center; }
+    .edu-fig figcaption b { color: var(--text-soft); font-weight: 600; }
+    /* SVG theme-aware helper classes (fill/stroke driven by CSS vars) */
+    .svg-text { fill: var(--text); font: 600 13px Inter, sans-serif; }
+    .svg-text-strong { fill: var(--head); font: 700 14px Inter, sans-serif; }
+    .svg-text-sm { fill: var(--muted); font: 500 11px Inter, sans-serif; }
+    .svg-axis { stroke: var(--line-3); stroke-width: 1.5; }
+    .svg-grid { stroke: var(--line); stroke-width: 1; }
+    .svg-track { stroke: var(--line-3); stroke-width: 2.5; fill: none; }
+    .svg-node { fill: var(--panel); stroke: var(--blue-500); stroke-width: 2.5; }
+    .svg-node-g { fill: var(--panel); stroke: var(--green-500); stroke-width: 2.5; }
+    .fill-blue { fill: var(--blue-500); } .fill-green { fill: var(--green-500); }
+    .fill-yellow { fill: var(--yellow-400); } .fill-red { fill: var(--red-400); }
+    .stroke-blue { stroke: var(--blue-500); fill: none; stroke-width: 2.5; }
+    .stroke-green { stroke: var(--green-500); fill: none; stroke-width: 2.5; }
+    .stroke-red { stroke: var(--red-400); fill: none; stroke-width: 2.5; }
+
     /* card */
     .edu-card {
       background: var(--panel); border: 1px solid var(--line-2);
@@ -353,6 +376,34 @@
           <h4>3. В дату погашения</h4>
           <p>Эмитент возвращает вам номинальную стоимость (обычно 1000&nbsp;₽ за облигацию) независимо от рыночной цены.</p>
         </div>
+        <figure class="edu-fig">
+          <svg viewBox="0 0 640 180" role="img" aria-label="Денежный поток по облигации во времени">
+            <!-- timeline axis -->
+            <line x1="40" y1="120" x2="600" y2="120" class="svg-axis"/>
+            <polygon points="600,120 590,115 590,125" class="fill-blue"/>
+            <!-- buy (outflow) -->
+            <line x1="80" y1="120" x2="80" y2="70" class="stroke-red"/>
+            <polygon points="80,70 75,80 85,80" class="fill-red"/>
+            <text x="80" y="58" text-anchor="middle" class="svg-text-sm">−975 ₽</text>
+            <text x="80" y="140" text-anchor="middle" class="svg-text-sm">Покупка</text>
+            <!-- coupons (inflows) -->
+            <g class="fill-green">
+              <line x1="190" y1="120" x2="190" y2="95" class="stroke-green"/><polygon points="190,95 185,105 195,105" /></g>
+            <text x="190" y="85" text-anchor="middle" class="svg-text-sm">+42 ₽</text>
+            <g class="fill-green"><line x1="300" y1="120" x2="300" y2="95" class="stroke-green"/><polygon points="300,95 295,105 305,105" /></g>
+            <text x="300" y="85" text-anchor="middle" class="svg-text-sm">+42 ₽</text>
+            <g class="fill-green"><line x1="410" y1="120" x2="410" y2="95" class="stroke-green"/><polygon points="410,95 405,105 415,105" /></g>
+            <text x="410" y="85" text-anchor="middle" class="svg-text-sm">+42 ₽</text>
+            <text x="300" y="140" text-anchor="middle" class="svg-text-sm">Купоны каждые полгода</text>
+            <!-- redemption (big inflow) -->
+            <g class="fill-green"><line x1="540" y1="120" x2="540" y2="55" class="stroke-green"/><polygon points="540,55 535,65 545,65" /></g>
+            <text x="540" y="45" text-anchor="middle" class="svg-text-sm">+1042 ₽</text>
+            <text x="540" y="140" text-anchor="middle" class="svg-text-sm">Погашение</text>
+            <text x="320" y="170" text-anchor="middle" class="svg-text-sm">время →</text>
+          </svg>
+          <figcaption>Денежный поток по облигации: <b>вы платите цену сейчас</b> (отток), затем регулярно
+          получаете купоны, а в дату погашения — последний купон <b>плюс номинал</b>.</figcaption>
+        </figure>
         <h3>Облигации, акции и вклад — в чём разница</h3>
         <div class="edu-card">
           <h4>🏦 Банковский вклад</h4>
@@ -388,6 +439,28 @@
           <h4>⚡ ВДО — высокодоходные облигации <span class="badge badge-red">Высокий риск</span></h4>
           <p>Облигации небольших компаний с рейтингом BB и ниже или без рейтинга. Купон 18–25%+, но риск дефолта значительно выше. Требуют диверсификации и анализа.</p>
         </div>
+        <figure class="edu-fig">
+          <svg viewBox="0 0 640 230" role="img" aria-label="Соотношение риска и доходности по типам облигаций">
+            <!-- axes -->
+            <line x1="60" y1="190" x2="610" y2="190" class="svg-axis"/>
+            <line x1="60" y1="190" x2="60" y2="20" class="svg-axis"/>
+            <text x="335" y="220" text-anchor="middle" class="svg-text-sm">риск дефолта →</text>
+            <text x="20" y="105" text-anchor="middle" class="svg-text-sm" transform="rotate(-90 20 105)">доходность →</text>
+            <!-- trend line -->
+            <path d="M 90 175 Q 350 130 580 45" class="stroke-blue" stroke-dasharray="5 5" opacity=".55"/>
+            <!-- points -->
+            <circle cx="110" cy="170" r="9" class="fill-green"/>
+            <text x="110" y="150" text-anchor="middle" class="svg-text-sm">ОФЗ</text>
+            <circle cx="240" cy="150" r="9" class="fill-green"/>
+            <text x="240" y="130" text-anchor="middle" class="svg-text-sm">Муни</text>
+            <circle cx="400" cy="110" r="9" class="fill-yellow"/>
+            <text x="400" y="90" text-anchor="middle" class="svg-text-sm">Корп. (BBB+)</text>
+            <circle cx="560" cy="55" r="9" class="fill-red"/>
+            <text x="560" y="35" text-anchor="middle" class="svg-text-sm">ВДО</text>
+          </svg>
+          <figcaption>Чем выше риск дефолта эмитента — <b>тем выше доходность</b>, которую требует рынок.
+          ОФЗ надёжнее всего и доходнее депозита ненамного; ВДО платят больше, но и теряют чаще.</figcaption>
+        </figure>
         <h3>По типу купона</h3>
         <div class="edu-card">
           <h4>Фиксированный купон</h4>
@@ -428,6 +501,27 @@
           <p>Купонная ставка — это просто 8,5% от номинала. Но вы купили дешевле номинала (за 970&nbsp;₽), а при погашении получите полные 1000&nbsp;₽ — то есть ещё +30&nbsp;₽ прибыли «в теле». Эта разница, распределённая на 3 года, добавляется к купонному доходу.</p>
           <p>Поэтому <strong>YTM окажется выше купонной ставки</strong> — примерно 9,6% против 8,5%. И наоборот: если бы цена была выше номинала, YTM был бы ниже купона. Именно поэтому для сравнения облигаций смотрят на YTM, а не на купон.</p>
         </div>
+        <figure class="edu-fig">
+          <svg viewBox="0 0 640 200" role="img" aria-label="Сравнение купонной ставки и YTM при покупке ниже номинала">
+            <!-- baseline номинал -->
+            <line x1="60" y1="60" x2="600" y2="60" class="svg-grid" stroke-dasharray="4 4"/>
+            <text x="606" y="64" class="svg-text-sm">1000 ₽ — номинал</text>
+            <!-- price bar 970 -->
+            <rect x="120" y="95" width="90" height="70" rx="4" class="fill-blue" opacity=".85"/>
+            <text x="165" y="185" text-anchor="middle" class="svg-text-sm">Цена покупки</text>
+            <text x="165" y="88" text-anchor="middle" class="svg-text-strong">970 ₽</text>
+            <!-- redemption bar 1000 -->
+            <rect x="430" y="60" width="90" height="105" rx="4" class="fill-green" opacity=".85"/>
+            <text x="475" y="185" text-anchor="middle" class="svg-text-sm">Погашение</text>
+            <text x="475" y="52" text-anchor="middle" class="svg-text-strong">1000 ₽</text>
+            <!-- gain arrow -->
+            <path d="M 230 130 H 410" class="stroke-green"/>
+            <polygon points="410,130 400,125 400,135" class="fill-green"/>
+            <text x="320" y="122" text-anchor="middle" class="svg-text-sm">+30 ₽ «в теле» → добавляется к купону</text>
+          </svg>
+          <figcaption>Купон фиксирован (8,5%), но вы купили за <b>970 ₽</b>, а вернут <b>1000 ₽</b>.
+          Эти +30 ₽ за срок поднимают итоговую доходность: <b>YTM ≈ 9,6% &gt; купона 8,5%</b>.</figcaption>
+        </figure>
         <div class="edu-example">
           <h4>Осторожно: доходность к оферте</h4>
           <p>Если у облигации скоро оферта, биржа может показывать <strong>доходность к оферте</strong>, а не к погашению. При близкой дате оферты это число бывает аномально большим (сотни процентов годовых) — это нормально математически, но не отражает реальную долгосрочную доходность. Всегда проверяйте, к какой дате считается доходность.</p>
@@ -445,6 +539,29 @@
           <h4>📉 Процентный риск <span class="badge badge-yellow">Средний</span></h4>
           <p>При росте ключевой ставки ЦБ цены облигаций падают (и наоборот). Чем длиннее срок — тем сильнее реакция. Решение: держать до погашения или выбирать флоатеры.</p>
         </div>
+        <figure class="edu-fig">
+          <svg viewBox="0 0 640 200" role="img" aria-label="Обратная зависимость цены облигации от ключевой ставки">
+            <!-- left: ставка вверх -->
+            <line x1="70" y1="170" x2="70" y2="30" class="svg-axis"/>
+            <line x1="70" y1="170" x2="280" y2="170" class="svg-axis"/>
+            <path d="M 80 150 L 270 50" class="stroke-red"/>
+            <polygon points="270,50 260,52 266,61" class="fill-red"/>
+            <text x="175" y="20" text-anchor="middle" class="svg-text-sm">Ставка ЦБ ↑</text>
+            <text x="175" y="190" text-anchor="middle" class="svg-text-sm">время</text>
+            <!-- right: цена вниз -->
+            <line x1="360" y1="30" x2="360" y2="170" class="svg-axis"/>
+            <line x1="360" y1="170" x2="570" y2="170" class="svg-axis"/>
+            <path d="M 370 50 L 560 150" class="stroke-blue"/>
+            <polygon points="560,150 550,141 554,150" class="fill-blue"/>
+            <text x="465" y="20" text-anchor="middle" class="svg-text-sm">Цена облигации ↓</text>
+            <text x="465" y="190" text-anchor="middle" class="svg-text-sm">время</text>
+            <!-- linking arrow -->
+            <path d="M 290 100 H 350" class="svg-axis" stroke-dasharray="4 4"/>
+            <polygon points="350,100 341,95 341,105" fill="var(--muted)"/>
+          </svg>
+          <figcaption>Ставки и цены движутся в <b>разные стороны</b>: когда ЦБ поднимает ключевую ставку,
+          новые выпуски платят больше, и старые с низким купоном дешевеют. Чем длиннее облигация — тем резче падение.</figcaption>
+        </figure>
         <div class="edu-card">
           <h4>💧 Риск ликвидности <span class="badge badge-yellow">Средний</span></h4>
           <p>Некоторые выпуски торгуются редко — трудно продать быстро по справедливой цене. Особенно актуально для ВДО и небольших выпусков. Проверяйте объём торгов перед покупкой.</p>
