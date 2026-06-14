@@ -38,6 +38,17 @@ border-radius:var(--radius-lg);padding:20px;transition:border-color .15s}
 .calc-links a:hover{border-color:var(--line-strong)}
 .calc-links .t{font-size:15px;font-weight:700;color:var(--head);margin-bottom:4px}
 .calc-links .d{font-size:13px;color:var(--text);line-height:1.6}
+.edu-fig{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius-lg);
+padding:20px 22px 16px;margin:20px 0}
+.edu-fig svg{display:block;width:100%;height:auto}
+.edu-fig figcaption{font-size:13px;color:var(--muted);line-height:1.6;margin-top:12px;text-align:center}
+.edu-fig figcaption b{color:var(--text-soft);font-weight:600}
+.svg-text-sm{fill:var(--muted);font:500 11px Inter,sans-serif}
+.svg-axis{stroke:var(--line-3);stroke-width:1.5}
+.svg-grid{stroke:var(--line);stroke-width:1}
+.fill-blue{fill:var(--blue-500)}.fill-green{fill:var(--green-400)}.fill-red{fill:var(--red-400)}
+.stroke-blue{stroke:var(--blue-500);fill:none;stroke-width:2.5}
+.stroke-green{stroke:var(--green-400);fill:none;stroke-width:2.5}
 </style>"""
 
 _FOOT_LINKS = ('<p>Смотрите также: <a href="/bond">каталог облигаций MOEX</a> с готовым НКД и доходностью '
@@ -219,6 +230,26 @@ def _render_nkd() -> str:
 
 <h2>Как считается НКД</h2>
 <div class="formula">НКД = Номинал × Ставка купона / 100 × Дней с выплаты / 365</div>
+<figure class="edu-fig">
+  <svg viewBox="0 0 640 200" role="img" aria-label="Как НКД растёт между купонами и обнуляется в дату выплаты">
+    <line x1="50" y1="160" x2="610" y2="160" class="svg-axis"/>
+    <line x1="50" y1="160" x2="50" y2="25" class="svg-axis"/>
+    <text x="20" y="95" text-anchor="middle" class="svg-text-sm" transform="rotate(-90 20 95)">НКД, ₽</text>
+    <text x="330" y="190" text-anchor="middle" class="svg-text-sm">время →</text>
+    <!-- sawtooth: grows, drops to 0 at each coupon -->
+    <path d="M 50 160 L 230 50 L 230 160 L 410 50 L 410 160 L 590 50" class="stroke-green"/>
+    <!-- coupon payout markers -->
+    <line x1="230" y1="25" x2="230" y2="160" class="svg-grid" stroke-dasharray="4 4"/>
+    <line x1="410" y1="25" x2="410" y2="160" class="svg-grid" stroke-dasharray="4 4"/>
+    <circle cx="230" cy="160" r="4" class="fill-blue"/><circle cx="410" cy="160" r="4" class="fill-blue"/>
+    <text x="230" y="178" text-anchor="middle" class="svg-text-sm">выплата купона</text>
+    <text x="410" y="178" text-anchor="middle" class="svg-text-sm">выплата купона</text>
+    <!-- max marker -->
+    <text x="240" y="46" class="svg-text-sm">= купон</text>
+  </svg>
+  <figcaption>НКД <b>растёт равными долями каждый день</b> и <b>обнуляется в дату выплаты купона</b> —
+  его получает тот, кто держал облигацию. Покупая в середине периода, вы доплачиваете накопленную часть.</figcaption>
+</figure>
 <p>НКД растёт каждый день равными долями и обнуляется в дату выплаты купона. При покупке облигации
 вы платите продавцу «чистую» цену плюс НКД — так продавец получает заработанный купонный доход
 за дни владения, а вы затем получаете весь купон целиком. Размер купона и даты выплат для любой
@@ -328,6 +359,39 @@ def _render_ytm() -> str:
 
 <h2>Как считается доходность</h2>
 <div class="formula">Цена + НКД = Σ Купон / (1+YTM)<sup>t</sup> + Номинал / (1+YTM)<sup>T</sup></div>
+<figure class="edu-fig">
+  <svg viewBox="0 0 640 220" role="img" aria-label="Дисконтирование будущих платежей по облигации к сегодняшней цене">
+    <line x1="50" y1="170" x2="610" y2="170" class="svg-axis"/>
+    <text x="330" y="205" text-anchor="middle" class="svg-text-sm">срок до погашения →</text>
+    <!-- future nominal cash flows (full height) -->
+    <g class="fill-green" opacity=".28">
+      <rect x="120" y="120" width="26" height="50" rx="2"/>
+      <rect x="240" y="120" width="26" height="50" rx="2"/>
+      <rect x="360" y="120" width="26" height="50" rx="2"/>
+      <rect x="500" y="40" width="26" height="130" rx="2"/>
+    </g>
+    <!-- discounted present values (shorter, solid) -->
+    <g class="fill-green">
+      <rect x="120" y="135" width="26" height="35" rx="2"/>
+      <rect x="240" y="143" width="26" height="27" rx="2"/>
+      <rect x="360" y="150" width="26" height="20" rx="2"/>
+      <rect x="500" y="105" width="26" height="65" rx="2"/>
+    </g>
+    <text x="133" y="112" text-anchor="middle" class="svg-text-sm">купон</text>
+    <text x="253" y="112" text-anchor="middle" class="svg-text-sm">купон</text>
+    <text x="373" y="112" text-anchor="middle" class="svg-text-sm">купон</text>
+    <text x="513" y="32" text-anchor="middle" class="svg-text-sm">купон + номинал</text>
+    <!-- today's price -->
+    <rect x="55" y="95" width="34" height="75" rx="2" class="fill-blue"/>
+    <text x="72" y="88" text-anchor="middle" class="svg-text-sm">цена</text>
+    <text x="72" y="186" text-anchor="middle" class="svg-text-sm">сегодня</text>
+    <!-- discount arrows -->
+    <path d="M 133 135 Q 100 100 92 110" class="stroke-blue" opacity=".4" stroke-dasharray="3 3"/>
+    <path d="M 513 105 Q 250 75 92 105" class="stroke-blue" opacity=".4" stroke-dasharray="3 3"/>
+  </svg>
+  <figcaption>Каждый будущий платёж <b>«уценивается» к сегодняшнему дню</b> (бледный столбик → сплошной):
+  чем дальше выплата, тем сильнее. YTM — это ставка, при которой сумма приведённых платежей <b>равна цене сейчас</b>.</figcaption>
+</figure>
 <p>Эффективная доходность (YTM) — это ставка, при которой все будущие платежи по облигации
 (купоны и номинал при погашении), приведённые к сегодняшнему дню, равны её полной цене с НКД.
 Калькулятор решает это уравнение численно. Расчёт приблизительный: даты купонов берутся равными
