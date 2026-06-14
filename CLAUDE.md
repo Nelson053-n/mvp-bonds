@@ -117,7 +117,7 @@ Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/
 | `MVP_TG_BOT_TOKEN` | No | — |
 | `MVP_TG_CHAT_ID` | No | — |
 
-SMTP variables (`MVP_SMTP_*`) are optional for password reset emails.
+`MVP_TG_BOT_TOKEN` powers the public bond-search Telegram bot (`app/services/telegram_bot_service.py`): when set, a long-polling loop starts in the leader worker and answers `/start`, `/help` and free-text ticker/name queries with a bond card. Unset → bot silently disabled. SMTP variables (`MVP_SMTP_*`) are optional for password reset emails.
 
 ## Design system (UI)
 

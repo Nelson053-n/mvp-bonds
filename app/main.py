@@ -411,12 +411,24 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_tbank_sync_loop())
         asyncio.create_task(_daily_backup_loop())
         asyncio.create_task(_benchmark_snapshot_loop())
+        # Public Telegram bond-search bot — only in the leader so a single
+        # getUpdates poller exists per token (avoids 409 conflicts). No-op if
+        # MVP_TG_BOT_TOKEN is unset.
+        from app.services.telegram_bot_service import telegram_bot_service
+        if telegram_bot_service.enabled:
+            logger.info("Starting Telegram bond-search bot")
+            asyncio.create_task(telegram_bot_service.run_polling())
     else:
         logger.info("This worker is a follower — DB-writing background tasks skipped")
     yield
     logger.info("Shutting down application")
     cache_service.stop_background()
     if is_leader:
+        try:
+            from app.services.telegram_bot_service import telegram_bot_service
+            telegram_bot_service.stop()
+        except Exception:
+            pass
         _release_leader_lock()
     try:
         storage_service.checkpoint()

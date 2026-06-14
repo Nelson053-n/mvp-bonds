@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     max_portfolios_per_user: int = 3
     max_items_per_portfolio: int = 200
+    # Public Telegram bond-search bot (optional). When set, a long-polling loop
+    # starts in the leader worker and answers /start + free-text ticker queries.
+    tg_bot_token: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 
