@@ -44,6 +44,7 @@ padding:20px 22px 16px;margin:20px 0}
 .edu-fig figcaption{font-size:13px;color:var(--muted);line-height:1.6;margin-top:12px;text-align:center}
 .edu-fig figcaption b{color:var(--text-soft);font-weight:600}
 .svg-text-sm{fill:var(--muted);font:500 11px Inter,sans-serif}
+.svg-text-strong{fill:var(--head);font:700 14px Inter,sans-serif}
 .svg-axis{stroke:var(--line-3);stroke-width:1.5}
 .svg-grid{stroke:var(--line);stroke-width:1}
 .fill-blue{fill:var(--blue-500)}.fill-green{fill:var(--green-400)}.fill-red{fill:var(--red-400)}
@@ -122,6 +123,34 @@ def _render_calc_index() -> str:
     облигации по цене покупки.</div>
   </a>
 </div>
+<figure class="edu-fig">
+  <svg viewBox="0 0 640 200" role="img" aria-label="Что считает каждый калькулятор: НКД и доходность к погашению">
+    <!-- left: НКД sawtooth -->
+    <line x1="40" y1="150" x2="290" y2="150" class="svg-axis"/>
+    <line x1="40" y1="150" x2="40" y2="35" class="svg-axis"/>
+    <path d="M 40 150 L 130 65 L 130 150 L 220 65 L 220 150 L 285 90" class="stroke-green"/>
+    <circle cx="130" cy="150" r="4" class="fill-blue"/><circle cx="220" cy="150" r="4" class="fill-blue"/>
+    <text x="165" y="30" text-anchor="middle" class="svg-text-strong">НКД</text>
+    <text x="165" y="175" text-anchor="middle" class="svg-text-sm">копится и обнуляется в купон</text>
+    <!-- divider -->
+    <line x1="320" y1="30" x2="320" y2="175" class="svg-grid"/>
+    <!-- right: YTM discount bars -->
+    <line x1="360" y1="150" x2="610" y2="150" class="svg-axis"/>
+    <rect x="362" y="95" width="22" height="55" rx="2" class="fill-blue"/>
+    <g class="fill-green" opacity=".28">
+      <rect x="410" y="110" width="18" height="40" rx="2"/>
+      <rect x="470" y="110" width="18" height="40" rx="2"/>
+      <rect x="530" y="60" width="18" height="90" rx="2"/></g>
+    <g class="fill-green">
+      <rect x="410" y="122" width="18" height="28" rx="2"/>
+      <rect x="470" y="130" width="18" height="20" rx="2"/>
+      <rect x="530" y="98" width="18" height="52" rx="2"/></g>
+    <text x="485" y="30" text-anchor="middle" class="svg-text-strong">YTM</text>
+    <text x="485" y="175" text-anchor="middle" class="svg-text-sm">платежи приводятся к цене сейчас</text>
+  </svg>
+  <figcaption><b>НКД</b> — сколько купона «накапало» к дате сделки. <b>YTM</b> — годовая доходность,
+  если держать бумагу до погашения. Выберите нужный калькулятор выше.</figcaption>
+</figure>
 {_faq_html(_CALC_INDEX_FAQ)}
 {_CTA}
 {_FOOT_LINKS}
