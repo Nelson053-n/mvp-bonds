@@ -75,6 +75,13 @@ async def test_bond_page_renders(client, monkeypatch):
     assert 'rel="canonical"' in html
     assert "/bond/SU26240RMFS0" in html          # related bond link
     assert "/app?auth=register" in html          # CTA
+    # Social cards: og:image + twitter:card so shared links render with a preview.
+    assert 'property="og:image" content="https://bondai.ru/og-image.png"' in html
+    assert 'name="twitter:card" content="summary_large_image"' in html
+    assert 'name="twitter:image"' in html
+    # Analytics: Yandex.Metrika on public SEO pages (same counter as the app).
+    assert "107693104" in html
+    assert "mc.yandex.ru/metrika/tag.js" in html
 
 
 async def test_bond_page_cached(client, monkeypatch):
@@ -143,6 +150,9 @@ async def test_catalog_page(client):
     assert 'id="cat-search"' in html
     assert 'data-col="3"' in html
     assert "Лет до погаш." in html
+    # social cards + analytics on the catalog page too
+    assert 'property="og:image"' in html
+    assert "107693104" in html
 
 
 async def test_catalog_yield_map(client):

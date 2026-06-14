@@ -24,7 +24,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["public-bonds"])
 
 _BASE_URL = "https://bondai.ru"
+_OG_IMAGE = "https://bondai.ru/og-image.png"
 _SECID_RE = re.compile(r"^[A-Z0-9-]{4,24}$")
+
+# Yandex.Metrika (counter 107693104) — same as landing/dashboard, so public SEO
+# pages (/bond, /calc*) feed the same analytics. Plain string (not in the f-string)
+# to avoid brace-escaping; CSP already allows mc.yandex.ru.
+_METRIKA = """<script>(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js?id=107693104","ym");ym(107693104,"init",{ssr:true,clickmap:true,trackLinks:true,accurateTrackBounce:true});</script><noscript><div><img src="https://mc.yandex.ru/watch/107693104" style="position:absolute;left:-9999px;" alt=""></div></noscript>"""
 
 _PAGE_TTL = 900        # rendered bond page cache
 _CATALOG_TTL = 3600    # rendered catalog page cache
@@ -290,8 +296,15 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
 <meta property="og:url" content="{e(canonical)}">
 <meta property="og:title" content="{e(title)}">
 <meta property="og:description" content="{e(description)}">
+<meta property="og:image" content="{_OG_IMAGE}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:site_name" content="Bond AI">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{e(title)}">
+<meta name="twitter:description" content="{e(description)}">
+<meta name="twitter:image" content="{_OG_IMAGE}">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -332,6 +345,7 @@ var light=h.getAttribute('data-theme')==='light';
 if(light)h.removeAttribute('data-theme');else h.setAttribute('data-theme','light');
 try{{localStorage.setItem('bondai_theme',light?'dark':'light');}}catch(e){{}}
 window.dispatchEvent(new Event('bondai-theme'));}});}})();</script>
+{_METRIKA}
 </body>
 </html>"""
 
@@ -565,7 +579,7 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
     return _page_shell(title, meta_desc, url, jsonld, body, og_type="article")
 
 
-@router.get("/bond/{secid}", response_class=HTMLResponse)
+@router.api_route("/bond/{secid}", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def bond_page(secid: str) -> HTMLResponse:
     """Public SEO page for a single bond (no auth)."""
     secid = secid.upper().strip()
@@ -992,7 +1006,7 @@ _CATALOG_JS = """<script>
 </script>"""
 
 
-@router.get("/bond", response_class=HTMLResponse)
+@router.api_route("/bond", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def bonds_catalog() -> HTMLResponse:
     """Public catalog of all traded MOEX bonds — crawl entry point for /bond/{secid}.
 
@@ -1202,7 +1216,7 @@ async def bonds_catalog() -> HTMLResponse:
 
 # ── Sitemap ──────────────────────────────────────────────────────────────────
 
-@router.get("/sitemap-bonds.xml")
+@router.api_route("/sitemap-bonds.xml", methods=["GET", "HEAD"])
 async def sitemap_bonds() -> Response:
     """Sitemap of all bond pages, rebuilt from the hourly bonds cache."""
     global _sitemap_cache

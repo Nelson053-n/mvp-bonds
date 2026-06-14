@@ -7922,6 +7922,7 @@
           if (topbarInner && !document.getElementById('btn-create-portfolio')) {
             const createBtn = document.createElement('button');
             createBtn.id = 'btn-create-portfolio';
+            createBtn.setAttribute('data-i18n', 'portfolio.createBtn');
             createBtn.textContent = '+ Создать портфель';
             createBtn.style.marginLeft = 'auto';
             createBtn.style.padding = '8px 16px';
@@ -7935,9 +7936,11 @@
             createBtn.style.height = 'auto';
             createBtn.style.alignSelf = 'center';
             createBtn.onclick = () => {
-              window.location.href = '/';
+              window.location.href = '/app?auth=register';
             };
             topbarInner.appendChild(createBtn);
+            // Localize the freshly-added button to the current language.
+            try { if (typeof applyLang === 'function') applyLang(window._lang || 'ru'); } catch (e) {}
           }
 
           // Don't load cache for shared views - always fetch from server

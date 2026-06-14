@@ -55,8 +55,12 @@ _SECURITY_HEADERS = {
         "script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://mc.yandex.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com; "
-        "connect-src 'self' https://mc.yandex.ru https://mc.yandex.com; "
+        # Yandex.Metrika audience-sync pixels load from yandex.ru/an
+        "img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com https://yandex.ru; "
+        # Webvisor uses a websocket (wss) to mc.yandex.ru
+        "connect-src 'self' https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru; "
+        # Metrika opens an iframe on mc.yandex.ru for session replay
+        "frame-src https://mc.yandex.ru; "
         "frame-ancestors 'none';"
     ),
 }
@@ -93,7 +97,7 @@ def _register_static_routes(application: FastAPI) -> None:
                 return Response(content, media_type=mt, headers={"Cache-Control": ch})
             return handler
 
-        application.get(url_path)(_make_handler())
+        application.api_route(url_path, methods=["GET", "HEAD"])(_make_handler())
 
 
 # ── Background tasks ────────────────────────────────────────────────────────
@@ -550,31 +554,31 @@ async def sitemap_xml():
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/uchebnik</loc>\n"
-        "    <lastmod>2026-06-08</lastmod>\n"
+        "    <lastmod>2026-06-14</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.7</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/bond</loc>\n"
-        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <lastmod>2026-06-14</lastmod>\n"
         "    <changefreq>daily</changefreq>\n"
         "    <priority>0.8</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/calc</loc>\n"
-        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <lastmod>2026-06-14</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.6</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/calc/nkd</loc>\n"
-        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <lastmod>2026-06-14</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.7</priority>\n"
         "  </url>\n"
         "  <url>\n"
         "    <loc>https://bondai.ru/calc/ytm</loc>\n"
-        "    <lastmod>2026-06-12</lastmod>\n"
+        "    <lastmod>2026-06-14</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.7</priority>\n"
         "  </url>\n"
@@ -645,7 +649,7 @@ for _page_url, _page_path in {**_PUBLIC_HTML_PAGES, **_PRIVATE_HTML_PAGES}.items
         async def handler() -> HTMLResponse:
             return HTMLResponse(fp.read_text(encoding="utf-8"), headers=hdrs)
         return handler
-    app.get(_page_url, response_class=HTMLResponse)(_make_page_handler())
+    app.api_route(_page_url, response_class=HTMLResponse, methods=["GET", "HEAD"])(_make_page_handler())
 
 
 # ── Share endpoints ─────────────────────────────────────────────────────────

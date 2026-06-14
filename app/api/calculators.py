@@ -452,16 +452,16 @@ def _page(key: str, render) -> HTMLResponse:
     return HTMLResponse(_rendered[key], headers=_CACHE_HEADERS)
 
 
-@router.get("/calc", response_class=HTMLResponse)
+@router.api_route("/calc", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def calc_index() -> HTMLResponse:
     return _page("index", _render_calc_index)
 
 
-@router.get("/calc/nkd", response_class=HTMLResponse)
+@router.api_route("/calc/nkd", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def calc_nkd() -> HTMLResponse:
     return _page("nkd", _render_nkd)
 
 
-@router.get("/calc/ytm", response_class=HTMLResponse)
+@router.api_route("/calc/ytm", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def calc_ytm() -> HTMLResponse:
     return _page("ytm", _render_ytm)

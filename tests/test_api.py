@@ -161,3 +161,42 @@ class TestPortfolioServiceUnit:
 
         assert result.validated is True
         assert result.warnings == []
+
+
+class TestPublicPagesAndHeaders:
+    """Static public pages: HEAD support, content-type, social cards."""
+
+    async def test_uchebnik_get_is_html(self, client: AsyncClient) -> None:
+        resp = await client.get("/uchebnik")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/html")
+        assert "Учебник по облигациям" in resp.text
+
+    @pytest.mark.parametrize("path", ["/uchebnik", "/privacy", "/terms", "/og-image.png"])
+    async def test_head_returns_html_not_json(self, client: AsyncClient, path: str) -> None:
+        """HEAD must mirror GET's content-type, not fall through to the JSON 404 handler."""
+        resp = await client.head(path)
+        assert resp.status_code == 200
+        ct = resp.headers["content-type"]
+        assert not ct.startswith("application/json"), f"{path} HEAD returned {ct}"
+
+    async def test_uchebnik_has_og_image_and_twitter(self, client: AsyncClient) -> None:
+        html = (await client.get("/uchebnik")).text
+        assert 'property="og:image" content="https://bondai.ru/og-image.png"' in html
+        assert 'name="twitter:card" content="summary_large_image"' in html
+
+    @pytest.mark.parametrize("path", ["/privacy", "/terms"])
+    async def test_legal_pages_have_og_image(self, client: AsyncClient, path: str) -> None:
+        html = (await client.get(path)).text
+        assert 'property="og:image"' in html
+        assert 'name="twitter:card"' in html
+
+    async def test_uchebnik_has_metrika(self, client: AsyncClient) -> None:
+        html = (await client.get("/uchebnik")).text
+        assert "107693104" in html
+        assert "mc.yandex.ru/metrika/tag.js" in html
+
+    async def test_og_image_served(self, client: AsyncClient) -> None:
+        resp = await client.get("/og-image.png")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/png"

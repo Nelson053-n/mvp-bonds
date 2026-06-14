@@ -19,6 +19,10 @@ async def test_calc_nkd(client):
     assert 'id="n-rate"' in html      # form present
     assert "nkdByRate" in html        # JS present
     assert 'rel="canonical"' in html
+    # explanatory inline-SVG scheme + social card + analytics
+    assert 'class="edu-fig"' in html
+    assert 'property="og:image"' in html
+    assert "107693104" in html
 
 
 async def test_calc_ytm(client):
