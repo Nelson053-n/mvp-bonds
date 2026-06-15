@@ -14,10 +14,17 @@ from pydantic import BaseModel, Field
 from app.api.deps import get_admin_user
 from app.services.storage_service import storage_service
 from app.services.moex_service import moex_service
+from app.promo_materials import all_materials
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/promo-materials")
+async def get_promo_materials(admin: dict = Depends(get_admin_user)) -> list:
+    """Ready-to-publish promo copy for vc.ru/Habr/forums/socials (admin only)."""
+    return all_materials()
 
 
 def _get_ip(request: Request) -> str:

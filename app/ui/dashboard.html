@@ -1787,6 +1787,18 @@
           </div>
         </div>
 
+        <!-- Промо-материалы для SEO/GEO-продвижения -->
+        <div class="card" style="margin-top:16px;" id="adm-promo-card">
+          <div class="card-header">
+            <h2 class="card-title">Промо-материалы</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadPromo()">↺</button>
+          </div>
+          <div style="padding:8px 16px 0;font-size:11px;color:var(--text-muted);line-height:1.5;">
+            Готовые тексты для размещения на vc.ru, Habr, форумах (smart-lab), Reddit и в соцсетях. Жмите «Копировать», вставляйте на площадку. Цель — внешние упоминания для попадания в поиск и AI-выдачу.
+          </div>
+          <div id="adm-promo-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px;"></div>
+        </div>
+
         <div id="adm-status" class="status" style="margin-top:12px;"></div>
       </div>
 
@@ -7979,6 +7991,7 @@
         adminLoadSources().catch(() => {});
         adminLoadAuditLog().catch(() => {});
         adminLoadBackups().catch(() => {});
+        adminLoadPromo().catch(() => {});
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -8053,6 +8066,61 @@
           });
         } catch(e) {
           body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Не удалось загрузить данные</div>';
+        }
+      }
+
+      let _promoMaterials = [];
+      function _escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+      }
+      async function adminLoadPromo() {
+        const body = document.getElementById('adm-promo-body');
+        if (!body) return;
+        body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Загрузка…</div>';
+        try {
+          const r = await apiFetch('/admin/promo-materials');
+          if (!r.ok) throw new Error();
+          _promoMaterials = await r.json();
+          body.innerHTML = '';
+          _promoMaterials.forEach((m, i) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;';
+            const preview = (m.body || '').slice(0, 600);
+            const truncated = (m.body || '').length > 600;
+            card.innerHTML =
+              '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">' +
+                '<div>' +
+                  '<div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-bottom:3px;">' + _escHtml(m.title) + '</div>' +
+                  '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+                    '<span style="font-size:10px;color:var(--blue-400);background:rgba(96,165,250,.1);border-radius:4px;padding:2px 7px;">' + _escHtml(m.platform) + '</span>' +
+                    '<span style="font-size:10px;color:var(--text-muted);background:var(--bg-subtle,rgba(148,163,184,.1));border-radius:4px;padding:2px 7px;">' + _escHtml(m.tone) + '</span>' +
+                    '<span style="font-size:10px;color:var(--text-muted);background:var(--bg-subtle,rgba(148,163,184,.1));border-radius:4px;padding:2px 7px;">' + _escHtml(m.format) + '</span>' +
+                  '</div>' +
+                '</div>' +
+                '<button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;white-space:nowrap;flex-shrink:0;" onclick="adminCopyPromo(' + i + ', this)">Копировать</button>' +
+              '</div>' +
+              '<pre style="margin:8px 0 0;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:11px;line-height:1.55;color:var(--text-secondary);max-height:180px;overflow:auto;background:var(--bg-subtle,rgba(148,163,184,.06));border-radius:6px;padding:10px 12px;">' +
+                _escHtml(preview) + (truncated ? '\n…' : '') +
+              '</pre>';
+            body.appendChild(card);
+          });
+        } catch(e) {
+          body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Не удалось загрузить материалы</div>';
+        }
+      }
+
+      async function adminCopyPromo(i, btn) {
+        const m = _promoMaterials[i];
+        if (!m) return;
+        try {
+          await navigator.clipboard.writeText(m.body || '');
+          const orig = btn.textContent;
+          btn.textContent = '✓ Скопировано';
+          setTimeout(() => { btn.textContent = orig; }, 1600);
+        } catch(e) {
+          toast('Не удалось скопировать — выделите текст вручную', 'error');
         }
       }
 
@@ -8522,6 +8590,14 @@
         _currentUserIsAdmin = isAdmin;
         const btn = document.getElementById('nav-admin');
         if (btn && isAdmin) btn.style.display = '';
+        // Deep-link: /admin/promo opens the admin panel scrolled to promo materials.
+        if (isAdmin && window.location.pathname === '/admin/promo') {
+          showPanel('panel-admin');
+          adminInit().then(() => {
+            const card = document.getElementById('adm-promo-card');
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }).catch(() => {});
+        }
       }
 
       // Lazy-load admin data when tab is clicked

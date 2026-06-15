@@ -101,3 +101,29 @@ async def test_indexnow_submit_posts_payload(monkeypatch):
     assert captured["json"]["host"] == "bondai.ru"
     assert captured["json"]["urlList"] == ["https://bondai.ru/", "https://bondai.ru/bond/X"]
     assert captured["json"]["keyLocation"] == "https://bondai.ru/key12345.txt"
+
+
+# ── Promo materials (admin-only) ─────────────────────────────────────────────
+
+async def test_promo_materials_requires_auth(client):
+    r = await client.get("/admin/promo-materials")
+    assert r.status_code in (401, 403)
+
+
+async def test_promo_materials_returned_for_admin(client, auth_headers):
+    r = await client.get("/admin/promo-materials", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list) and len(data) >= 4
+    for m in data:
+        assert {"id", "platform", "tone", "title", "body"} <= set(m)
+        assert m["body"].strip()  # non-empty copy
+    platforms = {m["platform"] for m in data}
+    assert any("vc.ru" in p or "Habr" in p for p in platforms)
+
+
+async def test_admin_promo_page_served(client):
+    # The /admin/promo deep-link must serve the SPA shell (HTML), not JSON 404.
+    r = await client.get("/admin/promo")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")

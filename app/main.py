@@ -718,8 +718,9 @@ _PUBLIC_HTML_PAGES: dict[str, Path] = {
 }
 # Private app shells — never cache (per-user data is fetched client-side).
 _PRIVATE_HTML_PAGES: dict[str, Path] = {
-    "/app":     dashboard_path,
-    "/all":     dashboard_path,
+    "/app":          dashboard_path,
+    "/all":          dashboard_path,
+    "/admin/promo":  dashboard_path,  # deep-link to the promo-materials section
 }
 # 5min freshness + day-long stale-while-revalidate: deploys propagate in minutes,
 # repeat views render instantly from cache while the browser revalidates in the
