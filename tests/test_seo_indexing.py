@@ -12,8 +12,7 @@ async def test_yandex_verification_served_when_configured(client, monkeypatch):
     monkeypatch.setattr(main_mod.settings, "yandex_verification", "tok123", raising=False)
     r = await client.get("/yandex_tok123.html")
     assert r.status_code == 200
-    assert "tok123" in r.text
-    assert "yandex-verification" in r.text
+    assert "Verification: tok123" in r.text
 
 
 async def test_yandex_verification_wrong_token_404(client, monkeypatch):

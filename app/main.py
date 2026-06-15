@@ -671,9 +671,15 @@ async def yandex_verification(token: str):
     expected = settings.yandex_verification
     if not expected or token != expected:
         return Response("Not Found", status_code=404, media_type="text/plain")
+    # Serve byte-for-byte the file Yandex.Webmaster generated (it checks the
+    # body contains "Verification: <token>").
     body = (
-        "<html><head><meta name='yandex-verification' content='" + expected + "' />"
-        "</head><body>Verification: " + expected + "</body></html>"
+        "<html>\n"
+        "    <head>\n"
+        '        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n'
+        "    </head>\n"
+        "    <body>Verification: " + expected + "</body>\n"
+        "</html>\n"
     )
     return Response(body, media_type="text/html")
 
