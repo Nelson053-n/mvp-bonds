@@ -205,3 +205,43 @@ class TestStorageService:
         items = service.get_items(TEST_PORTFOLIO_ID)
 
         assert [item["id"] for item in items] == [id1, id2, id3]
+
+
+class TestSnapshotGuard:
+    """Daily-snapshot guard against MOEX-outage zeros (false dip on charts)."""
+
+    @pytest.fixture
+    def service(self, settings_override) -> StorageService:
+        return StorageService()
+
+    def _fresh_portfolio(self, service: StorageService) -> int:
+        # Isolated portfolio with no pre-existing snapshots, so the guard's
+        # effect on today's row is unambiguous.
+        return service.create_portfolio(user_id=1, name="snap-guard-test")
+
+    def test_skips_zero_value_with_cost(self, service: StorageService) -> None:
+        # Simulates MOEX outage: prices never loaded → value 0 while cost > 0.
+        from datetime import date
+        today = date.today().isoformat()
+        pid = self._fresh_portfolio(service)
+        service.save_portfolio_snapshot(pid, total_value=0.0, total_cost=100000.0)
+        snaps = service.get_portfolio_snapshots(pid)
+        # No snapshot must be written for today (the outage zero was skipped).
+        assert not any(s["date"] == today for s in snaps)
+
+    def test_writes_real_snapshot(self, service: StorageService) -> None:
+        from datetime import date
+        today = date.today().isoformat()
+        pid = self._fresh_portfolio(service)
+        service.save_portfolio_snapshot(pid, total_value=105000.0, total_cost=100000.0)
+        snaps = service.get_portfolio_snapshots(pid)
+        assert any(s["date"] == today and s["total_value"] == 105000.0 for s in snaps)
+
+    def test_allows_zero_cost_empty_portfolio(self, service: StorageService) -> None:
+        # Empty portfolio (cost 0) is a legitimate zero, not an outage — must write.
+        from datetime import date
+        today = date.today().isoformat()
+        pid = self._fresh_portfolio(service)
+        service.save_portfolio_snapshot(pid, total_value=0.0, total_cost=0.0)
+        snaps = service.get_portfolio_snapshots(pid)
+        assert any(s["date"] == today for s in snaps)

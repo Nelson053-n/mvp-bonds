@@ -324,6 +324,16 @@ class PortfoliosMixin:
         the portfolio creation date (or up to 90 days back) using total_cost as
         the baseline value, so the history chart has enough points to render.
         """
+        # Guard against MOEX outages: a zero value with a non-zero cost means
+        # prices never loaded (e.g. network/MOEX downtime), not a real wipe-out.
+        # Skip the write so a transient fetch failure doesn't punch a false dip
+        # into the history chart.
+        if (not total_value) and total_cost > 0:
+            logger.warning(
+                "Skipping snapshot for portfolio %s: total_value=0 with total_cost=%.2f "
+                "(prices likely unavailable)", portfolio_id, total_cost
+            )
+            return
         from datetime import date, timedelta
         today = date.today()
         today_str = today.isoformat()
