@@ -172,3 +172,49 @@ class TestMOEXServiceRatings:
         """Test invalid rating inputs."""
         result = service._normalize_rating_value(input_val)
         assert result is None
+
+
+class TestRatingCacheTTL:
+    """The rating cache must expire entries so stale ratings aren't served forever."""
+
+    def _cache(self):
+        from app.services.moex_service import _RatingCache
+        return _RatingCache()
+
+    def test_value_present_while_fresh(self):
+        c = self._cache()
+        c["smartlab:X"] = "BB"
+        assert "smartlab:X" in c
+        assert c["smartlab:X"] == "BB"
+
+    def test_value_expires(self, monkeypatch):
+        import app.services.moex_service as m
+        c = self._cache()
+        c.OK_TTL = 100
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+        c["smartlab:X"] = "A"
+        assert "smartlab:X" in c
+        t[0] += 101  # past OK_TTL
+        assert "smartlab:X" not in c
+
+    def test_none_expires_faster(self, monkeypatch):
+        import app.services.moex_service as m
+        c = self._cache()
+        c.OK_TTL = 10000
+        c.MISS_TTL = 100
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+        c["smartlab:Y"] = None       # a source error / miss
+        assert "smartlab:Y" in c
+        t[0] += 101                  # past MISS_TTL but well within OK_TTL
+        assert "smartlab:Y" not in c  # error must not pin the bond to "no rating"
+
+    def test_pop_and_clear(self):
+        c = self._cache()
+        c["a"] = "A"
+        assert c.pop("a") == "A"
+        assert c.pop("missing", "d") == "d"
+        c["b"] = "B"
+        c.clear()
+        assert len(c) == 0

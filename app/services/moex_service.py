@@ -67,6 +67,52 @@ class SourceStats:
         }
 
 
+class _RatingCache:
+    """In-memory rating cache with differentiated TTL.
+
+    Drop-in for the old plain dict (same []/in/pop/clear/len interface) but
+    entries expire, so a once-fetched rating is re-checked instead of being
+    served stale forever. A successful rating is cached for OK_TTL; a None
+    (source error / not-found) only for MISS_TTL so a transient SmartLab
+    timeout can't pin a bond to "no rating" until the next restart.
+    """
+    OK_TTL = 6 * 3600     # 6h for a real rating
+    MISS_TTL = 900        # 15min for None (errors / not found) — retry soon
+
+    def __init__(self) -> None:
+        self._data: dict[str, tuple[object, float]] = {}
+
+    def _fresh(self, key: str) -> bool:
+        entry = self._data.get(key)
+        if entry is None:
+            return False
+        value, ts = entry
+        ttl = self.OK_TTL if value else self.MISS_TTL
+        if (time.time() - ts) >= ttl:
+            self._data.pop(key, None)
+            return False
+        return True
+
+    def __contains__(self, key: str) -> bool:
+        return self._fresh(key)
+
+    def __getitem__(self, key: str):
+        return self._data[key][0]
+
+    def __setitem__(self, key: str, value) -> None:
+        self._data[key] = (value, time.time())
+
+    def pop(self, key: str, default=None):
+        entry = self._data.pop(key, None)
+        return entry[0] if entry is not None else default
+
+    def clear(self) -> None:
+        self._data.clear()
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+
 class MOEXService:
     RATING_PATTERN = re.compile(
         r"^(ru(?:AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|"
@@ -82,7 +128,7 @@ class MOEXService:
     SNAPSHOT_TTL = 60    # 60 sec cache for bond/stock snapshots
 
     def __init__(self) -> None:
-        self._credit_rating_cache: dict[str, str | None] = {}
+        self._credit_rating_cache = _RatingCache()
         self._is_qual_cache: dict[str, bool] = {}
         self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
         self._bond_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
