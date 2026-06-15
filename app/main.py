@@ -21,6 +21,7 @@ from app.api.tbank import router as tbank_router
 from app.api.waitlist import router as waitlist_router
 from app.api.watchlist import router as watchlist_router
 from app.api.deps import get_shared_portfolio
+from app.config import settings
 from app.services.cache_service import cache_service
 from app.services.storage_service import storage_service
 from app.services.portfolio_service import portfolio_service
@@ -109,6 +110,25 @@ async def _cleanup_shares_loop():
             storage_service.cleanup_expired_shares()
         except Exception:
             pass
+
+
+async def _indexnow_loop():
+    """Submit all public URLs to IndexNow (Yandex/Bing) once a day.
+
+    Waits a short delay after startup so the bonds cache is warm, then resubmits
+    daily. Best-effort: never raises.
+    """
+    from app.services import indexnow_service
+    from app.api.bond_pages import all_public_urls
+    await asyncio.sleep(120)  # let the per-process bonds cache warm first
+    while True:
+        try:
+            urls = await all_public_urls()
+            if urls:
+                await indexnow_service.submit(urls)
+        except Exception:
+            logger.warning("IndexNow loop iteration failed", exc_info=True)
+        await asyncio.sleep(24 * 3600)
 
 
 async def _snapshot_loop():
@@ -418,6 +438,13 @@ async def lifespan(app: FastAPI):
         if telegram_bot_service.enabled:
             logger.info("Starting Telegram bond-search bot")
             asyncio.create_task(telegram_bot_service.run_polling())
+        # IndexNow: daily-resubmit all public URLs to Yandex/Bing so new bond
+        # pages index within minutes. Leader-only (one submit per deploy). No-op
+        # if MVP_INDEXNOW_KEY is unset.
+        from app.services import indexnow_service
+        if indexnow_service.enabled():
+            logger.info("IndexNow enabled — scheduling daily URL submission")
+            asyncio.create_task(_indexnow_loop())
     else:
         logger.info("This worker is a follower — DB-writing background tasks skipped")
     yield
@@ -633,6 +660,44 @@ async def llms_txt():
         "- Email: support@bondai.ru\n"
     )
     return Response(content, media_type="text/plain; charset=utf-8")
+
+
+# ── Search-engine verification & IndexNow ───────────────────────────────────
+# Yandex.Webmaster file-method: it expects /yandex_<token>.html to return a body
+# containing the token. We serve exactly the file Yandex looks for, sourced from
+# MVP_YANDEX_VERIFICATION, so verification needs only an .env value (no redeploy).
+@app.api_route("/yandex_{token}.html", methods=["GET", "HEAD"])
+async def yandex_verification(token: str):
+    expected = settings.yandex_verification
+    if not expected or token != expected:
+        return Response("Not Found", status_code=404, media_type="text/plain")
+    body = (
+        "<html><head><meta name='yandex-verification' content='" + expected + "' />"
+        "</head><body>Verification: " + expected + "</body></html>"
+    )
+    return Response(body, media_type="text/html")
+
+
+# Google Search Console file-method: GSC checks /google<token>.html contains the
+# line "google-site-verification: google<token>.html". Served from
+# MVP_GOOGLE_VERIFICATION (the bare token, without the "google" prefix/suffix).
+@app.api_route("/google{token}.html", methods=["GET", "HEAD"])
+async def google_verification(token: str):
+    expected = settings.google_verification
+    if not expected or token != expected:
+        return Response("Not Found", status_code=404, media_type="text/plain")
+    return Response("google-site-verification: google" + expected + ".html",
+                    media_type="text/html")
+
+
+# IndexNow: serving /<key>.txt (body = the key) proves key ownership to
+# Yandex/Bing, which then accept instant index-submission pings for our URLs.
+@app.api_route("/{key}.txt", methods=["GET", "HEAD"])
+async def indexnow_key_file(key: str):
+    configured = settings.indexnow_key
+    if configured and key == configured:
+        return Response(configured, media_type="text/plain")
+    return Response("Not Found", status_code=404, media_type="text/plain")
 
 
 # ── HTML pages ──────────────────────────────────────────────────────────────

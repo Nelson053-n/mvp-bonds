@@ -24,6 +24,16 @@ class Settings(BaseSettings):
     # Public Telegram bond-search bot (optional). When set, a long-polling loop
     # starts in the leader worker and answers /start + free-text ticker queries.
     tg_bot_token: str = ""
+    # Search-engine verification & indexing (all optional).
+    # yandex_verification: the token from Я.Вебмастер ("Мета-тег"/файл verification)
+    #   — served as /yandex_<token>.html and as a <meta> on public pages.
+    # google_verification: the content value from GSC "HTML tag" method
+    #   — served as a <meta name="google-site-verification"> on public pages.
+    # indexnow_key: a self-chosen hex key (8-128 chars). When set, the app serves
+    #   /<key>.txt and pings IndexNow (Yandex+Bing) so new/changed URLs index fast.
+    yandex_verification: str = ""
+    google_verification: str = ""
+    indexnow_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 

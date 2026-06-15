@@ -1216,6 +1216,21 @@ async def bonds_catalog() -> HTMLResponse:
 
 # ── Sitemap ──────────────────────────────────────────────────────────────────
 
+async def all_public_urls() -> list[str]:
+    """Every public, indexable URL — static pages + one per tradable bond.
+
+    Used by the IndexNow submitter so search engines learn about all bond pages
+    at once instead of discovering them one crawl at a time.
+    """
+    static = [
+        f"{_BASE_URL}/", f"{_BASE_URL}/uchebnik", f"{_BASE_URL}/bond",
+        f"{_BASE_URL}/calc", f"{_BASE_URL}/calc/nkd", f"{_BASE_URL}/calc/ytm",
+        f"{_BASE_URL}/privacy", f"{_BASE_URL}/terms",
+    ]
+    bonds = await _catalog_bonds()
+    return static + [f"{_BASE_URL}/bond/{b['ticker']}" for b in bonds]
+
+
 @router.api_route("/sitemap-bonds.xml", methods=["GET", "HEAD"])
 async def sitemap_bonds() -> Response:
     """Sitemap of all bond pages, rebuilt from the hourly bonds cache."""
