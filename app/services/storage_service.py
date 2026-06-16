@@ -140,6 +140,19 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             except sqlite3.OperationalError:
                 pass
 
+            # Pro tier (freemium). is_pro flag + optional expiry (ISO date/None=lifetime).
+            # On first add, grant Pro to all existing (early-adopter) users.
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0")
+                conn.execute("UPDATE users SET is_pro = 1")
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN pro_until TEXT")
+            except sqlite3.OperationalError:
+                pass
+
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS coupon_notifications (

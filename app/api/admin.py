@@ -39,6 +39,11 @@ class SetAdminInput(BaseModel):
     is_admin: bool
 
 
+class SetProInput(BaseModel):
+    is_pro: bool
+    pro_until: str | None = None  # ISO date (YYYY-MM-DD); None = lifetime when granting
+
+
 class ToggleSourceInput(BaseModel):
     enabled: bool
 
@@ -166,6 +171,39 @@ async def set_user_role(
         ip_address=_get_ip(request),
     )
     return {"ok": True, "is_admin": payload.is_admin}
+
+
+@router.patch("/users/{user_id}/pro")
+async def set_user_pro(
+    user_id: int,
+    payload: SetProInput,
+    request: Request,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """Grant or revoke Pro. pro_until = ISO date (None = lifetime when granting)."""
+    user = storage_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if payload.pro_until:
+        from datetime import date
+        try:
+            date.fromisoformat(payload.pro_until)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="pro_until должна быть датой YYYY-MM-DD")
+    storage_service.set_user_pro(user_id, payload.is_pro, payload.pro_until)
+    action_str = "grant_pro" if payload.is_pro else "revoke_pro"
+    logger.info("Admin %s %s for user %d (%s) until=%s",
+                admin["username"], action_str, user_id, user["username"], payload.pro_until)
+    storage_service.write_audit_log(
+        admin_user_id=admin["sub"],
+        action=action_str,
+        target_type="user",
+        target_id=user_id,
+        details=json.dumps({"username": user["username"], "is_pro": payload.is_pro,
+                            "pro_until": payload.pro_until}, ensure_ascii=False),
+        ip_address=_get_ip(request),
+    )
+    return {"ok": True, "is_pro": payload.is_pro, "pro_until": payload.pro_until}
 
 
 # ── Portfolios ───────────────────────────────────────────────────────────────

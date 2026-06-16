@@ -662,6 +662,17 @@ async def llms_txt():
     return Response(content, media_type="text/plain; charset=utf-8")
 
 
+# Donate: expose configured payment links to the frontend. Empty when unset →
+# the dashboard hides the "Поддержать проект" button. Public, no auth.
+@app.get("/donate-info")
+async def donate_info():
+    return {
+        "enabled": bool(settings.donate_url or settings.donate_sbp_url),
+        "url": settings.donate_url,
+        "sbp_url": settings.donate_sbp_url,
+    }
+
+
 # ── Search-engine verification & IndexNow ───────────────────────────────────
 # Yandex.Webmaster file-method: it expects /yandex_<token>.html to return a body
 # containing the token. We serve exactly the file Yandex looks for, sourced from

@@ -1253,6 +1253,17 @@
         </div>
 
         <!-- Recommendations -->
+        <!-- AI-анализ портфеля — только для Pro -->
+        <div class="card" id="ai-analysis-card" style="display:none;">
+          <div class="card-header">
+            <h2 class="card-title">🤖 AI-анализ портфеля <span style="font-size:10px;color:var(--green-400);background:rgba(74,222,128,.12);border-radius:4px;padding:2px 7px;vertical-align:middle;">PRO</span></h2>
+            <button class="btn btn-primary" style="height:28px;font-size:12px;padding:0 12px;" onclick="loadAiAnalysis()">Проанализировать</button>
+          </div>
+          <div id="ai-analysis-body" style="padding:16px 18px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+            <span style="color:var(--text-muted);">Нажмите «Проанализировать» — AI разберёт диверсификацию, риски и сбалансированность портфеля.</span>
+          </div>
+        </div>
+
         <div class="card" id="recommendations-card">
           <div class="card-header">
             <h2 class="card-title">Рекомендации для диверсификации</h2>
@@ -1849,7 +1860,11 @@
         &nbsp;·&nbsp;
         <a href="/uchebnik" target="_blank" style="color: var(--text-muted); text-decoration: none;" data-i18n="footer.edu">Учебник</a>
       </span>
-      <span style="font-size: 11px; color: var(--text-muted);"><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: var(--blue-400); text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a></span>
+      <span style="font-size: 11px; color: var(--text-muted);">
+        <a id="donate-link" href="#" target="_blank" rel="noopener" style="display:none;color: var(--green-400); text-decoration: none;">☕ Поддержать проект</a>
+        <span id="donate-sep" style="display:none;">&nbsp;·&nbsp;</span>
+        <a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: var(--blue-400); text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a>
+      </span>
     </footer>
 
     <!-- Share Portfolio Modal -->
@@ -6584,6 +6599,22 @@
       // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
 
       // Check authentication and render app
+      async function loadDonateLink() {
+        try {
+          const r = await fetch('/donate-info');
+          if (!r.ok) return;
+          const d = await r.json();
+          if (!d.enabled) return;
+          const link = document.getElementById('donate-link');
+          const sep = document.getElementById('donate-sep');
+          if (link) {
+            link.href = d.url || d.sbp_url;
+            link.style.display = '';
+            if (sep) sep.style.display = '';
+          }
+        } catch(e) { /* donate is optional */ }
+      }
+
       async function initAuth() {
         const token = localStorage.getItem('mvp_auth_token');
         const username = localStorage.getItem('mvp_username');
@@ -6605,6 +6636,12 @@
           }
           const meData = await res.json();
           setupAdminNav(meData.is_admin || false);
+          window._isPro = !!meData.is_pro;
+          if (window._isPro) {
+            const aiCard = document.getElementById('ai-analysis-card');
+            if (aiCard) aiCard.style.display = '';
+          }
+          loadDonateLink();
           showDashboard();
           await loadPortfolios();
           // Calculate total value of all portfolios (non-blocking)
@@ -9169,6 +9206,36 @@
       }
 
       // ── PORTFOLIO RECOMMENDATIONS ────────────────────────────────
+      async function loadAiAnalysis() {
+        const body = document.getElementById('ai-analysis-body');
+        if (!body || !portfolioId) return;
+        body.innerHTML = '<span style="color:var(--text-muted);">Анализирую портфель…</span>';
+        try {
+          const r = await apiFetch(`/portfolios/${portfolioId}/ai-analysis`);
+          if (r.status === 403) {
+            body.innerHTML = '<span style="color:var(--text-muted);">Доступно в тарифе Pro.</span>';
+            return;
+          }
+          if (!r.ok) throw new Error();
+          const d = await r.json();
+          if (d.available === false) {
+            body.innerHTML = '<span style="color:var(--text-muted);">' + _escHtml(d.message || 'AI-анализ скоро будет доступен.') + '</span>';
+            return;
+          }
+          let html = '';
+          if (d.summary) html += '<div style="margin-bottom:10px;font-weight:600;color:var(--text-primary);">' + _escHtml(d.summary) + '</div>';
+          if (Array.isArray(d.points) && d.points.length) {
+            html += '<ul style="margin:0;padding-left:18px;">' +
+              d.points.map(p => '<li style="margin-bottom:5px;">' + _escHtml(p) + '</li>').join('') +
+              '</ul>';
+          }
+          html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);">AI-анализ на основе данных портфеля. Не индивидуальная инвестиционная рекомендация.</div>';
+          body.innerHTML = html || '<span style="color:var(--text-muted);">Нет данных для анализа.</span>';
+        } catch(e) {
+          body.innerHTML = '<span style="color:var(--text-muted);">Не удалось выполнить анализ. Попробуйте позже.</span>';
+        }
+      }
+
       async function loadPortfolioRecommendations() {
         const grid = document.getElementById('recommendations-grid');
         if (!grid) return;

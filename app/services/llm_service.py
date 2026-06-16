@@ -9,7 +9,7 @@ from app.models import (
     InstrumentMetrics,
     ValidationResponse,
 )
-from app.prompts import SYSTEM_PROMPT, VALIDATION_PROMPT
+from app.prompts import SYSTEM_PROMPT, VALIDATION_PROMPT, PORTFOLIO_ANALYSIS_PROMPT
 
 
 class LLMService:
@@ -27,6 +27,37 @@ class LLMService:
         if self.mode == "openai" and settings.openai_api_key:
             return await self._openai_comment(payload)
         return self._stub_comment(payload)
+
+    @property
+    def real_ai_available(self) -> bool:
+        """True when a real LLM can be called (Pro deep analysis needs this)."""
+        return self.mode == "openai" and bool(settings.openai_api_key)
+
+    async def analyze_portfolio(self, rows: list[dict]) -> dict:
+        """Pro-only deep portfolio analysis. Requires a real LLM key.
+
+        Returns {"summary": str, "points": [str]}. When no key is configured,
+        returns an 'unavailable' marker so the UI can show a graceful message
+        instead of fabricating analysis.
+        """
+        if not self.real_ai_available:
+            return {"available": False, "summary": "", "points": []}
+        body = {
+            "model": settings.openai_model,
+            "messages": [
+                {"role": "system", "content": PORTFOLIO_ANALYSIS_PROMPT},
+                {"role": "user", "content": json.dumps({"holdings": rows}, ensure_ascii=False)},
+            ],
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"},
+        }
+        data = await self._openai_chat(body)
+        parsed = self._extract_json(data)
+        return {
+            "available": True,
+            "summary": str(parsed.get("summary", "")),
+            "points": [str(p) for p in parsed.get("points", []) if p],
+        }
 
     def _stub_validate(
         self, payload: AddInstrumentInput

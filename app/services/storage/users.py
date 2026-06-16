@@ -1,8 +1,21 @@
-"""Users mixin: user CRUD, admin flags, login tracking, password reset helpers."""
+"""Users mixin: user CRUD, admin flags, Pro tier, login tracking, password reset helpers."""
 import logging
 import sqlite3
 
 logger = logging.getLogger(__name__)
+
+
+def _pro_active(is_pro_flag, pro_until) -> bool:
+    """Effective Pro status: flag set AND (no expiry OR expiry in the future)."""
+    if not is_pro_flag:
+        return False
+    if not pro_until:
+        return True  # lifetime Pro
+    from datetime import date
+    try:
+        return date.fromisoformat(str(pro_until)[:10]) >= date.today()
+    except ValueError:
+        return True  # malformed expiry → treat as lifetime rather than lock out
 
 
 class UsersMixin:
@@ -43,7 +56,7 @@ class UsersMixin:
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, is_pro, pro_until FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -57,6 +70,8 @@ class UsersMixin:
             "is_admin": bool(row[4]),
             "email": row[5],
             "tg_chat_id": row[6],
+            "is_pro": _pro_active(row[7], row[8]),
+            "pro_until": row[8],
         }
 
     def get_all_users(self) -> list[dict]:
@@ -69,6 +84,8 @@ class UsersMixin:
                     u.is_admin,
                     u.created_at,
                     u.last_login,
+                    u.is_pro,
+                    u.pro_until,
                     COUNT(DISTINCT p.id) AS portfolio_count,
                     COALESCE(MAX(ps.sync_enabled), 0) AS has_autosync,
                     CASE WHEN u.tg_chat_id IS NOT NULL THEN 1 ELSE 0 END AS has_tg,
@@ -91,11 +108,13 @@ class UsersMixin:
                 "is_admin": bool(row[2]),
                 "created_at": row[3],
                 "last_login": row[4],
-                "portfolio_count": int(row[5]),
-                "has_autosync": bool(row[6]),
-                "has_tg": bool(row[7]),
-                "has_coupon_notif": bool(row[8]),
-                "has_sharing": bool(row[9]) if row[9] is not None else False,
+                "is_pro": _pro_active(row[5], row[6]),
+                "pro_until": row[6],
+                "portfolio_count": int(row[7]),
+                "has_autosync": bool(row[8]),
+                "has_tg": bool(row[9]),
+                "has_coupon_notif": bool(row[10]),
+                "has_sharing": bool(row[11]) if row[11] is not None else False,
             }
             for row in rows
         ]
@@ -128,6 +147,17 @@ class UsersMixin:
                 (1 if is_admin else 0, user_id),
             )
             conn.commit()
+            return int(cursor.rowcount)
+
+    def set_user_pro(self, user_id: int, is_pro: bool, pro_until: str | None = None) -> int:
+        """Grant/revoke Pro. pro_until = ISO date (None = lifetime when granting)."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET is_pro = ?, pro_until = ? WHERE id = ?",
+                (1 if is_pro else 0, pro_until if is_pro else None, user_id),
+            )
+            conn.commit()
+            logger.info("AUDIT set_user_pro: user_id=%d is_pro=%s until=%s", user_id, is_pro, pro_until)
             return int(cursor.rowcount)
 
     def update_user_password(self, user_id: int, password_hash: str) -> int:

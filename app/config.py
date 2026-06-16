@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     yandex_verification: str = ""
     google_verification: str = ""
     indexnow_key: str = ""
+    # Donate links (optional). When a link is set, a "Поддержать проект" button
+    # appears in the dashboard footer / Telegram bot. Add the real URL later.
+    donate_url: str = ""          # ЮMoney / СБП / CloudTips payment URL
+    donate_sbp_url: str = ""      # optional separate СБП/QR link
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 

@@ -562,6 +562,46 @@ async def get_portfolio(
     }
 
 
+@router.get("/{portfolio_id}/ai-analysis")
+async def portfolio_ai_analysis(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Pro-only deep AI analysis of the whole portfolio (real LLM)."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    user = storage_service.get_user_by_id(current_user["sub"])
+    if not user or not user.get("is_pro"):
+        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
+
+    from app.services.llm_service import llm_service
+    if not llm_service.real_ai_available:
+        return {"available": False,
+                "message": "AI-анализ скоро будет доступен.",
+                "summary": "", "points": []}
+
+    rows = await portfolio_service.get_table(portfolio_id)
+    holdings = [
+        {
+            "ticker": r.ticker,
+            "name": r.name,
+            "type": r.type,
+            "value_rub": round(r.current_value or 0, 2),
+            "weight_pct": None,  # filled below
+            "ytm": r.market_yield,
+            "rating": r.company_rating,
+            "coupon_rate": r.coupon_rate,
+            "profit_rub": round(r.profit or 0, 2),
+        }
+        for r in rows
+    ]
+    total = sum(h["value_rub"] for h in holdings) or 1.0
+    for h in holdings:
+        h["weight_pct"] = round(h["value_rub"] / total * 100, 1)
+
+    result = await llm_service.analyze_portfolio(holdings)
+    return result
+
+
 @router.patch("/{portfolio_id}", response_model=PortfolioResponse)
 async def update_portfolio(
     portfolio_id: int,

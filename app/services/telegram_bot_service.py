@@ -104,7 +104,7 @@ _START_TEXT = (
 _HELP_TEXT = (
     "Пришлите тикер или название облигации — например <code>SU26238RMFS4</code> "
     "или <code>Сбер</code>. Я найду бумагу и покажу её параметры.\n\n"
-    "Команды: /start — начать, /help — помощь."
+    "Команды: /start — начать, /help — помощь, /donate — поддержать проект."
 )
 
 
@@ -257,7 +257,14 @@ class TelegramBotService:
         )
 
     async def _handle_update(self, client, update: dict):
-        # Inline button press → bond card.
+        # Telegram Stars: must answer pre_checkout within seconds to allow payment.
+        pcq = update.get("pre_checkout_query")
+        if pcq:
+            await self._call(client, "answerPreCheckoutQuery",
+                             pre_checkout_query_id=pcq["id"], ok=True)
+            return
+
+        # Inline button press → bond card or donate amount.
         cb = update.get("callback_query")
         if cb:
             await self._call(client, "answerCallbackQuery", callback_query_id=cb["id"])
@@ -265,12 +272,21 @@ class TelegramBotService:
             chat_id = cb.get("message", {}).get("chat", {}).get("id")
             if chat_id and data.startswith("b:"):
                 await self._answer_card(client, chat_id, data[2:])
+            elif chat_id and data.startswith("don:"):
+                await self._send_donate_invoice(client, chat_id, data[4:])
             return
 
         msg = update.get("message") or update.get("edited_message")
         if not msg:
             return
         chat_id = msg.get("chat", {}).get("id")
+
+        # Successful Stars payment → thank the supporter.
+        if msg.get("successful_payment"):
+            await self._send(client, chat_id,
+                             "🙏 Спасибо за поддержку Bond AI! Это помогает развивать проект.")
+            return
+
         text = (msg.get("text") or "").strip()
         if not chat_id or not text:
             return
@@ -279,10 +295,47 @@ class TelegramBotService:
             await self._send(client, chat_id, _START_TEXT)
         elif text.startswith("/help"):
             await self._send(client, chat_id, _HELP_TEXT)
+        elif text.startswith("/donate"):
+            await self._send_donate_menu(client, chat_id)
         elif text.startswith("/"):
             await self._send(client, chat_id, _HELP_TEXT)
         else:
             await self._handle_query(client, chat_id, text)
+
+    async def _send_donate_menu(self, client, chat_id):
+        """Offer preset Telegram Stars amounts to support the project."""
+        kb = {"inline_keyboard": [[
+            {"text": "⭐ 50", "callback_data": "don:50"},
+            {"text": "⭐ 100", "callback_data": "don:100"},
+            {"text": "⭐ 250", "callback_data": "don:250"},
+            {"text": "⭐ 500", "callback_data": "don:500"},
+        ]]}
+        await self._send(
+            client, chat_id,
+            "☕ <b>Поддержать Bond AI</b>\n\n"
+            "Проект бесплатный. Если он вам полезен — поддержите развитие звёздами Telegram. "
+            "Выберите сумму:",
+            kb,
+        )
+
+    async def _send_donate_invoice(self, client, chat_id, amount_str):
+        try:
+            amount = int(amount_str)
+        except ValueError:
+            return
+        if amount < 1 or amount > 100000:
+            return
+        # Telegram Stars: currency XTR, empty provider_token, prices in whole stars.
+        await self._call(
+            client, "sendInvoice",
+            chat_id=chat_id,
+            title="Поддержка Bond AI",
+            description="Добровольная поддержка развития проекта Bond AI.",
+            payload=f"donate-{amount}",
+            provider_token="",
+            currency="XTR",
+            prices=[{"label": f"{amount} ⭐", "amount": amount}],
+        )
 
     async def run_polling(self) -> None:
         """Long-poll Telegram getUpdates until cancelled. Safe to await in a task."""
@@ -300,7 +353,8 @@ class TelegramBotService:
                     data = await self._call(
                         client, "getUpdates",
                         offset=offset, timeout=_POLL_TIMEOUT,
-                        allowed_updates=["message", "edited_message", "callback_query"],
+                        allowed_updates=["message", "edited_message", "callback_query",
+                                         "pre_checkout_query"],
                     )
                     if not data.get("ok"):
                         await asyncio.sleep(3)
