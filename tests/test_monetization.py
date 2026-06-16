@@ -89,6 +89,25 @@ async def test_ai_analysis_unavailable_without_key(client, auth_headers):
     assert r.json()["available"] is False
 
 
+async def test_ai_analysis_rate_limited(client, auth_headers, monkeypatch):
+    # With a (mocked) real LLM, the paid endpoint must rate-limit per user.
+    await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+    from app.services.llm_service import llm_service
+    monkeypatch.setattr(type(llm_service), "real_ai_available", property(lambda self: True))
+
+    async def fake_analyze(rows):
+        return {"available": True, "summary": "ok", "points": []}
+    monkeypatch.setattr(llm_service, "analyze_portfolio", fake_analyze)
+
+    # Limit is 20/hour; the 21st must be throttled.
+    statuses = []
+    for _ in range(22):
+        r = await client.get("/portfolios/1/ai-analysis", headers=auth_headers)
+        statuses.append(r.status_code)
+    assert 429 in statuses
+    assert statuses[:20] == [200] * 20
+
+
 # ── LLM analyze_portfolio without a key ──────────────────────────────────────
 
 async def test_analyze_portfolio_no_key_returns_unavailable():

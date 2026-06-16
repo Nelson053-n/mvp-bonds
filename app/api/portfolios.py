@@ -579,6 +579,11 @@ async def portfolio_ai_analysis(
                 "message": "AI-анализ скоро будет доступен.",
                 "summary": "", "points": []}
 
+    # Each call hits the paid OpenAI API — cap per-user frequency so a Pro
+    # account can't be looped to burn the LLM bill (CWE-770).
+    if not storage_service.check_rate_limit(f"ai_analysis:{current_user['sub']}", 3600, 20):
+        raise HTTPException(status_code=429, detail="Слишком много запросов AI-анализа. Попробуйте позже.")
+
     rows = await portfolio_service.get_table(portfolio_id)
     holdings = [
         {
