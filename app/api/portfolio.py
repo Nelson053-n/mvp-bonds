@@ -53,7 +53,7 @@ async def add_instrument(
     item_count = storage_service.count_items(portfolio_id)
     if item_count >= app_settings.max_items_per_portfolio:
         raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
-    logger.info("Add instrument request: portfolio_id=%s payload=%s", portfolio_id, getattr(payload, 'model_dump', lambda: payload)())
+    logger.info("Add instrument request: portfolio_id=%s ticker=%s", portfolio_id, getattr(payload, 'ticker', '?'))
     try:
         row = await portfolio_service.add_instrument(portfolio_id, payload)
     except InstrumentNotFoundError as exc:

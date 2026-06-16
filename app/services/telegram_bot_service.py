@@ -18,7 +18,6 @@ from html import escape as h
 import httpx
 
 from app.config import settings
-from app.exceptions import MOEXError
 from app.services.moex_service import moex_service
 
 logger = logging.getLogger(__name__)
@@ -223,8 +222,8 @@ class TelegramBotService:
     async def _answer_card(self, client, chat_id, secid: str):
         try:
             snap = await moex_service.get_bond_snapshot(secid)
-        except (MOEXError, Exception) as exc:  # noqa: BLE001 - any failure → friendly msg
-            logger.info("tg-bot: snapshot failed for %s: %s", secid, exc)
+        except Exception:  # noqa: BLE001 - any failure → friendly msg
+            logger.exception("tg-bot: snapshot failed for %s", secid)
             await self._send(client, chat_id,
                              "Не удалось получить данные по этой бумаге. "
                              "Попробуйте другой тикер или каталог bondai.ru/bond")

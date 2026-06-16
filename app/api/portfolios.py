@@ -4,6 +4,7 @@ Portfolio management API: CRUD operations and sharing.
 
 import csv
 import io
+import re
 import time
 import uuid
 
@@ -585,9 +586,13 @@ async def portfolio_ai_analysis(
         raise HTTPException(status_code=429, detail="Слишком много запросов AI-анализа. Попробуйте позже.")
 
     rows = await portfolio_service.get_table(portfolio_id)
+    # ticker is the one user-supplied field reaching the LLM — strip anything
+    # but alphanumerics/dash so it can't carry prompt-injection text.
+    def _safe_ticker(t: str) -> str:
+        return re.sub(r"[^A-Za-z0-9-]", "", str(t or ""))[:32]
     holdings = [
         {
-            "ticker": r.ticker,
+            "ticker": _safe_ticker(r.ticker),
             "name": r.name,
             "type": r.type,
             "value_rub": round(r.current_value or 0, 2),
