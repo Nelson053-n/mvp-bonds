@@ -124,6 +124,56 @@ def test_real_ai_available_flag():
     assert svc.real_ai_available is False
 
 
+# ── Tax report (Pro) ─────────────────────────────────────────────────────────
+
+def test_tax_progressive_rate():
+    from app.services.tax_service import _tax_on
+    assert _tax_on(0) == 0.0
+    assert _tax_on(-100) == 0.0
+    assert _tax_on(100) == 13.0
+    assert _tax_on(6_000_000) == 5_000_000 * 0.13 + 1_000_000 * 0.15
+
+
+def test_tax_report_nets_gains_and_losses():
+    from app.services.tax_service import build_tax_report
+
+    class R:
+        def __init__(self, q, pp, cv, rc):
+            self.ticker = "X"; self.name = "B"; self.quantity = q
+            self.purchase_price = pp; self.current_value = cv; self.profit = 0
+            self.realized_coupons = rc
+    # pos1: +50 result, pos2: -20 result → net +30; coupons 55+15=70
+    rows = [R(10, 55, 600, 40), R(5, 98, 470, 15)]
+    rep = build_tax_report(rows)
+    s = rep["summary"]
+    assert s["coupon_income"] == 55.0
+    assert s["financial_result"] == 30.0
+    assert s["taxable_result"] == 30.0
+    assert s["total_tax"] == round((55.0 + 30.0) * 0.13, 2)
+
+
+async def test_tax_report_blocked_for_non_pro(client, auth_headers):
+    await client.patch("/admin/users/1/pro", json={"is_pro": False}, headers=auth_headers)
+    r = await client.get("/portfolios/1/tax-report", headers=auth_headers)
+    assert r.status_code == 403
+
+
+async def test_tax_report_for_pro(client, auth_headers):
+    await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+    r = await client.get("/portfolios/1/tax-report", headers=auth_headers)
+    assert r.status_code == 200
+    assert "summary" in r.json()
+    assert "total_tax" in r.json()["summary"]
+
+
+async def test_tax_csv_for_pro(client, auth_headers):
+    await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+    r = await client.get("/portfolios/1/tax-report.csv", headers=auth_headers)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers.get("content-type", "")
+    assert "attachment" in r.headers.get("content-disposition", "")
+
+
 async def test_ai_analysis_sanitizes_ticker(client, auth_headers, monkeypatch):
     # A ticker with injected text must reach the LLM stripped to [A-Za-z0-9-].
     await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)

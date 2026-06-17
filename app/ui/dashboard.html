@@ -1284,6 +1284,20 @@
           </div>
         </div>
 
+        <!-- Налоговый помощник — только для Pro -->
+        <div class="card" id="tax-card" style="display:none;">
+          <div class="card-header">
+            <h2 class="card-title">🧾 Налоговый помощник <span style="font-size:10px;color:var(--green-400);background:rgba(74,222,128,.12);border-radius:4px;padding:2px 7px;vertical-align:middle;">PRO</span></h2>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="downloadTaxCsv()">Excel/CSV</button>
+              <button class="btn btn-primary" style="height:28px;font-size:12px;padding:0 12px;" onclick="loadTaxReport()">Рассчитать НДФЛ</button>
+            </div>
+          </div>
+          <div id="tax-body" style="padding:16px 18px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+            <span style="color:var(--text-muted);">Оценка НДФЛ с купонов и финрезультата + выгрузка для декларации.</span>
+          </div>
+        </div>
+
         <div class="card" id="recommendations-card">
           <div class="card-header">
             <h2 class="card-title">Рекомендации для диверсификации</h2>
@@ -6683,6 +6697,8 @@
           if (window._isPro) {
             const aiCard = document.getElementById('ai-analysis-card');
             if (aiCard) aiCard.style.display = '';
+            const taxCard = document.getElementById('tax-card');
+            if (taxCard) taxCard.style.display = '';
           }
           applyProGates();
           loadDonateLink();
@@ -9278,6 +9294,51 @@
         } catch(e) {
           body.innerHTML = '<span style="color:var(--text-muted);">Не удалось выполнить анализ. Попробуйте позже.</span>';
         }
+      }
+
+      function _fmtRub(v) {
+        return (Math.round((v || 0) * 100) / 100).toLocaleString('ru-RU') + ' ₽';
+      }
+      async function loadTaxReport() {
+        const body = document.getElementById('tax-body');
+        if (!body || !portfolioId) return;
+        body.innerHTML = '<span style="color:var(--text-muted);">Считаю…</span>';
+        try {
+          const r = await apiFetch(`/portfolios/${portfolioId}/tax-report`);
+          if (r.status === 403) { body.innerHTML = '<span style="color:var(--text-muted);">Доступно в тарифе Pro.</span>'; return; }
+          if (!r.ok) throw new Error();
+          const d = await r.json();
+          const s = d.summary;
+          body.innerHTML =
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px;">' +
+              _taxStat('Купонный доход', s.coupon_income, 'налог ' + _fmtRub(s.coupon_tax)) +
+              _taxStat('Финрезультат (прогноз)', s.financial_result, 'налог ' + _fmtRub(s.result_tax)) +
+              _taxStat('Итого налог (оценка)', s.total_tax, 'база ' + _fmtRub(s.total_base), true) +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);">' + _escHtml(d.disclaimer || '') + '</div>';
+        } catch(e) {
+          body.innerHTML = '<span style="color:var(--text-muted);">Не удалось рассчитать. Попробуйте позже.</span>';
+        }
+      }
+      function _taxStat(label, value, sub, hl) {
+        return '<div style="background:var(--bg-subtle,rgba(148,163,184,.06));border-radius:8px;padding:10px 12px;">' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">' + _escHtml(label) + '</div>' +
+          '<div style="font-size:16px;font-weight:700;color:' + (hl ? 'var(--blue-400)' : 'var(--text-primary)') + ';">' + _fmtRub(value) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + _escHtml(sub) + '</div>' +
+        '</div>';
+      }
+      async function downloadTaxCsv() {
+        if (!portfolioId) return;
+        try {
+          const r = await apiFetch(`/portfolios/${portfolioId}/tax-report.csv`);
+          if (!r.ok) { toast('Не удалось выгрузить', 'error'); return; }
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `tax-report-${portfolioId}.csv`;
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+        } catch(e) { toast('Не удалось выгрузить', 'error'); }
       }
 
       async function loadPortfolioRecommendations() {

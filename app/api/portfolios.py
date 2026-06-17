@@ -612,6 +612,59 @@ async def portfolio_ai_analysis(
     return result
 
 
+async def _require_pro(portfolio_id: int, current_user: dict):
+    """Ownership + Pro gate shared by Pro-only portfolio endpoints."""
+    await get_portfolio_or_403(portfolio_id, current_user)
+    user = storage_service.get_user_by_id(current_user["sub"])
+    if not user or not user.get("is_pro"):
+        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
+
+
+@router.get("/{portfolio_id}/tax-report")
+async def portfolio_tax_report(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Pro-only: НДФЛ estimate for the portfolio."""
+    await _require_pro(portfolio_id, current_user)
+    from app.services.tax_service import build_tax_report
+    rows = await portfolio_service.get_table(portfolio_id)
+    return build_tax_report(rows)
+
+
+@router.get("/{portfolio_id}/tax-report.csv")
+async def portfolio_tax_report_csv(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> StreamingResponse:
+    """Pro-only: НДФЛ estimate as a CSV (opens in Excel)."""
+    await _require_pro(portfolio_id, current_user)
+    from app.services.tax_service import build_tax_report
+    rows = await portfolio_service.get_table(portfolio_id)
+    report = build_tax_report(rows)
+
+    buf = io.StringIO()
+    buf.write("﻿")  # BOM so Excel reads UTF-8 correctly
+    w = csv.writer(buf, delimiter=";")
+    w.writerow(["Тикер", "Название", "Кол-во", "Затраты, ₽", "Стоимость, ₽",
+                "Финрезультат, ₽", "Купоны получены, ₽"])
+    for p in report["positions"]:
+        w.writerow([p["ticker"], p["name"], p["quantity"], p["purchase_cost"],
+                    p["current_value"], p["result"], p["coupons_received"]])
+    s = report["summary"]
+    w.writerow([])
+    w.writerow(["Купонный доход", s["coupon_income"], "Налог с купонов", s["coupon_tax"]])
+    w.writerow(["Финрезультат (прогноз)", s["financial_result"],
+                "Налог с прибыли", s["result_tax"]])
+    w.writerow(["Итого база", s["total_base"], "Итого налог (оценка)", s["total_tax"]])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="tax-report-{portfolio_id}.csv"'},
+    )
+
+
 @router.patch("/{portfolio_id}", response_model=PortfolioResponse)
 async def update_portfolio(
     portfolio_id: int,
