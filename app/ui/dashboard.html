@@ -954,7 +954,7 @@
         </div>
         <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
         <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
-        <button class="nav-btn" id="mobile-btn-logout" style="color:#f87171;" onclick="localStorage.removeItem('mvp_auth_token');localStorage.removeItem('mvp_username');location.reload();" data-i18n="nav.logout">Выйти</button>
+        <button class="nav-btn" id="mobile-btn-logout" style="color:#f87171;" onclick="clearUserState();location.reload();" data-i18n="nav.logout">Выйти</button>
       </div>
     </nav>
 
@@ -2483,8 +2483,7 @@
         const fetchOpts = { ...opts, headers };
         const response = await fetch(url, fetchOpts);
         if (response.status === 401 && !isReadOnly) {
-          localStorage.removeItem('mvp_auth_token');
-          localStorage.removeItem('mvp_username');
+          clearUserState();
           toast(t('auth.sessionExpired') || 'Сессия истекла, войдите заново', 'warn');
           setTimeout(() => showLoginScreen(), 1200);
           throw new Error('session_expired');
@@ -6689,8 +6688,7 @@
         try {
           const res = await apiFetch('/auth/me');
           if (res.status === 401 || res.status === 403 || !res.ok) {
-            localStorage.removeItem('mvp_auth_token');
-            localStorage.removeItem('mvp_username');
+            clearUserState();
             showLoginScreen();
             return;
           }
@@ -6738,6 +6736,15 @@
         }
       }
 
+      // Clear per-user state so switching accounts in the same browser doesn't
+      // carry over the previous user's active portfolio / mode. Device-level
+      // prefs (theme, lang, mobile mode, last username) are intentionally kept.
+      function clearUserState() {
+        ['mvp_auth_token', 'mvp_username', 'mvp_active_portfolio',
+         'mvp_active_portfolio_id', 'mvp_profit_mode2', 'mvp_onboarding_done',
+         'mvp_start_onboarding'].forEach(k => localStorage.removeItem(k));
+      }
+
       function showLoginScreen() {
         document.querySelector('.container').style.display = 'none';
         let loginHtml = document.getElementById('login-screen-template');
@@ -6776,6 +6783,7 @@
               });
               const data = await res.json();
               if (res.ok) {
+                clearUserState();  // drop any previous user's portfolio/mode
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
@@ -6814,6 +6822,7 @@
               });
               const data = await res.json();
               if (res.ok) {
+                clearUserState();  // a brand-new account must not inherit prior state
                 localStorage.setItem('mvp_auth_token', data.access_token);
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
@@ -7294,8 +7303,7 @@
             btn.textContent = 'Выйти';
             btn.style.cssText = 'padding:4px 12px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;';
             btn.onclick = () => {
-              localStorage.removeItem('mvp_auth_token');
-              localStorage.removeItem('mvp_username');
+              clearUserState();
               location.reload();
             };
             topbarRight.appendChild(btn);
