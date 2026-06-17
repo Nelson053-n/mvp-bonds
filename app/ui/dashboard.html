@@ -6730,6 +6730,11 @@
             await syncTableFromServer();
             // Показать онбординг для новых пользователей
             setTimeout(() => initOnboarding(), 1500);
+          } else {
+            // No portfolio yet (e.g. freshly registered user) — still run the
+            // onboarding wizard so they can create their first portfolio.
+            updatePortfolioSelector();
+            setTimeout(() => initOnboarding(), 400);
           }
         } catch (err) {
           showLoginScreen();
@@ -9624,10 +9629,26 @@
         const priceRaw = document.getElementById('add-modal-price').value.trim();
         const price = priceRaw ? parseFloat(priceRaw) : null;
         if (!ticker) { statusEl.textContent = 'Введите тикер'; return; }
-        if (!portfolioId) { statusEl.textContent = 'Портфель не выбран'; return; }
         statusEl.textContent = 'Добавление...';
         statusEl.style.color = 'var(--text-muted)';
         try {
+          // First-ever instrument with no portfolio yet → create a default one.
+          if (!portfolioId) {
+            const pr = await apiFetch('/portfolios', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ name: 'Мой портфель' }),
+            });
+            const pd = await pr.json().catch(() => ({}));
+            if (!pr.ok) {
+              statusEl.textContent = pd.detail || 'Не удалось создать портфель';
+              statusEl.style.color = 'var(--red-400)';
+              return;
+            }
+            portfolioId = pd.id;
+            localStorage.setItem('mvp_active_portfolio_id', String(portfolioId));
+            await loadPortfolios();
+            updatePortfolioSelector();
+          }
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
