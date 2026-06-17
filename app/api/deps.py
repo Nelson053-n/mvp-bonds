@@ -37,6 +37,20 @@ def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
+def user_is_pro(current_user: dict) -> bool:
+    """Effective Pro status read live from the DB (never trust the JWT)."""
+    from app.services.storage_service import storage_service
+    user = storage_service.get_user_by_id(current_user["sub"])
+    return bool(user and user.get("is_pro"))
+
+
+def require_pro(current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependency that 403s non-Pro users (for Pro-only endpoints)."""
+    if not user_is_pro(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступно в тарифе Pro")
+    return current_user
+
+
 async def get_optional_user(request: Request) -> dict | None:
     """
     Try to extract JWT token from Authorization header.

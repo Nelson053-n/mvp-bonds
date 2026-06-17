@@ -174,6 +174,44 @@ async def test_tax_csv_for_pro(client, auth_headers):
     assert "attachment" in r.headers.get("content-disposition", "")
 
 
+# ── Free limits (enforced for non-Pro only) ──────────────────────────────────
+
+async def test_analytics_extra_blocked_for_non_pro(client, auth_headers):
+    await client.patch("/admin/users/1/pro", json={"is_pro": False}, headers=auth_headers)
+    r = await client.get("/portfolios/1/analytics-extra", headers=auth_headers)
+    assert r.status_code == 403
+
+
+async def test_analytics_extra_allowed_for_pro(client, auth_headers):
+    await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+    r = await client.get("/portfolios/1/analytics-extra", headers=auth_headers)
+    assert r.status_code == 200
+
+
+async def test_free_portfolio_limit(client, auth_headers):
+    # Non-Pro user is capped at free_max_portfolios (2). Bootstrap admin already
+    # owns portfolio id=1, so creating up to the cap then one more must 400.
+    await client.patch("/admin/users/1/pro", json={"is_pro": False}, headers=auth_headers)
+    # Find out how many we already have to reach the cap deterministically.
+    listed = (await client.get("/portfolios", headers=auth_headers)).json()
+    have = len(listed["portfolios"])
+    last = None
+    while have < 2:
+        last = await client.post("/portfolios", json={"name": f"P{have}"}, headers=auth_headers)
+        assert last.status_code == 201
+        have += 1
+    over = await client.post("/portfolios", json={"name": "over"}, headers=auth_headers)
+    assert over.status_code == 400
+    assert "Pro" in over.json()["detail"]
+
+
+async def test_pro_portfolio_limit_relaxed(client, auth_headers):
+    # Pro user can exceed the free cap of 2.
+    await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+    r = await client.post("/portfolios", json={"name": "pro-extra"}, headers=auth_headers)
+    assert r.status_code == 201
+
+
 async def test_ai_analysis_sanitizes_ticker(client, auth_headers, monkeypatch):
     # A ticker with injected text must reach the LLM stripped to [A-Za-z0-9-].
     await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)

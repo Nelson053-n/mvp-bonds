@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_current_user, get_portfolio_or_403
+from app.api.deps import get_current_user, get_portfolio_or_403, user_is_pro
 from app.config import settings as app_settings
 from app.exceptions import AppError, InstrumentNotFoundError
 from app.models import (
@@ -420,6 +420,14 @@ async def create_item_alert(
     item = storage_service.get_item(item_id, portfolio_id)
     if not item:
         raise HTTPException(status_code=404, detail="Инструмент не найден")
+    # Free users are capped per instrument; Pro is unlimited.
+    if not user_is_pro(current_user):
+        existing = storage_service.get_price_alerts_for_item(item_id, current_user["sub"])
+        if len(existing) >= app_settings.free_max_alerts_per_item:
+            raise HTTPException(
+                status_code=400,
+                detail=f"На бесплатном тарифе — до {app_settings.free_max_alerts_per_item} алертов на бумагу. Оформите Pro.",
+            )
     alert_id = storage_service.create_price_alert(
         current_user["sub"], portfolio_id, item_id,
         item["ticker"], payload.alert_type, payload.target_price

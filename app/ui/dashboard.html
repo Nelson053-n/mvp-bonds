@@ -6639,12 +6639,15 @@
         { id: 'stress-test-card', title: 'Стресс-тест по ставке ЦБ' },
         { id: 'ytm-curve-card', title: 'Рыночная доходность и YTM-кривая' },
         { id: 'swot-card', title: 'SWOT-анализ портфеля' },
+        { id: 'events-card', title: 'События портфеля (30 дней)' },
+        { id: 'cash-reinvest-card', title: 'Свободные средства и реинвест', forceShow: true },
       ];
       function applyProGates() {
         if (window._isPro) return;  // Pro sees everything
         PRO_WIDGETS.forEach(w => {
           const card = document.getElementById(w.id);
           if (!card || card.classList.contains('pro-locked')) return;
+          if (w.forceShow) card.style.display = '';  // show (blurred) as an upsell
           card.classList.add('pro-locked');
           const ov = document.createElement('div');
           ov.className = 'pro-overlay';

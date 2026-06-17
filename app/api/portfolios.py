@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, get_portfolio_or_403
+from app.api.deps import get_current_user, get_portfolio_or_403, user_is_pro
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.cbr_service import cbr_service
@@ -116,8 +116,17 @@ async def create_portfolio(
     """Create a new portfolio for current user."""
     user_id = current_user["sub"]
     count = storage_service.count_portfolios(user_id)
-    if count >= app_settings.max_portfolios_per_user:
-        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_portfolios_per_user} портфелей на аккаунт")
+    # Free users are capped; Pro is unlimited (up to the legacy hard safety net).
+    if user_is_pro(current_user):
+        limit = app_settings.max_portfolios_per_user
+    else:
+        limit = app_settings.free_max_portfolios
+    if count >= limit:
+        if user_is_pro(current_user):
+            detail = f"Максимум {limit} портфелей на аккаунт"
+        else:
+            detail = f"На бесплатном тарифе — до {limit} портфелей. Оформите Pro для большего."
+        raise HTTPException(status_code=400, detail=detail)
     portfolio_id = storage_service.create_portfolio(user_id, payload.name)
     portfolio = storage_service.get_portfolio(portfolio_id)
 
@@ -356,6 +365,8 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
     """Aggregated analytics-extra across all user's portfolios."""
     from datetime import date, datetime, timedelta
 
+    if not user_is_pro(current_user):
+        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
     user_id = current_user["sub"]
     rows, portfolios_data, _origin = await _collect_all_user_rows(user_id)
     portfolio_ids = [p["id"] for p in portfolios_data]
@@ -799,6 +810,8 @@ async def get_analytics_extra(
     from datetime import date, datetime, timedelta
 
     await get_portfolio_or_403(portfolio_id, current_user)
+    if not user_is_pro(current_user):
+        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
     rows = await portfolio_service.get_table(portfolio_id)
     today = date.today()
 

@@ -19,8 +19,11 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
-    max_portfolios_per_user: int = 3
+    max_portfolios_per_user: int = 50     # Pro safety net (effectively unlimited)
     max_items_per_portfolio: int = 200
+    # Freemium limits — applied to non-Pro users only (Pro is unlimited).
+    free_max_portfolios: int = 2
+    free_max_alerts_per_item: int = 3
     # Public Telegram bond-search bot (optional). When set, a long-polling loop
     # starts in the leader worker and answers /start + free-text ticker queries.
     tg_bot_token: str = ""
