@@ -1932,6 +1932,26 @@
     </div>
 
     <!-- ── ADD INSTRUMENT MODAL ──────────────────────────────────── -->
+    <!-- Pro purchase modal -->
+    <div id="pro-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-header"><h2 class="modal-title">🚀 Bond AI Pro</h2></div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:var(--text-secondary);margin:0 0 14px;">AI-анализ без лимита, налоговый помощник, стресс-тесты, безлимит портфелей, автосинк Т-Банка и данные каждые 5 минут.</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn btn-secondary" style="height:auto;padding:12px 16px;justify-content:space-between;" onclick="buyPro('month', this)">
+              <span style="font-weight:600;">Месяц</span><span id="pro-price-month" style="color:var(--blue-400);font-weight:700;">299 ₽</span>
+            </button>
+            <button class="btn btn-primary" style="height:auto;padding:12px 16px;justify-content:space-between;" onclick="buyPro('year', this)">
+              <span style="font-weight:600;">Год <span style="font-size:10px;background:rgba(255,255,255,.2);border-radius:4px;padding:1px 6px;margin-left:4px;">−30%</span></span><span id="pro-price-year" style="font-weight:700;">2 490 ₽</span>
+            </button>
+          </div>
+          <p id="pro-modal-status" style="font-size:12px;color:var(--text-muted);min-height:16px;margin:12px 0 0;"></p>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('pro-modal').style.display='none'">Закрыть</button></div>
+      </div>
+    </div>
+
     <div id="add-instrument-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
       <div class="modal" style="max-width:460px;">
         <div class="modal-header">
@@ -6655,9 +6675,56 @@
           ov.innerHTML =
             '<span class="pro-badge">PRO</span>' +
             '<div class="pro-title">' + w.title + '</div>' +
-            '<div class="pro-desc">Доступно в тарифе Pro — разбор рисков и доходности портфеля.</div>';
+            '<div class="pro-desc">Доступно в тарифе Pro — разбор рисков и доходности портфеля.</div>' +
+            '<button class="btn btn-primary" style="margin-top:6px;height:32px;padding:0 16px;font-size:13px;" onclick="openProModal()">Оформить Pro</button>';
           card.appendChild(ov);
         });
+      }
+
+      // ── Pro billing (YooKassa) ───────────────────────────────────
+      let _billingEnabled = false;
+      async function initBilling() {
+        try {
+          const r = await fetch('/billing/config');
+          if (!r.ok) return;
+          const d = await r.json();
+          _billingEnabled = !!d.enabled;
+          const pm = document.getElementById('pro-price-month');
+          const py = document.getElementById('pro-price-year');
+          if (pm && d.price_month) pm.textContent = d.price_month + ' ₽';
+          if (py && d.price_year) py.textContent = Number(d.price_year).toLocaleString('ru-RU') + ' ₽';
+        } catch (e) { /* billing optional */ }
+        // Handle return from payment / deep-link to buy.
+        const params = new URLSearchParams(location.search);
+        if (params.get('pro') === 'success') {
+          toast('Оплата прошла — Pro активирован 🎉', 'success');
+          history.replaceState(null, '', '/app');
+          setTimeout(() => location.reload(), 1500);
+        } else if (params.get('pro') === '1' && !window._isPro) {
+          history.replaceState(null, '', '/app');
+          openProModal();
+        }
+      }
+      function openProModal() {
+        if (!_billingEnabled) { toast('Оплата скоро будет доступна', 'warn'); return; }
+        document.getElementById('pro-modal').style.display = 'flex';
+      }
+      async function buyPro(plan, btn) {
+        const status = document.getElementById('pro-modal-status');
+        if (btn) btn.disabled = true;
+        if (status) status.textContent = 'Создаём платёж…';
+        try {
+          const r = await apiFetch('/billing/create', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ plan }),
+          });
+          const d = await r.json();
+          if (!r.ok || !d.confirmation_url) throw new Error(d.detail || 'Ошибка');
+          location.href = d.confirmation_url;  // redirect to YooKassa
+        } catch (e) {
+          if (status) status.textContent = 'Не удалось создать платёж. Попробуйте позже.';
+          if (btn) btn.disabled = false;
+        }
       }
 
       async function loadDonateLink() {
@@ -6709,6 +6776,7 @@
             if (verBadge) verBadge.style.display = 'none';
           }
           applyProGates();
+          initBilling();
           loadDonateLink();
           showDashboard();
           await loadPortfolios();

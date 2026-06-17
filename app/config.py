@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # appears in the dashboard footer / Telegram bot. Add the real URL later.
     donate_url: str = ""          # ЮMoney / СБП / CloudTips payment URL
     donate_sbp_url: str = ""      # optional separate СБП/QR link
+    # YooKassa (ЮKassa) — Pro payments. Both empty → billing disabled (UI hides
+    # the "Оформить Pro" buttons). shop_id + secret_key from ЮKassa dashboard
+    # → Интеграция → Ключи API. Add to .env later, no redeploy needed.
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    # Pro prices in RUB and the days each grants.
+    pro_price_month: int = 299
+    pro_price_year: int = 2490
+    pro_days_month: int = 30
+    pro_days_year: int = 365
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="MVP_")
 

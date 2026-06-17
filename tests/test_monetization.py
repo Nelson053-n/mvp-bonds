@@ -237,6 +237,52 @@ def test_autosync_free_expired(monkeypatch):
     assert deps.user_can_autosync(1) is False
 
 
+# ── YooKassa billing ─────────────────────────────────────────────────────────
+
+async def test_billing_config_disabled_by_default(client):
+    r = await client.get("/billing/config")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["enabled"] is False
+    assert d["price_month"] == 299
+
+
+async def test_billing_create_requires_auth(client):
+    r = await client.post("/billing/create", json={"plan": "month"})
+    assert r.status_code in (401, 403)
+
+
+async def test_billing_create_503_without_keys(client, auth_headers):
+    r = await client.post("/billing/create", json={"plan": "month"}, headers=auth_headers)
+    assert r.status_code == 503  # YooKassa not configured
+
+
+async def test_billing_webhook_always_200(client):
+    # Webhook must never error (so YooKassa doesn't retry-storm), even on garbage.
+    r = await client.post("/billing/webhook", json={"garbage": True})
+    assert r.status_code == 200
+
+
+def test_grant_pro_from_payment(monkeypatch):
+    from app.api import billing
+    captured = {}
+    monkeypatch.setattr(billing.storage_service, "get_user_by_id", lambda uid: {"pro_until": None})
+    monkeypatch.setattr(billing.storage_service, "set_user_pro",
+                        lambda uid, pro, until: captured.update({"uid": uid, "pro": pro, "until": until}))
+    payment = {"status": "succeeded", "metadata": {"user_id": "7", "plan": "month"}}
+    assert billing._grant_pro_from_payment(payment) is True
+    assert captured["uid"] == 7 and captured["pro"] is True and captured["until"]
+
+
+def test_grant_pro_ignores_unpaid(monkeypatch):
+    from app.api import billing
+    called = {"n": 0}
+    monkeypatch.setattr(billing.storage_service, "set_user_pro",
+                        lambda *a, **k: called.update(n=called["n"] + 1))
+    assert billing._grant_pro_from_payment({"status": "pending", "metadata": {"user_id": "7", "plan": "month"}}) is False
+    assert called["n"] == 0
+
+
 async def test_ai_analysis_sanitizes_ticker(client, auth_headers, monkeypatch):
     # A ticker with injected text must reach the LLM stripped to [A-Za-z0-9-].
     await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)

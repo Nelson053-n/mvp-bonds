@@ -1897,6 +1897,10 @@
             </div>
             <div id="waitlist-msg" style="min-height:16px;font-size:12px;"></div>
           </div>
+          <!-- Shown instead of waitlist when billing is live -->
+          <a id="pro-buy-btn" href="/app?pro=1" class="btn btn-primary" style="display:none;width:100%;justify-content:center;height:44px;">
+            Оформить Pro
+          </a>
         </div>
 
       </div>
@@ -2211,6 +2215,21 @@
       document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
       if (!wasOpen) item.classList.add('open');
     }
+
+    // When billing is live, swap the Pro waitlist for a real "Оформить Pro" button.
+    (async () => {
+      try {
+        const r = await fetch('/billing/config');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.enabled) {
+          const wl = document.getElementById('waitlist-form');
+          const buy = document.getElementById('pro-buy-btn');
+          if (wl) wl.style.display = 'none';
+          if (buy) buy.style.display = 'flex';
+        }
+      } catch (e) { /* billing optional */ }
+    })();
 
     async function submitWaitlist() {
       const input = document.getElementById('waitlist-email');
