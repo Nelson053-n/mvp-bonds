@@ -9,6 +9,7 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Bond AI">
@@ -939,7 +940,7 @@
       <div class="topbar-inner">
         <div class="topbar-brand" data-panel="panel-table" style="cursor:pointer;">
           <div class="brand-mark">B</div>
-          <span class="brand-name">Bond AI</span><span style="font-size:9px;font-weight:600;padding:1px 5px;margin-left:6px;border-radius:4px;background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);letter-spacing:.3px;vertical-align:middle;">v3.0</span>
+          <span class="brand-name">Bond AI</span><span id="brand-pro-badge" style="display:none;font-size:9px;font-weight:800;padding:1px 6px;margin-left:6px;border-radius:4px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;letter-spacing:.5px;vertical-align:middle;box-shadow:0 1px 4px rgba(34,197,94,.4);">PRO</span><span id="brand-version-badge" style="font-size:9px;font-weight:600;padding:1px 5px;margin-left:6px;border-radius:4px;background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);letter-spacing:.3px;vertical-align:middle;">v3.0</span>
         </div>
         <div class="topbar-nav">
           <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
@@ -1708,6 +1709,7 @@
                     <th>Купоны</th>
                     <th>Шеринг</th>
                     <th data-i18n="adm.colRole">Роль</th>
+                    <th>Pro</th>
                     <th class="no-sort" data-i18n="tbl.actions">Действия</th>
                   </tr>
                 </thead>
@@ -6700,6 +6702,11 @@
             if (aiCard) aiCard.style.display = '';
             const taxCard = document.getElementById('tax-card');
             if (taxCard) taxCard.style.display = '';
+            // «Bond AI Pro» badge replaces the version chip for Pro users.
+            const proBadge = document.getElementById('brand-pro-badge');
+            const verBadge = document.getElementById('brand-version-badge');
+            if (proBadge) proBadge.style.display = '';
+            if (verBadge) verBadge.style.display = 'none';
           }
           applyProGates();
           loadDonateLink();
@@ -8315,7 +8322,7 @@
 
       async function adminLoadUsers() {
         const tbody = document.getElementById('adm-users-body');
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--slate-400);padding:16px;">Загрузка...</td></tr>';
         try {
           const r = await apiFetch('/admin/users');
           const users = await r.json();
@@ -8382,6 +8389,31 @@
             }
             tdRole.appendChild(roleSpan);
 
+            // Pro status + expiry
+            const tdPro = document.createElement('td');
+            tdPro.style.textAlign = 'center';
+            tdPro.style.whiteSpace = 'nowrap';
+            if (u.is_pro) {
+              const badge = document.createElement('span');
+              badge.textContent = 'PRO';
+              badge.style.cssText = 'font-size:10px;font-weight:700;color:var(--green-400);background:rgba(74,222,128,.12);border-radius:4px;padding:2px 6px;';
+              tdPro.appendChild(badge);
+              if (u.pro_until) {
+                const until = document.createElement('div');
+                until.textContent = 'до ' + String(u.pro_until).substring(0, 10);
+                until.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:2px;';
+                tdPro.appendChild(until);
+              } else {
+                const inf = document.createElement('div');
+                inf.textContent = 'бессрочно';
+                inf.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:2px;';
+                tdPro.appendChild(inf);
+              }
+            } else {
+              tdPro.textContent = '—';
+              tdPro.style.color = 'var(--slate-400)';
+            }
+
             const tdActions = document.createElement('td');
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:2px;justify-content:center;';
@@ -8389,6 +8421,13 @@
             const pwdBtn = _mkIconBtn('🔑', t('adm.btnPassword'), 'background:rgba(59,130,246,.12);color:var(--blue-600);border:1px solid rgba(59,130,246,.25);',
               () => adminOpenPwdModal(u.id, u.username));
             div.appendChild(pwdBtn);
+
+            // Grant / revoke Pro
+            const proBtn = _mkIconBtn(u.is_pro ? '★' : '☆', u.is_pro ? 'Снять Pro' : 'Выдать Pro',
+              u.is_pro ? 'background:rgba(74,222,128,.12);color:var(--green-400);border:1px solid rgba(74,222,128,.3);'
+                       : 'background:rgba(148,163,184,.1);color:var(--text-muted);border:1px solid var(--border);',
+              function() { adminSetPro(u.id, !u.is_pro, this); });
+            div.appendChild(proBtn);
 
             if (u.is_admin && !isPrimary) {
               const demoteBtn = _mkIconBtn('⬇', t('adm.btnDemote'), 'background:rgba(217,119,6,.12);color:#d97706;border:1px solid rgba(217,119,6,.25);',
@@ -8404,11 +8443,28 @@
             }
 
             tdActions.appendChild(div);
-            tr.append(tdId, tdName, tdCount, tdDate, tdLastLogin, tdSync, tdTg, tdCoupon, tdShare, tdRole, tdActions);
+            tr.append(tdId, tdName, tdCount, tdDate, tdLastLogin, tdSync, tdTg, tdCoupon, tdShare, tdRole, tdPro, tdActions);
             tbody.appendChild(tr);
           });
         } catch(e) {
-          tbody.innerHTML = `<tr><td colspan="11" style="color:var(--red-400);text-align:center;">${t('adm.loadError')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="12" style="color:var(--red-400);text-align:center;">${t('adm.loadError')}</td></tr>`;
+        }
+      }
+
+      async function adminSetPro(userId, makePro, btn) {
+        if (btn) btn.disabled = true;
+        try {
+          const r = await apiFetch(`/admin/users/${userId}/pro`, {
+            method: 'PATCH',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ is_pro: makePro }),
+          });
+          if (!r.ok) throw new Error();
+          toast(makePro ? 'Pro выдан' : 'Pro снят', 'success');
+          adminLoadUsers();
+        } catch(e) {
+          toast('Ошибка изменения Pro', 'error');
+          if (btn) btn.disabled = false;
         }
       }
 
@@ -9488,7 +9544,8 @@
 
       // ── ADD INSTRUMENT MODAL ─────────────────────────────────────
       function openAddInstrumentModal() {
-        if (!portfolioId) return;
+        // No early-return on missing portfolioId: the modal opens anyway and
+        // submitAddInstrumentModal() creates a default portfolio on first add.
         const modal = document.getElementById('add-instrument-modal');
         if (!modal) return;
         const tickerInput = document.getElementById('add-modal-ticker');

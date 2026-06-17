@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, user_can_autosync, FREE_AUTOSYNC_DAYS
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.crypto_utils import encrypt_token
@@ -218,6 +218,13 @@ async def tbank_sync_enable(
     user_id = current_user["sub"]
     _get_portfolio_or_403(payload.portfolio_id, user_id)
 
+    if not user_can_autosync(user_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Автосинхронизация бесплатна {FREE_AUTOSYNC_DAYS} дней после регистрации. "
+                   "Оформите Pro, чтобы продолжить.",
+        )
+
     # Validate token
     svc = TBankService(payload.token)
     try:
@@ -348,6 +355,13 @@ async def tbank_sync_now(
         raise HTTPException(status_code=404, detail="Синхронизация не настроена")
     if not cfg["sync_enabled"]:
         raise HTTPException(status_code=400, detail="Синхронизация отключена")
+    if not user_can_autosync(user_id):
+        storage_service.set_sync_enabled(payload.portfolio_id, False)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Автосинхронизация бесплатна {FREE_AUTOSYNC_DAYS} дней после регистрации. "
+                   "Оформите Pro, чтобы продолжить.",
+        )
 
     try:
         result = await do_sync_one(payload.portfolio_id, cfg)

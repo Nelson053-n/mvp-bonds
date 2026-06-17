@@ -170,9 +170,16 @@ async def _tbank_sync_loop():
     while True:
         try:
             from app.services.tbank_sync_service import do_sync_one
+            from app.api.deps import user_can_autosync
             syncs = storage_service.get_all_enabled_syncs()
             for cfg in syncs:
                 try:
+                    # Free trial expired (non-Pro past the window) → disable sync.
+                    if not user_can_autosync(cfg["user_id"]):
+                        storage_service.set_sync_enabled(cfg["portfolio_id"], False)
+                        logger.info("Auto-sync disabled (free trial ended): portfolio_id=%d user_id=%d",
+                                    cfg["portfolio_id"], cfg["user_id"])
+                        continue
                     await do_sync_one(cfg["portfolio_id"], cfg)
                 except Exception:
                     pass

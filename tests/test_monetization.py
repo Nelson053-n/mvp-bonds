@@ -212,6 +212,31 @@ async def test_pro_portfolio_limit_relaxed(client, auth_headers):
     assert r.status_code == 201
 
 
+# ── Auto-sync trial (free 30 days, then Pro) ─────────────────────────────────
+
+def test_autosync_pro_always_allowed(monkeypatch):
+    from app.api import deps
+    monkeypatch.setattr(deps.storage_service, "get_user_by_id",
+                        lambda uid: {"is_pro": True, "created_at": "2000-01-01T00:00:00+00:00"})
+    assert deps.user_can_autosync(1) is True
+
+
+def test_autosync_free_within_window(monkeypatch):
+    from app.api import deps
+    from datetime import datetime, timezone
+    recent = datetime.now(timezone.utc).isoformat()
+    monkeypatch.setattr(deps.storage_service, "get_user_by_id",
+                        lambda uid: {"is_pro": False, "created_at": recent})
+    assert deps.user_can_autosync(1) is True
+
+
+def test_autosync_free_expired(monkeypatch):
+    from app.api import deps
+    monkeypatch.setattr(deps.storage_service, "get_user_by_id",
+                        lambda uid: {"is_pro": False, "created_at": "2000-01-01T00:00:00+00:00"})
+    assert deps.user_can_autosync(1) is False
+
+
 async def test_ai_analysis_sanitizes_ticker(client, auth_headers, monkeypatch):
     # A ticker with injected text must reach the LLM stripped to [A-Za-z0-9-].
     await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)

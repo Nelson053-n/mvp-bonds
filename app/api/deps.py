@@ -51,6 +51,31 @@ def require_pro(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
+# Auto-sync is free for the first FREE_AUTOSYNC_DAYS after registration, then Pro-only.
+FREE_AUTOSYNC_DAYS = 30
+
+
+def user_can_autosync(user_id: int) -> bool:
+    """Pro users always; free users only within the trial window from signup."""
+    from datetime import datetime, timezone, timedelta
+    from app.services.storage_service import storage_service
+    user = storage_service.get_user_by_id(user_id)
+    if not user:
+        return False
+    if user.get("is_pro"):
+        return True
+    created = user.get("created_at")
+    if not created:
+        return True  # unknown signup date → don't lock out
+    try:
+        dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    return datetime.now(timezone.utc) - dt < timedelta(days=FREE_AUTOSYNC_DAYS)
+
+
 async def get_optional_user(request: Request) -> dict | None:
     """
     Try to extract JWT token from Authorization header.
