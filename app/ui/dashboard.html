@@ -10818,10 +10818,26 @@
         }
       });
 
-      // Register service worker for PWA
+      // Register service worker for PWA + auto-update.
+      // When a new SW takes control (after a deploy), reload once so the page
+      // picks up the fresh HTML/JS instead of serving stale cached assets —
+      // this is what previously required a manual "Clear site data".
       if ('serviceWorker' in navigator) {
+        let _swReloading = false;
+        // Only reload on a *controller swap* (SW update), not the first install
+        // on a fresh page (where there was no controller to begin with).
+        const _hadController = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (_swReloading || !_hadController) return;
+          _swReloading = true;
+          location.reload();
+        });
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            // Poll for an updated SW on load and periodically.
+            reg.update().catch(() => {});
+            setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+          }).catch(() => {});
         });
       }
 
