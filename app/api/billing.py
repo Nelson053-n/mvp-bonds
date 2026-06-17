@@ -62,7 +62,7 @@ def _grant_pro_from_payment(payment: dict) -> bool:
     plan_info = yookassa_service.PLANS.get(plan)
     if not plan_info:
         return False
-    _amount, days = plan_info
+    amount, days = plan_info
     # Extend from the later of now / current expiry so stacking a renewal adds time.
     from datetime import date, timedelta
     user = storage_service.get_user_by_id(user_id)
@@ -76,6 +76,17 @@ def _grant_pro_from_payment(payment: dict) -> bool:
             pass
     until = (base + timedelta(days=days)).isoformat()
     storage_service.set_user_pro(user_id, True, until)
+    # Record the payment for NPD bookkeeping (receipts entered into "Мой налог"
+    # by hand — YooKassa has no auto-integration for that).
+    try:
+        storage_service.record_pro_payment(
+            payment_id=str(payment.get("id") or ""),
+            user_id=user_id,
+            username=(user or {}).get("username", ""),
+            plan=plan, amount=float(amount), status="succeeded",
+        )
+    except Exception:
+        logger.exception("record_pro_payment failed")
     logger.info("AUDIT pro_granted_via_payment: user_id=%d plan=%s until=%s", user_id, plan, until)
     return True
 

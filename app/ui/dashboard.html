@@ -1835,6 +1835,25 @@
         </div>
 
         <!-- Промо-материалы для SEO/GEO-продвижения -->
+        <!-- Платежи Pro (для учёта НПД в «Мой налог» вручную) -->
+        <div class="card" style="margin-top:16px;" id="adm-payments-card">
+          <div class="card-header">
+            <h2 class="card-title">💳 Платежи Pro</h2>
+            <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadPayments()">↺</button>
+          </div>
+          <div style="padding:8px 16px 0;font-size:11px;color:var(--text-muted);line-height:1.5;">
+            Успешные оплаты Pro. Чек в «Мой налог» по НПД забивается вручную — отметьте галкой, когда выбили, чтобы не потерять.
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;font-size:12px;">
+              <thead><tr>
+                <th>Дата</th><th>Юзер</th><th>План</th><th>Сумма</th><th>Чек выбит</th>
+              </tr></thead>
+              <tbody id="adm-payments-body"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card" style="margin-top:16px;" id="adm-promo-card">
           <div class="card-header">
             <h2 class="card-title">Промо-материалы</h2>
@@ -8180,6 +8199,7 @@
         adminLoadAuditLog().catch(() => {});
         adminLoadBackups().catch(() => {});
         adminLoadPromo().catch(() => {});
+        adminLoadPayments().catch(() => {});
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -8254,6 +8274,52 @@
           });
         } catch(e) {
           body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Не удалось загрузить данные</div>';
+        }
+      }
+
+      async function adminLoadPayments() {
+        const body = document.getElementById('adm-payments-body');
+        if (!body) return;
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Загрузка…</td></tr>';
+        try {
+          const r = await apiFetch('/admin/payments');
+          if (!r.ok) throw new Error();
+          const rows = await r.json();
+          if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Платежей пока нет</td></tr>';
+            return;
+          }
+          body.innerHTML = '';
+          rows.forEach(p => {
+            const tr = document.createElement('tr');
+            const date = (p.created_at || '').substring(0, 10);
+            const planTxt = p.plan === 'year' ? 'Год' : 'Месяц';
+            const tdDate = document.createElement('td'); tdDate.textContent = date;
+            const tdUser = document.createElement('td'); tdUser.textContent = (p.username || '') + ' #' + (p.user_id || '');
+            const tdPlan = document.createElement('td'); tdPlan.textContent = planTxt;
+            const tdAmount = document.createElement('td'); tdAmount.textContent = Math.round(p.amount || 0) + ' ₽';
+            const tdReceipt = document.createElement('td'); tdReceipt.style.textAlign = 'center';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.checked = !!p.receipt_done; cb.style.cursor = 'pointer';
+            cb.onchange = () => adminToggleReceipt(p.payment_id, cb.checked, cb);
+            tdReceipt.appendChild(cb);
+            tr.append(tdDate, tdUser, tdPlan, tdAmount, tdReceipt);
+            body.appendChild(tr);
+          });
+        } catch(e) {
+          body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Не удалось загрузить</td></tr>';
+        }
+      }
+      async function adminToggleReceipt(paymentId, done, cb) {
+        try {
+          const r = await apiFetch(`/admin/payments/${encodeURIComponent(paymentId)}/receipt`, {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ done }),
+          });
+          if (!r.ok) throw new Error();
+        } catch(e) {
+          if (cb) cb.checked = !done;
+          toast('Ошибка сохранения', 'error');
         }
       }
 

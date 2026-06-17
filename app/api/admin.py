@@ -27,6 +27,27 @@ async def get_promo_materials(admin: dict = Depends(get_admin_user)) -> list:
     return all_materials()
 
 
+@router.get("/payments")
+async def list_pro_payments(admin: dict = Depends(get_admin_user)) -> list:
+    """Pro payments for NPD bookkeeping (receipts go into «Мой налог» by hand)."""
+    return storage_service.get_pro_payments()
+
+
+class ReceiptToggleInput(BaseModel):
+    done: bool
+
+
+@router.patch("/payments/{payment_id}/receipt")
+async def toggle_payment_receipt(
+    payment_id: str,
+    payload: ReceiptToggleInput,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """Mark a payment's «Мой налог» receipt as entered / not entered."""
+    storage_service.set_payment_receipt_done(payment_id, payload.done)
+    return {"ok": True, "receipt_done": payload.done}
+
+
 def _get_ip(request: Request) -> str:
     return request.client.host if request.client else ""
 

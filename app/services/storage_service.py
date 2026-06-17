@@ -256,6 +256,20 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 )
             """)
 
+            # Pro payments (YooKassa) — for NPD bookkeeping ("Мой налог" by hand).
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pro_payments (
+                    payment_id TEXT PRIMARY KEY,
+                    user_id INTEGER,
+                    username TEXT,
+                    plan TEXT,
+                    amount REAL,
+                    status TEXT,
+                    receipt_done INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS portfolio_sync (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -979,6 +993,44 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             conn.commit()
             return int(cursor.lastrowid)  # type: ignore[arg-type]
+
+    # ── Pro payments (YooKassa, for NPD bookkeeping) ─────────────────────────
+
+    def record_pro_payment(self, payment_id: str, user_id: int, username: str,
+                           plan: str, amount: float, status: str) -> None:
+        """Upsert a Pro payment by its YooKassa id (idempotent on webhook retries)."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO pro_payments (payment_id, user_id, username, plan, amount, status, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(payment_id) DO UPDATE SET status=excluded.status""",
+                (payment_id, user_id, username, plan, amount, status, now),
+            )
+            conn.commit()
+
+    def get_pro_payments(self, limit: int = 200) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT payment_id, user_id, username, plan, amount, status, receipt_done, created_at
+                   FROM pro_payments ORDER BY created_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [
+            {"payment_id": r[0], "user_id": r[1], "username": r[2], "plan": r[3],
+             "amount": r[4], "status": r[5], "receipt_done": bool(r[6]), "created_at": r[7]}
+            for r in rows
+        ]
+
+    def set_payment_receipt_done(self, payment_id: str, done: bool) -> int:
+        with self._connect() as conn:
+            cur = conn.execute(
+                "UPDATE pro_payments SET receipt_done = ? WHERE payment_id = ?",
+                (1 if done else 0, payment_id),
+            )
+            conn.commit()
+            return int(cur.rowcount)
 
     # ── T-Bank auto-sync ─────────────────────────────────────────────────────
 

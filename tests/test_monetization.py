@@ -283,6 +283,37 @@ def test_grant_pro_ignores_unpaid(monkeypatch):
     assert called["n"] == 0
 
 
+# ── Pro payments ledger (NPD bookkeeping) ────────────────────────────────────
+
+async def test_admin_payments_requires_auth(client):
+    r = await client.get("/admin/payments")
+    assert r.status_code in (401, 403)
+
+
+async def test_payment_recorded_on_grant(client, auth_headers, monkeypatch):
+    # A succeeded payment is logged to the ledger and shows up in /admin/payments.
+    from app.api import billing
+    payment = {"id": "pay_test_1", "status": "succeeded",
+               "metadata": {"user_id": "1", "plan": "month"}}
+    billing._grant_pro_from_payment(payment)
+    r = await client.get("/admin/payments", headers=auth_headers)
+    assert r.status_code == 200
+    ids = [p["payment_id"] for p in r.json()]
+    assert "pay_test_1" in ids
+
+
+async def test_payment_receipt_toggle(client, auth_headers):
+    from app.api import billing
+    billing._grant_pro_from_payment({"id": "pay_test_2", "status": "succeeded",
+                                     "metadata": {"user_id": "1", "plan": "year"}})
+    r = await client.patch("/admin/payments/pay_test_2/receipt",
+                           json={"done": True}, headers=auth_headers)
+    assert r.status_code == 200
+    rows = (await client.get("/admin/payments", headers=auth_headers)).json()
+    row = next(p for p in rows if p["payment_id"] == "pay_test_2")
+    assert row["receipt_done"] is True
+
+
 async def test_ai_analysis_sanitizes_ticker(client, auth_headers, monkeypatch):
     # A ticker with injected text must reach the LLM stripped to [A-Za-z0-9-].
     await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
