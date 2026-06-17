@@ -265,6 +265,26 @@
         margin-bottom: 16px;
         overflow: hidden;
       }
+      /* Pro-gated widgets: blur content + overlay CTA for non-Pro users */
+      .card.pro-locked { position: relative; }
+      .card.pro-locked > *:not(.pro-overlay) {
+        filter: blur(5px);
+        pointer-events: none;
+        user-select: none;
+      }
+      .pro-overlay {
+        position: absolute; inset: 0; z-index: 5;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 8px; text-align: center; padding: 16px;
+        background: color-mix(in srgb, var(--bg-card) 55%, transparent);
+      }
+      .pro-overlay .pro-badge {
+        font-size: 11px; font-weight: 700; letter-spacing: .03em;
+        color: var(--green-400); background: rgba(74,222,128,.12);
+        border-radius: 6px; padding: 3px 9px;
+      }
+      .pro-overlay .pro-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+      .pro-overlay .pro-desc { font-size: 12px; color: var(--text-muted); max-width: 320px; }
       .card-header {
         padding: 14px 18px;
         border-bottom: 1px solid var(--border);
@@ -6599,6 +6619,29 @@
       // ── AUTH & PORTFOLIO MANAGEMENT ───────────────────────────────
 
       // Check authentication and render app
+      // Advanced analytics are Pro-only. For non-Pro users, blur these cards
+      // and overlay an upsell. Pro users see them untouched.
+      const PRO_WIDGETS = [
+        { id: 'stress-test-card', title: 'Стресс-тест по ставке ЦБ' },
+        { id: 'ytm-curve-card', title: 'Рыночная доходность и YTM-кривая' },
+        { id: 'swot-card', title: 'SWOT-анализ портфеля' },
+      ];
+      function applyProGates() {
+        if (window._isPro) return;  // Pro sees everything
+        PRO_WIDGETS.forEach(w => {
+          const card = document.getElementById(w.id);
+          if (!card || card.classList.contains('pro-locked')) return;
+          card.classList.add('pro-locked');
+          const ov = document.createElement('div');
+          ov.className = 'pro-overlay';
+          ov.innerHTML =
+            '<span class="pro-badge">PRO</span>' +
+            '<div class="pro-title">' + w.title + '</div>' +
+            '<div class="pro-desc">Доступно в тарифе Pro — разбор рисков и доходности портфеля.</div>';
+          card.appendChild(ov);
+        });
+      }
+
       async function loadDonateLink() {
         try {
           const r = await fetch('/donate-info');
@@ -6641,6 +6684,7 @@
             const aiCard = document.getElementById('ai-analysis-card');
             if (aiCard) aiCard.style.display = '';
           }
+          applyProGates();
           loadDonateLink();
           showDashboard();
           await loadPortfolios();
