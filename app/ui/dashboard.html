@@ -6948,8 +6948,9 @@
           setupAdminNav(meData.is_admin || false);
           window._isPro = !!meData.is_pro;
           if (window._isPro) {
-            const aiCard = document.getElementById('ai-analysis-card');
-            if (aiCard) aiCard.style.display = '';
+            // AI-анализ портфеля временно скрыт на фронте (раскомментировать для возврата):
+            // const aiCard = document.getElementById('ai-analysis-card');
+            // if (aiCard) aiCard.style.display = '';
             const taxCard = document.getElementById('tax-card');
             if (taxCard) taxCard.style.display = '';
             // «Bond AI Pro» badge replaces the version chip for Pro users.
