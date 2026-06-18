@@ -242,3 +242,37 @@ class TestCustomInstrument:
         assert upd.status_code == 200
         assert upd.json()["current_price"] == 1100.0
         assert upd.json()["profit"] == 200.0  # (1100-1000)*2
+
+
+class TestAllAggregation:
+    """/all/table?group=ticker merges same security across portfolios."""
+
+    async def test_merge_same_ticker_across_portfolios(self, client: AsyncClient, auth_headers: dict) -> None:
+        # Pro needed to create >2 portfolios (free-tier cap).
+        await client.patch("/admin/users/1/pro", json={"is_pro": True}, headers=auth_headers)
+        # two portfolios (brokers) with the SAME custom bond
+        r1 = await client.post("/portfolios", json={"name": "Брокер 1"}, headers=auth_headers)
+        r2 = await client.post("/portfolios", json={"name": "Брокер 2"}, headers=auth_headers)
+        assert r1.status_code in (200, 201), r1.text
+        assert r2.status_code in (200, 201), r2.text
+        p1, p2 = r1.json(), r2.json()
+        for pid, qty, price in [(p1["id"], 10, 1000.0), (p2["id"], 20, 950.0)]:
+            await client.post(
+                f"/portfolios/{pid}/instruments",
+                json={"ticker": "MERGE1", "quantity": qty, "purchase_price": price,
+                      "is_custom": True, "instrument_type": "bond", "custom_name": "Merge Test",
+                      "current_price": 1020.0},
+                headers=auth_headers,
+            )
+        # ungrouped: 2 rows
+        plain = (await client.get("/portfolios/all/table", headers=auth_headers)).json()["items"]
+        assert len([r for r in plain if r["ticker"] == "MERGE1"]) == 2
+        # grouped: 1 row, summed qty, weighted-avg price
+        grouped = (await client.get("/portfolios/all/table?group=ticker", headers=auth_headers)).json()["items"]
+        rows = [r for r in grouped if r["ticker"] == "MERGE1"]
+        assert len(rows) == 1
+        m = rows[0]
+        assert m["quantity"] == 30.0
+        assert round(m["purchase_price"], 2) == 966.67  # (10*1000+20*950)/30
+        assert m["aggregated"] is True
+        assert len(m["brokers"]) == 2

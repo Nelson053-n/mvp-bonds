@@ -285,21 +285,75 @@ async def _collect_all_user_rows(user_id: int) -> tuple[list, list[dict], dict]:
     return all_rows, portfolios_data, origin
 
 
+def _merge_by_ticker(items: list[dict]) -> list[dict]:
+    """Merge same-ticker positions held across different portfolios/brokers into
+    one row: sum quantity / current_value / profit / coupons, weighted-average the
+    purchase price, list the brokers (portfolios) it sits in. Per-unit fields
+    (current_price, coupon, rating, dates…) are identical for the same security,
+    so they're taken from the first occurrence."""
+    merged: dict[str, dict] = {}
+    for d in items:
+        key = (d.get("ticker") or "").upper()
+        qty = float(d.get("quantity") or 0)
+        cur = merged.get(key)
+        if cur is None:
+            nd = dict(d)
+            nd["_cost_sum"] = float(d.get("purchase_price") or 0) * qty
+            nd["brokers"] = []
+            pname = d.get("portfolio_name")
+            if pname:
+                nd["brokers"].append({"portfolio_id": d.get("portfolio_id"), "name": pname, "quantity": qty})
+            merged[key] = nd
+        else:
+            cur["quantity"] = float(cur.get("quantity") or 0) + qty
+            cur["current_value"] = float(cur.get("current_value") or 0) + float(d.get("current_value") or 0)
+            cur["profit"] = float(cur.get("profit") or 0) + float(d.get("profit") or 0)
+            if d.get("full_profit") is not None:
+                cur["full_profit"] = float(cur.get("full_profit") or 0) + float(d["full_profit"])
+            if d.get("realized_coupons") is not None:
+                cur["realized_coupons"] = float(cur.get("realized_coupons") or 0) + float(d["realized_coupons"])
+            if d.get("day_profit") is not None:
+                cur["day_profit"] = float(cur.get("day_profit") or 0) + float(d["day_profit"])
+            cur["_cost_sum"] += float(d.get("purchase_price") or 0) * qty
+            pname = d.get("portfolio_name")
+            if pname:
+                cur["brokers"].append({"portfolio_id": d.get("portfolio_id"), "name": pname, "quantity": qty})
+    out: list[dict] = []
+    for d in merged.values():
+        q = float(d.get("quantity") or 0)
+        d["purchase_price"] = round(d.pop("_cost_sum") / q, 4) if q else d.get("purchase_price")
+        # merged rows are virtual — can't edit/move/delete a specific item
+        d["aggregated"] = len(d["brokers"]) > 1
+        d["portfolio_id"] = None if d["aggregated"] else d.get("portfolio_id")
+        out.append(d)
+    return out
+
+
 @router.get("/all/table")
-async def get_all_table(current_user: dict = Depends(get_current_user)) -> dict:
-    """Aggregated table: union of items across all user's portfolios with rebalanced weights."""
+async def get_all_table(
+    group: str = "",
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Aggregated table across all user's portfolios. group=ticker merges the same
+    security held at different brokers into one row."""
     user_id = current_user["sub"]
     rows, _portfolios, origin = await _collect_all_user_rows(user_id)
 
-    total_value = sum(float(r.current_value or 0) for r in rows) or 1.0
     items: list[dict] = []
     for r in rows:
         d = r.model_dump() if hasattr(r, "model_dump") else dict(r.__dict__)
-        d["weight"] = round(float(r.current_value or 0) / total_value * 100, 2)
         pid, pname = origin.get(id(r), (None, None))
         d["portfolio_id"] = pid
         d["portfolio_name"] = pname
         items.append(d)
+
+    if group == "ticker":
+        items = _merge_by_ticker(items)
+
+    # (re)compute weights on the final row set
+    total_value = sum(float(d.get("current_value") or 0) for d in items) or 1.0
+    for d in items:
+        d["weight"] = round(float(d.get("current_value") or 0) / total_value * 100, 2)
     return {"items": items}
 
 
