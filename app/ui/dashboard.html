@@ -2045,6 +2045,33 @@
       </div>
     </div>
 
+    <!-- Edit Instrument Modal (price / quantity) -->
+    <div id="edit-instrument-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-header">
+          <h2 class="modal-title" id="edit-modal-title">Редактировать бумагу</h2>
+        </div>
+        <div class="modal-body">
+          <p id="edit-modal-name" style="margin:0 0 14px;font-weight:600;color:var(--text-secondary);font-size:14px;"></p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="modal-field">
+              <label>Количество (шт.)</label>
+              <input type="number" id="edit-modal-qty" class="input" min="1" step="1">
+            </div>
+            <div class="modal-field">
+              <label>Цена покупки (₽)</label>
+              <input type="number" id="edit-modal-price" class="input" step="0.01" min="0.01">
+            </div>
+          </div>
+          <div id="edit-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeEditInstrumentModal()">Отмена</button>
+          <button class="btn-primary" onclick="submitEditInstrumentModal()">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Universal Confirm Modal -->
     <div id="confirm-modal-overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
       <div class="modal" style="max-width:360px;">
@@ -5913,6 +5940,18 @@
               openPriceAlerts(row.id, portfolioId);
             });
             actionTd.appendChild(alertBtn);
+
+            // Edit button (price / quantity)
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-sm';
+            editBtn.style.marginLeft = '4px';
+            editBtn.title = 'Редактировать';
+            editBtn.textContent = '✎';
+            editBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              openEditInstrumentModal(row);
+            });
+            actionTd.appendChild(editBtn);
 
             // Delete button
             const delBtn = document.createElement('button');
@@ -10071,6 +10110,48 @@
             list.appendChild(btn);
           });
         } catch(e) {}
+      }
+
+      let _editItemId = null;
+      function openEditInstrumentModal(row) {
+        _editItemId = row.id;
+        const modal = document.getElementById('edit-instrument-modal');
+        if (!modal) return;
+        document.getElementById('edit-modal-name').textContent = row.name || row.ticker || '';
+        document.getElementById('edit-modal-qty').value = row.quantity != null ? row.quantity : 1;
+        document.getElementById('edit-modal-price').value =
+          row.purchase_price != null ? row.purchase_price : (row.current_price != null ? row.current_price : '');
+        document.getElementById('edit-modal-status').textContent = '';
+        modal.style.display = 'flex';
+        setTimeout(() => document.getElementById('edit-modal-price').focus(), 80);
+      }
+      function closeEditInstrumentModal() {
+        const modal = document.getElementById('edit-instrument-modal');
+        if (modal) modal.style.display = 'none';
+        _editItemId = null;
+      }
+      async function submitEditInstrumentModal() {
+        const statusEl = document.getElementById('edit-modal-status');
+        if (!_editItemId || !portfolioId) { closeEditInstrumentModal(); return; }
+        const qty = parseFloat(document.getElementById('edit-modal-qty').value);
+        const price = parseFloat(document.getElementById('edit-modal-price').value);
+        if (!qty || qty <= 0) { statusEl.textContent = 'Укажите количество'; return; }
+        if (!price || price <= 0) { statusEl.textContent = 'Укажите цену покупки'; return; }
+        statusEl.textContent = 'Сохранение...';
+        statusEl.style.color = 'var(--text-muted)';
+        try {
+          const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${_editItemId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: qty, purchase_price: price }),
+          });
+          const body = await resp.json();
+          if (!resp.ok) throw new Error(body.detail || 'Не удалось сохранить.');
+          closeEditInstrumentModal();
+          await syncTableFromServer();  // refresh table with recalculated values
+        } catch (err) {
+          statusEl.textContent = err.message || 'Ошибка сохранения';
+          statusEl.style.color = 'var(--red-400)';
+        }
       }
 
       async function submitAddInstrumentModal() {

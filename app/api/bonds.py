@@ -155,8 +155,6 @@ async def _fetch_board(
             if len(row) > sidx:
                 mkt_lookup[row[sidx]] = dict(zip(mkt_cols, row))
 
-    today = date.today()
-    min_date = today + timedelta(days=180)  # 6 months minimum
     results: list[dict[str, Any]] = []
 
     for row in sec_rows:
@@ -176,15 +174,9 @@ async def _fetch_board(
         if not coupon or float(coupon) <= 0:
             continue
 
-        # Maturity must be > 6 months away
-        mat_date = _parse_date_safe(bond.get("MATDATE") or "")
-        if mat_date and mat_date < min_date:
-            continue
-
-        # Offer date: if present, must be > 6 months away
-        offer_date = _parse_date_safe(bond.get("OFFERDATE") or "")
-        if offer_date and offer_date < min_date:
-            continue
+        # NOTE: short-maturity / near-offer bonds are intentionally KEPT in the
+        # cache so manual search (/bonds/search) and the bot can find them. The
+        # ">6 months" cut-off is applied only in /bonds/suggest (beginner picks).
 
         mkt_data = mkt_lookup.get(secid, {})
         market_yield = mkt_data.get("YIELD")
@@ -338,6 +330,19 @@ async def suggest_portfolio(
         raise HTTPException(502, "Не удалось загрузить данные с MOEX")
 
     adjusted_risk = _adjust_risk_for_amount(risk, amount)
+
+    # Step 0: for beginner picks, drop bonds maturing or with an offer in <6 months
+    # (the cache keeps them so manual search can find them, but they're a poor
+    # auto-pick — little time to earn coupons, near-term redemption risk).
+    min_date = date.today() + timedelta(days=180)
+    def _far_enough(b: dict) -> bool:
+        for key in ("maturity", "offer_date"):
+            dt = _parse_date_safe(b.get(key) or "")
+            if dt and dt < min_date:
+                return False
+        return True
+    long_bonds = [b for b in all_bonds if _far_enough(b)]
+    all_bonds = long_bonds or all_bonds
 
     # Step 1: board filter
     if adjusted_risk == "ultra_low":
