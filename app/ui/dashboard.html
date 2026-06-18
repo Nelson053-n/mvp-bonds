@@ -1111,10 +1111,6 @@
                 <div id="analytics-history-return-abs" style="font-size:15px;font-weight:700;"></div>
                 <div id="analytics-history-return-pct" style="font-size:11px;color:var(--text-muted);"></div>
               </div>
-              <label id="rgbi-toggle-label" title="MOEX RGBI — биржевой индекс российских государственных облигаций (ОФЗ). При включении показывается пунктирная линия индекса, нормализованная к стартовой точке вашего портфеля — обе линии начинаются из одной точки, чтобы видеть, обгоняете ли вы рынок ОФЗ." style="display:inline-flex;align-items:center;gap:6px;cursor:help;font-size:12px;color:var(--text-secondary);user-select:none;">
-                <input type="checkbox" id="rgbi-toggle" style="cursor:pointer;" onchange="(function(){const a=document.querySelector('.analytics-period-btn.active');const d=a?parseInt(a.dataset.days):30;loadAnalyticsHistory(d);})()" />
-                <span>vs Индекс ОФЗ</span>
-              </label>
               <div style="display:flex;gap:6px;">
                 <button class="analytics-period-btn" data-days="7" onclick="loadAnalyticsHistory(7)">7 дн</button>
                 <button class="analytics-period-btn active" data-days="30" onclick="loadAnalyticsHistory(30)">30 дн</button>
