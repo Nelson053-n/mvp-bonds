@@ -4468,13 +4468,6 @@
             }
             ctx.stroke();
             ctx.restore();
-            // legend
-            ctx.font = 'bold 9px Inter, sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillStyle = lineClr;
-            ctx.fillText('— Стоимость портфеля (с кэшем)', pad.l + 4, pad.t + 10);
-            ctx.fillStyle = st.getPropertyValue('--green-600').trim() || '#16a34a';
-            ctx.fillText('— Только бумаги', pad.l + 4, pad.t + 22);
           }
 
           // RGBI overlay (already normalized above) — second dashed line
@@ -4494,10 +4487,21 @@
             }
             ctx.stroke();
             ctx.restore();
-            ctx.fillStyle = '#f59e0b';
+          }
+
+          // Unified legend — stacked rows, no overlap. Only lines actually drawn.
+          {
+            const greenClr = st.getPropertyValue('--green-600').trim() || '#16a34a';
+            const legend = [];
+            legend.push([hasSecurities ? 'Стоимость портфеля (с кэшем)' : 'Стоимость портфеля', lineClr]);
+            if (hasSecurities) legend.push(['Только бумаги', greenClr]);
+            if (_rgbiNorm) legend.push(['Индекс ОФЗ (норм.)', '#f59e0b']);
             ctx.font = 'bold 9px Inter, sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText('— Индекс ОФЗ (норм.)', pad.l + 4, pad.t + 10);
+            legend.forEach((item, i) => {
+              ctx.fillStyle = item[1];
+              ctx.fillText('— ' + item[0], pad.l + 4, pad.t + 10 + i * 12);
+            });
           }
 
           // X labels — show all (static)
