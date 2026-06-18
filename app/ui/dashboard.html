@@ -2727,7 +2727,10 @@
         // desire degrades to 'total' for display without overwriting the saved choice,
         // so an early render with an empty table can't clobber the full-profit default.
         const stored = localStorage.getItem('mvp_profit_mode2');
-        window._profitModeDesired = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'full';
+        // Default = 'total' (price change since purchase). Coupons are shown
+        // separately under the figure, not folded into "Прибыль" — mixing realized
+        // coupon cash into P&L overstated it and confused users.
+        window._profitModeDesired = (stored === 'day' || stored === 'total' || stored === 'full') ? stored : 'total';
         window._profitMode = window._profitModeDesired;
       })();
       function setProfitMode(m) {
