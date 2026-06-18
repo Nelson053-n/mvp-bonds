@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from datetime import date
 import logging
 from typing import TYPE_CHECKING
 
@@ -11,6 +12,7 @@ from app.models import (
     UpdateInstrumentInput,
     ValidationResponse,
 )
+from app.services.coupon_schedule_service import coupon_schedule_service
 from app.services.llm_service import llm_service
 from app.services.moex_service import moex_service
 from app.services.storage_service import storage_service
@@ -20,6 +22,15 @@ if TYPE_CHECKING:
     from app.services.cache_service import CacheService
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_iso_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return None
 
 
 def _get_cache() -> "CacheService":
@@ -38,6 +49,7 @@ class PortfolioItem:
     manual_coupon: float | None
     manual_coupon_rate: float | None
     figi: str | None = None
+    purchase_date: str | None = None  # ISO date or None
 
     @classmethod
     def from_dict(cls, item: dict) -> "PortfolioItem":
@@ -54,6 +66,7 @@ class PortfolioItem:
                 float(item["manual_coupon_rate"]) if item.get("manual_coupon_rate") is not None else None
             ),
             figi=item.get("figi"),
+            purchase_date=item.get("purchase_date"),
         )
 
 
@@ -112,6 +125,7 @@ class PortfolioService:
             quantity=payload.quantity,
             purchase_price=purchase_price,
             portfolio_id=portfolio_id,
+            purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
         )
         logger.info("Added instrument %s (ID: %d) to portfolio_id=%d", ticker, new_id, portfolio_id)
 
@@ -205,6 +219,7 @@ class PortfolioService:
             portfolio_id=portfolio_id,
             quantity=payload.quantity,
             purchase_price=payload.purchase_price,
+            purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
         )
         if updated == 0:
             logger.warning(
@@ -366,15 +381,33 @@ class PortfolioService:
                             and snapshot.coupon_rate is not None
                             and snapshot.coupon_rate > 0
                         )
-                        # Full profit (T-Bank only): revaluation + current ACI + realized coupons.
-                        # Coupons are stored per position (summed by figi), so no ×quantity.
-                        realized = (
-                            coupons_map.get(item.figi, {}).get("coupons_total", 0.0)
-                            if item.figi else 0.0
-                        )
+                        # Full profit = revaluation + current ACI + realized coupons.
+                        # Two sources of realized coupons:
+                        #  • T-Bank synced positions: exact figures from the operations
+                        #    journal, stored per figi (already summed, no ×quantity).
+                        #  • Manually-added bonds with a purchase_date: coupons paid since
+                        #    that date, from the MOEX coupon schedule (per-bond value, so
+                        #    ×quantity, and ×fx_rate for non-RUB bonds).
+                        tbank_synced = item.figi in coupons_map
+                        if tbank_synced:
+                            realized = coupons_map.get(item.figi, {}).get("coupons_total", 0.0)
+                            has_realized = True
+                        elif item.purchase_date:
+                            since = _parse_iso_date(item.purchase_date)
+                            per_bond = (
+                                await coupon_schedule_service.realized_coupons_per_bond(
+                                    item.ticker, since
+                                )
+                                if since else 0.0
+                            )
+                            realized = per_bond * item.quantity * (snapshot.fx_rate or 1.0)
+                            has_realized = True
+                        else:
+                            realized = 0.0
+                            has_realized = False
                         full_profit_val = (
                             profit + (snapshot.aci or 0.0) * item.quantity + realized
-                            if item.figi in coupons_map else None
+                            if has_realized else None
                         )
                         return InstrumentMetrics(
                             id=item.id,
@@ -416,10 +449,11 @@ class PortfolioService:
                             offer_date=snapshot.offer_date,
                             next_coupon_date=snapshot.next_coupon_date,
                             aci=snapshot.aci,
-                            realized_coupons=round(realized, 2) if item.figi in coupons_map else None,
+                            realized_coupons=round(realized, 2) if has_realized else None,
                             full_profit=round(full_profit_val, 2) if full_profit_val is not None else None,
                             market_yield=snapshot.market_yield,
                             face_unit=snapshot.face_unit,
+                            purchase_date=item.purchase_date,
                             ai_comment="",
                         )
                     else:
@@ -452,6 +486,7 @@ class PortfolioService:
                             weight=0.0,
                             company_rating=snapshot.company_rating or item.company_rating,
                             dividend_yield=snapshot.dividend_yield,
+                            purchase_date=item.purchase_date,
                             ai_comment="",
                         )
                 except Exception as exc:
@@ -479,6 +514,7 @@ class PortfolioService:
                         coupon_rate=item.manual_coupon_rate,
                         manual_coupon_set=item.manual_coupon is not None,
                         manual_coupon_rate_set=item.manual_coupon_rate is not None,
+                        purchase_date=item.purchase_date,
                         ai_comment=f"Нет рыночных данных: {str(exc)}",
                     )
 

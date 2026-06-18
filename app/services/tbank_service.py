@@ -148,13 +148,19 @@ class TBankService:
 
     @staticmethod
     def _operations_to_coupons_and_buys(operations: list[dict]) -> dict[str, dict]:
-        """Aggregate operations by figi → {coupons: Σ coupon payments, first_buy: min buy date}."""
+        """Aggregate operations by figi → {coupons, first_buy, has_sell, last_sell}.
+
+        has_sell/last_sell let the sync tell an actual sale (position legitimately
+        gone) apart from a position that merely vanished from a flaky API response.
+        """
         agg: dict[str, dict] = {}
         for op in operations:
             figi = op.get("figi")
             if not figi:
                 continue
-            entry = agg.setdefault(figi, {"coupons": 0.0, "first_buy": None})
+            entry = agg.setdefault(
+                figi, {"coupons": 0.0, "first_buy": None, "has_sell": False, "last_sell": None}
+            )
             otype = op.get("operation_type", "")
             if otype == "OPERATION_TYPE_COUPON":
                 entry["coupons"] += float(op.get("payment") or 0.0)
@@ -162,6 +168,11 @@ class TBankService:
                 d = op.get("date") or ""
                 if d and (entry["first_buy"] is None or d < entry["first_buy"]):
                     entry["first_buy"] = d
+            elif otype in ("OPERATION_TYPE_SELL", "OPERATION_TYPE_SELL_CARD"):
+                entry["has_sell"] = True
+                d = op.get("date") or ""
+                if d and (entry["last_sell"] is None or d > entry["last_sell"]):
+                    entry["last_sell"] = d
         for entry in agg.values():
             entry["coupons"] = round(entry["coupons"], 2)
         return agg
@@ -296,12 +307,11 @@ class TBankService:
                 logger.warning("sync_portfolio: error processing %s: %s", key, exc)
                 errors.append(api_item["ticker"])
 
-        # Positions present in DB but gone from broker
-        for key, db_item in db_map.items():
-            if key not in api_map:
-                removed_candidates.append(db_item["ticker"])
-
-        # Realized coupons from operations journal (best-effort, never fail the sync)
+        # Realized coupons + sell facts from the operations journal. Fetched BEFORE
+        # handling disappeared positions so we can tell a real sale apart from a
+        # position that merely fell out of a flaky GetPortfolio response.
+        # (best-effort: never fail the sync on a journal error)
+        agg: dict[str, dict] = {}
         try:
             from datetime import datetime, timezone
             now_dt = datetime.now(timezone.utc)
@@ -323,17 +333,44 @@ class TBankService:
                 portfolio_id, exc,
             )
 
-        if added > 0 or updated > 0:
+        # Positions present in DB but gone from broker. If the journal confirms a
+        # SELL for that figi, the position was genuinely closed → auto-remove it
+        # (and drop its coupon record) so it stops counting as phantom profit.
+        # Without a confirmed sale we keep the old conservative behaviour: report
+        # it as a removal candidate for the user to confirm.
+        removed = 0
+        for key, db_item in db_map.items():
+            if key in api_map:
+                continue
+            figi = db_item.get("figi")
+            sold = bool(figi and agg.get(figi, {}).get("has_sell"))
+            if sold:
+                try:
+                    storage.delete_item(db_item["id"], portfolio_id)
+                    storage.delete_tbank_coupons(portfolio_id, figi)
+                    removed += 1
+                    logger.info(
+                        "AUDIT tbank_sync auto-removed sold position: portfolio_id=%d ticker=%s figi=%s",
+                        portfolio_id, db_item["ticker"], figi,
+                    )
+                except Exception as exc:
+                    logger.warning("sync_portfolio: failed to remove sold %s: %s", db_item["ticker"], exc)
+                    removed_candidates.append(db_item["ticker"])
+            else:
+                removed_candidates.append(db_item["ticker"])
+
+        if added > 0 or updated > 0 or removed > 0:
             cache_service.invalidate(portfolio_id)
 
         logger.info(
-            "AUDIT tbank_sync: portfolio_id=%d added=%d updated=%d removed_candidates=%d errors=%d",
-            portfolio_id, added, updated, len(removed_candidates), len(errors),
+            "AUDIT tbank_sync: portfolio_id=%d added=%d updated=%d removed=%d removed_candidates=%d errors=%d",
+            portfolio_id, added, updated, removed, len(removed_candidates), len(errors),
         )
 
         return {
             "added": added,
             "updated": updated,
+            "removed": removed,
             "removed_candidates": removed_candidates,
             "errors": errors,
             "cash": cash,

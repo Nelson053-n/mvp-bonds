@@ -43,6 +43,18 @@ class TestOperationsAggregation:
         agg = TBankService._operations_to_coupons_and_buys(ops)
         assert agg == {}
 
+    def test_detects_sell(self) -> None:
+        ops = [
+            {"figi": "A", "date": "2024-01-01T00:00:00Z", "operation_type": "OPERATION_TYPE_BUY", "payment": -1000.0},
+            {"figi": "A", "date": "2024-09-01T00:00:00Z", "operation_type": "OPERATION_TYPE_SELL", "payment": 1050.0},
+            {"figi": "B", "date": "2024-02-01T00:00:00Z", "operation_type": "OPERATION_TYPE_BUY", "payment": -2000.0},
+        ]
+        agg = TBankService._operations_to_coupons_and_buys(ops)
+        assert agg["A"]["has_sell"] is True
+        assert agg["A"]["last_sell"] == "2024-09-01T00:00:00Z"
+        assert agg["B"]["has_sell"] is False
+        assert agg["B"]["last_sell"] is None
+
 
 class TestTbankCouponsStorage:
     """Round-trip + ON CONFLICT overwrite for tbank_coupons."""
@@ -67,3 +79,10 @@ class TestTbankCouponsStorage:
 
     def test_empty_for_unknown_portfolio(self, service: StorageService) -> None:
         assert service.get_tbank_coupons(999999) == {}
+
+    def test_delete_removes_record(self, service: StorageService) -> None:
+        service.upsert_tbank_coupons(TEST_PORTFOLIO_ID, "FIGI_DEL", 100.0, "2024-01-01T00:00:00Z")
+        assert "FIGI_DEL" in service.get_tbank_coupons(TEST_PORTFOLIO_ID)
+        removed = service.delete_tbank_coupons(TEST_PORTFOLIO_ID, "FIGI_DEL")
+        assert removed == 1
+        assert "FIGI_DEL" not in service.get_tbank_coupons(TEST_PORTFOLIO_ID)

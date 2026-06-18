@@ -14,16 +14,17 @@ class ItemsMixin:
         portfolio_id: int,
         source: str = "manual",
         figi: str | None = None,
+        purchase_date: str | None = None,
     ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO portfolio_items (
-                    portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi
+                    portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi, purchase_date
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi),
+                (portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi, purchase_date),
             )
             conn.commit()
             if cursor.lastrowid is None:
@@ -40,7 +41,7 @@ class ItemsMixin:
             rows = conn.execute(
                 """
                 SELECT id, ticker, instrument_type, quantity, purchase_price
-                     , manual_coupon, company_rating, manual_coupon_rate, figi
+                     , manual_coupon, company_rating, manual_coupon_rate, figi, purchase_date
                 FROM portfolio_items
                 WHERE portfolio_id = ? AND deleted_at IS NULL
                 ORDER BY id ASC
@@ -63,6 +64,7 @@ class ItemsMixin:
                     float(row[7]) if row[7] is not None else None
                 ),
                 "figi": row[8],
+                "purchase_date": row[9],
             }
             for row in rows
         ]
@@ -123,16 +125,18 @@ class ItemsMixin:
         quantity: float,
         purchase_price: float,
         figi: str | None = None,
+        purchase_date: str | None = None,
     ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 UPDATE portfolio_items
                 SET quantity = ?, purchase_price = ?,
-                    figi = COALESCE(?, figi)
+                    figi = COALESCE(?, figi),
+                    purchase_date = COALESCE(?, purchase_date)
                 WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL
                 """,
-                (quantity, purchase_price, figi, item_id, portfolio_id),
+                (quantity, purchase_price, figi, purchase_date, item_id, portfolio_id),
             )
             conn.commit()
             updated = int(cursor.rowcount)

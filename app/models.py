@@ -11,11 +11,13 @@ class AddInstrumentInput(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=32)
     quantity: float = Field(..., gt=0)
     purchase_price: float | None = Field(None, gt=0)  # None = auto-fetch from MOEX
+    purchase_date: date | None = None  # optional; enables realized-coupon profit
 
 
 class UpdateInstrumentInput(BaseModel):
     quantity: float = Field(..., gt=0)
     purchase_price: float = Field(..., gt=0)
+    purchase_date: date | None = None  # optional
 
 
 class UpdateCouponInput(BaseModel):
@@ -60,11 +62,12 @@ class InstrumentMetrics(BaseModel):
     next_coupon_date: date | None = None
     nominal: float | None = None
     aci: float | None = None
-    realized_coupons: float | None = None  # Σ coupons paid since purchase (RUB), T-Bank only
+    realized_coupons: float | None = None  # Σ coupons paid since purchase (RUB)
     full_profit: float | None = None  # revaluation + aci×qty + realized_coupons (RUB)
     market_yield: float | None = None
     dividend_yield: float | None = None
     face_unit: str | None = None  # Валюта номинала (SUR, CNY, USD, EUR, CHF)
+    purchase_date: str | None = None  # ISO date or None (optional)
     ai_comment: str
 
 

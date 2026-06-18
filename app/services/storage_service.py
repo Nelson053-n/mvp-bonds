@@ -74,7 +74,8 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                     quantity REAL NOT NULL,
                     purchase_price REAL NOT NULL,
                     manual_coupon REAL,
-                    company_rating TEXT
+                    company_rating TEXT,
+                    purchase_date TEXT
                 )
                 """
             )
@@ -98,6 +99,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ("snapshot_coupon_rate", "REAL"),  # MOEX market coupon rate for risk calc
                 ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
                 ("figi", "TEXT"),  # T-Bank instrument id, links position to operations journal
+                ("purchase_date", "TEXT"),  # ISO date (YYYY-MM-DD); NULL = unknown (optional)
             ]:
                 try:
                     conn.execute(
@@ -1197,6 +1199,16 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             row[0]: {"coupons_total": float(row[1]), "first_buy_date": row[2]}
             for row in rows
         }
+
+    def delete_tbank_coupons(self, portfolio_id: int, figi: str) -> int:
+        """Drop the realized-coupon record for a figi (e.g. position fully sold)."""
+        with self._connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM tbank_coupons WHERE portfolio_id = ? AND figi = ?",
+                (portfolio_id, figi),
+            )
+            conn.commit()
+            return int(cur.rowcount)
 
     def set_sync_enabled(self, portfolio_id: int, enabled: bool) -> None:
         with self._connect() as conn:

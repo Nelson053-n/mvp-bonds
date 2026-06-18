@@ -2036,6 +2036,11 @@
               <input type="number" id="add-modal-price" class="input" placeholder="авто" step="0.01" min="0.01">
             </div>
           </div>
+          <div class="modal-field" style="margin-top:12px;">
+            <label>Дата покупки (необяз.)</label>
+            <input type="date" id="add-modal-date" class="input">
+            <span style="font-size:11px;color:var(--text-muted);">Укажите, чтобы учесть полученные купоны в прибыли.</span>
+          </div>
           <div id="add-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
         </div>
         <div class="modal-actions">
@@ -2062,6 +2067,11 @@
               <label>Цена покупки (₽)</label>
               <input type="number" id="edit-modal-price" class="input" step="0.01" min="0.01">
             </div>
+          </div>
+          <div class="modal-field" style="margin-top:12px;">
+            <label>Дата покупки (необяз.)</label>
+            <input type="date" id="edit-modal-date" class="input">
+            <span style="font-size:11px;color:var(--text-muted);">Учитывает полученные купоны в полной прибыли.</span>
           </div>
           <div id="edit-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
         </div>
@@ -5027,6 +5037,12 @@
 
       function createEditableCell(row, field, extraClass) {
         const td = document.createElement('td');
+        // Show the purchase date as a tooltip on the buy-price cell when known.
+        if (field === 'purchase_price' && row.purchase_date) {
+          const d = String(row.purchase_date).substring(0, 10);
+          const [y, m, day] = d.split('-');
+          td.title = `Куплено ${day}.${m}.${y}`;
+        }
         if (isReadOnly) {
           td.textContent = fmt(row[field]);
           return td;
@@ -9986,6 +10002,8 @@
         tickerInput.style.textTransform = '';
         document.getElementById('add-modal-price').value = '';
         document.getElementById('add-modal-qty').value = 1;
+        const addDateEl = document.getElementById('add-modal-date');
+        if (addDateEl) addDateEl.value = '';
         document.getElementById('add-modal-status').textContent = '';
         document.getElementById('add-modal-autocomplete').style.display = 'none';
         // Load suggest list
@@ -10121,6 +10139,7 @@
         document.getElementById('edit-modal-qty').value = row.quantity != null ? row.quantity : 1;
         document.getElementById('edit-modal-price').value =
           row.purchase_price != null ? row.purchase_price : (row.current_price != null ? row.current_price : '');
+        document.getElementById('edit-modal-date').value = row.purchase_date ? String(row.purchase_date).substring(0, 10) : '';
         document.getElementById('edit-modal-status').textContent = '';
         modal.style.display = 'flex';
         setTimeout(() => document.getElementById('edit-modal-price').focus(), 80);
@@ -10135,14 +10154,17 @@
         if (!_editItemId || !portfolioId) { closeEditInstrumentModal(); return; }
         const qty = parseFloat(document.getElementById('edit-modal-qty').value);
         const price = parseFloat(document.getElementById('edit-modal-price').value);
+        const dateVal = document.getElementById('edit-modal-date').value || null;
         if (!qty || qty <= 0) { statusEl.textContent = 'Укажите количество'; return; }
         if (!price || price <= 0) { statusEl.textContent = 'Укажите цену покупки'; return; }
         statusEl.textContent = 'Сохранение...';
         statusEl.style.color = 'var(--text-muted)';
         try {
+          const payload = { quantity: qty, purchase_price: price };
+          if (dateVal) payload.purchase_date = dateVal;
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${_editItemId}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ quantity: qty, purchase_price: price }),
+            body: JSON.stringify(payload),
           });
           const body = await resp.json();
           if (!resp.ok) throw new Error(body.detail || 'Не удалось сохранить.');
@@ -10181,10 +10203,13 @@
             await loadPortfolios();
             updatePortfolioSelector();
           }
+          const addPayload = { ticker, quantity: qty, purchase_price: price };
+          const addDate = document.getElementById('add-modal-date').value || null;
+          if (addDate) addPayload.purchase_date = addDate;
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ ticker, quantity: qty, purchase_price: price })
+            body: JSON.stringify(addPayload)
           });
           if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
