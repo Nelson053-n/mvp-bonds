@@ -20,14 +20,17 @@ def _pro_active(is_pro_flag, pro_until) -> bool:
 
 class UsersMixin:
     def create_user(self, username: str, password_hash: str) -> int:
-        from datetime import datetime, timezone
+        from datetime import datetime, timezone, date, timedelta
 
         now = datetime.now(timezone.utc).isoformat()
+        # New users get a 30-day Pro trial.
+        trial_until = (date.today() + timedelta(days=30)).isoformat()
         with self._connect() as conn:
             try:
                 cursor = conn.execute(
-                    "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-                    (username, password_hash, now),
+                    "INSERT INTO users (username, password_hash, created_at, is_pro, pro_until) "
+                    "VALUES (?, ?, ?, 1, ?)",
+                    (username, password_hash, now, trial_until),
                 )
                 conn.commit()
                 if cursor.lastrowid is None:
