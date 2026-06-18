@@ -5926,13 +5926,14 @@
           const profitVal = (rawProfitVal === null || rawProfitVal === undefined)
             ? null : Number(rawProfitVal);
           const profitTd = document.createElement('td');
-          if (profitVal === null) {
+          // Treat values that round to 0 as "no change" — avoids "+0"/"-0".
+          if (profitVal === null || Math.round(profitVal) === 0) {
             profitTd.textContent = '—';
             profitTd.style.color = 'var(--text-muted)';
           } else {
-            profitTd.textContent = (profitVal >= 0 ? '+' : '') + fmt(profitVal);
+            profitTd.textContent = (profitVal > 0 ? '+' : '−') + fmt(Math.abs(profitVal));
             if (profitVal > 0) profitTd.classList.add('profit-positive');
-            else if (profitVal < 0) profitTd.classList.add('profit-negative');
+            else profitTd.classList.add('profit-negative');
           }
           tr.appendChild(profitTd);
           // Цветовая индикация строки по прибыли (всегда по total — стабильнее)
