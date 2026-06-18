@@ -4343,6 +4343,10 @@
         const H = canvas.height || 220;
         const values = snapshots.map(s => s.total_value);
         const costs  = snapshots.map(s => s.total_cost);
+        // Securities-only line (value minus cash). Present only on snapshots taken
+        // after the column was added; null elsewhere → drawn as a gap.
+        const securities = snapshots.map(s => (s.securities_value != null ? s.securities_value : null));
+        const hasSecurities = securities.some(v => v != null);
         // Pre-compute normalized RGBI series (if present) so we can include
         // it in min/max range — otherwise its line could fall outside the
         // visible chart area and the toggle would appear to "do nothing".
@@ -4368,7 +4372,8 @@
           }
         }
         const rgbiOnly = _rgbiNorm ? _rgbiNorm.filter(v => v != null) : [];
-        const allVals = [...values, ...costs, ...rgbiOnly];
+        const securitiesOnly = securities.filter(v => v != null);
+        const allVals = [...values, ...costs, ...rgbiOnly, ...securitiesOnly];
         const maxV = Math.max(...allVals);
         const minV = Math.min(...allVals) * 0.98;
         const pad = { t: 16, r: 16, b: 32, l: 56 };
@@ -4445,6 +4450,32 @@
             ctx.lineTo(xScale(maxIdx), yScale(interpPoint(values, maxIdx)));
           }
           ctx.stroke();
+
+          // Securities-only line (value − cash): solid green, drawn with gaps
+          // where the data is missing (older snapshots).
+          if (hasSecurities) {
+            ctx.save();
+            ctx.strokeStyle = st.getPropertyValue('--green-600').trim() || '#16a34a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i <= Math.floor(maxIdx); i++) {
+              const v = securities[i];
+              if (v == null) { started = false; continue; }
+              const x = xScale(i), y = yScale(v);
+              if (!started) { ctx.moveTo(x, y); started = true; }
+              else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+            // legend
+            ctx.font = 'bold 9px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = lineClr;
+            ctx.fillText('— Стоимость портфеля (с кэшем)', pad.l + 4, pad.t + 10);
+            ctx.fillStyle = st.getPropertyValue('--green-600').trim() || '#16a34a';
+            ctx.fillText('— Только бумаги', pad.l + 4, pad.t + 22);
+          }
 
           // RGBI overlay (already normalized above) — second dashed line
           if (_rgbiNorm) {

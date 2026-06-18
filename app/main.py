@@ -144,9 +144,13 @@ async def _snapshot_loop():
             for p in portfolios_list:
                 try:
                     rows = await portfolio_service.get_table(p["id"])
-                    total_value = sum(r.current_value or 0 for r in rows)
+                    securities_value = sum(r.current_value or 0 for r in rows)
                     total_cost = sum((r.purchase_price or 0) * (r.quantity or 0) for r in rows)
-                    storage_service.save_portfolio_snapshot(p["id"], total_value, total_cost)
+                    cash_rub = await portfolio_service.get_cash_rub(p["id"])
+                    # Portfolio value = securities + cash (selling into cash mustn't drop it)
+                    storage_service.save_portfolio_snapshot(
+                        p["id"], securities_value + cash_rub, total_cost, securities_value
+                    )
                 except Exception:
                     pass
         except Exception:

@@ -81,9 +81,14 @@ class CacheService:
                 if ok_count > 0:
                     try:
                         from app.services.storage_service import storage_service
-                        total_value = sum(r.current_value or 0 for r in merged)
+                        from app.services.portfolio_service import portfolio_service
+                        securities_value = sum(r.current_value or 0 for r in merged)
                         total_cost = sum((r.purchase_price or 0) * (r.quantity or 0) for r in merged)
-                        storage_service.save_portfolio_snapshot(portfolio_id, total_value, total_cost)
+                        cash_rub = await portfolio_service.get_cash_rub(portfolio_id)
+                        # Portfolio value = securities + cash
+                        storage_service.save_portfolio_snapshot(
+                            portfolio_id, securities_value + cash_rub, total_cost, securities_value
+                        )
                     except Exception:
                         logger.exception("Failed to save portfolio snapshot for portfolio_id=%d", portfolio_id)
                 # Check for rating/price changes and notify

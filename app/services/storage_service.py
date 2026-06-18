@@ -223,10 +223,17 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                     snapshot_date TEXT NOT NULL,
                     total_value REAL NOT NULL DEFAULT 0,
                     total_cost REAL NOT NULL DEFAULT 0,
+                    securities_value REAL,
                     UNIQUE(portfolio_id, snapshot_date)
                 )
                 """
             )
+            # total_value = securities + cash; securities_value = securities only
+            # (NULL for snapshots taken before this column existed).
+            try:
+                conn.execute("ALTER TABLE portfolio_snapshots ADD COLUMN securities_value REAL")
+            except sqlite3.OperationalError:
+                pass
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS watchlist (

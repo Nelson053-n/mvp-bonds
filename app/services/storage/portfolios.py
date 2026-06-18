@@ -317,20 +317,25 @@ class PortfoliosMixin:
             for row in rows
         ]
 
-    def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float) -> None:
+    def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float,
+                                securities_value: float | None = None) -> None:
         """Save daily snapshot. Upsert by date.
+
+        total_value = securities + cash (so selling into cash doesn't drop it).
+        securities_value = securities only (for the separate "bonds value" line).
 
         On the first-ever snapshot for a portfolio, backfills daily entries from
         the portfolio creation date (or up to 90 days back) using total_cost as
         the baseline value, so the history chart has enough points to render.
         """
-        # Guard against MOEX outages: a zero value with a non-zero cost means
-        # prices never loaded (e.g. network/MOEX downtime), not a real wipe-out.
-        # Skip the write so a transient fetch failure doesn't punch a false dip
-        # into the history chart.
-        if (not total_value) and total_cost > 0:
+        # Guard against MOEX outages: zero securities value with a non-zero cost
+        # means prices never loaded (network/MOEX downtime), not a real wipe-out.
+        # Check securities (not total_value, which now includes cash) so the guard
+        # still fires when only cash remains would be a legitimate state.
+        sec_check = securities_value if securities_value is not None else total_value
+        if (not sec_check) and total_cost > 0:
             logger.warning(
-                "Skipping snapshot for portfolio %s: total_value=0 with total_cost=%.2f "
+                "Skipping snapshot for portfolio %s: securities_value=0 with total_cost=%.2f "
                 "(prices likely unavailable)", portfolio_id, total_cost
             )
             return
@@ -357,11 +362,12 @@ class PortfoliosMixin:
 
             # Upsert today's real snapshot
             conn.execute(
-                """INSERT INTO portfolio_snapshots (portfolio_id, snapshot_date, total_value, total_cost)
-                   VALUES (?, ?, ?, ?)
+                """INSERT INTO portfolio_snapshots (portfolio_id, snapshot_date, total_value, total_cost, securities_value)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT(portfolio_id, snapshot_date) DO UPDATE SET
-                   total_value=excluded.total_value, total_cost=excluded.total_cost""",
-                (portfolio_id, today_str, total_value, total_cost)
+                   total_value=excluded.total_value, total_cost=excluded.total_cost,
+                   securities_value=excluded.securities_value""",
+                (portfolio_id, today_str, total_value, total_cost, securities_value)
             )
             conn.commit()
 
@@ -371,10 +377,13 @@ class PortfoliosMixin:
         since = (date.today() - timedelta(days=days)).isoformat()
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT snapshot_date, total_value, total_cost
+                """SELECT snapshot_date, total_value, total_cost, securities_value
                    FROM portfolio_snapshots
                    WHERE portfolio_id = ? AND snapshot_date >= ?
                    ORDER BY snapshot_date ASC""",
                 (portfolio_id, since)
             ).fetchall()
-        return [{"date": r[0], "total_value": r[1], "total_cost": r[2]} for r in rows]
+        return [
+            {"date": r[0], "total_value": r[1], "total_cost": r[2], "securities_value": r[3]}
+            for r in rows
+        ]

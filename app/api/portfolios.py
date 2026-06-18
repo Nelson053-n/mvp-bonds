@@ -350,12 +350,16 @@ async def get_all_snapshots(
         for s in snaps:
             d = s["date"]
             if d not in agg:
-                agg[d] = {"total_value": 0.0, "total_cost": 0.0}
+                agg[d] = {"total_value": 0.0, "total_cost": 0.0, "securities_value": 0.0, "_has_sec": False}
             agg[d]["total_value"] += float(s.get("total_value") or 0)
             agg[d]["total_cost"] += float(s.get("total_cost") or 0)
+            if s.get("securities_value") is not None:
+                agg[d]["securities_value"] += float(s["securities_value"])
+                agg[d]["_has_sec"] = True
 
     return [
-        {"date": d, "total_value": round(v["total_value"], 2), "total_cost": round(v["total_cost"], 2)}
+        {"date": d, "total_value": round(v["total_value"], 2), "total_cost": round(v["total_cost"], 2),
+         "securities_value": (round(v["securities_value"], 2) if v["_has_sec"] else None)}
         for d, v in sorted(agg.items())
     ]
 

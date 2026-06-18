@@ -327,6 +327,32 @@ class PortfolioService:
             return cache_service.rows(portfolio_id)
         return await cache_service.refresh(portfolio_id)
 
+    async def get_cash_rub(self, portfolio_id: int) -> float:
+        """Free cash of a portfolio converted to RUB (0 if none / not synced).
+
+        Portfolio value = securities + cash, so this is added to snapshots: selling
+        a bond into cash must not drop the total value.
+        """
+        import json as _json
+        cfg = storage_service.get_sync_config(portfolio_id)
+        if not cfg or not cfg.get("cash_balance"):
+            return 0.0
+        try:
+            entries = _json.loads(cfg["cash_balance"])
+        except (ValueError, TypeError):
+            return 0.0
+        total = 0.0
+        for c in entries:
+            ccy = (c.get("currency") or "").upper()
+            amt = float(c.get("amount") or 0)
+            if ccy in ("RUB", "SUR", ""):
+                total += amt
+            else:
+                rate = await moex_service._get_fx_rate(ccy)
+                if rate:
+                    total += amt * rate
+        return total
+
     # ------------------------------------------------------------------
     # Heavy method: called ONLY by cache_service in background
     # ------------------------------------------------------------------
