@@ -767,6 +767,7 @@
       content: '';
       position: absolute; inset: 0;
       background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,.15) 0%, transparent 70%);
+      pointer-events: none;
     }
     .plan-popular {
       position: absolute; top: 20px; right: 20px;
@@ -1868,7 +1869,7 @@
         </div>
 
         <div class="plan-card featured">
-          <div class="plan-popular">Скоро</div>
+          <div class="plan-popular" id="plan-popular-badge">Скоро</div>
           <div class="plan-name">Pro</div>
           <div class="plan-price" style="background:linear-gradient(135deg,var(--blue-400),var(--indigo-400),var(--purple-400));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
             299 <sup>₽</sup>
@@ -2225,8 +2226,10 @@
         if (d.enabled) {
           const wl = document.getElementById('waitlist-form');
           const buy = document.getElementById('pro-buy-btn');
+          const badge = document.getElementById('plan-popular-badge');
           if (wl) wl.style.display = 'none';
           if (buy) buy.style.display = 'flex';
+          if (badge) badge.textContent = 'Популярный';
         }
       } catch (e) { /* billing optional */ }
     })();
