@@ -33,6 +33,12 @@ async def list_pro_payments(admin: dict = Depends(get_admin_user)) -> list:
     return storage_service.get_pro_payments()
 
 
+@router.get("/revenue")
+async def get_revenue(days: int = 30, admin: dict = Depends(get_admin_user)) -> dict:
+    """Daily revenue (succeeded payments) for the last N days — admin chart (7/30/90)."""
+    return storage_service.get_revenue_by_day(days)
+
+
 class ReceiptToggleInput(BaseModel):
     done: bool
 

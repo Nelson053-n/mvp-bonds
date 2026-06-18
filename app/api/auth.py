@@ -37,6 +37,7 @@ class UserResponse(BaseModel):
     username: str
     is_admin: bool = False
     is_pro: bool = False
+    pro_until: str | None = None  # ISO date; None = lifetime (or not Pro)
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -75,6 +76,7 @@ async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
         "username": current_user["username"],
         "is_admin": current_user.get("is_admin", False),
         "is_pro": bool(user.get("is_pro")) if user else False,
+        "pro_until": (user.get("pro_until") if user else None),
     }
 
 

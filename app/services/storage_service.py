@@ -1023,6 +1023,37 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             for r in rows
         ]
 
+    def get_revenue_by_day(self, days: int = 30) -> dict:
+        """Daily succeeded-payment revenue for the last `days` days (admin chart).
+
+        Groups by the UTC date in created_at (ISO string). Returns rows for every
+        day in the window (zero-filled), oldest first, plus a period total.
+        """
+        from datetime import date, timedelta
+        days = max(1, min(int(days), 365))
+        start = (date.today() - timedelta(days=days - 1)).isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT substr(created_at, 1, 10) AS d,
+                          SUM(amount) AS total,
+                          COUNT(*) AS cnt
+                   FROM pro_payments
+                   WHERE status = 'succeeded' AND substr(created_at, 1, 10) >= ?
+                   GROUP BY d""",
+                (start,),
+            ).fetchall()
+        by_day = {r[0]: (float(r[1] or 0), int(r[2])) for r in rows}
+        series = []
+        total_sum = 0.0
+        total_cnt = 0
+        for i in range(days):
+            d = (date.today() - timedelta(days=days - 1 - i)).isoformat()
+            amount, cnt = by_day.get(d, (0.0, 0))
+            total_sum += amount
+            total_cnt += cnt
+            series.append({"date": d, "amount": amount, "count": cnt})
+        return {"days": days, "series": series, "total": total_sum, "count": total_cnt}
+
     def set_payment_receipt_done(self, payment_id: str, done: bool) -> int:
         with self._connect() as conn:
             cur = conn.execute(

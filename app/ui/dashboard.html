@@ -314,6 +314,18 @@
         overflow: hidden;
         margin-bottom: 16px;
       }
+      /* Admin sub-section tabs */
+      .adm-tab {
+        background: transparent; border: none; cursor: pointer;
+        padding: 10px 16px; font-size: 13px; font-weight: 600; font-family: inherit;
+        color: var(--text-muted); border-bottom: 2px solid transparent;
+        margin-bottom: -1px; transition: color .15s, border-color .15s; white-space: nowrap;
+      }
+      .adm-tab:hover { color: var(--text-secondary); }
+      .adm-tab.active { color: var(--blue-600); border-bottom-color: var(--blue-600); }
+      .adm-pane { display: none; }
+      .adm-pane.active { display: block; }
+
       .stat-card {
         background: var(--bg-card);
         backdrop-filter: blur(8px);
@@ -1688,8 +1700,17 @@
           </div>
         </div>
 
+        <!-- Sub-section tabs -->
+        <div class="adm-tabs" id="adm-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+          <button class="adm-tab active" data-tab="users"      onclick="adminShowTab('users', this)">👥 Пользователи</button>
+          <button class="adm-tab"        data-tab="money"      onclick="adminShowTab('money', this)">💰 Монетизация</button>
+          <button class="adm-tab"        data-tab="portfolios" onclick="adminShowTab('portfolios', this)">📁 Портфели</button>
+          <button class="adm-tab"        data-tab="system"     onclick="adminShowTab('system', this)">⚙️ Система</button>
+          <button class="adm-tab"        data-tab="promo"      onclick="adminShowTab('promo', this)">📣 Промо</button>
+        </div>
+
         <!-- Users table -->
-        <div class="card" style="margin-bottom:16px;">
+        <div class="card adm-pane active" data-adm-tab="users" style="margin-bottom:16px;">
           <div class="card-header">
             <h2 class="card-title" data-i18n="adm.usersTitle">Пользователи</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadUsers()" data-i18n="btn.refresh">↺ Обновить</button>
@@ -1720,7 +1741,7 @@
         </div>
 
         <!-- Admin Audit Log -->
-        <div class="card" style="margin-bottom:16px;" id="adm-audit-card">
+        <div class="card adm-pane" data-adm-tab="system" style="margin-bottom:16px;" id="adm-audit-card">
           <div class="card-header">
             <h2 class="card-title">Журнал администратора</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadAuditLog()">↺ Обновить</button>
@@ -1749,7 +1770,7 @@
         </div>
 
         <!-- Portfolios table -->
-        <div class="card">
+        <div class="card adm-pane" data-adm-tab="portfolios">
           <div class="card-header">
             <h2 class="card-title" data-i18n="adm.portfoliosTitle">Все портфели</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadPortfolios()" data-i18n="btn.refresh">↺ Обновить</button>
@@ -1776,7 +1797,7 @@
 
         <!-- Data Sources -->
         <!-- Backups -->
-        <div class="card" style="margin-top:16px;" id="adm-backup-card">
+        <div class="card adm-pane" data-adm-tab="system" style="margin-top:16px;" id="adm-backup-card">
           <div class="card-header">
             <h2 class="card-title">Резервные копии</h2>
             <div style="display:flex;gap:6px;">
@@ -1820,7 +1841,7 @@
           </div>
         </div>
 
-        <div class="card" style="margin-top:16px;" id="adm-sources-card">
+        <div class="card adm-pane" data-adm-tab="system" style="margin-top:16px;" id="adm-sources-card">
           <div class="card-header">
             <h2 class="card-title">Источники данных</h2>
             <div style="display:flex;gap:6px;">
@@ -1835,8 +1856,29 @@
         </div>
 
         <!-- Промо-материалы для SEO/GEO-продвижения -->
+        <!-- Выручка по дням (Pro-платежи) -->
+        <div class="card adm-pane" data-adm-tab="money" style="margin-top:16px;" id="adm-revenue-card">
+          <div class="card-header">
+            <h2 class="card-title">📈 Выручка по дням</h2>
+            <div style="display:flex;gap:6px;" id="adm-rev-range">
+              <button class="btn btn-secondary adm-rev-btn" data-days="7"  style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadRevenue(7, this)">7 дней</button>
+              <button class="btn btn-primary adm-rev-btn"   data-days="30" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadRevenue(30, this)">30 дней</button>
+              <button class="btn btn-secondary adm-rev-btn" data-days="90" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadRevenue(90, this)">90 дней</button>
+            </div>
+          </div>
+          <div style="padding:12px 16px 4px;display:flex;gap:24px;flex-wrap:wrap;">
+            <div><div style="font-size:11px;color:var(--text-muted);">Сумма за период</div><div id="adm-rev-total" style="font-size:22px;font-weight:800;color:var(--green-600);">—</div></div>
+            <div><div style="font-size:11px;color:var(--text-muted);">Платежей</div><div id="adm-rev-count" style="font-size:22px;font-weight:800;">—</div></div>
+            <div><div style="font-size:11px;color:var(--text-muted);">Средний чек</div><div id="adm-rev-avg" style="font-size:22px;font-weight:800;">—</div></div>
+          </div>
+          <div style="padding:8px 16px 16px;">
+            <canvas id="adm-rev-canvas" style="width:100%;max-width:100%;height:200px;"></canvas>
+            <div id="adm-rev-empty" style="display:none;font-size:12px;color:var(--text-muted);text-align:center;padding:24px;">За выбранный период платежей не было.</div>
+          </div>
+        </div>
+
         <!-- Платежи Pro (для учёта НПД в «Мой налог» вручную) -->
-        <div class="card" style="margin-top:16px;" id="adm-payments-card">
+        <div class="card adm-pane" data-adm-tab="money" style="margin-top:16px;" id="adm-payments-card">
           <div class="card-header">
             <h2 class="card-title">💳 Платежи Pro</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadPayments()">↺</button>
@@ -1854,7 +1896,7 @@
           </div>
         </div>
 
-        <div class="card" style="margin-top:16px;" id="adm-promo-card">
+        <div class="card adm-pane" data-adm-tab="promo" style="margin-top:16px;" id="adm-promo-card">
           <div class="card-header">
             <h2 class="card-title">Промо-материалы</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadPromo()">↺</button>
@@ -6791,7 +6833,17 @@
             // «Bond AI Pro» badge replaces the version chip for Pro users.
             const proBadge = document.getElementById('brand-pro-badge');
             const verBadge = document.getElementById('brand-version-badge');
-            if (proBadge) proBadge.style.display = '';
+            if (proBadge) {
+              proBadge.style.display = '';
+              proBadge.style.cursor = 'help';
+              if (meData.pro_until) {
+                const d = String(meData.pro_until).substring(0, 10);
+                const [y, m, day] = d.split('-');
+                proBadge.title = `Pro активен до ${day}.${m}.${y}`;
+              } else {
+                proBadge.title = 'Pro активен бессрочно';
+              }
+            }
             if (verBadge) verBadge.style.display = 'none';
           }
           applyProGates();
@@ -8191,15 +8243,41 @@
       // ── ADMIN PANEL ──────────────────────────────────────────────
       let _admPwdUserId = null;
 
+      // Lazy loaders per tab — run once when the tab is first opened.
+      const _ADM_TAB_LOADERS = {
+        users:      () => adminLoadUsers(),
+        money:      () => { adminLoadRevenue(30).catch(() => {}); adminLoadPayments().catch(() => {}); },
+        portfolios: () => adminLoadPortfolios(),
+        system:     () => { adminLoadSources().catch(() => {}); adminLoadBackups().catch(() => {}); adminLoadAuditLog().catch(() => {}); },
+        promo:      () => adminLoadPromo(),
+      };
+      const _admTabLoaded = {};
+
+      function adminShowTab(name, btn) {
+        if (history.replaceState) history.replaceState(null, '', '#' + name);
+        document.querySelectorAll('.adm-pane').forEach(p => {
+          p.classList.toggle('active', p.dataset.admTab === name);
+        });
+        document.querySelectorAll('.adm-tab').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === name);
+        });
+        if (!btn) {
+          const tabBtn = document.querySelector(`.adm-tab[data-tab="${name}"]`);
+          if (tabBtn) tabBtn.classList.add('active');
+        }
+        if (!_admTabLoaded[name] && _ADM_TAB_LOADERS[name]) {
+          _admTabLoaded[name] = true;
+          try { _ADM_TAB_LOADERS[name](); } catch (e) { /* lazy load best-effort */ }
+        }
+      }
+
       async function adminInit() {
         await adminLoadStats();
-        await adminLoadUsers();
-        await adminLoadPortfolios();
-        adminLoadSources().catch(() => {});
-        adminLoadAuditLog().catch(() => {});
-        adminLoadBackups().catch(() => {});
-        adminLoadPromo().catch(() => {});
-        adminLoadPayments().catch(() => {});
+        // Deep-link via hash (/admin#money) or legacy path (/admin/promo).
+        // Hash is used so tab names don't collide with /admin/* API routes.
+        const hash = (location.hash.match(/^#(users|money|portfolios|system|promo)$/) || [])[1];
+        const legacy = location.pathname === '/admin/promo' ? 'promo' : null;
+        adminShowTab(hash || legacy || 'users');
       }
 
       // ── Data Sources ─────────────────────────────────────────────────────
@@ -8275,6 +8353,73 @@
         } catch(e) {
           body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Не удалось загрузить данные</div>';
         }
+      }
+
+      async function adminLoadRevenue(days, btn) {
+        // toggle active button state
+        if (btn) {
+          document.querySelectorAll('.adm-rev-btn').forEach(b => {
+            b.classList.remove('btn-primary'); b.classList.add('btn-secondary');
+          });
+          btn.classList.remove('btn-secondary'); btn.classList.add('btn-primary');
+        }
+        try {
+          const r = await apiFetch('/admin/revenue?days=' + days);
+          if (!r.ok) throw new Error();
+          const d = await r.json();
+          const fmt = n => Number(n).toLocaleString('ru-RU') + ' ₽';
+          document.getElementById('adm-rev-total').textContent = fmt(d.total || 0);
+          document.getElementById('adm-rev-count').textContent = d.count || 0;
+          document.getElementById('adm-rev-avg').textContent = d.count ? fmt(Math.round(d.total / d.count)) : '—';
+          _drawRevenueChart(d.series || []);
+        } catch (e) { /* admin chart optional */ }
+      }
+
+      function _drawRevenueChart(series) {
+        const canvas = document.getElementById('adm-rev-canvas');
+        const empty = document.getElementById('adm-rev-empty');
+        if (!canvas) return;
+        const hasData = series.some(p => p.amount > 0);
+        canvas.style.display = hasData ? '' : 'none';
+        if (empty) empty.style.display = hasData ? 'none' : '';
+        if (!hasData) return;
+
+        const parent = canvas.parentElement;
+        const cssW = parent ? parent.clientWidth : 600;
+        const cssH = 200;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+        canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssW, cssH);
+
+        const padL = 8, padR = 8, padT = 10, padB = 22;
+        const plotW = cssW - padL - padR, plotH = cssH - padT - padB;
+        const maxV = Math.max(...series.map(p => p.amount), 1);
+        const css = getComputedStyle(document.documentElement);
+        const green = (css.getPropertyValue('--green-600') || '#16a34a').trim();
+        const muted = (css.getPropertyValue('--text-muted') || '#94a3b8').trim();
+        const n = series.length;
+        const gap = n > 45 ? 1 : 2;
+        const barW = Math.max(1, (plotW - gap * (n - 1)) / n);
+
+        ctx.fillStyle = green;
+        series.forEach((p, i) => {
+          const h = (p.amount / maxV) * plotH;
+          const x = padL + i * (barW + gap);
+          const y = padT + plotH - h;
+          ctx.fillRect(x, y, barW, h);
+        });
+
+        // x-axis: first & last date labels
+        ctx.fillStyle = muted;
+        ctx.font = '10px Inter, sans-serif';
+        const lbl = s => s.substring(8, 10) + '.' + s.substring(5, 7);
+        ctx.textAlign = 'left';
+        ctx.fillText(lbl(series[0].date), padL, cssH - 6);
+        ctx.textAlign = 'right';
+        ctx.fillText(lbl(series[n - 1].date), cssW - padR, cssH - 6);
       }
 
       async function adminLoadPayments() {
@@ -8893,13 +9038,11 @@
         _currentUserIsAdmin = isAdmin;
         const btn = document.getElementById('nav-admin');
         if (btn && isAdmin) btn.style.display = '';
-        // Deep-link: /admin/promo opens the admin panel scrolled to promo materials.
+        // Deep-link: /admin/promo (legacy path) or /admin#<tab> opens the admin
+        // panel on that sub-section. adminInit() picks the tab from hash/path.
         if (isAdmin && window.location.pathname === '/admin/promo') {
           showPanel('panel-admin');
-          adminInit().then(() => {
-            const card = document.getElementById('adm-promo-card');
-            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }).catch(() => {});
+          adminInit().catch(() => {});
         }
       }
 

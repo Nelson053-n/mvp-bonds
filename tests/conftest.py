@@ -55,8 +55,18 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
         log_level="DEBUG",
         log_format="text",
         jwt_secret=TEST_JWT_SECRET,
+        yookassa_shop_id="",
+        yookassa_secret_key="",
     )
     config.settings = test_settings
+
+    # Modules that did `from app.config import settings` hold a reference to the
+    # ORIGINAL object, so reassigning config.settings isn't enough — also blank
+    # the YooKassa keys on the original so billing reads "disabled" in tests
+    # regardless of whether real keys exist in the local .env.
+    original_yk = (original_settings.yookassa_shop_id, original_settings.yookassa_secret_key)
+    original_settings.yookassa_shop_id = ""
+    original_settings.yookassa_secret_key = ""
 
     # CRITICAL: redirect the global singleton to the test database.
     # All modules that imported `storage_service` hold a reference to this
@@ -67,6 +77,7 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
     yield test_settings
 
     # Restore production settings and DB path
+    original_settings.yookassa_shop_id, original_settings.yookassa_secret_key = original_yk
     config.settings = original_settings
     _global_storage.db_path = original_db_path
 
