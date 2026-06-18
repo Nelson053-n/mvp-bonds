@@ -12,12 +12,20 @@ class AddInstrumentInput(BaseModel):
     quantity: float = Field(..., gt=0)
     purchase_price: float | None = Field(None, gt=0)  # None = auto-fetch from MOEX
     purchase_date: date | None = None  # optional; enables realized-coupon profit
+    # Off-exchange ("custom") item: no MOEX lookup. When is_custom=True the bond is
+    # built from these fields and ticker is just a label.
+    is_custom: bool = False
+    instrument_type: InstrumentType | None = None  # required when is_custom
+    custom_name: str | None = Field(None, max_length=128)
+    current_price: float | None = Field(None, gt=0)  # user-set live price (custom only)
+    coupon_rate: float | None = Field(None, ge=0)    # annual coupon %, custom bonds
 
 
 class UpdateInstrumentInput(BaseModel):
     quantity: float = Field(..., gt=0)
     purchase_price: float = Field(..., gt=0)
     purchase_date: date | None = None  # optional
+    current_price: float | None = Field(None, gt=0)  # custom items: update live price
 
 
 class UpdateCouponInput(BaseModel):
@@ -68,6 +76,7 @@ class InstrumentMetrics(BaseModel):
     dividend_yield: float | None = None
     face_unit: str | None = None  # Валюта номинала (SUR, CNY, USD, EUR, CHF)
     purchase_date: str | None = None  # ISO date or None (optional)
+    source: str | None = None  # 'manual' | 'tbank' | 'custom'
     ai_comment: str
 
 

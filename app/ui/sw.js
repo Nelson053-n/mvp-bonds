@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bond-ai-v77';
+const CACHE_NAME = 'bond-ai-v78';
 const STATIC_ASSETS = [
   '/manifest.json',
 ];

@@ -50,6 +50,9 @@ class PortfolioItem:
     manual_coupon_rate: float | None
     figi: str | None = None
     purchase_date: str | None = None  # ISO date or None
+    source: str | None = None         # 'manual' | 'tbank' | 'custom'
+    custom_name: str | None = None    # off-exchange item name
+    custom_price: float | None = None # off-exchange current price
 
     @classmethod
     def from_dict(cls, item: dict) -> "PortfolioItem":
@@ -67,6 +70,9 @@ class PortfolioItem:
             ),
             figi=item.get("figi"),
             purchase_date=item.get("purchase_date"),
+            source=item.get("source"),
+            custom_name=item.get("custom_name"),
+            custom_price=item.get("custom_price"),
         )
 
 
@@ -99,6 +105,32 @@ class PortfolioService:
     ) -> InstrumentMetrics:
         logger.info("add_instrument called: portfolio_id=%s ticker=%s quantity=%s purchase_price=%s",
                     portfolio_id, payload.ticker, payload.quantity, payload.purchase_price)
+
+        # Off-exchange item: skip validation and MOEX entirely. The user supplies
+        # everything (name, type, prices, coupon). ticker is just a label.
+        if payload.is_custom:
+            if payload.purchase_price is None:
+                raise ValidationError("Ошибка валидации", "Укажите цену покупки")
+            itype = payload.instrument_type or "bond"
+            new_id = storage_service.add_item(
+                ticker=payload.ticker.upper().strip(),
+                instrument_type=itype,
+                quantity=payload.quantity,
+                purchase_price=payload.purchase_price,
+                portfolio_id=portfolio_id,
+                source="custom",
+                purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
+                custom_name=payload.custom_name,
+                custom_price=payload.current_price if payload.current_price is not None else payload.purchase_price,
+            )
+            if payload.coupon_rate is not None:
+                storage_service.update_coupon_rate(new_id, portfolio_id, payload.coupon_rate)
+            rows = await _get_cache().refresh(portfolio_id)
+            for row in rows:
+                if row.id == new_id:
+                    return row
+            raise ValueError("Не удалось сформировать строку для добавленной бумаги")
+
         validation = await self.validate(payload)
         if not validation.validated:
             warnings_msg = (
@@ -220,6 +252,7 @@ class PortfolioService:
             quantity=payload.quantity,
             purchase_price=payload.purchase_price,
             purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
+            custom_price=payload.current_price,
         )
         if updated == 0:
             logger.warning(
@@ -370,6 +403,32 @@ class PortfolioService:
 
         async def fetch_row(item: PortfolioItem) -> InstrumentMetrics:
             async with semaphore:
+                # Off-exchange (custom) item: no MOEX lookup. Build the row from the
+                # user-entered name / current price / coupon. current_price falls
+                # back to purchase_price (profit 0) until the user edits it.
+                if item.source == "custom":
+                    cur = item.custom_price if item.custom_price is not None else item.purchase_price
+                    profit = (cur - item.purchase_price) * item.quantity
+                    return InstrumentMetrics(
+                        id=item.id,
+                        type=item.instrument_type,
+                        name=item.custom_name or item.ticker,
+                        ticker=item.ticker,
+                        current_price=round(cur, 4),
+                        purchase_price=item.purchase_price,
+                        quantity=item.quantity,
+                        current_value=round(cur * item.quantity, 2),
+                        profit=round(profit, 2),
+                        weight=0.0,
+                        is_traded=False,
+                        coupon=item.manual_coupon,
+                        coupon_rate=item.manual_coupon_rate,
+                        manual_coupon_set=item.manual_coupon is not None,
+                        manual_coupon_rate_set=item.manual_coupon_rate is not None,
+                        purchase_date=item.purchase_date,
+                        source="custom",
+                        ai_comment="",
+                    )
                 try:
                     if item.instrument_type == "bond":
                         snapshot = await moex_service.get_bond_snapshot(

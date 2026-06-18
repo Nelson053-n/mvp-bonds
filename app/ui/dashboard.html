@@ -2016,9 +2016,13 @@
           <h2 class="modal-title" id="add-modal-title">Добавить бумагу</h2>
         </div>
         <div class="modal-body">
+          <label style="display:inline-flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer;font-size:13px;color:var(--text-secondary);user-select:none;">
+            <input type="checkbox" id="add-modal-custom" style="cursor:pointer;" onchange="toggleCustomMode(this.checked)" />
+            <span>Своя бумага (без биржи) — СПБ, внебиржевые, отсутствующие</span>
+          </label>
           <div id="add-suggest-list" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
           <div class="modal-field" style="position:relative;">
-            <label>Тикер или название</label>
+            <label id="add-modal-ticker-label">Тикер или название</label>
             <input type="text" id="add-modal-ticker" class="input" placeholder="Например: SU26238RMFS4 или Сбербанк" autocomplete="off">
             <div id="add-modal-autocomplete" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--modal-bg);border:1px solid var(--border-strong);border-radius:var(--radius-sm);box-shadow:0 8px 32px rgba(0,0,0,.55);max-height:240px;overflow-y:auto;margin-top:2px;"></div>
           </div>
@@ -2030,6 +2034,25 @@
             <div class="modal-field">
               <label>Цена покупки (₽, необяз.)</label>
               <input type="number" id="add-modal-price" class="input" placeholder="авто" step="0.01" min="0.01">
+            </div>
+          </div>
+          <div id="add-custom-fields" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+              <div class="modal-field">
+                <label>Тип</label>
+                <select id="add-modal-custom-type" class="input">
+                  <option value="bond">Облигация</option>
+                  <option value="stock">Акция</option>
+                </select>
+              </div>
+              <div class="modal-field">
+                <label>Текущая цена (₽)</label>
+                <input type="number" id="add-modal-custom-price" class="input" placeholder="= цене покупки" step="0.01" min="0.01">
+              </div>
+            </div>
+            <div class="modal-field" style="margin-top:12px;">
+              <label>Ставка купона (% год., необяз.)</label>
+              <input type="number" id="add-modal-custom-coupon" class="input" placeholder="напр. 14" step="0.01" min="0">
             </div>
           </div>
           <div class="modal-field" style="margin-top:12px;">
@@ -2063,6 +2086,11 @@
               <label>Цена покупки (₽)</label>
               <input type="number" id="edit-modal-price" class="input" step="0.01" min="0.01">
             </div>
+          </div>
+          <div class="modal-field" id="edit-modal-curprice-wrap" style="margin-top:12px;display:none;">
+            <label>Текущая цена (₽)</label>
+            <input type="number" id="edit-modal-curprice" class="input" step="0.01" min="0.01">
+            <span style="font-size:11px;color:var(--text-muted);">Для своих бумаг (без биржи) обновляйте цену вручную.</span>
           </div>
           <div class="modal-field" style="margin-top:12px;">
             <label>Дата покупки (необяз.)</label>
@@ -10030,6 +10058,20 @@
       }
 
       // ── ADD INSTRUMENT MODAL ─────────────────────────────────────
+      function toggleCustomMode(on) {
+        // Custom = off-exchange item: hide MOEX search/suggest, show manual fields.
+        document.getElementById('add-custom-fields').style.display = on ? 'block' : 'none';
+        const suggest = document.getElementById('add-suggest-list');
+        if (suggest) suggest.style.display = on ? 'none' : 'grid';
+        const lbl = document.getElementById('add-modal-ticker-label');
+        if (lbl) lbl.textContent = on ? 'Название бумаги' : 'Тикер или название';
+        const ti = document.getElementById('add-modal-ticker');
+        if (ti) ti.placeholder = on ? 'Напр.: Облигация СПБ ХХХ' : 'Например: SU26238RMFS4 или Сбербанк';
+        const priceLbl = document.querySelector('#add-modal-price')?.previousElementSibling;
+        if (priceLbl) priceLbl.textContent = on ? 'Цена покупки (₽)' : 'Цена покупки (₽, необяз.)';
+        if (on) document.getElementById('add-modal-autocomplete').style.display = 'none';
+      }
+
       function openAddInstrumentModal() {
         // No early-return on missing portfolioId: the modal opens anyway and
         // submitAddInstrumentModal() creates a default portfolio on first add.
@@ -10042,6 +10084,11 @@
         document.getElementById('add-modal-qty').value = 1;
         const addDateEl = document.getElementById('add-modal-date');
         if (addDateEl) addDateEl.value = '';
+        // reset custom mode
+        const customCb = document.getElementById('add-modal-custom');
+        if (customCb) { customCb.checked = false; toggleCustomMode(false); }
+        document.getElementById('add-modal-custom-price').value = '';
+        document.getElementById('add-modal-custom-coupon').value = '';
         document.getElementById('add-modal-status').textContent = '';
         document.getElementById('add-modal-autocomplete').style.display = 'none';
         // Load suggest list
@@ -10169,8 +10216,10 @@
       }
 
       let _editItemId = null;
+      let _editIsCustom = false;
       function openEditInstrumentModal(row) {
         _editItemId = row.id;
+        _editIsCustom = row.source === 'custom';
         const modal = document.getElementById('edit-instrument-modal');
         if (!modal) return;
         document.getElementById('edit-modal-name').textContent = row.name || row.ticker || '';
@@ -10178,6 +10227,10 @@
         document.getElementById('edit-modal-price').value =
           row.purchase_price != null ? row.purchase_price : (row.current_price != null ? row.current_price : '');
         document.getElementById('edit-modal-date').value = row.purchase_date ? String(row.purchase_date).substring(0, 10) : '';
+        // Show the live-price field only for off-exchange items.
+        const cpWrap = document.getElementById('edit-modal-curprice-wrap');
+        cpWrap.style.display = _editIsCustom ? 'block' : 'none';
+        if (_editIsCustom) document.getElementById('edit-modal-curprice').value = row.current_price != null ? row.current_price : '';
         document.getElementById('edit-modal-status').textContent = '';
         modal.style.display = 'flex';
         setTimeout(() => document.getElementById('edit-modal-price').focus(), 80);
@@ -10200,6 +10253,10 @@
         try {
           const payload = { quantity: qty, purchase_price: price };
           if (dateVal) payload.purchase_date = dateVal;
+          if (_editIsCustom) {
+            const cp = parseFloat(document.getElementById('edit-modal-curprice').value);
+            if (cp > 0) payload.current_price = cp;
+          }
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${_editItemId}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -10216,11 +10273,14 @@
 
       async function submitAddInstrumentModal() {
         const statusEl = document.getElementById('add-modal-status');
-        const ticker = document.getElementById('add-modal-ticker').value.trim().toUpperCase();
+        const isCustom = document.getElementById('add-modal-custom').checked;
+        const tickerRaw = document.getElementById('add-modal-ticker').value.trim();
+        const ticker = tickerRaw.toUpperCase();
         const qty = parseInt(document.getElementById('add-modal-qty').value) || 1;
         const priceRaw = document.getElementById('add-modal-price').value.trim();
         const price = priceRaw ? parseFloat(priceRaw) : null;
-        if (!ticker) { statusEl.textContent = 'Введите тикер'; return; }
+        if (!tickerRaw) { statusEl.textContent = isCustom ? 'Введите название' : 'Введите тикер'; return; }
+        if (isCustom && (!price || price <= 0)) { statusEl.textContent = 'Укажите цену покупки'; return; }
         statusEl.textContent = 'Добавление...';
         statusEl.style.color = 'var(--text-muted)';
         try {
@@ -10244,6 +10304,15 @@
           const addPayload = { ticker, quantity: qty, purchase_price: price };
           const addDate = document.getElementById('add-modal-date').value || null;
           if (addDate) addPayload.purchase_date = addDate;
+          if (isCustom) {
+            addPayload.is_custom = true;
+            addPayload.instrument_type = document.getElementById('add-modal-custom-type').value;
+            addPayload.custom_name = tickerRaw;  // use the entered name as-is (not uppercased)
+            const cp = parseFloat(document.getElementById('add-modal-custom-price').value);
+            if (cp > 0) addPayload.current_price = cp;
+            const cr = parseFloat(document.getElementById('add-modal-custom-coupon').value);
+            if (cr >= 0 && !isNaN(cr)) addPayload.coupon_rate = cr;
+          }
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},

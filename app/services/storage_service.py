@@ -100,6 +100,8 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
                 ("figi", "TEXT"),  # T-Bank instrument id, links position to operations journal
                 ("purchase_date", "TEXT"),  # ISO date (YYYY-MM-DD); NULL = unknown (optional)
+                ("custom_name", "TEXT"),   # user-set name for off-exchange (source='custom') items
+                ("custom_price", "REAL"),  # user-set current price for source='custom' items
             ]:
                 try:
                     conn.execute(

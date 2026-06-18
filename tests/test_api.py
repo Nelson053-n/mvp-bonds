@@ -200,3 +200,45 @@ class TestPublicPagesAndHeaders:
         resp = await client.get("/og-image.png")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "image/png"
+
+
+class TestCustomInstrument:
+    """Off-exchange ('custom') items: added without MOEX, priced manually."""
+
+    async def test_add_custom_bond_no_moex(self, client: AsyncClient, auth_headers: dict) -> None:
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments",
+            json={
+                "ticker": "SPB-TEST", "quantity": 5, "purchase_price": 920.0,
+                "is_custom": True, "instrument_type": "bond",
+                "custom_name": "Облигация СПБ Тест", "current_price": 960.0, "coupon_rate": 14.0,
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        item_id = resp.json()["id"]
+        # Verify via the fresh table (POST may return a pre-recompute cache row).
+        table = await client.get(f"/portfolios/{TEST_PORTFOLIO_ID}/table", headers=auth_headers)
+        row = next(r for r in table.json()["items"] if r["id"] == item_id)
+        assert row["source"] == "custom"
+        assert row["name"] == "Облигация СПБ Тест"
+        assert row["current_price"] == 960.0
+        assert row["is_traded"] is False
+        assert row["profit"] == 200.0  # (960-920)*5
+
+    async def test_edit_custom_price(self, client: AsyncClient, auth_headers: dict) -> None:
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments",
+            json={"ticker": "SPB-EDIT", "quantity": 2, "purchase_price": 1000.0,
+                  "is_custom": True, "instrument_type": "bond", "custom_name": "Edit Me"},
+            headers=auth_headers,
+        )
+        item_id = resp.json()["id"]
+        upd = await client.patch(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments/{item_id}",
+            json={"quantity": 2, "purchase_price": 1000.0, "current_price": 1100.0},
+            headers=auth_headers,
+        )
+        assert upd.status_code == 200
+        assert upd.json()["current_price"] == 1100.0
+        assert upd.json()["profit"] == 200.0  # (1100-1000)*2
