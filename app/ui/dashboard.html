@@ -1871,8 +1871,9 @@
             <div><div style="font-size:11px;color:var(--text-muted);">Платежей</div><div id="adm-rev-count" style="font-size:22px;font-weight:800;">—</div></div>
             <div><div style="font-size:11px;color:var(--text-muted);">Средний чек</div><div id="adm-rev-avg" style="font-size:22px;font-weight:800;">—</div></div>
           </div>
-          <div style="padding:8px 16px 16px;">
-            <canvas id="adm-rev-canvas" style="width:100%;max-width:100%;height:200px;"></canvas>
+          <div style="padding:8px 16px 16px;position:relative;">
+            <canvas id="adm-rev-canvas" style="width:100%;max-width:100%;height:220px;display:block;"></canvas>
+            <div id="adm-rev-tooltip" style="position:absolute;pointer-events:none;opacity:0;transition:opacity .12s;background:var(--bg-card,#0f172a);border:1px solid var(--border,rgba(148,163,184,.25));border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;box-shadow:0 6px 20px rgba(0,0,0,.35);white-space:nowrap;z-index:5;"></div>
             <div id="adm-rev-empty" style="display:none;font-size:12px;color:var(--text-muted);text-align:center;padding:24px;">За выбранный период платежей не было.</div>
           </div>
         </div>
@@ -8371,55 +8372,171 @@
           document.getElementById('adm-rev-total').textContent = fmt(d.total || 0);
           document.getElementById('adm-rev-count').textContent = d.count || 0;
           document.getElementById('adm-rev-avg').textContent = d.count ? fmt(Math.round(d.total / d.count)) : '—';
+          _revHoverIdx = -1;
           _drawRevenueChart(d.series || []);
+          const canvas = document.getElementById('adm-rev-canvas');
+          if (canvas && !canvas._revBound) {
+            canvas._revBound = true;
+            canvas.addEventListener('mousemove', _revOnMove);
+            canvas.addEventListener('mouseleave', _revOnLeave);
+            let rt;
+            window.addEventListener('resize', () => {
+              clearTimeout(rt);
+              rt = setTimeout(() => { if (_revSeries.length) _drawRevenueChart(_revSeries); }, 150);
+            });
+          }
         } catch (e) { /* admin chart optional */ }
+      }
+
+      let _revBars = [];        // {x,y,w,h,point} geometry for hover hit-testing
+      let _revHoverIdx = -1;
+      let _revSeries = [];
+
+      function _revFmtMoney(n) {
+        return Number(n).toLocaleString('ru-RU') + ' ₽';
+      }
+      function _revFmtAxis(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 ? 1 : 0) + 'М';
+        if (n >= 1000) return (n / 1000).toFixed(n % 1000 ? 1 : 0) + 'к';
+        return String(Math.round(n));
+      }
+      function _revFmtDate(s, withYear) {
+        const [y, m, day] = s.split('-');
+        return day + '.' + m + (withYear ? '.' + y : '');
+      }
+      function _revNiceMax(v) {
+        // round the axis max up to a clean number for readable gridlines
+        if (v <= 0) return 1;
+        const mag = Math.pow(10, Math.floor(Math.log10(v)));
+        const norm = v / mag;
+        const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+        return nice * mag;
       }
 
       function _drawRevenueChart(series) {
         const canvas = document.getElementById('adm-rev-canvas');
         const empty = document.getElementById('adm-rev-empty');
         if (!canvas) return;
+        _revSeries = series;
         const hasData = series.some(p => p.amount > 0);
-        canvas.style.display = hasData ? '' : 'none';
+        canvas.style.display = hasData ? 'block' : 'none';
         if (empty) empty.style.display = hasData ? 'none' : '';
-        if (!hasData) return;
+        if (!hasData) { _revBars = []; return; }
 
         const parent = canvas.parentElement;
-        const cssW = parent ? parent.clientWidth : 600;
-        const cssH = 200;
+        const cssW = (parent ? parent.clientWidth : 600) - 32; // minus card padding
+        const cssH = 220;
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+        canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
         canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
         const ctx = canvas.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const padL = 8, padR = 8, padT = 10, padB = 22;
-        const plotW = cssW - padL - padR, plotH = cssH - padT - padB;
-        const maxV = Math.max(...series.map(p => p.amount), 1);
         const css = getComputedStyle(document.documentElement);
         const green = (css.getPropertyValue('--green-600') || '#16a34a').trim();
+        const greenLight = (css.getPropertyValue('--green-400') || '#4ade80').trim();
         const muted = (css.getPropertyValue('--text-muted') || '#94a3b8').trim();
+        const grid = (css.getPropertyValue('--border') || 'rgba(148,163,184,.15)').trim();
+
+        const padL = 38, padR = 10, padT = 12, padB = 24;
+        const plotW = cssW - padL - padR, plotH = cssH - padT - padB;
+        const rawMax = Math.max(...series.map(p => p.amount), 1);
+        const maxV = _revNiceMax(rawMax);
         const n = series.length;
-        const gap = n > 45 ? 1 : 2;
+        const gap = n > 45 ? 1 : n > 14 ? 2 : 4;
         const barW = Math.max(1, (plotW - gap * (n - 1)) / n);
 
-        ctx.fillStyle = green;
+        // ── horizontal gridlines + Y-axis labels ──
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textBaseline = 'middle';
+        const ticks = 4;
+        for (let t = 0; t <= ticks; t++) {
+          const val = (maxV / ticks) * t;
+          const y = padT + plotH - (val / maxV) * plotH;
+          ctx.strokeStyle = grid;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(padL, y + 0.5);
+          ctx.lineTo(cssW - padR, y + 0.5);
+          ctx.stroke();
+          ctx.fillStyle = muted;
+          ctx.textAlign = 'right';
+          ctx.fillText(_revFmtAxis(val), padL - 6, y);
+        }
+
+        // ── bars: rounded top + vertical gradient ──
+        _revBars = [];
         series.forEach((p, i) => {
           const h = (p.amount / maxV) * plotH;
           const x = padL + i * (barW + gap);
           const y = padT + plotH - h;
-          ctx.fillRect(x, y, barW, h);
+          _revBars.push({ x, y, w: barW, h, point: p, index: i });
+          if (p.amount <= 0) return;
+          const hovered = i === _revHoverIdx;
+          const grad = ctx.createLinearGradient(0, y, 0, y + h);
+          grad.addColorStop(0, hovered ? greenLight : green);
+          grad.addColorStop(1, hovered ? green : greenLight);
+          ctx.fillStyle = grad;
+          const r = Math.min(barW / 2, 4, h);
+          ctx.beginPath();
+          ctx.moveTo(x, y + h);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.lineTo(x + barW - r, y);
+          ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+          ctx.lineTo(x + barW, y + h);
+          ctx.closePath();
+          ctx.fill();
         });
 
-        // x-axis: first & last date labels
+        // ── X-axis labels: ~6 evenly spaced dates ──
         ctx.fillStyle = muted;
         ctx.font = '10px Inter, sans-serif';
-        const lbl = s => s.substring(8, 10) + '.' + s.substring(5, 7);
-        ctx.textAlign = 'left';
-        ctx.fillText(lbl(series[0].date), padL, cssH - 6);
-        ctx.textAlign = 'right';
-        ctx.fillText(lbl(series[n - 1].date), cssW - padR, cssH - 6);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        const step = Math.max(1, Math.ceil(n / 6));
+        for (let i = 0; i < n; i += step) {
+          const b = _revBars[i];
+          ctx.fillText(_revFmtDate(series[i].date, false), b.x + b.w / 2, cssH - 7);
+        }
+      }
+
+      function _revOnMove(e) {
+        const canvas = document.getElementById('adm-rev-canvas');
+        const tip = document.getElementById('adm-rev-tooltip');
+        if (!canvas || !tip || !_revBars.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        // nearest bar by x
+        let idx = -1, best = Infinity;
+        _revBars.forEach((b, i) => {
+          const cx = b.x + b.w / 2;
+          const dist = Math.abs(mx - cx);
+          if (dist < best && dist < (b.w / 2 + 6)) { best = dist; idx = i; }
+        });
+        if (idx !== _revHoverIdx) { _revHoverIdx = idx; _drawRevenueChart(_revSeries); }
+        if (idx < 0) { tip.style.opacity = '0'; return; }
+        const p = _revBars[idx].point;
+        const plural = p.count === 1 ? 'платёж' : (p.count >= 2 && p.count <= 4 ? 'платежа' : 'платежей');
+        tip.innerHTML = '<div style="font-weight:700;margin-bottom:2px;">' + _revFmtDate(p.date, true) + '</div>'
+          + '<div style="color:var(--green-400);font-weight:700;">' + _revFmtMoney(p.amount) + '</div>'
+          + '<div style="color:var(--text-muted);font-size:11px;">' + p.count + ' ' + plural + '</div>';
+        // position tooltip near the bar, kept inside the canvas box
+        const parent = canvas.parentElement;
+        tip.style.opacity = '1';
+        const tw = tip.offsetWidth, th = tip.offsetHeight;
+        let left = _revBars[idx].x + _revBars[idx].w / 2 - tw / 2;
+        left = Math.max(4, Math.min(left, parent.clientWidth - tw - 4));
+        let top = _revBars[idx].y - th - 8;
+        if (top < 0) top = _revBars[idx].y + 8;
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+      }
+      function _revOnLeave() {
+        const tip = document.getElementById('adm-rev-tooltip');
+        if (tip) tip.style.opacity = '0';
+        if (_revHoverIdx !== -1) { _revHoverIdx = -1; _drawRevenueChart(_revSeries); }
       }
 
       async function adminLoadPayments() {
