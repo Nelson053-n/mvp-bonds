@@ -2899,9 +2899,12 @@
         svs.innerHTML = isEmpty ? t('stat.sub.empty') : (posText + cashText + totalText);
         svs.style.whiteSpace = 'pre-wrap';
 
-        // For T-Bank portfolios show full profit (revaluation + НКД + coupons) as the headline.
-        const useFull = summary.hasFullData;
-        const headlineProfit = useFull ? summary.totalFullProfit : summary.totalProfit;
+        // Headline follows the selected profit mode (the ⇄ toggle on the table),
+        // so the big number matches the column. 'full' only if data supports it.
+        const useFull = window._profitMode === 'full' && summary.hasFullData;
+        const headlineProfit = useFull
+          ? summary.totalFullProfit
+          : (window._profitMode === 'day' ? summary.dayProfit : summary.totalProfit);
         sp.className = 'stat-value ' + (isEmpty ? '' : headlineProfit > 0 ? 'positive' : headlineProfit < 0 ? 'negative' : '');
         animateCounter(sp, isEmpty ? 0 : roundTo2(headlineProfit),
           v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
