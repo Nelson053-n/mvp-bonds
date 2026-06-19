@@ -140,13 +140,14 @@
         --slate-400: #475569;
         --slate-500: #64748b;
       }
-      /* The slider cards stay dark even in light theme, so their inner text must
-         stay light — restore the original slate values inside .pw-card. */
-      [data-theme="light"] #pw-wizard .pw-card {
-        --slate-100: #f1f5f9;
-        --slate-300: #cbd5e1;
-        --slate-400: #94a3b8;
-        --slate-500: #64748b;
+      /* Slider cards: light surface in light theme with dark-on-light text. */
+      [data-theme="light"] #pw-wizard .pw-card,
+      [data-theme="light"] #pw-wizard .pw-bond-card {
+        background: var(--bg-card);
+        border-color: var(--border);
+      }
+      [data-theme="light"] #pw-wizard .pw-slider {
+        background: var(--border-strong);
       }
 
       *, *::before, *::after { box-sizing: border-box; }
