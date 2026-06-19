@@ -243,6 +243,58 @@ class TestCustomInstrument:
         assert upd.json()["current_price"] == 1100.0
         assert upd.json()["profit"] == 200.0  # (1100-1000)*2
 
+    async def test_edit_custom_fields(self, client: AsyncClient, auth_headers: dict) -> None:
+        """Editing a custom bond updates nominal/freq/maturity/coupon and recomputes."""
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments",
+            json={"ticker": "SPB-CF", "quantity": 1, "purchase_price": 1000.0,
+                  "is_custom": True, "instrument_type": "bond", "custom_name": "CF Bond",
+                  "custom_nominal": 1000, "custom_coupon_freq": 2, "coupon_rate": 10.0},
+            headers=auth_headers,
+        )
+        item_id = resp.json()["id"]
+        upd = await client.patch(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments/{item_id}",
+            json={"quantity": 1, "purchase_price": 1000.0,
+                  "custom_nominal": 2000, "custom_coupon_freq": 4,
+                  "custom_maturity": "2030-01-01", "coupon_rate": 12.0,
+                  "manual_rating": "BBB+"},
+            headers=auth_headers,
+        )
+        assert upd.status_code == 200
+        table = await client.get(f"/portfolios/{TEST_PORTFOLIO_ID}/table", headers=auth_headers)
+        row = next(r for r in table.json()["items"] if r["id"] == item_id)
+        assert row["nominal"] == 2000
+        assert row["coupon_rate"] == 12.0
+        assert row["company_rating"] == "BBB+"  # manual rating wins
+        # 2000 * 12% / 4 = 60 per payment
+        assert row["coupon"] == 60.0
+
+    async def test_refresh_ratings(self, client: AsyncClient, auth_headers: dict) -> None:
+        """Manual rating refresh returns counts and is rate-limited per portfolio."""
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/refresh-ratings",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "updated" in body and "total" in body
+        # Second immediate call hits the 5-minute per-portfolio rate limit.
+        resp2 = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/refresh-ratings",
+            headers=auth_headers,
+        )
+        assert resp2.status_code == 429
+
+    async def test_refresh_ratings_forbidden_other_user(
+        self, client: AsyncClient, auth_headers: dict
+    ) -> None:
+        """Refreshing ratings on a non-owned portfolio is rejected."""
+        resp = await client.post(
+            "/portfolios/999999/refresh-ratings", headers=auth_headers
+        )
+        assert resp.status_code in (403, 404)
+
 
 class TestAllAggregation:
     """/all/table?group=ticker merges same security across portfolios."""

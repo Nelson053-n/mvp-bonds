@@ -1076,6 +1076,7 @@
               <span id="autosync-badge" title="Включена автосинхронизация с Т-Банк" style="display:none;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green-600);border:1px solid rgba(34,197,94,.3);">🔄 авто синхронизация с банком</span>
               <span id="autosync-cash" style="display:none;font-size:11px;font-weight:500;color:var(--text-muted);flex-basis:100%;margin-top:2px;"></span>
             </h2>
+            <button id="btn-refresh-ratings" class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="refreshRatings()" title="Подтянуть актуальные кредитные рейтинги по биржевым бумагам" data-i18n="ratings.refresh">↻ Рейтинги</button>
             <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
             <label id="all-group-toggle" style="display:none;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none;">
               <input type="checkbox" id="all-group-cb" checked style="cursor:pointer;" onchange="setAllGrouped(this.checked)" />
@@ -2109,7 +2110,7 @@
           <div class="modal-field" style="margin-top:12px;">
             <label>Дата покупки (необяз.)</label>
             <input type="date" id="add-modal-date" class="input">
-            <span style="font-size:11px;color:var(--text-muted);">Укажите, чтобы учесть полученные купоны в прибыли.</span>
+            <span style="font-size:11px;color:var(--text-muted);">Укажите, чтобы учесть купоны, полученные с этой даты (для бумаг не из Т-Банка).</span>
           </div>
           <div id="add-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
         </div>
@@ -2143,10 +2144,34 @@
             <input type="number" id="edit-modal-curprice" class="input" step="0.01" min="0.01">
             <span style="font-size:11px;color:var(--text-muted);">Для своих бумаг (без биржи) обновляйте цену вручную.</span>
           </div>
+          <div id="edit-custom-fields" style="display:none;">
+            <div class="modal-field" style="margin-top:12px;">
+              <label>Ставка купона (% год., необяз.)</label>
+              <input type="number" id="edit-modal-custom-coupon" class="input" placeholder="напр. 14" step="0.01" min="0">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+              <div class="modal-field">
+                <label>Номинал (₽)</label>
+                <input type="number" id="edit-modal-custom-nominal" class="input" placeholder="1000" step="0.01" min="0.01">
+              </div>
+              <div class="modal-field">
+                <label>Частота выплат</label>
+                <select id="edit-modal-custom-freq" class="input">
+                  <option value="2">Полугодовой (2 раза/год)</option>
+                  <option value="4">Ежеквартально (4 раза/год)</option>
+                  <option value="12">Ежемесячно (12 раз/год)</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-field" style="margin-top:12px;">
+              <label>Дата погашения (необяз.)</label>
+              <input type="date" id="edit-modal-custom-maturity" class="input">
+            </div>
+          </div>
           <div class="modal-field" style="margin-top:12px;">
             <label>Дата покупки (необяз.)</label>
             <input type="date" id="edit-modal-date" class="input">
-            <span style="font-size:11px;color:var(--text-muted);">Учитывает полученные купоны в полной прибыли.</span>
+            <span id="edit-modal-date-hint" style="font-size:11px;color:var(--text-muted);">Учитывает полученные купоны в полной прибыли.</span>
           </div>
           <div class="modal-field" style="margin-top:12px;">
             <label>Рейтинг (вручную, необяз.)</label>
@@ -6335,6 +6360,29 @@
         syncTableFromServer().catch(() => {});
       }
 
+      async function refreshRatings() {
+        if (isReadOnly || isAllMode || !portfolioId) return;
+        const btn = document.getElementById('btn-refresh-ratings');
+        if (btn && btn.disabled) return;
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '↻ Обновляю…'; }
+        try {
+          const resp = await apiFetch(`/portfolios/${portfolioId}/refresh-ratings`, { method: 'POST' });
+          if (resp.status === 429) {
+            toast(t('ratings.tooOften'), 'warn');
+            return;
+          }
+          if (!resp.ok) { toast(t('ratings.error'), 'error'); return; }
+          const data = await resp.json().catch(() => ({}));
+          await syncTableFromServer();
+          toast(t('ratings.updated').replace('{n}', data.updated ?? 0), 'success');
+        } catch (e) {
+          toast(t('ratings.error'), 'error');
+        } finally {
+          if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+        }
+      }
+
       async function syncTableFromServer() {
         showSkeletonRows();
         if (_soldBanner) _soldBanner.style.display = 'none';
@@ -7825,6 +7873,11 @@
         const mbHint = document.getElementById('multibroker-hint');
         if (mbHint) {
           mbHint.style.display = (!isReadOnly && !isAllMode && portfolios.length > 1) ? 'flex' : 'none';
+        }
+        // Refresh-ratings button: per-portfolio only (hidden in all-mode / share)
+        const rrBtn = document.getElementById('btn-refresh-ratings');
+        if (rrBtn) {
+          rrBtn.style.display = (!isReadOnly && !isAllMode && portfolioId) ? '' : 'none';
         }
       }
 
@@ -10389,6 +10442,23 @@
         const cpWrap = document.getElementById('edit-modal-curprice-wrap');
         cpWrap.style.display = _editIsCustom ? 'block' : 'none';
         if (_editIsCustom) document.getElementById('edit-modal-curprice').value = row.current_price != null ? row.current_price : '';
+        // Custom-bond fields (nominal / freq / maturity / coupon rate).
+        const cfWrap = document.getElementById('edit-custom-fields');
+        cfWrap.style.display = _editIsCustom ? 'block' : 'none';
+        if (_editIsCustom) {
+          document.getElementById('edit-modal-custom-coupon').value = row.coupon_rate != null ? row.coupon_rate : '';
+          document.getElementById('edit-modal-custom-nominal').value = row.nominal != null ? row.nominal : '';
+          const freq = row.coupon_period ? Math.round(365 / row.coupon_period) : 2;
+          document.getElementById('edit-modal-custom-freq').value = String([2, 4, 12].includes(freq) ? freq : 2);
+          document.getElementById('edit-modal-custom-maturity').value = row.maturity_date ? String(row.maturity_date).substring(0, 10) : '';
+        }
+        // Date hint: purchase date affects full profit only for non-T-Bank items.
+        const dateHint = document.getElementById('edit-modal-date-hint');
+        if (dateHint) {
+          dateHint.textContent = row.source === 'tbank'
+            ? 'Купоны для бумаг из Т-Банка берутся из журнала операций — дата покупки на полную прибыль не влияет.'
+            : 'Учитывает полученные купоны в полной прибыли.';
+        }
         document.getElementById('edit-modal-rating').value = row.company_rating != null ? row.company_rating : '';
         document.getElementById('edit-modal-status').textContent = '';
         modal.style.display = 'flex';
@@ -10416,6 +10486,14 @@
           if (_editIsCustom) {
             const cp = parseFloat(document.getElementById('edit-modal-curprice').value);
             if (cp > 0) payload.current_price = cp;
+            const cr = parseFloat(document.getElementById('edit-modal-custom-coupon').value);
+            if (cr >= 0 && !isNaN(cr)) payload.coupon_rate = cr;
+            const nom = parseFloat(document.getElementById('edit-modal-custom-nominal').value);
+            if (nom > 0) payload.custom_nominal = nom;
+            const freq = parseInt(document.getElementById('edit-modal-custom-freq').value, 10);
+            if (freq > 0) payload.custom_coupon_freq = freq;
+            const mat = document.getElementById('edit-modal-custom-maturity').value;
+            if (mat) payload.custom_maturity = mat;
           }
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${_editItemId}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -10774,6 +10852,10 @@
           'error.prefix': 'Ошибка: ',
           'nav.portfolio': 'Портфель',
           'nav.catalog': 'Каталог',
+          'ratings.refresh': '↻ Рейтинги',
+          'ratings.updated': 'Рейтинги обновлены ({n})',
+          'ratings.tooOften': 'Рейтинги недавно обновлялись, попробуйте через пару минут',
+          'ratings.error': 'Не удалось обновить рейтинги',
           'multibroker.hint': 'Ведёте несколько брокеров? На странице «Все портфели» одинаковые бумаги сводятся в одну строку.',
           'multibroker.cta': 'Открыть сводку →',
           'modal.createPortfolio.title': 'Новый портфель',
@@ -11184,6 +11266,10 @@
           'error.prefix': 'Error: ',
           'nav.portfolio': 'Portfolio',
           'nav.catalog': 'Catalog',
+          'ratings.refresh': '↻ Ratings',
+          'ratings.updated': 'Ratings updated ({n})',
+          'ratings.tooOften': 'Ratings were refreshed recently, try again in a couple of minutes',
+          'ratings.error': 'Could not refresh ratings',
           'multibroker.hint': 'Juggling several brokers? On the “All portfolios” page, identical bonds are merged into one row.',
           'multibroker.cta': 'Open summary →',
           'modal.createPortfolio.title': 'New Portfolio',
@@ -11660,18 +11746,34 @@
       // this is what previously required a manual "Clear site data".
       if ('serviceWorker' in navigator) {
         let _swReloading = false;
-        // Only reload on a *controller swap* (SW update), not the first install
-        // on a fresh page (where there was no controller to begin with).
+        // Reload once when a new SW takes control (after a deploy) so the page
+        // picks up fresh HTML/JS instead of stale cached assets. Skip the very
+        // first install on a fresh page (no controller to swap from).
         const _hadController = !!navigator.serviceWorker.controller;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (_swReloading || !_hadController) return;
           _swReloading = true;
           location.reload();
         });
+        // Promote a waiting worker immediately so users don't sit on a stale SW
+        // until every tab closes — the usual cause of "my changes don't show up".
+        const _activateWaiting = (reg) => {
+          if (reg && reg.waiting) {
+            try { reg.waiting.postMessage('SKIP_WAITING'); } catch (e) {}
+          }
+        };
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then((reg) => {
-            // Poll for an updated SW on load and periodically.
+            _activateWaiting(reg);
+            reg.addEventListener('updatefound', () => {
+              const sw = reg.installing;
+              if (sw) sw.addEventListener('statechange', () => {
+                if (sw.state === 'installed') _activateWaiting(reg);
+              });
+            });
+            // Poll for an updated SW on load, on focus, and hourly.
             reg.update().catch(() => {});
+            window.addEventListener('focus', () => reg.update().catch(() => {}));
             setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
           }).catch(() => {});
         });

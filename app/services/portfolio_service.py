@@ -266,6 +266,9 @@ class PortfolioService:
             purchase_price=payload.purchase_price,
             purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
             custom_price=payload.current_price,
+            custom_nominal=payload.custom_nominal,
+            custom_coupon_freq=payload.custom_coupon_freq,
+            custom_maturity=payload.custom_maturity.isoformat() if payload.custom_maturity else None,
         )
         if updated == 0:
             logger.warning(
@@ -277,6 +280,11 @@ class PortfolioService:
             rating = (payload.manual_rating or "").strip() or None
             storage_service.update_manual_rating(
                 item_id=item_id, portfolio_id=portfolio_id, rating=rating
+            )
+
+        if "coupon_rate" in payload.model_fields_set and payload.coupon_rate is not None:
+            storage_service.update_coupon_rate(
+                item_id=item_id, portfolio_id=portfolio_id, coupon_rate=payload.coupon_rate
             )
 
         rows = await _get_cache().refresh(portfolio_id)

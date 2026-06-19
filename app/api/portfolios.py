@@ -767,6 +767,53 @@ async def delete_portfolio(
     storage_service.delete_portfolio(portfolio_id)
 
 
+@router.post("/{portfolio_id}/refresh-ratings")
+async def refresh_portfolio_ratings(
+    portfolio_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Force a fresh credit-rating fetch for every exchange bond in the portfolio.
+
+    Ratings normally refresh once a day in the background; this lets a user pull
+    the latest on demand. Custom (off-exchange) items have no MOEX rating and are
+    skipped. Manual ratings (manual_rating) take priority and are never touched.
+    """
+    import asyncio
+
+    from app.services.moex_service import moex_service
+
+    await get_portfolio_or_403(portfolio_id, current_user)
+    # Hits SmartLab per ticker — cap to once per 5 minutes per portfolio.
+    if not storage_service.check_rate_limit(f"refresh_ratings:{portfolio_id}", 300, 1):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Рейтинги недавно обновлялись. Попробуйте через несколько минут.",
+        )
+    tickers = {
+        item["ticker"]
+        for item in storage_service.get_items(portfolio_id)
+        if item.get("ticker") and item.get("source") != "custom"
+    }
+    updated = 0
+    sem = asyncio.Semaphore(3)
+
+    async def _refresh_one(ticker: str) -> None:
+        nonlocal updated
+        async with sem:
+            try:
+                result = await moex_service.refresh_rating_with_sources(ticker)
+            except Exception:
+                return
+        if result.get("best") is not None:
+            storage_service.update_rating_all_items_for_ticker(ticker, result["best"])
+            updated += 1
+
+    await asyncio.gather(*(_refresh_one(t) for t in tickers))
+    # Rebuild the cache so the next /table call returns the fresh ratings.
+    await cache_service.refresh(portfolio_id)
+    return {"updated": updated, "total": len(tickers)}
+
+
 @router.post("/{portfolio_id}/share", response_model=SharePortfolioResponse)
 async def create_share_link(
     portfolio_id: int,

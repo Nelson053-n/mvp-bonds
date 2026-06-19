@@ -145,6 +145,9 @@ class ItemsMixin:
         figi: str | None = None,
         purchase_date: str | None = None,
         custom_price: float | None = None,
+        custom_nominal: float | None = None,
+        custom_coupon_freq: int | None = None,
+        custom_maturity: str | None = None,
     ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
@@ -153,10 +156,14 @@ class ItemsMixin:
                 SET quantity = ?, purchase_price = ?,
                     figi = COALESCE(?, figi),
                     purchase_date = COALESCE(?, purchase_date),
-                    custom_price = COALESCE(?, custom_price)
+                    custom_price = COALESCE(?, custom_price),
+                    custom_nominal = COALESCE(?, custom_nominal),
+                    custom_coupon_freq = COALESCE(?, custom_coupon_freq),
+                    custom_maturity = COALESCE(?, custom_maturity)
                 WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL
                 """,
-                (quantity, purchase_price, figi, purchase_date, custom_price, item_id, portfolio_id),
+                (quantity, purchase_price, figi, purchase_date, custom_price,
+                 custom_nominal, custom_coupon_freq, custom_maturity, item_id, portfolio_id),
             )
             conn.commit()
             updated = int(cursor.rowcount)
