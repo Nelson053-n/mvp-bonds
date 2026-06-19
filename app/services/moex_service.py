@@ -516,10 +516,14 @@ class MOEXService:
                     face_unit, secid,
                 )
 
-        # Convert absolute values from native currency to RUB
+        # Convert absolute values from native currency to RUB.
+        # NOTE: MOEX reports FACEVALUE and COUPONVALUE in the bond's own currency
+        # (so they need ×fx_rate), but ACCRUEDINT (НКД) is ALREADY in rubles even
+        # for FX bonds — multiplying it again double-converts and inflates the
+        # position value and full-profit (НКД can exceed the nominal otherwise).
         nominal_rub = round(float(nominal) * fx_rate, 2) if nominal is not None else None
         coupon_rub = round(float(coupon) * fx_rate, 4) if coupon is not None else None
-        aci_rub = round(float(aci) * fx_rate, 5) if aci is not None else None
+        aci_rub = round(float(aci), 5) if aci is not None else None
 
         snapshot = BondSnapshot(
             ticker=secid,

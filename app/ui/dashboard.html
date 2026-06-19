@@ -6074,6 +6074,27 @@
             if (profitVal > 0) profitTd.classList.add('profit-positive');
             else profitTd.classList.add('profit-negative');
           }
+          // Breakdown tooltip so the figure isn't a black box (esp. "Полная").
+          if (profitVal !== null && row.type === 'bond') {
+            const _q = Number(row.quantity || 0);
+            const body = Number(row.profit || 0);                 // переоценка тела
+            const aciT = Number(row.aci || 0) * _q;               // накопленный НКД
+            const coup = Number(row.realized_coupons || 0);       // полученные купоны
+            const fmtSigned = (v) => (v >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(v))) + ' ₽';
+            if (window._profitMode === 'full' && row.full_profit != null) {
+              profitTd.title =
+                'Полная прибыль = переоценка тела + НКД + полученные купоны\n' +
+                'Переоценка тела:  ' + fmtSigned(body) + '\n' +
+                'Накопленный НКД:  ' + fmtSigned(aciT) + '\n' +
+                'Купоны получены:  ' + fmtSigned(coup) + '\n' +
+                '─────────────\n' +
+                'Итого:  ' + fmtSigned(Number(row.full_profit));
+            } else if (window._profitMode === 'day') {
+              profitTd.title = 'Изменение цены тела за последнюю торговую сессию × количество';
+            } else {
+              profitTd.title = 'Прибыль от покупки = (текущая чистая цена − цена покупки) × количество';
+            }
+          }
           tr.appendChild(profitTd);
           // Цветовая индикация строки по прибыли (всегда по total — стабильнее)
           if (profitTotal > 0) tr.style.setProperty('--row-profit-color', 'rgba(22,163,74,0.04)');

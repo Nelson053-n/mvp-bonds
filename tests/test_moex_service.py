@@ -218,3 +218,55 @@ class TestRatingCacheTTL:
         c["b"] = "B"
         c.clear()
         assert len(c) == 0
+
+
+class TestFxBondConversion:
+    """FX bonds: FACEVALUE/COUPONVALUE are in the bond currency (×rate),
+    but ACCRUEDINT (НКД) is already in rubles and must NOT be re-converted."""
+
+    async def test_aci_not_double_converted_for_fx_bond(self, monkeypatch):
+        from app.services.moex_service import MOEXService
+        svc = MOEXService()
+
+        # Minimal MOEX payload for a USD bond on TQCB.
+        async def fake_fetch(url):
+            return {
+                "securities": {
+                    "columns": ["SECID", "BOARDID", "SHORTNAME", "PREVPRICE",
+                                "FACEVALUE", "FACEUNIT", "ACCRUEDINT",
+                                "COUPONVALUE", "COUPONPERCENT", "COUPONPERIOD",
+                                "MATDATE", "NEXTCOUPON", "LISTLEVEL"],
+                    "data": [["RU000TEST", "TQCB", "USD Bond", 96.0,
+                              1000, "USD", 1139.27,
+                              21.5, 4.3, 181,
+                              "2027-02-12", "2026-08-12", 1]],
+                },
+                "marketdata": {
+                    "columns": ["SECID", "BOARDID", "LAST", "LCLOSE", "YIELD"],
+                    "data": [["RU000TEST", "TQCB", None, None, 7.0]],
+                },
+            }
+
+        async def fake_fx(currency):
+            return 73.439
+
+        async def fake_rating(secid):
+            return None
+
+        async def fake_meta(secid):
+            return (False, True)
+
+        monkeypatch.setattr(svc, "_fetch", fake_fetch)
+        monkeypatch.setattr(svc, "_get_fx_rate", fake_fx)
+        monkeypatch.setattr(svc, "_get_smartlab_credit_rating", fake_rating)
+        monkeypatch.setattr(svc, "_get_credit_rating", fake_rating)
+        monkeypatch.setattr(svc, "_get_sec_meta", fake_meta)
+
+        snap = await svc.get_bond_snapshot("RU000TEST")
+
+        # nominal = 1000 USD × 73.439 = 73439 (converted)
+        assert abs(snap.nominal - 73439.0) < 1.0
+        # ACCRUEDINT is already RUB → stays 1139.27, NOT ×73.439 (=83666)
+        assert abs(snap.aci - 1139.27) < 1.0
+        # Sanity: НКД must never exceed the nominal for a normal bond.
+        assert snap.aci < snap.nominal
