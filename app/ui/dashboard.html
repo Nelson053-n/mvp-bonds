@@ -128,6 +128,18 @@
       }
       [data-theme="light"] .orbs { opacity: 0.2; }
       [data-theme="light"] .mesh-bg { opacity: 0.35; }
+      /* Onboarding wizard: dark by default, light surface in light theme.
+         The wizard's text uses --slate-* (tuned for a dark bg); remap them to
+         dark-on-light inside the wizard so text stays readable in light theme. */
+      #pw-wizard { background-color: #0f172a; }
+      [data-theme="light"] #pw-wizard {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border);
+        --slate-100: #0f172a;
+        --slate-300: #334155;
+        --slate-400: #475569;
+        --slate-500: #64748b;
+      }
 
       *, *::before, *::after { box-sizing: border-box; }
       button, input, select, textarea { font-family: inherit; }
@@ -5390,7 +5402,7 @@
 
       function buildWizardHTML() {
         return `
-        <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background-color:#0f172a;background-image:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);background-size:44px 44px;border-radius:var(--radius,8px);width:100%;box-sizing:border-box;text-align:left;">
+        <div id="pw-wizard" style="padding:40px 24px 60px;font-family:inherit;background-image:linear-gradient(rgba(148,163,184,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.06) 1px,transparent 1px);background-size:44px 44px;border-radius:var(--radius,8px);width:100%;box-sizing:border-box;text-align:left;">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:32px;">
             <div style="font-size:28px;font-weight:800;color:var(--slate-100);letter-spacing:-.5px;margin-bottom:8px;" data-i18n="wizard.title">
               Подберём портфель за вас
@@ -5434,7 +5446,7 @@
               Подобрать портфель
             </button>
             <div style="margin-top:12px;">
-              <button onclick="showPanel('panel-add')" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;" data-i18n="wizard.addManual">
+              <button onclick="openAddInstrumentModal()" style="background:none;border:none;color:var(--slate-500);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;" data-i18n="wizard.addManual">
                 Добавить бумагу вручную
               </button>
             </div>
