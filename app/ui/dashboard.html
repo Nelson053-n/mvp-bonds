@@ -4331,7 +4331,7 @@
             const color = diff > 0 ? 'var(--green-400)' : diff < 0 ? 'var(--red-400)' : 'var(--text-primary)';
             retAbs.style.color = color;
             retAbs.textContent = `${sign}${Math.round(absDiff).toLocaleString('ru')} ₽`;
-            retPct.textContent = `${diff >= 0 ? '+' : ''}${pct.toFixed(2)}% за ${days} дн.`;
+            retPct.textContent = `изменение стоимости ${diff >= 0 ? '+' : ''}${pct.toFixed(2)}% за ${days} дн.`;
             retBox.style.display = '';
           }
           if (canvas) { canvas._snapshots = snapshots; canvas._lastDays = days; }

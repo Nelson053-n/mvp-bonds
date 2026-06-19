@@ -77,8 +77,25 @@ class CacheService:
                     ok_count,
                     len(merged),
                 )
-                # Save daily snapshot if there is real data
-                if ok_count > 0:
+                # Custom (off-exchange) rows never carry a MOEX price — exclude
+                # them from the coverage check so they don't skew the ratio.
+                priced_rows = [r for r in merged if getattr(r, "source", None) != "custom"]
+                priced_ok = sum(1 for r in priced_rows if r.current_price > 0)
+                # Only snapshot when MOEX returned prices for (nearly) all exchange
+                # instruments. A partial fetch (e.g. MOEX rate-limited the batch)
+                # would otherwise record an artificially low securities_value and
+                # punch a false dip into the value-history chart.
+                coverage_ok = (
+                    not priced_rows
+                    or priced_ok >= max(1, int(len(priced_rows) * 0.9))
+                )
+                if not coverage_ok:
+                    logger.warning(
+                        "Skipping snapshot for portfolio %d: only %d/%d priced rows OK "
+                        "(partial MOEX fetch)", portfolio_id, priced_ok, len(priced_rows)
+                    )
+                # Save daily snapshot only when price coverage is good
+                if ok_count > 0 and coverage_ok:
                     try:
                         from app.services.storage_service import storage_service
                         from app.services.portfolio_service import portfolio_service
