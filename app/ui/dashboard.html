@@ -6330,7 +6330,9 @@
         }
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
-        tableRows = (payload.items || []).filter(r => r.is_traded !== false);
+        // Keep custom (off-exchange) items: they carry is_traded=false by design,
+        // but must still appear — only hide genuinely delisted exchange instruments.
+        tableRows = (payload.items || []).filter(r => r.is_traded !== false || r.source === 'custom');
         if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
         renderTable();
         scheduleAnalytics();
