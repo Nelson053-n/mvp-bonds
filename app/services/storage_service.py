@@ -102,6 +102,9 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ("purchase_date", "TEXT"),  # ISO date (YYYY-MM-DD); NULL = unknown (optional)
                 ("custom_name", "TEXT"),   # user-set name for off-exchange (source='custom') items
                 ("custom_price", "REAL"),  # user-set current price for source='custom' items
+                ("custom_nominal", "REAL"),      # nominal of off-exchange bond (source='custom')
+                ("custom_coupon_freq", "INTEGER"),  # coupon payments per year (2/4/12)
+                ("custom_maturity", "TEXT"),     # maturity date ISO (optional)
             ]:
                 try:
                     conn.execute(

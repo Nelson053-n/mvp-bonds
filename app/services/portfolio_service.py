@@ -53,6 +53,9 @@ class PortfolioItem:
     source: str | None = None         # 'manual' | 'tbank' | 'custom'
     custom_name: str | None = None    # off-exchange item name
     custom_price: float | None = None # off-exchange current price
+    custom_nominal: float | None = None       # off-exchange bond nominal
+    custom_coupon_freq: int | None = None      # coupon payments per year (2/4/12)
+    custom_maturity: str | None = None         # maturity date ISO (optional)
 
     @classmethod
     def from_dict(cls, item: dict) -> "PortfolioItem":
@@ -73,6 +76,9 @@ class PortfolioItem:
             source=item.get("source"),
             custom_name=item.get("custom_name"),
             custom_price=item.get("custom_price"),
+            custom_nominal=item.get("custom_nominal"),
+            custom_coupon_freq=item.get("custom_coupon_freq"),
+            custom_maturity=item.get("custom_maturity"),
         )
 
 
@@ -122,6 +128,9 @@ class PortfolioService:
                 purchase_date=payload.purchase_date.isoformat() if payload.purchase_date else None,
                 custom_name=payload.custom_name,
                 custom_price=payload.current_price if payload.current_price is not None else payload.purchase_price,
+                custom_nominal=payload.custom_nominal,
+                custom_coupon_freq=payload.custom_coupon_freq,
+                custom_maturity=payload.custom_maturity.isoformat() if payload.custom_maturity else None,
             )
             if payload.coupon_rate is not None:
                 storage_service.update_coupon_rate(new_id, portfolio_id, payload.coupon_rate)
@@ -409,6 +418,39 @@ class PortfolioService:
                 if item.source == "custom":
                     cur = item.custom_price if item.custom_price is not None else item.purchase_price
                     profit = (cur - item.purchase_price) * item.quantity
+                    # Coupon cash-flow fields for the «Денежный поток» widget.
+                    # The user supplies an annual coupon rate; we derive the per-period
+                    # payment amount, the period in days, and an anchor next-coupon date.
+                    nominal = item.custom_nominal if item.custom_nominal is not None else 1000.0
+                    freq = item.custom_coupon_freq if item.custom_coupon_freq else 2
+                    coupon_period = 365 // freq
+                    coupon_amount: float | None = None
+                    next_coupon_date: date | None = None
+                    if item.manual_coupon_rate is not None and item.manual_coupon_rate > 0:
+                        coupon_amount = round(nominal * (item.manual_coupon_rate / 100.0) / freq, 4)
+                        # Anchor: nearest future payment date stepping forward from the
+                        # purchase date (or today) with a coupon_period-day stride.
+                        anchor = None
+                        if item.purchase_date:
+                            try:
+                                anchor = date.fromisoformat(str(item.purchase_date)[:10])
+                            except ValueError:
+                                anchor = None
+                        if anchor is None:
+                            anchor = date.today()
+                        today = date.today()
+                        from datetime import timedelta
+                        step = timedelta(days=coupon_period)
+                        d = anchor
+                        while d < today:
+                            d = d + step
+                        next_coupon_date = d
+                    maturity_date: date | None = None
+                    if item.custom_maturity:
+                        try:
+                            maturity_date = date.fromisoformat(str(item.custom_maturity)[:10])
+                        except ValueError:
+                            maturity_date = None
                     return InstrumentMetrics(
                         id=item.id,
                         type=item.instrument_type,
@@ -421,10 +463,14 @@ class PortfolioService:
                         profit=round(profit, 2),
                         weight=0.0,
                         is_traded=False,
-                        coupon=item.manual_coupon,
+                        coupon=coupon_amount if coupon_amount is not None else item.manual_coupon,
+                        coupon_period=coupon_period if coupon_amount is not None else None,
                         coupon_rate=item.manual_coupon_rate,
                         manual_coupon_set=item.manual_coupon is not None,
                         manual_coupon_rate_set=item.manual_coupon_rate is not None,
+                        next_coupon_date=next_coupon_date,
+                        maturity_date=maturity_date,
+                        nominal=nominal if item.instrument_type == "bond" else None,
                         purchase_date=item.purchase_date,
                         source="custom",
                         ai_comment="",

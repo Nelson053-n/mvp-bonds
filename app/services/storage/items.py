@@ -17,18 +17,23 @@ class ItemsMixin:
         purchase_date: str | None = None,
         custom_name: str | None = None,
         custom_price: float | None = None,
+        custom_nominal: float | None = None,
+        custom_coupon_freq: int | None = None,
+        custom_maturity: str | None = None,
     ) -> int:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO portfolio_items (
                     portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi,
-                    purchase_date, custom_name, custom_price
+                    purchase_date, custom_name, custom_price, custom_nominal, custom_coupon_freq,
+                    custom_maturity
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (portfolio_id, ticker, instrument_type, quantity, purchase_price, source, figi,
-                 purchase_date, custom_name, custom_price),
+                 purchase_date, custom_name, custom_price, custom_nominal, custom_coupon_freq,
+                 custom_maturity),
             )
             conn.commit()
             if cursor.lastrowid is None:
@@ -47,6 +52,7 @@ class ItemsMixin:
                 SELECT id, ticker, instrument_type, quantity, purchase_price
                      , manual_coupon, company_rating, manual_coupon_rate, figi, purchase_date
                      , source, custom_name, custom_price
+                     , custom_nominal, custom_coupon_freq, custom_maturity
                 FROM portfolio_items
                 WHERE portfolio_id = ? AND deleted_at IS NULL
                 ORDER BY id ASC
@@ -73,6 +79,9 @@ class ItemsMixin:
                 "source": row[10],
                 "custom_name": row[11],
                 "custom_price": float(row[12]) if row[12] is not None else None,
+                "custom_nominal": float(row[13]) if row[13] is not None else None,
+                "custom_coupon_freq": int(row[14]) if row[14] is not None else None,
+                "custom_maturity": row[15],
             }
             for row in rows
         ]

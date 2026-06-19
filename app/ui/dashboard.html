@@ -2087,6 +2087,24 @@
               <label>Ставка купона (% год., необяз.)</label>
               <input type="number" id="add-modal-custom-coupon" class="input" placeholder="напр. 14" step="0.01" min="0">
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+              <div class="modal-field">
+                <label>Номинал (₽)</label>
+                <input type="number" id="add-modal-custom-nominal" class="input" placeholder="1000" step="0.01" min="0.01">
+              </div>
+              <div class="modal-field">
+                <label>Частота выплат</label>
+                <select id="add-modal-custom-freq" class="input">
+                  <option value="2">Полугодовой (2 раза/год)</option>
+                  <option value="4">Ежеквартально (4 раза/год)</option>
+                  <option value="12">Ежемесячно (12 раз/год)</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-field" style="margin-top:12px;">
+              <label>Дата погашения (необяз.)</label>
+              <input type="date" id="add-modal-custom-maturity" class="input">
+            </div>
           </div>
           <div class="modal-field" style="margin-top:12px;">
             <label>Дата покупки (необяз.)</label>
@@ -10163,6 +10181,9 @@
         if (customCb) { customCb.checked = false; toggleCustomMode(false); }
         document.getElementById('add-modal-custom-price').value = '';
         document.getElementById('add-modal-custom-coupon').value = '';
+        document.getElementById('add-modal-custom-nominal').value = '';
+        document.getElementById('add-modal-custom-freq').value = '2';
+        document.getElementById('add-modal-custom-maturity').value = '';
         document.getElementById('add-modal-status').textContent = '';
         document.getElementById('add-modal-autocomplete').style.display = 'none';
         // Load suggest list
@@ -10386,6 +10407,12 @@
             if (cp > 0) addPayload.current_price = cp;
             const cr = parseFloat(document.getElementById('add-modal-custom-coupon').value);
             if (cr >= 0 && !isNaN(cr)) addPayload.coupon_rate = cr;
+            const nom = parseFloat(document.getElementById('add-modal-custom-nominal').value);
+            if (nom > 0) addPayload.custom_nominal = nom;
+            const freq = parseInt(document.getElementById('add-modal-custom-freq').value, 10);
+            if (freq > 0) addPayload.custom_coupon_freq = freq;
+            const mat = document.getElementById('add-modal-custom-maturity').value;
+            if (mat) addPayload.custom_maturity = mat;
           }
           const resp = await apiFetch(`/portfolios/${portfolioId}/instruments`, {
             method: 'POST',
