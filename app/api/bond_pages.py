@@ -327,10 +327,20 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
       <svg class="ic-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
       <svg class="ic-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <a class="btn btn-ghost" href="/app?auth=login">Войти</a>
-    <a class="btn btn-primary" href="/app?auth=register">Попробовать бесплатно</a>
+    <a id="nav-login" class="btn btn-ghost" href="/app?auth=login">Войти</a>
+    <a id="nav-register" class="btn btn-primary" href="/app?auth=register">Попробовать бесплатно</a>
+    <a id="nav-portfolio" class="btn btn-primary" href="/app" style="display:none;">Мои портфели &rarr;</a>
   </nav>
 </header>
+<script>
+  // Public catalog renders without auth context; if a token is in localStorage,
+  // swap the login/register CTAs for a "Мои портфели" link back to the app.
+  (function(){{try{{
+    if(!localStorage.getItem('mvp_auth_token'))return;
+    var l=document.getElementById('nav-login'),r=document.getElementById('nav-register'),p=document.getElementById('nav-portfolio');
+    if(l)l.style.display='none'; if(r)r.style.display='none'; if(p)p.style.display='inline-flex';
+  }}catch(e){{}}}})();
+</script>
 <main class="wrap">
 {body}
 </main>

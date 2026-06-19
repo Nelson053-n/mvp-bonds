@@ -1389,8 +1389,9 @@
       <a href="/bond" class="topbar-link">Облигации</a>
       <a href="/calc" class="topbar-link">Калькуляторы</a>
       <a href="/uchebnik" class="topbar-link">Учебник</a>
-      <button class="btn btn-ghost" onclick="landingAuthOpen('login')">Войти</button>
-      <button class="btn btn-primary" onclick="wizOpen()">Попробовать бесплатно</button>
+      <button id="nav-login-btn" class="btn btn-ghost" onclick="landingAuthOpen('login')">Войти</button>
+      <button id="nav-trial-btn" class="btn btn-primary" onclick="wizOpen()">Попробовать бесплатно</button>
+      <a id="nav-portfolio-btn" href="/app" class="btn btn-primary" style="display:none;text-decoration:none;align-items:center;">Мои портфели →</a>
     </nav>
   </header>
 
@@ -2035,10 +2036,10 @@
     <div class="cta-glow"></div>
     <p class="cta-headline">Начните прямо сейчас —<br>это займёт 30 секунд</p>
     <p>Бесплатная регистрация. Никакой кредитной карты. Никакого брокерского счёта.</p>
-    <button class="btn btn-primary btn-xl" onclick="wizOpen()">
+    <button class="btn btn-primary btn-xl" data-cta-trial onclick="wizOpen()">
       Создать аккаунт бесплатно
     </button>
-    <p class="cta-fine">Уже есть аккаунт? <a href="/app?auth=login" style="color:var(--blue-400);text-decoration:none;">Войти →</a></p>
+    <p class="cta-fine" data-cta-fine>Уже есть аккаунт? <a href="/app?auth=login" style="color:var(--blue-400);text-decoration:none;">Войти →</a></p>
   </section>
 
   <!-- ═══ DISCLAIMER ══════════════════════════════════════════ -->
@@ -2209,6 +2210,27 @@
   </footer>
 
   <script>
+    // ═══ LOGGED-IN STATE ═════════════════════════════
+    // Public pages render server-side without auth context; swap the CTAs on the
+    // client when a token is present so a logged-in user sees "Мои портфели"
+    // instead of "Попробовать бесплатно" / "Войти".
+    (function reflectAuthState() {
+      try {
+        const token = localStorage.getItem('mvp_auth_token');
+        if (!token) return;
+        const show = (id, disp) => { const e = document.getElementById(id); if (e) e.style.display = disp; };
+        show('nav-login-btn', 'none');
+        show('nav-trial-btn', 'none');
+        show('nav-portfolio-btn', 'inline-flex');
+        // CTA section + any trial buttons → "Открыть портфели"
+        document.querySelectorAll('[data-cta-trial]').forEach(el => {
+          el.textContent = 'Открыть мои портфели →';
+          el.onclick = () => { window.location.href = '/app'; };
+        });
+        document.querySelectorAll('[data-cta-fine]').forEach(el => { el.style.display = 'none'; });
+      } catch (e) {}
+    })();
+
     // ═══ FAQ ACCORDION ═══════════════════════════════
     function faqToggle(qEl) {
       const item = qEl.parentElement;

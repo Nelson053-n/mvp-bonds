@@ -2210,6 +2210,24 @@
       </div>
     </div>
 
+    <!-- Prompt modal (styled replacement for window.prompt) -->
+    <div id="prompt-modal-overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title">
+      <div class="modal" style="max-width:400px;">
+        <div class="modal-header">
+          <h2 class="modal-title" id="prompt-modal-title"></h2>
+        </div>
+        <div class="modal-body">
+          <p id="prompt-modal-message" style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;line-height:1.5;white-space:pre-line;"></p>
+          <input type="text" id="prompt-modal-input" class="input" style="width:100%;" autocomplete="off">
+          <div id="prompt-modal-error" class="status error" style="min-height:16px;margin-top:6px;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="prompt-modal-cancel" data-i18n="confirm.cancel">Отмена</button>
+          <button class="btn-primary" id="prompt-modal-ok" data-i18n="confirm.ok">OK</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Password Entry Modal for Shared View -->
     <div id="password-modal-overlay" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
       <div class="modal" style="max-width: 320px;">
@@ -8096,6 +8114,58 @@
         document.getElementById('confirm-modal-overlay').style.display = 'flex';
       }
 
+      // Styled replacement for window.prompt. Resolves to the entered string,
+      // or null on cancel. opts: {value, placeholder, okText, mustMatch, matchError}.
+      let _promptResolve = null;
+      (function initPromptModal() {
+        const overlay = document.getElementById('prompt-modal-overlay');
+        const okBtn = document.getElementById('prompt-modal-ok');
+        const cancelBtn = document.getElementById('prompt-modal-cancel');
+        const input = document.getElementById('prompt-modal-input');
+        const errEl = document.getElementById('prompt-modal-error');
+        function close(result) {
+          overlay.style.display = 'none';
+          const r = _promptResolve; _promptResolve = null;
+          overlay._mustMatch = undefined; overlay._matchError = '';
+          if (r) r(result);
+        }
+        function submit() {
+          const val = input.value.trim();
+          if (overlay._mustMatch !== undefined && val !== overlay._mustMatch) {
+            errEl.textContent = overlay._matchError || 'Значение не совпадает';
+            return;
+          }
+          close(val);
+        }
+        okBtn.addEventListener('click', submit);
+        cancelBtn.addEventListener('click', () => close(null));
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); submit(); }
+          if (e.key === 'Escape') close(null);
+        });
+        input.addEventListener('input', () => { errEl.textContent = ''; });
+      })();
+
+      function showPrompt(title, message, opts) {
+        opts = opts || {};
+        document.getElementById('prompt-modal-title').textContent = title;
+        document.getElementById('prompt-modal-message').textContent = message || '';
+        const overlay = document.getElementById('prompt-modal-overlay');
+        const input = document.getElementById('prompt-modal-input');
+        const okBtn = document.getElementById('prompt-modal-ok');
+        const errEl = document.getElementById('prompt-modal-error');
+        input.value = opts.value || '';
+        input.placeholder = opts.placeholder || '';
+        okBtn.textContent = opts.okText || t('confirm.ok');
+        errEl.textContent = '';
+        overlay._mustMatch = opts.mustMatch;
+        overlay._matchError = opts.matchError || '';
+        overlay.style.display = 'flex';
+        setTimeout(() => { input.focus(); input.select(); }, 50);
+        return new Promise(resolve => { _promptResolve = resolve; });
+      }
+
       // ── SHARE PORTFOLIO ──────────────────────────────────────────
       function openShareModal() {
         const overlay = document.getElementById('share-modal-overlay');
@@ -9767,7 +9837,9 @@
         if (isReadOnly || isAllMode || !portfolioId) return;
         const active = portfolios.find(p => p.id === portfolioId);
         const cur = active ? active.name : '';
-        const newName = (window.prompt(t('portfolio.rename'), cur) || '').trim();
+        const res = await showPrompt(t('portfolio.rename'), '', { value: cur, okText: t('confirm.ok') });
+        if (res === null) return;
+        const newName = res.trim();
         if (!newName || newName === cur) return;
         try {
           const r = await apiFetch(`/portfolios/${portfolioId}`, {
@@ -9780,7 +9852,7 @@
         } catch(e) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); }
       }
 
-      function topbarDeletePortfolio() {
+      async function topbarDeletePortfolio() {
         if (isReadOnly || isAllMode || !portfolioId) return;
         const active = portfolios.find(p => p.id === portfolioId);
         const name = active ? active.name : '';
@@ -9789,26 +9861,22 @@
         // an accidental click on the header trash icon.
         const hasData = Array.isArray(tableRows) && tableRows.length > 0;
         if (hasData) {
-          const typed = (window.prompt(
-            'Удаление портфеля «' + name + '» необратимо — будут удалены все ' +
-            tableRows.length + ' бумаг(и), история и купоны.\n\n' +
-            'Чтобы подтвердить, введите название портфеля:', '') || '').trim();
-          if (typed !== name) {
-            if (typed) toast('Название не совпало — удаление отменено', 'warn');
-            return;
-          }
-          // Name matched → delete directly (skip the lighter second confirm).
-          (async () => {
-            try {
-              const r = await apiFetch(`/portfolios/${portfolioId}`, { method: 'DELETE' });
-              if (!r.ok) { toast(t('settings.portfolios.deleteError'), 'error'); return; }
-              await loadPortfolios();
-              updatePortfolioSelector();
-              if (portfolioId === active.id) { portfolioId = portfolios[0]?.id || null; }
-              if (portfolioId) { syncTableFromServer().catch(() => {}); } else { renderTable(); }
-              toast('Портфель удалён', 'success');
-            } catch (e) { toast(t('settings.portfolios.deleteError'), 'error'); }
-          })();
+          const typed = await showPrompt(
+            'Удалить портфель?',
+            'Удаление «' + name + '» необратимо — будут удалены все ' +
+            tableRows.length + ' бумаг(и), история и купоны.\nЧтобы подтвердить, введите название портфеля:',
+            { placeholder: name, okText: 'Удалить', mustMatch: name,
+              matchError: 'Название не совпадает с «' + name + '»' });
+          if (typed === null) return;  // cancelled or didn't match
+          try {
+            const r = await apiFetch(`/portfolios/${portfolioId}`, { method: 'DELETE' });
+            if (!r.ok) { toast(t('settings.portfolios.deleteError'), 'error'); return; }
+            await loadPortfolios();
+            updatePortfolioSelector();
+            if (portfolioId === active.id) { portfolioId = portfolios[0]?.id || null; }
+            if (portfolioId) { syncTableFromServer().catch(() => {}); } else { renderTable(); }
+            toast('Портфель удалён', 'success');
+          } catch (e) { toast(t('settings.portfolios.deleteError'), 'error'); }
           return;
         }
         settingsDeletePortfolio(portfolioId, name);
