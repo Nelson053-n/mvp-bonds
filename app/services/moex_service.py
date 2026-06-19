@@ -398,7 +398,7 @@ class MOEXService:
         )
         data = await self._fetch(url)
 
-        sec_row = self._get_first_row(data.get("securities", {}))
+        sec_row = self._get_security_row(data.get("securities", {}))
         md_row = self._get_row_with_price(data.get("marketdata", {}))
 
         name = sec_row.get("SHORTNAME") or sec_row.get("SECNAME") or secid
@@ -605,6 +605,34 @@ class MOEXService:
                 return row
         max_index = min(len(columns), len(best))
         return {columns[idx]: best[idx] for idx in range(max_index)}
+
+    # Price fields a securities row may carry, in fallback order.
+    _SEC_PRICE_FIELDS = (
+        "PREVPRICE",
+        "PREVWAPRICE",
+        "PREVLEGALCLOSEPRICE",
+    )
+
+    @classmethod
+    def _get_security_row(cls, dataset: dict[str, Any]) -> dict[str, Any]:
+        """Pick the securities row that actually carries a price.
+
+        MOEX may list a bond on several boards (e.g. SPOB + TQOB) and the
+        first row can be a board with all PREV* prices empty. Blindly taking
+        rows[0] then yields a zero-priced snapshot. Prefer the first row that
+        has any PREV* price set; fall back to the first row otherwise.
+        """
+        columns = dataset.get("columns", [])
+        rows = dataset.get("data", [])
+        if not rows:
+            return {}
+        for values in rows:
+            max_index = min(len(columns), len(values))
+            row = {columns[idx]: values[idx] for idx in range(max_index)}
+            if any(row.get(f) is not None for f in cls._SEC_PRICE_FIELDS):
+                return row
+        max_index = min(len(columns), len(rows[0]))
+        return {columns[idx]: rows[0][idx] for idx in range(max_index)}
 
     @staticmethod
     def _parse_date(value: str | None) -> date | None:
