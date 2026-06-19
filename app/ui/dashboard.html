@@ -975,6 +975,7 @@
           <span class="brand-name">Bond AI</span><span id="brand-pro-badge" style="display:none;font-size:9px;font-weight:800;padding:1px 6px;margin-left:6px;border-radius:4px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;letter-spacing:.5px;vertical-align:middle;box-shadow:0 1px 4px rgba(34,197,94,.4);">PRO</span><span id="brand-version-badge" style="font-size:9px;font-weight:600;padding:1px 5px;margin-left:6px;border-radius:4px;background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);letter-spacing:.3px;vertical-align:middle;">v3.0</span>
         </div>
         <div class="topbar-nav">
+          <a class="nav-btn" href="/bond" target="_blank" style="display:flex;align-items:center;text-decoration:none;" data-i18n="nav.catalog">Каталог</a>
           <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
           <button class="nav-btn" id="nav-admin" data-panel="panel-admin" style="display:none; color:#f59e0b;">Администратор</button>
         </div>
@@ -986,6 +987,7 @@
           <select id="mobile-portfolio-selector" style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--input-bg);color:var(--text-primary);font-size:13px;"></select>
         </div>
         <button class="nav-btn" data-panel="panel-table" data-i18n="nav.portfolio">Портфель</button>
+        <a class="nav-btn" href="/bond" target="_blank" style="text-decoration:none;" data-i18n="nav.catalog">Каталог</a>
         <button class="nav-btn" data-panel="panel-settings" data-i18n="nav.settings">Настройки</button>
         <button class="nav-btn" id="mobile-btn-logout" style="color:#f87171;" onclick="clearUserState();location.reload();" data-i18n="nav.logout">Выйти</button>
       </div>
@@ -1059,6 +1061,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Multi-broker hint (shown when user has >1 portfolio and is not in all-mode) -->
+        <a id="multibroker-hint" href="/all" style="display:none;align-items:center;gap:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;text-decoration:none;color:var(--text-primary);">
+          <span style="font-size:16px;line-height:1;">🔗</span>
+          <span style="flex:1;min-width:0;font-size:12.5px;color:var(--text-secondary);" data-i18n="multibroker.hint">Ведёте несколько брокеров? На странице «Все портфели» одинаковые бумаги сводятся в одну строку.</span>
+          <span style="font-size:12px;font-weight:600;color:var(--blue-600);white-space:nowrap;" data-i18n="multibroker.cta">Открыть сводку →</span>
+        </a>
 
         <div id="portfolio-table-card" class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
@@ -2506,6 +2515,7 @@
         // panel-add and panel-analytics/watchlist are removed; no-op for them
       }
       navBtns.forEach(b => b.addEventListener('click', () => {
+        if (!b.dataset.panel) return;  // plain links (e.g. /bond catalog) navigate on their own
         showPanel(b.dataset.panel);
         if (b.dataset.panel === 'panel-io' && window._loadTbankSyncStatus) {
           const pid = parseInt(localStorage.getItem('mvp_active_portfolio_id') || '0', 10);
@@ -7773,6 +7783,12 @@
             importSelector.appendChild(option);
           }
         }
+
+        // Multi-broker hint: show when juggling >1 portfolio outside all-mode
+        const mbHint = document.getElementById('multibroker-hint');
+        if (mbHint) {
+          mbHint.style.display = (!isReadOnly && !isAllMode && portfolios.length > 1) ? 'flex' : 'none';
+        }
       }
 
       function setupPortfolioSelector() {
@@ -10665,6 +10681,9 @@
           'btn.cancel': 'Отмена',
           'error.prefix': 'Ошибка: ',
           'nav.portfolio': 'Портфель',
+          'nav.catalog': 'Каталог',
+          'multibroker.hint': 'Ведёте несколько брокеров? На странице «Все портфели» одинаковые бумаги сводятся в одну строку.',
+          'multibroker.cta': 'Открыть сводку →',
           'modal.createPortfolio.title': 'Новый портфель',
           'modal.createPortfolio.nameLabel': 'Название',
           'modal.createPortfolio.namePlaceholder': 'Например: Мои облигации',
@@ -11072,6 +11091,9 @@
           'btn.cancel': 'Cancel',
           'error.prefix': 'Error: ',
           'nav.portfolio': 'Portfolio',
+          'nav.catalog': 'Catalog',
+          'multibroker.hint': 'Juggling several brokers? On the “All portfolios” page, identical bonds are merged into one row.',
+          'multibroker.cta': 'Open summary →',
           'modal.createPortfolio.title': 'New Portfolio',
           'modal.createPortfolio.nameLabel': 'Name',
           'modal.createPortfolio.namePlaceholder': 'E.g. My Bonds',
