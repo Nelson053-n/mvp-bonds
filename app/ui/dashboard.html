@@ -2034,7 +2034,7 @@
     <!-- Pro purchase modal -->
     <div id="pro-modal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
       <div class="modal" style="max-width:420px;">
-        <div class="modal-header"><h2 class="modal-title">🚀 Bond AI Pro</h2></div>
+        <div class="modal-header"><h2 class="modal-title">Bond AI Pro</h2></div>
         <div class="modal-body">
           <p style="font-size:13px;color:var(--text-secondary);margin:0 0 14px;">AI-анализ без лимита, налоговый помощник, стресс-тесты, безлимит портфелей, автосинк Т-Банка и данные каждые 5 минут.</p>
           <div style="display:flex;flex-direction:column;gap:10px;">
@@ -2047,7 +2047,7 @@
           </div>
           <p id="pro-modal-status" style="font-size:12px;color:var(--text-muted);min-height:16px;margin:12px 0 0;"></p>
         </div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('pro-modal').style.display='none'">Закрыть</button></div>
+        <div class="modal-actions"><button class="btn-secondary" onclick="closeProModal()">Закрыть</button></div>
       </div>
     </div>
 
@@ -7096,6 +7096,9 @@
         if (!_billingEnabled) { toast('Оплата скоро будет доступна', 'warn'); return; }
         document.getElementById('pro-modal').style.display = 'flex';
       }
+      function closeProModal() {
+        document.getElementById('pro-modal').style.display = 'none';
+      }
       async function buyPro(plan, btn) {
         const status = document.getElementById('pro-modal-status');
         if (btn) btn.disabled = true;
@@ -11939,14 +11942,35 @@
           if (typeof manualRefresh === 'function') manualRefresh();
         }
         if (e.key === 'Escape') {
-          // Close any open modal-overlay
-          const openModal = document.querySelector('.modal-overlay[style*="flex"],.modal-overlay:not([style*="none"])');
-          if (openModal) {
-            // Find close button and click it if exists
-            const closeBtn = openModal.querySelector('.modal-close, [onclick*="close"], [data-close-modal]');
-            if (closeBtn) closeBtn.click();
-            else openModal.style.display = 'none';
-          }
+          // Close the top-most actually-visible modal-overlay.
+          const open = [...document.querySelectorAll('.modal-overlay')].filter(_isModalVisible).pop();
+          if (open) _dismissModal(open);
+        }
+      });
+
+      // True only when the overlay is actually on screen (covers both the
+      // display:flex inline mechanism and the .show class mechanism). Note: the
+      // overlay is position:fixed, so offsetParent is null even when visible —
+      // rely on the computed display instead.
+      function _isModalVisible(el) {
+        if (!el) return false;
+        const cs = getComputedStyle(el);
+        return cs.display !== 'none' && cs.visibility !== 'hidden';
+      }
+      // Close a modal the way it was opened: prefer its named close handler, fall
+      // back to the .show class, then to inline display.
+      function _dismissModal(el) {
+        const closeBtn = el.querySelector('.modal-close, [onclick*="close"], [data-close-modal]');
+        if (closeBtn) { closeBtn.click(); return; }
+        if (el.classList.contains('show')) el.classList.remove('show');
+        else el.style.display = 'none';
+      }
+      // Universal "click on the dim backdrop to dismiss" for every modal — applied
+      // once via delegation so individual modals don't each need their own handler.
+      document.addEventListener('mousedown', e => {
+        if (e.target && e.target.classList && e.target.classList.contains('modal-overlay')
+            && _isModalVisible(e.target)) {
+          _dismissModal(e.target);
         }
       });
 
