@@ -1071,13 +1071,20 @@
 
         <div id="portfolio-table-card" class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
-            <h2 class="card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h2 class="card-title" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span>Портфель</span>
+              <span id="pf-table-actions" style="display:none;align-items:center;gap:1px;">
+                <button id="btn-pf-rename-tbl" onclick="topbarRenamePortfolio()" title="Переименовать портфель" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:2px 4px;border-radius:4px;">✎</button>
+                <button id="btn-pf-delete-tbl" onclick="topbarDeletePortfolio()" title="Удалить портфель" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:2px 4px;border-radius:4px;">🗑</button>
+              </span>
               <span id="autosync-badge" title="Включена автосинхронизация с Т-Банк" style="display:none;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green-600);border:1px solid rgba(34,197,94,.3);">🔄 авто синхронизация с банком</span>
               <span id="autosync-cash" style="display:none;font-size:11px;font-weight:500;color:var(--text-muted);flex-basis:100%;margin-top:2px;"></span>
             </h2>
-            <button id="btn-refresh-ratings" class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="refreshRatings()" title="Подтянуть актуальные кредитные рейтинги по биржевым бумагам" data-i18n="ratings.refresh">↻ Рейтинги</button>
-            <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button id="btn-profit-mode" class="btn btn-secondary" style="display:none;height:28px;font-size:12px;padding:0 12px;" onclick="cycleProfitMode()" title="Переключить режим: Полная / От покупки / За день">Прибыль: <span id="btn-profit-mode-label">Полная</span> ⇄</button>
+              <button id="btn-refresh-ratings" class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="refreshRatings()" title="Подтянуть актуальные кредитные рейтинги по биржевым бумагам" data-i18n="ratings.refresh">↻ Рейтинги</button>
+              <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
+            </div>
             <label id="all-group-toggle" style="display:none;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none;">
               <input type="checkbox" id="all-group-cb" checked style="cursor:pointer;" onchange="setAllGrouped(this.checked)" />
               <span>Свести одинаковые бумаги</span>
@@ -2865,6 +2872,22 @@
           toggle.style.borderColor = special ? 'var(--blue-500)' : 'var(--border)';
           toggle.style.color = special ? 'var(--blue-500)' : 'var(--text-muted)';
         }
+        // Mirror the current mode on the prominent header button. "total" reads as
+        // "От покупки" here (the column header keeps the bare "Прибыль").
+        const modeLbl = document.getElementById('btn-profit-mode-label');
+        if (modeLbl) {
+          const labels = {
+            full:  window._lang === 'en' ? 'Full' : 'Полная',
+            total: window._lang === 'en' ? 'Since buy' : 'От покупки',
+            day:   window._lang === 'en' ? 'Day' : 'За день',
+          };
+          modeLbl.textContent = labels[window._profitMode] || labels.total;
+        }
+      }
+      // Wrapper used by the header button: advance to the next mode and re-render.
+      function cycleProfitMode() {
+        setProfitMode(nextProfitMode());
+        if (typeof renderTable === 'function') renderTable();
       }
       function nextProfitMode() {
         const order = portfolioSupportsFull() ? ['full', 'total', 'day'] : ['total', 'day'];
@@ -7839,7 +7862,9 @@
             showPfActions = !isReadOnly && !!active;
           }
         }
-        if (pfActionsEl) pfActionsEl.style.display = showPfActions ? 'flex' : 'none';
+        // Rename/delete moved to the table header next to the «Портфель» title —
+        // keep the topbar clean (the name still shows there).
+        if (pfActionsEl) pfActionsEl.style.display = 'none';
         // Size to longest name
         if (portfolios.length) {
           const longest = portfolios.reduce((a, b) => a.name.length > b.name.length ? a : b).name;
@@ -7899,6 +7924,16 @@
         const rrBtn = document.getElementById('btn-refresh-ratings');
         if (rrBtn) {
           rrBtn.style.display = (!isReadOnly && !isAllMode && portfolioId) ? '' : 'none';
+        }
+        // Portfolio rename/delete icons next to the "Портфель" title
+        const pfTbl = document.getElementById('pf-table-actions');
+        if (pfTbl) {
+          pfTbl.style.display = (!isReadOnly && !isAllMode && portfolioId) ? 'inline-flex' : 'none';
+        }
+        // Prominent profit-mode button (shown only when full mode is available)
+        const pmBtn = document.getElementById('btn-profit-mode');
+        if (pmBtn) {
+          pmBtn.style.display = (!isReadOnly && !isAllMode && portfolioId) ? '' : 'none';
         }
       }
 
