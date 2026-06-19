@@ -6005,7 +6005,17 @@
           if (row.face_unit && row.face_unit !== 'SUR') {
             const fxBadge = document.createElement('span');
             fxBadge.textContent = ({CNY:'¥ CNY', USD:'$ USD', EUR:'€ EUR', CHF:'₣ CHF'})[row.face_unit] || row.face_unit;
-            fxBadge.title = 'Номинал в ' + row.face_unit;
+            // Tooltip explains the RUB figures: numbers in the table are the
+            // currency nominal converted at the live FX rate.
+            const fxSym = ({CNY:'¥', USD:'$', EUR:'€', CHF:'₣'})[row.face_unit] || '';
+            if (row.fx_rate && row.fx_rate > 1 && row.nominal) {
+              const nomCcy = row.nominal / row.fx_rate;
+              fxBadge.title = 'Номинал ' + nomCcy.toLocaleString('ru', {maximumFractionDigits: 0}) + ' ' + fxSym
+                + ' × ' + row.fx_rate.toFixed(2) + ' ₽ = ' + Math.round(row.nominal).toLocaleString('ru') + ' ₽'
+                + '\nЦифры в таблице — в рублях по текущему курсу.';
+            } else {
+              fxBadge.title = 'Номинал в ' + row.face_unit;
+            }
             fxBadge.style.cssText = 'display:inline-block;margin-top:3px;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(59,130,246,.12);color:#2563eb;border:1px solid rgba(59,130,246,.25);letter-spacing:.3px;';
             nameTd.appendChild(fxBadge);
           }

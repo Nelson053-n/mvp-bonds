@@ -595,6 +595,7 @@ class PortfolioService:
                             full_profit=round(full_profit_val, 2) if full_profit_val is not None else None,
                             market_yield=snapshot.market_yield,
                             face_unit=snapshot.face_unit,
+                            fx_rate=snapshot.fx_rate,
                             purchase_date=item.purchase_date,
                             ai_comment="",
                         )

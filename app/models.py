@@ -79,6 +79,7 @@ class InstrumentMetrics(BaseModel):
     market_yield: float | None = None
     dividend_yield: float | None = None
     face_unit: str | None = None  # Валюта номинала (SUR, CNY, USD, EUR, CHF)
+    fx_rate: float | None = None  # Курс валюты номинала к рублю (None/1.0 для рублёвых)
     purchase_date: str | None = None  # ISO date or None (optional)
     source: str | None = None  # 'manual' | 'tbank' | 'custom'
     ai_comment: str
