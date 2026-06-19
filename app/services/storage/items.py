@@ -52,7 +52,7 @@ class ItemsMixin:
                 SELECT id, ticker, instrument_type, quantity, purchase_price
                      , manual_coupon, company_rating, manual_coupon_rate, figi, purchase_date
                      , source, custom_name, custom_price
-                     , custom_nominal, custom_coupon_freq, custom_maturity
+                     , custom_nominal, custom_coupon_freq, custom_maturity, manual_rating
                 FROM portfolio_items
                 WHERE portfolio_id = ? AND deleted_at IS NULL
                 ORDER BY id ASC
@@ -82,6 +82,7 @@ class ItemsMixin:
                 "custom_nominal": float(row[13]) if row[13] is not None else None,
                 "custom_coupon_freq": int(row[14]) if row[14] is not None else None,
                 "custom_maturity": row[15],
+                "manual_rating": row[16],
             }
             for row in rows
         ]
@@ -202,6 +203,22 @@ class ItemsMixin:
                 (rating, item_id, portfolio_id),
             )
             conn.commit()
+
+    def update_manual_rating(
+        self, item_id: int, portfolio_id: int, rating: str | None
+    ) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE portfolio_items SET manual_rating = ? WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL",
+                (rating, item_id, portfolio_id),
+            )
+            conn.commit()
+            updated = int(cursor.rowcount)
+            logger.info(
+                "AUDIT update_manual_rating: item_id=%d portfolio_id=%d rating=%s updated=%d",
+                item_id, portfolio_id, rating, updated,
+            )
+            return updated
 
     def save_rating_history(self, ticker: str, rating: str, source: str) -> None:
         """Save a rating observation to history (deduplicate: skip if same as last entry)."""

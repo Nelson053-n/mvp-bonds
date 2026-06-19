@@ -171,8 +171,11 @@ async def _fetch_board(
 
         if not price or float(price) <= 0:
             continue
-        if not coupon or float(coupon) <= 0:
-            continue
+        # Floaters (and some bonds) report an empty COUPONPERCENT in the batch
+        # feed — keep them so manual search can find them; the real coupon is
+        # resolved per-bond when added to a portfolio. Only the beginner-picks
+        # /suggest flow needs a positive coupon and filters them out itself.
+        coupon_val = float(coupon) if coupon else 0.0
 
         # NOTE: short-maturity / near-offer bonds are intentionally KEPT in the
         # cache so manual search (/bonds/search) and the bot can find them. The
@@ -193,7 +196,7 @@ async def _fetch_board(
             "ticker": secid,
             "name": bond.get("SHORTNAME", secid),
             "price": float(price),
-            "coupon_percent": float(coupon),
+            "coupon_percent": coupon_val,
             "face_value": float(face),
             "face_unit": face_unit,
             "lot_size": int(lotsize),
@@ -201,7 +204,7 @@ async def _fetch_board(
             "offer_date": bond.get("OFFERDATE") or None,
             "coupon_period": period_int,
             "coupon_frequency": _coupon_frequency(period_int),
-            "market_yield": float(market_yield) if market_yield else float(coupon),
+            "market_yield": float(market_yield) if market_yield else coupon_val,
             "board": board,
             "listlevel": int(listlevel) if listlevel else None,
             "rating": pre_rating,
@@ -361,7 +364,9 @@ async def suggest_portfolio(
     y_max = yield_target + 8
     filtered = [b for b in pool if y_min <= b["coupon_percent"] <= y_max]
     if len(filtered) < 5:
-        filtered = pool  # widen if too few candidates
+        # widen if too few candidates, but never auto-pick a bond whose coupon is
+        # unknown (0 — e.g. a floater pulled in only for manual search)
+        filtered = [b for b in pool if b["coupon_percent"] > 0]
 
     # Step 3: sort by proximity to target yield, take top-50 for rating fetch
     filtered.sort(key=lambda b: abs(b["coupon_percent"] - yield_target))

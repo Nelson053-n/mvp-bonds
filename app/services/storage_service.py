@@ -105,6 +105,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ("custom_nominal", "REAL"),      # nominal of off-exchange bond (source='custom')
                 ("custom_coupon_freq", "INTEGER"),  # coupon payments per year (2/4/12)
                 ("custom_maturity", "TEXT"),     # maturity date ISO (optional)
+                ("manual_rating", "TEXT"),       # user-set credit rating; overrides auto snapshot rating
             ]:
                 try:
                     conn.execute(

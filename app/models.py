@@ -29,6 +29,7 @@ class UpdateInstrumentInput(BaseModel):
     purchase_price: float = Field(..., gt=0)
     purchase_date: date | None = None  # optional
     current_price: float | None = Field(None, gt=0)  # custom items: update live price
+    manual_rating: str | None = Field(None, max_length=16)  # user-set credit rating override
 
 
 class UpdateCouponInput(BaseModel):

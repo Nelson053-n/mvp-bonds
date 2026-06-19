@@ -2148,6 +2148,11 @@
             <input type="date" id="edit-modal-date" class="input">
             <span style="font-size:11px;color:var(--text-muted);">Учитывает полученные купоны в полной прибыли.</span>
           </div>
+          <div class="modal-field" style="margin-top:12px;">
+            <label>Рейтинг (вручную, необяз.)</label>
+            <input type="text" id="edit-modal-rating" class="input" maxlength="16" placeholder="напр. A+ или BBB">
+            <span style="font-size:11px;color:var(--text-muted);">Перекрывает авто-рейтинг. Оставьте пустым для очистки.</span>
+          </div>
           <div id="edit-modal-status" class="status error" style="min-height:18px;margin-top:4px;"></div>
         </div>
         <div class="modal-actions">
@@ -7742,6 +7747,8 @@
         selector.appendChild(addOpt);
         // Update portfolio name in topbar
         const nameEl = document.getElementById('topbar-portfolio-name');
+        const pfActionsEl = document.getElementById('topbar-portfolio-actions');
+        let showPfActions = false;
         if (nameEl) {
           if (isAllMode) {
             nameEl.textContent = 'Все портфели';
@@ -7750,8 +7757,10 @@
             const active = portfolios.find(p => p.id === portfolioId);
             nameEl.textContent = active ? active.name : '';
             nameEl.style.display = active ? '' : 'none';
+            showPfActions = !isReadOnly && !!active;
           }
         }
+        if (pfActionsEl) pfActionsEl.style.display = showPfActions ? 'flex' : 'none';
         // Size to longest name
         if (portfolios.length) {
           const longest = portfolios.reduce((a, b) => a.name.length > b.name.length ? a : b).name;
@@ -7905,7 +7914,26 @@
           // Имя портфеля
           const nameSpan = document.createElement('span');
           nameSpan.id = 'topbar-portfolio-name';
-          nameSpan.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-secondary);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px;border-right:1px solid var(--border);';
+          nameSpan.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-secondary);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+          // Иконки переименования/удаления активного портфеля
+          const pfActions = document.createElement('span');
+          pfActions.id = 'topbar-portfolio-actions';
+          pfActions.style.cssText = 'display:none;align-items:center;gap:2px;padding-right:10px;border-right:1px solid var(--border);';
+          const renameBtn = document.createElement('button');
+          renameBtn.id = 'btn-pf-rename';
+          renameBtn.title = t('portfolio.rename');
+          renameBtn.onclick = topbarRenamePortfolio;
+          renameBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:2px 4px;';
+          renameBtn.textContent = '✎';
+          const delBtn = document.createElement('button');
+          delBtn.id = 'btn-pf-delete';
+          delBtn.title = t('settings.portfolios.deleteTitle');
+          delBtn.onclick = topbarDeletePortfolio;
+          delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:2px 4px;';
+          delBtn.textContent = '🗑';
+          pfActions.appendChild(renameBtn);
+          pfActions.appendChild(delBtn);
 
           // Обновлено ЧЧ:ММ
           const timeSpan = document.createElement('span');
@@ -7923,6 +7951,7 @@
           // Вставить в начало topbar-right (перед темой/языком/выходом)
           topbarRight.insertBefore(refreshBtn, topbarRight.firstChild);
           topbarRight.insertBefore(timeSpan, topbarRight.firstChild);
+          topbarRight.insertBefore(pfActions, topbarRight.firstChild);
           topbarRight.insertBefore(nameSpan, topbarRight.firstChild);
         }
 
@@ -9614,6 +9643,30 @@
         });
       }
 
+      // ── TOPBAR: rename / delete active portfolio ─────────────────
+      async function topbarRenamePortfolio() {
+        if (isReadOnly || isAllMode || !portfolioId) return;
+        const active = portfolios.find(p => p.id === portfolioId);
+        const cur = active ? active.name : '';
+        const newName = (window.prompt(t('portfolio.rename'), cur) || '').trim();
+        if (!newName || newName === cur) return;
+        try {
+          const r = await apiFetch(`/portfolios/${portfolioId}`, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name: newName }),
+          });
+          if (!r.ok) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); return; }
+          await loadPortfolios();
+          updatePortfolioSelector();
+        } catch(e) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); }
+      }
+
+      function topbarDeletePortfolio() {
+        if (isReadOnly || isAllMode || !portfolioId) return;
+        const active = portfolios.find(p => p.id === portfolioId);
+        settingsDeletePortfolio(portfolioId, active ? active.name : '');
+      }
+
       // Change username
       document.getElementById('acc-username-btn').addEventListener('click', async () => {
         const newUsername = document.getElementById('acc-username-new').value.trim();
@@ -10326,6 +10379,7 @@
         const cpWrap = document.getElementById('edit-modal-curprice-wrap');
         cpWrap.style.display = _editIsCustom ? 'block' : 'none';
         if (_editIsCustom) document.getElementById('edit-modal-curprice').value = row.current_price != null ? row.current_price : '';
+        document.getElementById('edit-modal-rating').value = row.company_rating != null ? row.company_rating : '';
         document.getElementById('edit-modal-status').textContent = '';
         modal.style.display = 'flex';
         setTimeout(() => document.getElementById('edit-modal-price').focus(), 80);
@@ -10348,6 +10402,7 @@
         try {
           const payload = { quantity: qty, purchase_price: price };
           if (dateVal) payload.purchase_date = dateVal;
+          payload.manual_rating = (document.getElementById('edit-modal-rating').value || '').trim();
           if (_editIsCustom) {
             const cp = parseFloat(document.getElementById('edit-modal-curprice').value);
             if (cp > 0) payload.current_price = cp;

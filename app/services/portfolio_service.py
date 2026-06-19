@@ -56,6 +56,8 @@ class PortfolioItem:
     custom_nominal: float | None = None       # off-exchange bond nominal
     custom_coupon_freq: int | None = None      # coupon payments per year (2/4/12)
     custom_maturity: str | None = None         # maturity date ISO (optional)
+    company_rating: str | None = None          # auto rating from last market snapshot
+    manual_rating: str | None = None           # user-set rating; overrides auto
 
     @classmethod
     def from_dict(cls, item: dict) -> "PortfolioItem":
@@ -79,6 +81,8 @@ class PortfolioItem:
             custom_nominal=item.get("custom_nominal"),
             custom_coupon_freq=item.get("custom_coupon_freq"),
             custom_maturity=item.get("custom_maturity"),
+            company_rating=item.get("company_rating"),
+            manual_rating=item.get("manual_rating"),
         )
 
 
@@ -268,6 +272,12 @@ class PortfolioService:
                 "Update failed: instrument ID %d not found", item_id
             )
             raise InstrumentNotFoundError(item_id)
+
+        if "manual_rating" in payload.model_fields_set:
+            rating = (payload.manual_rating or "").strip() or None
+            storage_service.update_manual_rating(
+                item_id=item_id, portfolio_id=portfolio_id, rating=rating
+            )
 
         rows = await _get_cache().refresh(portfolio_id)
         for row in rows:
@@ -471,6 +481,7 @@ class PortfolioService:
                         next_coupon_date=next_coupon_date,
                         maturity_date=maturity_date,
                         nominal=nominal if item.instrument_type == "bond" else None,
+                        company_rating=item.manual_rating,
                         purchase_date=item.purchase_date,
                         source="custom",
                         ai_comment="",
@@ -553,7 +564,7 @@ class PortfolioService:
                             day_profit=round(day_profit_val, 2) if day_profit_val is not None else None,
                             prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
-                            company_rating=snapshot.company_rating or item.company_rating,
+                            company_rating=item.manual_rating or snapshot.company_rating or item.company_rating,
                             is_qual=snapshot.is_qual,
                             is_traded=snapshot.is_traded,
                             nominal=nominal,
@@ -615,7 +626,7 @@ class PortfolioService:
                             day_profit=round(day_profit_val, 2) if day_profit_val is not None else None,
                             prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
-                            company_rating=snapshot.company_rating or item.company_rating,
+                            company_rating=item.manual_rating or snapshot.company_rating or item.company_rating,
                             dividend_yield=snapshot.dividend_yield,
                             purchase_date=item.purchase_date,
                             ai_comment="",
