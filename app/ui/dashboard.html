@@ -9783,7 +9783,35 @@
       function topbarDeletePortfolio() {
         if (isReadOnly || isAllMode || !portfolioId) return;
         const active = portfolios.find(p => p.id === portfolioId);
-        settingsDeletePortfolio(portfolioId, active ? active.name : '');
+        const name = active ? active.name : '';
+        // Deleting a non-empty portfolio is irreversible (cascades positions,
+        // snapshots, coupons). Require typing the name to confirm — guards against
+        // an accidental click on the header trash icon.
+        const hasData = Array.isArray(tableRows) && tableRows.length > 0;
+        if (hasData) {
+          const typed = (window.prompt(
+            'Удаление портфеля «' + name + '» необратимо — будут удалены все ' +
+            tableRows.length + ' бумаг(и), история и купоны.\n\n' +
+            'Чтобы подтвердить, введите название портфеля:', '') || '').trim();
+          if (typed !== name) {
+            if (typed) toast('Название не совпало — удаление отменено', 'warn');
+            return;
+          }
+          // Name matched → delete directly (skip the lighter second confirm).
+          (async () => {
+            try {
+              const r = await apiFetch(`/portfolios/${portfolioId}`, { method: 'DELETE' });
+              if (!r.ok) { toast(t('settings.portfolios.deleteError'), 'error'); return; }
+              await loadPortfolios();
+              updatePortfolioSelector();
+              if (portfolioId === active.id) { portfolioId = portfolios[0]?.id || null; }
+              if (portfolioId) { syncTableFromServer().catch(() => {}); } else { renderTable(); }
+              toast('Портфель удалён', 'success');
+            } catch (e) { toast(t('settings.portfolios.deleteError'), 'error'); }
+          })();
+          return;
+        }
+        settingsDeletePortfolio(portfolioId, name);
       }
 
       // Change username
