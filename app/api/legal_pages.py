@@ -2,8 +2,7 @@
 
 Rendered through the shared public page shell from bond_pages so they match the
 rest of the public site (theme toggle, mesh background, unified topbar/footer,
-Yandex.Metrika). The legal text itself is kept verbatim from the original static
-ui/privacy.html and ui/terms.html documents.
+Yandex.Metrika). The legal text is the source of truth and lives below.
 """
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
