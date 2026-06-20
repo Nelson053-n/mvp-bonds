@@ -144,7 +144,7 @@ def _cache_put(secid: str, html: str) -> None:
 _CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--blue-400:#60a5fa;--blue-500:#3b82f6;--blue-600:#2563eb;--indigo-500:#6366f1;
---green-400:#4ade80;--red-400:#f87171;--yellow-400:#fbbf24;
+--green-400:#4ade80;--green-500:#22c55e;--red-400:#f87171;--yellow-400:#fbbf24;
 --slate-300:#cbd5e1;--slate-400:#94a3b8;--slate-500:#64748b;--slate-600:#475569;
 --slate-700:#334155;--slate-800:#1e293b;--slate-900:#0f172a;
 --radius-sm:6px;--radius:8px;--radius-lg:12px;
