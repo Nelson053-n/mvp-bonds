@@ -194,8 +194,20 @@
     }
     .logo-text { font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
     .topbar-spacer { flex: 1; }
-    .topbar-back { font-size: 13px; font-weight: 600; color: var(--muted); transition: color .15s; }
-    .topbar-back:hover { color: var(--link); }
+    .topbar-nav { display: flex; align-items: center; gap: 18px; }
+    .topbar-nav a.nav-link { font-size: 13px; font-weight: 600; color: var(--muted); transition: color .15s; }
+    .topbar-nav a.nav-link:hover { color: var(--link); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 6px;
+      padding: 7px 14px; cursor: pointer; transition: all .15s ease; text-decoration: none;
+      border: 1.5px solid transparent; white-space: nowrap;
+    }
+    .btn-ghost { background: transparent; border-color: var(--line-3); color: var(--text-soft); }
+    .btn-ghost:hover { border-color: var(--line-strong); color: var(--head); background: var(--hover-bg); }
+    .btn-primary { background: linear-gradient(135deg,#2563eb,#4f46e5); border-color: transparent;
+      color: #fff !important; box-shadow: 0 0 20px rgba(37,99,235,.35); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(37,99,235,.55); filter: brightness(1.08); }
     .theme-btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 32px; height: 32px; background: transparent;
@@ -328,6 +340,8 @@
 
     @media (max-width: 640px) {
       .topbar { padding: 0 16px; }
+      .topbar-nav { gap: 10px; }
+      .topbar-nav a.nav-link, .btn-ghost { display: none; }
       .edu-page { padding: 32px 16px 60px; }
     }
   </style>
@@ -341,11 +355,16 @@
       <span class="logo-text">Bond AI</span>
     </a>
     <div class="topbar-spacer"></div>
-    <button id="theme-toggle" class="theme-btn" aria-label="Переключить тему" title="Светлая / тёмная тема">
-      <svg class="ic-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      <svg class="ic-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    </button>
-    <a href="/" class="topbar-back">&larr; На главную</a>
+    <nav class="topbar-nav">
+      <a class="nav-link" href="/bond">Облигации</a>
+      <a class="nav-link" href="/calc">Калькуляторы</a>
+      <button id="theme-toggle" class="theme-btn" aria-label="Переключить тему" title="Светлая / тёмная тема">
+        <svg class="ic-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="ic-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a class="btn btn-ghost" href="/app?auth=login">Войти</a>
+      <a class="btn btn-primary" href="/app?auth=register">Попробовать бесплатно</a>
+    </nav>
   </header>
 
   <main class="edu-page">
@@ -660,11 +679,14 @@
   <footer class="footer">
     <p>
       &copy; 2025 Bond AI &middot;
+      <a href="/bond">Облигации</a> &middot;
+      <a href="/calc">Калькуляторы</a> &middot;
       <a href="/uchebnik">Учебник</a> &middot;
       <a href="/privacy">Конфиденциальность</a> &middot;
-      <a href="/terms">Условия использования</a> &middot;
-      Данные предоставлены Московской биржей
+      <a href="/terms">Условия использования</a>
     </p>
+    <p>Данные предоставлены Московской биржей. Информация носит справочный характер и не является индивидуальной инвестиционной рекомендацией.</p>
+    <p><a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color:var(--link);">Откройте счёт в Т-Инвестициях и получите акции на 2000 &#8381; &rarr;</a></p>
   </footer>
   <script>(function(){var b=document.getElementById('theme-toggle');if(!b)return;
 b.addEventListener('click',function(){var h=document.documentElement;

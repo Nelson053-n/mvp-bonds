@@ -3,35 +3,56 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>(function(){try{if(localStorage.getItem('bondai_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><text x='16' y='23' font-family='Inter,Arial,sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'>B</text></svg>" />
     <title>Портфель не найден — Bond AI</title>
+    <meta name="robots" content="noindex" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
         *, *::before, *::after { box-sizing: border-box; }
+        :root {
+            --bg: #020817; --panel: #0f172a; --line: rgba(148,163,184,.1);
+            --head: #f1f5f9; --text: #94a3b8; --faint: #475569;
+            --link: #60a5fa; --icon-bg: rgba(37,99,235,.18);
+            --topbar-bg: rgba(2,8,23,.85); --mesh: rgba(148,163,184,.04);
+        }
+        html[data-theme=light] {
+            --bg: #f6f8fb; --panel: #fff; --line: rgba(15,23,42,.1);
+            --head: #0f172a; --text: #475569; --faint: #94a3b8;
+            --link: #2563eb; --icon-bg: rgba(37,99,235,.1);
+            --topbar-bg: rgba(255,255,255,.85); --mesh: rgba(15,23,42,.04);
+        }
         body {
             margin: 0;
             font-family: 'Inter', system-ui, sans-serif;
-            background: #0f172a;
+            background: var(--bg);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
+        .mesh-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background-image: linear-gradient(var(--mesh) 1px,transparent 1px),
+            linear-gradient(90deg,var(--mesh) 1px,transparent 1px); background-size: 44px 44px; }
+        nav, main, footer { position: relative; z-index: 1; }
         nav {
-            padding: 14px 32px;
+            padding: 0 32px; height: 56px;
             display: flex;
             align-items: center;
             gap: 10px;
-            border-bottom: 1px solid #1e293b;
+            background: var(--topbar-bg);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--line);
         }
+        nav a { text-decoration: none; display: flex; align-items: center; gap: 10px; }
         .brand-mark {
             width: 30px; height: 30px;
-            background: #2563eb; border-radius: 7px;
+            background: linear-gradient(135deg,#2563eb,#4f46e5); border-radius: 7px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 15px; color: #fff;
+            font-weight: 800; font-size: 15px; color: #fff;
         }
-        .brand-name { font-weight: 700; font-size: 14px; color: #f1f5f9; letter-spacing: -.2px; }
+        .brand-name { font-weight: 700; font-size: 15px; color: var(--head); letter-spacing: -.2px; }
         main {
             flex: 1;
             display: flex;
@@ -40,61 +61,65 @@
             padding: 60px 24px;
         }
         .card {
-            background: #1e293b;
-            border: 1px solid #334155;
+            background: var(--panel);
+            border: 1px solid var(--line);
             border-radius: 16px;
             padding: 48px 40px;
             text-align: center;
             max-width: 480px;
             width: 100%;
-            box-shadow: 0 25px 50px rgba(0,0,0,.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,.25);
         }
         .card-icon {
             width: 64px; height: 64px;
-            background: #1e3a8a; border-radius: 16px;
+            background: var(--icon-bg); border-radius: 16px;
             display: flex; align-items: center; justify-content: center;
             font-size: 28px; margin: 0 auto 24px;
         }
         h1 {
             margin: 0 0 12px;
             font-size: 22px; font-weight: 700;
-            color: #f1f5f9; letter-spacing: -.3px;
+            color: var(--head); letter-spacing: -.3px;
         }
         p {
             margin: 0 0 10px;
-            font-size: 14px; color: #94a3b8; line-height: 1.65;
+            font-size: 14px; color: var(--text); line-height: 1.65;
         }
         .back-link {
             display: inline-block;
             margin-top: 20px;
             padding: 10px 24px;
-            background: #2563eb; color: #fff;
+            background: linear-gradient(135deg,#2563eb,#4f46e5); color: #fff;
             text-decoration: none; border-radius: 8px;
             font-size: 14px; font-weight: 600;
-            transition: background .15s;
+            box-shadow: 0 0 20px rgba(37,99,235,.35);
+            transition: filter .15s, transform .15s;
         }
-        .back-link:hover { background: #1d4ed8; }
+        .back-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
         footer {
-            border-top: 1px solid #1e293b;
+            border-top: 1px solid var(--line);
             padding: 16px 32px;
             display: flex; align-items: center; justify-content: space-between;
             flex-wrap: wrap; gap: 8px;
         }
-        footer span { font-size: 11px; color: #475569; }
-        footer a { color: #3b82f6; text-decoration: none; }
+        footer span { font-size: 11px; color: var(--faint); }
+        footer a { color: var(--link); text-decoration: none; }
     </style>
 </head>
 <body>
+    <div class="mesh-bg"></div>
     <nav>
-        <div class="brand-mark">B</div>
-        <span class="brand-name">Bond AI</span>
+        <a href="/">
+            <div class="brand-mark">B</div>
+            <span class="brand-name">Bond AI</span>
+        </a>
     </nav>
     <main>
         <div class="card">
             <div class="card-icon">&#128279;</div>
             <h1>Ссылка истекла или неверна</h1>
             <p>Портфель по этой ссылке больше не доступен.<br>Владелец мог удалить его или отозвать общий доступ.</p>
-            <p style="font-size: 12px; color: #475569;">Если вы считаете, что это ошибка — обратитесь к владельцу портфеля.</p>
+            <p style="font-size: 12px; color: var(--faint);">Если вы считаете, что это ошибка — обратитесь к владельцу портфеля.</p>
             <a href="/" class="back-link">&#8592; На главную</a>
         </div>
     </main>
@@ -102,5 +127,7 @@
         <span>&#169; Bond AI &middot; Не является инвестиционной рекомендацией</span>
         <span>Откройте счёт: <a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener">Т&#8209;Инвестиции</a></span>
     </footer>
+    <script>(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js?id=107693104","ym");ym(107693104,"init",{ssr:true,clickmap:true,trackLinks:true,accurateTrackBounce:true});</script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/107693104" style="position:absolute;left:-9999px;" alt=""></div></noscript>
 </body>
 </html>

@@ -12,6 +12,7 @@ from app.api.auth import router as auth_router
 from app.api.bond_pages import router as bond_pages_router
 from app.api.bonds import router as bonds_router
 from app.api.calculators import router as calculators_router
+from app.api.legal_pages import router as legal_pages_router
 from app.api.pdf import router as pdf_router
 from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
@@ -522,6 +523,7 @@ app.include_router(auth_router)
 app.include_router(bond_pages_router)
 app.include_router(bonds_router)
 app.include_router(calculators_router)
+app.include_router(legal_pages_router)
 app.include_router(pdf_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
@@ -736,8 +738,6 @@ async def indexnow_key_file(key: str):
 _PUBLIC_HTML_PAGES: dict[str, Path] = {
     "/":        landing_path,
     "/landing": landing_path,
-    "/privacy": _ui_dir / "privacy.html",
-    "/terms":   _ui_dir / "terms.html",
     "/uchebnik": _ui_dir / "uchebnik.html",
 }
 # Private app shells — never cache (per-user data is fetched client-side).
