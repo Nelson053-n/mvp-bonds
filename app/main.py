@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.api.auth import router as auth_router
-from app.api.bond_pages import router as bond_pages_router
+from app.api.bond_pages import error_page_html, router as bond_pages_router
 from app.api.bonds import router as bonds_router
 from app.api.calculators import router as calculators_router
 from app.api.legal_pages import router as legal_pages_router
@@ -38,8 +38,6 @@ logger = logging.getLogger(__name__)
 _ui_dir = Path(__file__).parent / "ui"
 dashboard_path = _ui_dir / "dashboard.html"
 landing_path = _ui_dir / "landing.html"
-share_error_path = _ui_dir / "share_error.html"
-not_found_path = _ui_dir / "404.html"
 
 _NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -499,7 +497,12 @@ async def not_found_handler(request: Request, exc):
     """Return HTML 404 for browser requests, JSON 404 for API requests."""
     if request.url.path.startswith(_API_PREFIXES):
         return JSONResponse(status_code=404, content={"detail": getattr(exc, "detail", "Not found")})
-    return HTMLResponse(not_found_path.read_text(encoding="utf-8"), status_code=404)
+    html = error_page_html(
+        "\U0001f50d", "Страница не найдена",
+        "Запрашиваемая страница не существует или была перемещена.",
+        title="Страница не найдена — Bond AI",
+    )
+    return HTMLResponse(html, status_code=404, headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(Exception)
@@ -768,10 +771,12 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
     """View shared portfolio page (public endpoint, no auth required)."""
     portfolio = storage_service.get_portfolio_by_share_token(share_token)
     if not portfolio:
-        return HTMLResponse(
-            share_error_path.read_text(encoding="utf-8"),
-            status_code=404,
+        html = error_page_html(
+            "\U0001f517", "Ссылка истекла или неверна",
+            "Портфель по этой ссылке больше не доступен.",
+            title="Портфель не найден — Bond AI",
         )
+        return HTMLResponse(html, status_code=404, headers={"Cache-Control": "no-store"})
 
     html = dashboard_path.read_text(encoding="utf-8")
     html = html.replace(

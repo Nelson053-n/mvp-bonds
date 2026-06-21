@@ -640,6 +640,31 @@ def _render_404() -> HTMLResponse:
     return HTMLResponse(html, status_code=404, headers={"Cache-Control": "no-store"})
 
 
+# Shared centred-card layout for error pages, rendered through the common shell
+# so 404 / share-error match the rest of the site (topbar, footer, theme, mesh).
+_ERROR_CSS = """<style>
+.err-card{max-width:440px;margin:48px auto;text-align:center;
+background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius-lg);
+padding:40px 32px}
+.err-icon{font-size:40px;line-height:1;margin-bottom:14px}
+.err-card h1{font-size:22px;margin:0 0 10px}
+.err-card p{color:var(--text);margin:0 0 22px;line-height:1.6}
+</style>"""
+
+
+def error_page_html(icon: str, heading: str, message: str,
+                    cta_label: str = "← На главную", cta_href: str = "/",
+                    title: str = "Bond AI") -> str:
+    """Full HTML for a centred error page (404, broken share link, …)."""
+    body = (
+        _ERROR_CSS
+        + '<div class="err-card"><div class="err-icon">' + icon + "</div>"
+        + "<h1>" + heading + "</h1><p>" + message + "</p>"
+        + '<a href="' + cta_href + '" class="btn btn-primary">' + cta_label + "</a></div>"
+    )
+    return _page_shell(title, message, _BASE_URL + "/", [], body)
+
+
 # ── Catalog ──────────────────────────────────────────────────────────────────
 
 _CATALOG_CSS = """<style>
