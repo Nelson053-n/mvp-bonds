@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bond-ai-v107';
+const CACHE_NAME = 'bond-ai-v108';
 const STATIC_ASSETS = [
   '/manifest.json',
 ];
@@ -83,14 +83,25 @@ self.addEventListener('fetch', (event) => {
         if (preload) return preload;
         return await fetch(event.request, { cache: 'no-cache' });
       } catch (e) {
-        return (await caches.match('/app')) || (await caches.match('/'));
+        // Offline / network error: serve whatever shell we have, else a minimal
+        // response so respondWith() never resolves to undefined (which the browser
+        // logs as "FetchEvent resulted in a network error response").
+        return (await caches.match('/app')) ||
+               (await caches.match('/')) ||
+               new Response('', { status: 503, statusText: 'Offline' });
       }
     })());
     return;
   }
 
-  // Cache-first for everything else
+  // Cache-first for everything else. fetch() may reject on a network error, so
+  // catch it and fall back to the cache (or a 503) — otherwise the rejection
+  // surfaces as an uncaught "TypeError: Failed to fetch" in the console.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then((cached) =>
+      cached || fetch(event.request).catch(() =>
+        new Response('', { status: 503, statusText: 'Offline' })
+      )
+    )
   );
 });
