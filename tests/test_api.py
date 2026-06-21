@@ -270,6 +270,42 @@ class TestCustomInstrument:
         # 2000 * 12% / 4 = 60 per payment
         assert row["coupon"] == 60.0
 
+    async def test_custom_full_profit(self, client: AsyncClient, auth_headers: dict) -> None:
+        """Custom bonds accrue full profit = price change + coupons since purchase."""
+        # Bought far in the past with a semi-annual 12% coupon → coupons accrue.
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments",
+            json={"ticker": "SPB-FP", "quantity": 10, "purchase_price": 1000.0,
+                  "current_price": 1020.0, "is_custom": True, "instrument_type": "bond",
+                  "custom_name": "FP Bond", "custom_nominal": 1000, "custom_coupon_freq": 2,
+                  "coupon_rate": 12.0, "purchase_date": "2020-01-01"},
+            headers=auth_headers,
+        )
+        item_id = resp.json()["id"]
+        table = await client.get(f"/portfolios/{TEST_PORTFOLIO_ID}/table", headers=auth_headers)
+        row = next(r for r in table.json()["items"] if r["id"] == item_id)
+        assert row["profit"] == 200.0  # (1020-1000)*10
+        # full_profit = body + realized coupons; realized must be positive and
+        # full_profit strictly greater than the body-only profit.
+        assert row["realized_coupons"] is not None and row["realized_coupons"] > 0
+        assert row["full_profit"] == round(200.0 + row["realized_coupons"], 2)
+
+    async def test_custom_full_profit_none_without_date(
+        self, client: AsyncClient, auth_headers: dict
+    ) -> None:
+        """No purchase date → coupons can't be counted → full_profit is None."""
+        resp = await client.post(
+            f"/portfolios/{TEST_PORTFOLIO_ID}/instruments",
+            json={"ticker": "SPB-NOFP", "quantity": 5, "purchase_price": 1000.0,
+                  "is_custom": True, "instrument_type": "bond", "custom_name": "No date",
+                  "custom_nominal": 1000, "custom_coupon_freq": 2, "coupon_rate": 10.0},
+            headers=auth_headers,
+        )
+        item_id = resp.json()["id"]
+        table = await client.get(f"/portfolios/{TEST_PORTFOLIO_ID}/table", headers=auth_headers)
+        row = next(r for r in table.json()["items"] if r["id"] == item_id)
+        assert row["full_profit"] is None
+
     async def test_refresh_ratings(self, client: AsyncClient, auth_headers: dict) -> None:
         """Manual rating refresh returns counts and is rate-limited per portfolio."""
         resp = await client.post(

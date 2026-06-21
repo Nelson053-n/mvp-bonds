@@ -469,6 +469,34 @@ class PortfolioService:
                             maturity_date = date.fromisoformat(str(item.custom_maturity)[:10])
                         except ValueError:
                             maturity_date = None
+                    # Full profit = price revaluation + coupons received since purchase.
+                    # No ACI for custom items (the user doesn't enter it). Coupons are
+                    # counted from the purchase date stepping by coupon_period days up to
+                    # today (and never past the maturity date).
+                    realized = 0.0
+                    has_realized = False
+                    if (
+                        coupon_amount is not None
+                        and item.purchase_date
+                        and item.instrument_type == "bond"
+                    ):
+                        buy = _parse_iso_date(item.purchase_date)
+                        if buy is not None:
+                            from datetime import timedelta
+                            today = date.today()
+                            end = today
+                            if maturity_date is not None and maturity_date < end:
+                                end = maturity_date
+                            paid = 0
+                            d = buy + timedelta(days=coupon_period)
+                            while d <= end:
+                                paid += 1
+                                d = d + timedelta(days=coupon_period)
+                            realized = coupon_amount * item.quantity * paid
+                            has_realized = True
+                    full_profit_val = (
+                        round(profit + realized, 2) if has_realized else None
+                    )
                     return InstrumentMetrics(
                         id=item.id,
                         type=item.instrument_type,
@@ -490,6 +518,8 @@ class PortfolioService:
                         maturity_date=maturity_date,
                         nominal=nominal if item.instrument_type == "bond" else None,
                         company_rating=item.manual_rating,
+                        realized_coupons=round(realized, 2) if has_realized else None,
+                        full_profit=full_profit_val,
                         purchase_date=item.purchase_date,
                         source="custom",
                         ai_comment="",
