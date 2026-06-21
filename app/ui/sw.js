@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bond-ai-v105';
+const CACHE_NAME = 'bond-ai-v106';
 const STATIC_ASSETS = [
   '/manifest.json',
 ];
@@ -36,6 +36,12 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Leave cross-origin requests (Google Fonts, Yandex Metrika, …) to the browser.
+  // Wrapping them in our own fetch() would subject them to the page's CSP
+  // connect-src directive, which blocks third-party hosts allowed only for
+  // style-src/font-src/script-src.
+  if (url.origin !== self.location.origin) return;
 
   // Never serve sw.js or the app shell from cache — always hit the network so a
   // stale worker can't pin itself or an old page in place.
