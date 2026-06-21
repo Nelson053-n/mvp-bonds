@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bond-ai-v106';
+const CACHE_NAME = 'bond-ai-v107';
 const STATIC_ASSETS = [
   '/manifest.json',
 ];
@@ -43,9 +43,10 @@ self.addEventListener('fetch', (event) => {
   // style-src/font-src/script-src.
   if (url.origin !== self.location.origin) return;
 
-  // Never serve sw.js or the app shell from cache — always hit the network so a
-  // stale worker can't pin itself or an old page in place.
-  if (url.pathname === '/sw.js' || url.pathname === '/app') {
+  // Never serve sw.js from cache — always hit the network so a stale worker
+  // can't pin itself in place. (The app shell /app is handled in the navigate
+  // branch below so the navigation-preload response is always consumed.)
+  if (url.pathname === '/sw.js') {
     event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() =>
       caches.match(event.request)
     ));
@@ -67,9 +68,18 @@ self.addEventListener('fetch', (event) => {
   // and {cache:'no-cache'} revalidates with the server so a stale browser
   // HTTP-cache entry (public pages have max-age) can't pin old HTML.
   if (event.request.mode === 'navigate') {
+    // /app must always come fresh from the network (no-store) so a stale shell
+    // can't pin an old page; it ignores the preload response, but we still must
+    // consume event.preloadResponse, otherwise the browser cancels the preload
+    // request before it settles and logs a console warning.
+    const isAppShell = url.pathname === '/app';
     event.respondWith((async () => {
+      // Always settle the preload promise so it isn't left dangling.
+      const preload = await event.preloadResponse.catch(() => null);
       try {
-        const preload = await event.preloadResponse;
+        if (isAppShell) {
+          return await fetch(event.request, { cache: 'no-store' });
+        }
         if (preload) return preload;
         return await fetch(event.request, { cache: 'no-cache' });
       } catch (e) {
