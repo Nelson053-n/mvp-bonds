@@ -267,10 +267,79 @@ async def test_billing_create_503_without_keys(client, auth_headers):
     assert r.status_code == 503  # YooKassa not configured
 
 
-async def test_billing_webhook_always_200(client):
+async def test_billing_webhook_always_200(client, monkeypatch):
     # Webhook must never error (so YooKassa doesn't retry-storm), even on garbage.
+    # Disable the IP-allowlist so the test client (127.0.0.1) is treated as trusted.
+    from app.api import billing
+    monkeypatch.setattr(billing.settings, "yookassa_webhook_ip_check", False)
     r = await client.post("/billing/webhook", json={"garbage": True})
     assert r.status_code == 200
+
+
+async def test_billing_webhook_rejects_untrusted_ip(client):
+    # IP-allowlist on by default: an unknown source IP (test client = 127.0.0.1)
+    # is rejected with 403 BEFORE any outbound YooKassa lookup.
+    from app.api import billing
+    called = {"n": 0}
+
+    async def _boom(_pid):
+        called["n"] += 1
+        return None
+
+    # If the allowlist worked, get_payment is never reached.
+    import app.services.yookassa_service as yk
+    orig = yk.get_payment
+    yk.get_payment = _boom
+    try:
+        r = await client.post(
+            "/billing/webhook",
+            json={"object": {"id": "21966b95-000f-5000-8000-1ee2f5a1d8a0"}},
+        )
+    finally:
+        yk.get_payment = orig
+    assert r.status_code == 403
+    assert called["n"] == 0
+
+
+async def test_billing_webhook_ignores_non_uuid_id(client, monkeypatch):
+    # Even from a trusted IP, a forged id that isn't a YooKassa UUID must not
+    # trigger an outbound get_payment call (DoS-amplification guard).
+    from app.api import billing
+    monkeypatch.setattr(billing.settings, "yookassa_webhook_ip_check", False)
+    called = {"n": 0}
+
+    async def _boom(_pid):
+        called["n"] += 1
+        return None
+
+    monkeypatch.setattr(billing.yookassa_service, "get_payment", _boom)
+    r = await client.post(
+        "/billing/webhook", json={"object": {"id": "'; DROP TABLE users; --"}}
+    )
+    assert r.status_code == 200
+    assert called["n"] == 0
+
+
+async def test_billing_webhook_rate_limit(client, monkeypatch):
+    # 60 requests/hour per IP; the 61st is rejected with 429. IP-check off so the
+    # test client passes the allowlist and we exercise only the rate limiter.
+    from app.api import billing
+    monkeypatch.setattr(billing.settings, "yookassa_webhook_ip_check", False)
+    monkeypatch.setattr(billing.yookassa_service, "get_payment",
+                        lambda _pid: _async_none())
+    # Start from a clean window so prior webhook tests don't pre-fill the counter.
+    with billing.storage_service._connect() as conn:
+        conn.execute("DELETE FROM rate_limits WHERE key LIKE 'billing_webhook:%'")
+        conn.commit()
+
+    last = None
+    for _ in range(61):
+        last = await client.post("/billing/webhook", json={"garbage": True})
+    assert last.status_code == 429
+
+
+async def _async_none():
+    return None
 
 
 def test_grant_pro_from_payment(monkeypatch):

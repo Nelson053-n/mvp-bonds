@@ -1,5 +1,7 @@
 """Pro billing via YooKassa (one-off month/year payments)."""
+import ipaddress
 import logging
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,6 +15,34 @@ from app.services.storage_service import storage_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+# Official YooKassa notification source ranges (docs → "IP-адреса ЮKassa").
+# Webhooks arriving from outside these are rejected before any outbound call.
+_YOOKASSA_NETWORKS = [
+    ipaddress.ip_network(n) for n in (
+        "185.71.76.0/27", "185.71.77.0/27", "77.75.153.0/25",
+        "77.75.156.11/32", "77.75.156.35/32", "77.75.154.128/25",
+        "2a02:5180::/32",
+    )
+]
+
+# YooKassa payment ids are UUIDs with a couple of dashes turned into dots in
+# some SDKs, but the canonical form is a plain UUID. Reject anything else early
+# so a forged id never triggers an outbound get_payment lookup.
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
+)
+
+
+def _ip_allowed(client_ip: str) -> bool:
+    """True if the request comes from an official YooKassa subnet."""
+    if not client_ip:
+        return False
+    try:
+        addr = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    return any(addr in net for net in _YOOKASSA_NETWORKS)
 
 
 @router.get("/config")
@@ -94,14 +124,33 @@ def _grant_pro_from_payment(payment: dict) -> bool:
 @router.post("/webhook")
 async def billing_webhook(request: Request) -> dict:
     """YooKassa notification. Untrusted input — we RE-FETCH the payment by id and
-    verify its real status before granting Pro (never trust the webhook body)."""
+    verify its real status before granting Pro (never trust the webhook body).
+
+    Hardening (DoS-amplification): only official YooKassa IPs may reach the
+    outbound get_payment lookup, per-IP rate-limited, and a forged id that
+    doesn't look like a YooKassa UUID is rejected before any external call."""
+    client_ip = request.client.host if request.client else ""
+
+    # (1) IP-allowlist — official YooKassa subnets only (toggleable for dev).
+    if settings.yookassa_webhook_ip_check and not _ip_allowed(client_ip):
+        logger.warning("billing_webhook rejected: untrusted ip=%s", client_ip)
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    # (2) Per-IP rate limit (60/hour) to cap load on us and the YooKassa API.
+    if client_ip and not storage_service.check_rate_limit(
+        f"billing_webhook:ip:{client_ip}", 3600, 60
+    ):
+        logger.warning("billing_webhook rate limit exceeded ip=%s", client_ip)
+        raise HTTPException(status_code=429, detail="too many requests")
+
     try:
         body = await request.json()
     except Exception:
         return {"ok": True}  # always 200 so YooKassa doesn't retry-storm
     obj = (body or {}).get("object") or {}
     payment_id = obj.get("id")
-    if not payment_id:
+    # (3) Bail out before any outbound call if the id isn't a YooKassa UUID.
+    if not payment_id or not _UUID_RE.match(str(payment_id)):
         return {"ok": True}
     verified = await yookassa_service.get_payment(payment_id)
     if verified:

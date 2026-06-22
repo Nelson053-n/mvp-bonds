@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # → Интеграция → Ключи API. Add to .env later, no redeploy needed.
     yookassa_shop_id: str = ""
     yookassa_secret_key: str = ""
+    # Webhook IP-allowlist: only official YooKassa subnets may hit /billing/webhook.
+    # Set MVP_YOOKASSA_WEBHOOK_IP_CHECK=false to disable (local dev / behind proxy).
+    yookassa_webhook_ip_check: bool = True
     # Pro prices in RUB and the days each grants.
     pro_price_month: int = 299
     pro_price_year: int = 2490
