@@ -77,19 +77,32 @@ class _RatingCache:
     timeout can't pin a bond to "no rating" until the next restart.
     """
     OK_TTL = 6 * 3600     # 6h for a real rating
-    MISS_TTL = 900        # 15min for None (errors / not found) — retry soon
+    MISS_TTL = 900        # 15min for an honest None (rating genuinely absent)
+    ERROR_TTL = 60        # 1min for a None from a transient source error
 
     def __init__(self) -> None:
         self._data: dict[str, tuple[object, float]] = {}
+        self._errored: set[str] = set()
+
+    def set_error(self, key: str) -> None:
+        """Cache None from a source error with a short ERROR_TTL."""
+        self._data[key] = (None, time.time())
+        self._errored.add(key)
 
     def _fresh(self, key: str) -> bool:
         entry = self._data.get(key)
         if entry is None:
             return False
         value, ts = entry
-        ttl = self.OK_TTL if value else self.MISS_TTL
+        if value:
+            ttl = self.OK_TTL
+        elif key in self._errored:
+            ttl = self.ERROR_TTL
+        else:
+            ttl = self.MISS_TTL
         if (time.time() - ts) >= ttl:
             self._data.pop(key, None)
+            self._errored.discard(key)
             return False
         return True
 
@@ -101,13 +114,16 @@ class _RatingCache:
 
     def __setitem__(self, key: str, value) -> None:
         self._data[key] = (value, time.time())
+        self._errored.discard(key)
 
     def pop(self, key: str, default=None):
+        self._errored.discard(key)
         entry = self._data.pop(key, None)
         return entry[0] if entry is not None else default
 
     def clear(self) -> None:
         self._data.clear()
+        self._errored.clear()
 
     def __len__(self) -> int:
         return len(self._data)
@@ -824,24 +840,56 @@ class MOEXService:
             )
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=3) as client:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
-                html = response.text
-        except httpx.HTTPStatusError as exc:
-            src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
-            logger.warning(
-                "SmartLab HTTP error %s for %s",
-                exc.response.status_code,
-                secid,
-            )
-            self._credit_rating_cache[cache_key] = None
-            return None
-        except httpx.RequestError as exc:
-            src.record_error(None, str(exc)[:80])
-            logger.warning("SmartLab request error for %s: %s", secid, exc)
-            self._credit_rating_cache[cache_key] = None
+        # Short retries with backoff — a transient SmartLab timeout/5xx must not
+        # freeze the rating onto the inaccurate LISTLEVEL proxy. On the final
+        # failure cache with a short ERROR_TTL (set_error), not the 15min MISS_TTL.
+        SMARTLAB_RETRY_DELAYS = [0.5, 1.5]  # seconds before each retry
+        last_exc: Exception | None = None
+        html: str | None = None
+        for attempt in range(len(SMARTLAB_RETRY_DELAYS) + 1):
+            try:
+                async with httpx.AsyncClient(timeout=8) as client:
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                    html = response.text
+                break
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                code = exc.response.status_code
+                # 404 is a definitive "no such bond" — don't waste retries on it.
+                if code == 404:
+                    src.record_error(code, f"HTTP {code}")
+                    logger.warning("SmartLab HTTP 404 for %s", secid)
+                    self._credit_rating_cache.set_error(cache_key)
+                    return None
+                if attempt < len(SMARTLAB_RETRY_DELAYS):
+                    logger.warning(
+                        "SmartLab HTTP %s for %s (attempt %d) — retrying",
+                        code, secid, attempt + 1,
+                    )
+                    await asyncio.sleep(SMARTLAB_RETRY_DELAYS[attempt])
+                    continue
+                src.record_error(code, f"HTTP {code}")
+                logger.warning("SmartLab HTTP error %s for %s", code, secid)
+                self._credit_rating_cache.set_error(cache_key)
+                return None
+            except httpx.RequestError as exc:
+                last_exc = exc
+                if attempt < len(SMARTLAB_RETRY_DELAYS):
+                    logger.warning(
+                        "SmartLab request error for %s (attempt %d): %s — retrying",
+                        secid, attempt + 1, exc,
+                    )
+                    await asyncio.sleep(SMARTLAB_RETRY_DELAYS[attempt])
+                    continue
+                src.record_error(None, str(exc)[:80])
+                logger.warning("SmartLab request error for %s: %s", secid, exc)
+                self._credit_rating_cache.set_error(cache_key)
+                return None
+
+        if html is None:  # defensive: shouldn't happen, all paths above return
+            src.record_error(None, str(last_exc)[:80] if last_exc else "")
+            self._credit_rating_cache.set_error(cache_key)
             return None
 
         rating_match = self._find_rating_with_label(html)

@@ -210,6 +210,39 @@ class TestRatingCacheTTL:
         t[0] += 101                  # past MISS_TTL but well within OK_TTL
         assert "smartlab:Y" not in c  # error must not pin the bond to "no rating"
 
+    def test_error_expires_faster_than_miss(self, monkeypatch):
+        """A None from a transient network error uses the short ERROR_TTL,
+        so a SmartLab blip can't pin a bond to 'no rating' for the full MISS_TTL."""
+        import app.services.moex_service as m
+        c = self._cache()
+        c.MISS_TTL = 900
+        c.ERROR_TTL = 60
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+
+        c.set_error("smartlab:E")    # transient network error → None
+        c["smartlab:M"] = None       # honest "rating not found" → None
+        assert "smartlab:E" in c
+        assert "smartlab:M" in c
+
+        t[0] += 61                   # past ERROR_TTL but well within MISS_TTL
+        assert "smartlab:E" not in c  # error entry already retryable
+        assert "smartlab:M" in c      # honest miss still cached
+
+    def test_overwriting_error_clears_error_flag(self, monkeypatch):
+        """A successful re-fetch over an errored key reverts to OK_TTL."""
+        import app.services.moex_service as m
+        c = self._cache()
+        c.OK_TTL = 10000
+        c.ERROR_TTL = 60
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+        c.set_error("smartlab:K")
+        c["smartlab:K"] = "AA"       # real rating now
+        t[0] += 61                   # past ERROR_TTL
+        assert "smartlab:K" in c     # but it's a real value on OK_TTL now
+        assert c["smartlab:K"] == "AA"
+
     def test_pop_and_clear(self):
         c = self._cache()
         c["a"] = "A"
@@ -218,6 +251,128 @@ class TestRatingCacheTTL:
         c["b"] = "B"
         c.clear()
         assert len(c) == 0
+
+
+class TestSmartLabRetry:
+    """_get_smartlab_credit_rating must retry transient failures and must not
+    pin a bond to 'no rating' for the full MISS_TTL when SmartLab hiccups."""
+
+    def _service(self):
+        return MOEXService()
+
+    @pytest.fixture(autouse=True)
+    def _no_sleep(self, monkeypatch):
+        import app.services.moex_service as m
+
+        async def _instant(_):
+            return None
+
+        monkeypatch.setattr(m.asyncio, "sleep", _instant)
+
+    def _patch_client(self, monkeypatch, responses):
+        """Patch httpx.AsyncClient so each .get() consumes the next item from
+        `responses`: an Exception is raised, anything else is returned as a
+        fake response with .text / .raise_for_status()."""
+        import app.services.moex_service as m
+        calls = {"n": 0}
+
+        class _FakeResp:
+            def __init__(self, text):
+                self.text = text
+
+            def raise_for_status(self):
+                return None
+
+        class _FakeClient:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, headers=None):
+                idx = calls["n"]
+                calls["n"] += 1
+                item = responses[idx]
+                if isinstance(item, Exception):
+                    raise item
+                return _FakeResp(item)
+
+        monkeypatch.setattr(m.httpx, "AsyncClient", _FakeClient)
+        return calls
+
+    async def test_retries_then_succeeds(self, monkeypatch):
+        import app.services.moex_service as m
+        svc = self._service()
+        html = '<span class="linear-progress-bar__text">ruAA+</span>'
+        calls = self._patch_client(
+            monkeypatch,
+            [m.httpx.ConnectTimeout("boom"), html],  # fail once, then succeed
+        )
+        result = await svc._get_smartlab_credit_rating("SECID1")
+        assert calls["n"] == 2          # retried exactly once
+        assert result is not None
+        assert "AA+" in result
+
+    async def test_transient_failure_does_not_pin_none_for_miss_ttl(
+        self, monkeypatch
+    ):
+        """All attempts fail → None cached, but with the short ERROR_TTL, so a
+        recovered SmartLab is re-queried long before MISS_TTL elapses."""
+        import app.services.moex_service as m
+        svc = self._service()
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+
+        calls = self._patch_client(
+            monkeypatch,
+            [m.httpx.ConnectTimeout("boom")] * 5,  # every attempt fails
+        )
+        result = await svc._get_smartlab_credit_rating("SECID2")
+        assert result is None
+        assert calls["n"] >= 2          # at least one retry happened
+
+        cache_key = "smartlab:SECID2"
+        cache = svc._credit_rating_cache
+        # Still cached right now…
+        assert cache_key in cache
+        # …but only for ERROR_TTL, NOT the 15-min MISS_TTL.
+        t[0] += cache.ERROR_TTL + 1
+        assert cache_key not in cache
+        assert (cache.ERROR_TTL + 1) < cache.MISS_TTL
+
+    async def test_http_404_not_retried(self, monkeypatch):
+        """A definitive 404 is cached immediately (short TTL) without retrying."""
+        import app.services.moex_service as m
+        svc = self._service()
+
+        class _Resp:
+            status_code = 404
+
+        exc = m.httpx.HTTPStatusError("nf", request=None, response=_Resp())
+        calls = self._patch_client(monkeypatch, [exc, exc, exc])
+        result = await svc._get_smartlab_credit_rating("SECID404")
+        assert result is None
+        assert calls["n"] == 1          # no retries on 404
+
+    async def test_honest_not_found_uses_long_miss_ttl(self, monkeypatch):
+        """A valid page with no rating is an honest miss — keep MISS_TTL."""
+        import app.services.moex_service as m
+        svc = self._service()
+        t = [1000.0]
+        monkeypatch.setattr(m.time, "time", lambda: t[0])
+
+        self._patch_client(monkeypatch, ["<html>no rating here</html>"])
+        result = await svc._get_smartlab_credit_rating("SECID3")
+        assert result is None
+
+        cache_key = "smartlab:SECID3"
+        cache = svc._credit_rating_cache
+        t[0] += cache.ERROR_TTL + 1   # past ERROR_TTL…
+        assert cache_key in cache      # …but honest miss persists (MISS_TTL)
 
 
 class TestFxBondConversion:
