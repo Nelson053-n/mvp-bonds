@@ -1,7 +1,9 @@
 import json
+import logging
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from app.config import settings
 from app.models import (
@@ -10,6 +12,20 @@ from app.models import (
     ValidationResponse,
 )
 from app.prompts import SYSTEM_PROMPT, VALIDATION_PROMPT, PORTFOLIO_ANALYSIS_PROMPT
+
+logger = logging.getLogger(__name__)
+
+# OpenAI may be unreachable (network/HTTP error) or return malformed JSON.
+# These are the recoverable failures we fall back to stub logic on.
+_OPENAI_FAILURES = (
+    httpx.HTTPStatusError,
+    httpx.RequestError,
+    json.JSONDecodeError,
+    ValidationError,
+    KeyError,
+    IndexError,
+    TypeError,
+)
 
 
 class LLMService:
@@ -20,12 +36,22 @@ class LLMService:
         self, payload: AddInstrumentInput
     ) -> ValidationResponse:
         if self.mode == "openai" and settings.openai_api_key:
-            return await self._openai_validate(payload)
+            try:
+                return await self._openai_validate(payload)
+            except _OPENAI_FAILURES as exc:
+                logger.warning(
+                    "OpenAI validation failed, falling back to stub: %s", exc
+                )
         return self._stub_validate(payload)
 
     async def generate_comment(self, payload: InstrumentMetrics) -> str:
         if self.mode == "openai" and settings.openai_api_key:
-            return await self._openai_comment(payload)
+            try:
+                return await self._openai_comment(payload)
+            except _OPENAI_FAILURES as exc:
+                logger.warning(
+                    "OpenAI comment failed, falling back to stub: %s", exc
+                )
         return self._stub_comment(payload)
 
     @property
@@ -51,8 +77,16 @@ class LLMService:
             "temperature": 0.3,
             "response_format": {"type": "json_object"},
         }
-        data = await self._openai_chat(body)
-        parsed = self._extract_json(data)
+        try:
+            data = await self._openai_chat(body)
+            parsed = self._extract_json(data)
+        except _OPENAI_FAILURES as exc:
+            logger.warning("OpenAI portfolio analysis failed: %s", exc)
+            return {
+                "available": False,
+                "summary": "AI временно недоступен, попробуйте позже.",
+                "points": [],
+            }
         return {
             "available": True,
             "summary": str(parsed.get("summary", "")),

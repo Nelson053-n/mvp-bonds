@@ -2,9 +2,13 @@
 Tests for LLM service.
 """
 
+from unittest.mock import AsyncMock, patch
+
+import httpx
 import pytest
 from pydantic import ValidationError
 
+from app.config import settings
 from app.models import AddInstrumentInput, InstrumentMetrics
 from app.services.llm_service import LLMService
 
@@ -214,3 +218,111 @@ class TestLLMServiceStubComment:
         comment = await service.generate_comment(metrics)
 
         assert "Позиция в просадке" in comment or "Позиция в минусе" in comment
+
+
+def _http_error() -> httpx.HTTPStatusError:
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(503, request=request)
+    return httpx.HTTPStatusError("503", request=request, response=response)
+
+
+class TestLLMServiceOpenAIFallback:
+    """When OpenAI fails, validate/comment fall back to stub and analyze
+    returns a graceful 'unavailable' marker instead of raising (→ HTTP 500)."""
+
+    @pytest.fixture
+    def service(self, monkeypatch: pytest.MonkeyPatch) -> LLMService:
+        monkeypatch.setattr(settings, "llm_mode", "openai")
+        monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+        svc = LLMService()
+        svc.mode = "openai"
+        return svc
+
+    async def test_validate_falls_back_on_http_error(
+        self, service: LLMService
+    ) -> None:
+        """OpenAI HTTP failure → stub validation, no exception."""
+        payload = AddInstrumentInput(
+            ticker="SBER", quantity=100, purchase_price=250.0
+        )
+        with patch.object(
+            service, "_openai_chat", AsyncMock(side_effect=_http_error())
+        ):
+            result = await service.validate_instrument(payload)
+
+        # Stub result for a stock ticker.
+        assert result.instrument_type == "stock"
+        assert result.validated is True
+
+    async def test_validate_falls_back_on_invalid_json(
+        self, service: LLMService
+    ) -> None:
+        """OpenAI returns non-JSON content → stub validation, no exception."""
+        bad = {"choices": [{"message": {"content": "not a json"}}]}
+        payload = AddInstrumentInput(
+            ticker="SBER", quantity=100, purchase_price=250.0
+        )
+        with patch.object(service, "_openai_chat", AsyncMock(return_value=bad)):
+            result = await service.validate_instrument(payload)
+
+        assert result.instrument_type == "stock"
+        assert result.validated is True
+
+    async def test_comment_falls_back_on_request_error(
+        self, service: LLMService
+    ) -> None:
+        """OpenAI network failure → stub comment, no exception."""
+        metrics = InstrumentMetrics(
+            id=1,
+            type="stock",
+            name="Sberbank",
+            ticker="SBER",
+            current_price=300.0,
+            purchase_price=250.0,
+            quantity=100,
+            current_value=30000.0,
+            profit=5000.0,
+            weight=100.0,
+            dividend_yield=6.0,
+            ai_comment="",
+        )
+        err = httpx.RequestError("connection refused")
+        with patch.object(
+            service, "_openai_chat", AsyncMock(side_effect=err)
+        ):
+            comment = await service.generate_comment(metrics)
+
+        assert "Позиция в плюсе" in comment
+
+    async def test_analyze_portfolio_unavailable_on_failure(
+        self, service: LLMService
+    ) -> None:
+        """OpenAI failure → available:False marker, no exception (no HTTP 500)."""
+        err = httpx.HTTPStatusError(
+            "503",
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+            response=httpx.Response(
+                503,
+                request=httpx.Request(
+                    "POST", "https://api.openai.com/v1/chat/completions"
+                ),
+            ),
+        )
+        with patch.object(
+            service, "_openai_chat", AsyncMock(side_effect=err)
+        ):
+            result = await service.analyze_portfolio([{"ticker": "SBER"}])
+
+        assert result["available"] is False
+        assert result["points"] == []
+        assert isinstance(result["summary"], str)
+
+    async def test_analyze_portfolio_unavailable_on_invalid_json(
+        self, service: LLMService
+    ) -> None:
+        """Malformed OpenAI JSON → available:False, no exception."""
+        bad = {"choices": [{"message": {"content": "<<<not json>>>"}}]}
+        with patch.object(service, "_openai_chat", AsyncMock(return_value=bad)):
+            result = await service.analyze_portfolio([{"ticker": "SBER"}])
+
+        assert result["available"] is False
