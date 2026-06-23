@@ -8,8 +8,7 @@ the same pattern (do_sync_one + _XXXX_INTERVAL background loop).
 import logging
 from datetime import datetime, timezone
 
-from app.config import settings as app_settings
-from app.services.crypto_utils import decrypt_token
+from app.services.crypto_utils import decrypt_and_maybe_migrate
 from app.services.storage_service import storage_service
 from app.services.tbank_service import TBankError, TBankService
 
@@ -17,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 _PENDING_REMOVAL_PREFIX = "PENDING_REMOVAL:"
 
-# In-memory set of portfolio_ids currently being synced (concurrency guard)
-_sync_in_progress: set[int] = set()
+# TTL for the cross-process sync lock. A sync (GetOperations + writes) should
+# finish well within this; if a worker crashes mid-sync, the lock is reclaimed
+# after this many seconds so the portfolio isn't stuck.
+_SYNC_LOCK_TTL_SECONDS = 600
 
 
 def parse_pending_removal(last_sync_error: str | None) -> list[str]:
@@ -35,13 +36,18 @@ async def do_sync_one(portfolio_id: int, cfg: dict) -> dict:
     Returns result dict with keys: added, updated, removed_candidates, errors.
     Also sets {"skipped": True} if another sync for this portfolio is already running.
     """
-    if portfolio_id in _sync_in_progress:
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    if not storage_service.acquire_sync_lock(portfolio_id, now_ts, _SYNC_LOCK_TTL_SECONDS):
         logger.debug("sync_portfolio %d: already in progress, skipping", portfolio_id)
         return {"skipped": True, "added": 0, "updated": 0, "removed_candidates": [], "errors": []}
 
-    _sync_in_progress.add(portfolio_id)
     try:
-        token = decrypt_token(cfg["tbank_token_enc"], app_settings.jwt_secret)
+        token, migrated_enc = decrypt_and_maybe_migrate(cfg["tbank_token_enc"])
+        if migrated_enc is not None:
+            # Token was stored under the legacy jwt_secret-derived key; persist
+            # it re-encrypted under the dedicated key (lazy migration).
+            storage_service.update_sync_token(portfolio_id, migrated_enc)
+            logger.info("AUDIT tbank_token re-encrypted portfolio=%d", portfolio_id)
         svc = TBankService(token)
         result = await svc.sync_portfolio(
             portfolio_id=portfolio_id,
@@ -77,4 +83,4 @@ async def do_sync_one(portfolio_id: int, cfg: dict) -> dict:
         storage_service.update_sync_status(portfolio_id, now_iso, str(exc)[:500])
         raise
     finally:
-        _sync_in_progress.discard(portfolio_id)
+        storage_service.release_sync_lock(portfolio_id)
