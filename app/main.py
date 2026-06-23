@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.api.auth import router as auth_router
 from app.api.bond_pages import error_page_html, router as bond_pages_router
@@ -36,6 +37,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 _ui_dir = Path(__file__).parent / "ui"
+_static_dir = _ui_dir / "static"
 dashboard_path = _ui_dir / "dashboard.html"
 landing_path = _ui_dir / "landing.html"
 
@@ -104,13 +106,43 @@ def _register_static_routes(application: FastAPI) -> None:
 
 # ── Background tasks ────────────────────────────────────────────────────────
 
+# After this many consecutive failures of a critical task (backup / daily
+# snapshot), send a Telegram alert so the operator notices a silently broken
+# loop instead of discovering missing backups days later.
+_FAILURE_ALERT_THRESHOLD = 3
+
+
+async def _alert_task_failure(task_name: str, streak: int, exc: Exception) -> None:
+    """Best-effort Telegram alert that a critical background task keeps failing.
+
+    No-op when TG isn't configured. Never raises — an alert failure must not
+    take down the loop that called it.
+    """
+    try:
+        from app.services.notification_service import notification_service
+        s = storage_service.get_all_settings()
+        tg_token = s.get("tg_bot_token", "")
+        tg_chat_id = s.get("tg_chat_id", "")
+        if not tg_token or not tg_chat_id:
+            return
+        msg = (
+            f"\U0001f6a8 <b>Фоновая задача не работает</b>\n\n"
+            f"Задача: <b>{task_name}</b>\n"
+            f"Сбоев подряд: {streak}\n"
+            f"Последняя ошибка: {type(exc).__name__}: {exc}"
+        )
+        await notification_service.send_telegram(tg_token, tg_chat_id, msg)
+    except Exception:
+        logger.exception("Failed to send background-task failure alert (%s)", task_name)
+
+
 async def _cleanup_shares_loop():
     while True:
         await asyncio.sleep(3600)
         try:
             storage_service.cleanup_expired_shares()
         except Exception:
-            pass
+            logger.exception("cleanup_shares_loop: iteration failed")
 
 
 async def _indexnow_loop():
@@ -135,6 +167,7 @@ async def _indexnow_loop():
 async def _snapshot_loop():
     """Save daily portfolio snapshots for all portfolios."""
     from datetime import datetime, timezone
+    fail_streak = 0
     while True:
         now = datetime.now(timezone.utc)
         seconds_until_midnight = (24*3600) - (now.hour*3600 + now.minute*60 + now.second) + 300
@@ -152,9 +185,13 @@ async def _snapshot_loop():
                         p["id"], securities_value + cash_rub, total_cost, securities_value
                     )
                 except Exception:
-                    pass
-        except Exception:
-            pass
+                    logger.exception("snapshot_loop: failed for portfolio_id=%s", p.get("id"))
+            fail_streak = 0
+        except Exception as exc:
+            fail_streak += 1
+            logger.exception("snapshot_loop: iteration failed (streak=%d)", fail_streak)
+            if fail_streak >= _FAILURE_ALERT_THRESHOLD:
+                await _alert_task_failure("Ежедневные снапшоты портфелей", fail_streak, exc)
 
 
 async def _notification_loop():
@@ -165,7 +202,7 @@ async def _notification_loop():
         try:
             await notification_service.check_and_send_coupon_notifications()
         except Exception:
-            pass
+            logger.exception("notification_loop: coupon check failed")
 
 
 async def _tbank_sync_loop():
@@ -187,7 +224,8 @@ async def _tbank_sync_loop():
                         continue
                     await do_sync_one(cfg["portfolio_id"], cfg)
                 except Exception:
-                    pass
+                    logger.exception("tbank_sync_loop: sync failed for portfolio_id=%s",
+                                     cfg.get("portfolio_id"))
         except Exception:
             logger.exception("tbank_sync_loop: unexpected error")
         await asyncio.sleep(SYNC_INTERVAL)
@@ -287,6 +325,7 @@ async def _benchmark_snapshot_loop():
 async def _daily_backup_loop():
     """Create a daily automatic backup at the configured hour (UTC)."""
     from datetime import datetime, timezone
+    fail_streak = 0
     while True:
         try:
             hour = int(storage_service.get_setting("backup_daily_hour", "2"))
@@ -300,8 +339,12 @@ async def _daily_backup_loop():
         try:
             storage_service.create_backup(label="auto")
             logger.info("Daily auto backup completed")
-        except Exception:
-            logger.exception("Daily auto backup failed")
+            fail_streak = 0
+        except Exception as exc:
+            fail_streak += 1
+            logger.exception("Daily auto backup failed (streak=%d)", fail_streak)
+            if fail_streak >= _FAILURE_ALERT_THRESHOLD:
+                await _alert_task_failure("Ежедневный бэкап БД", fail_streak, exc)
 
 
 def _backup_db_on_startup() -> None:
@@ -467,7 +510,7 @@ async def lifespan(app: FastAPI):
             from app.services.telegram_bot_service import telegram_bot_service
             telegram_bot_service.stop()
         except Exception:
-            pass
+            logger.exception("Failed to stop Telegram bond-search bot on shutdown")
         _release_leader_lock()
     try:
         storage_service.checkpoint()
@@ -541,6 +584,11 @@ app.include_router(billing_router)
 
 # Register all static file routes (favicon, icons, manifest, sw.js)
 _register_static_routes(app)
+
+# Extracted SPA assets (translations.js, etc.) live under app/ui/static/ and are
+# served at /static/*. Cache-busting is via ?v=<sw-version> query in dashboard.html;
+# /app HTML is always no-store, so a new deploy's HTML pulls the fresh ?v immediately.
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 # ── SEO / text routes ───────────────────────────────────────────────────────

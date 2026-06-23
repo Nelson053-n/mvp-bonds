@@ -4,6 +4,7 @@ Portfolio management API: CRUD operations and sharing.
 
 import csv
 import io
+import logging
 import re
 import time
 import uuid
@@ -19,6 +20,8 @@ from app.services.cache_service import cache_service
 from app.services.cbr_service import cbr_service
 from app.services.portfolio_service import portfolio_service
 from app.services.storage_service import storage_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -278,6 +281,7 @@ async def _collect_all_user_rows(user_id: int) -> tuple[list, list[dict], dict]:
         try:
             rows = await portfolio_service.get_table(p["id"])
         except Exception:
+            logger.exception("_collect_all_rows: failed for portfolio_id=%s", p.get("id"))
             continue
         for r in rows:
             origin[id(r)] = (p["id"], p["name"])
@@ -373,6 +377,7 @@ async def get_all_totals(current_user: dict = Depends(get_current_user)) -> dict
         try:
             rows = await portfolio_service.get_table(p["id"])
         except Exception:
+            logger.exception("get_all_totals: failed for portfolio_id=%s", p.get("id"))
             rows = []
         p_value = sum(float(getattr(r, "current_value", 0) or 0) for r in rows)
         totals.append({
@@ -418,19 +423,23 @@ async def get_all_snapshots(
     ]
 
 
-@router.get("/all/analytics-extra")
-async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)) -> dict:
-    """Aggregated analytics-extra across all user's portfolios."""
+async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
+    """Shared analytics-extra builder used by both single-portfolio and all-portfolios endpoints.
+
+    Args:
+        rows: list of PortfolioRow (bonds/stocks) to analyse.
+        portfolio_ids: list of portfolio IDs for coupon and cash queries.
+    """
+    import asyncio as _asyncio
+    import json as _json
     from datetime import date, datetime, timedelta
 
-    if not user_is_pro(current_user):
-        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
-    user_id = current_user["sub"]
-    rows, portfolios_data, _origin = await _collect_all_user_rows(user_id)
-    portfolio_ids = [p["id"] for p in portfolios_data]
+    from app.services.moex_service import moex_service as _moex
+    from app.services.rating_utils import rating_worsened
+
     today = date.today()
 
-    # 1) Upcoming events (30 days)
+    # 1) Upcoming events (30 days): coupons + maturities + offers
     events: list[dict] = []
     horizon = today + timedelta(days=30)
     for r in rows:
@@ -481,6 +490,8 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
 
     # 2) Anomalies
     anomalies: list[dict] = []
+
+    # 2a) Rating downgrades in last 14 days
     try:
         cutoff = (datetime.utcnow() - timedelta(days=14)).isoformat()
         with storage_service._connect() as conn:
@@ -493,7 +504,6 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                     f"ORDER BY ticker, recorded_at ASC",
                     (*tickers, cutoff),
                 )
-                from app.services.rating_utils import rating_worsened
                 history_by_ticker: dict[str, list[tuple[str, str]]] = {}
                 for tkr, rating, _src, ts in cursor.fetchall():
                     history_by_ticker.setdefault(tkr, []).append((rating, ts))
@@ -506,8 +516,9 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                             "severity": "high",
                         })
     except Exception:
-        pass
+        logger.exception("get_all_analytics_extra: rating anomaly check failed")
 
+    # 2b) Sharp price drop (>=3% from previous snapshot)
     try:
         with storage_service._connect() as conn:
             seen_drop: set[str] = set()
@@ -533,8 +544,9 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                             })
                             seen_drop.add(r.ticker)
     except Exception:
-        pass
+        logger.exception("get_all_analytics_extra: price drop check failed")
 
+    # 2c) Imminent maturity/offer (<7 days)
     soon = today + timedelta(days=7)
     seen_event: set[tuple[str, str]] = set()
     for r in rows:
@@ -554,7 +566,7 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
         if ytm_anom:
             anomalies.append(ytm_anom)
 
-    # 3) Realized coupons across all portfolios
+    # 3) Realized coupons from coupon_notifications
     realized_coupons = 0.0
     if portfolio_ids:
         try:
@@ -569,18 +581,14 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                 if row and row[0]:
                     realized_coupons = float(row[0])
         except Exception:
-            pass
+            logger.exception("get_all_analytics_extra: realized coupons query failed")
 
-    # 4) Free cash across all portfolios — gather distinct FX rates concurrently,
-    #    then fold cash totals; key_rate runs alongside via asyncio.gather.
-    async def _compute_free_cash_all() -> float:
-        import json as _json
-        from app.services.moex_service import moex_service as _moex
-
+    # 4) Free cash (RUB equivalent) via FX conversion, fetched concurrently.
+    async def _compute_free_cash() -> float:
         all_cash: list[tuple[str, float]] = []
-        for p in portfolios_data:
+        for pid in portfolio_ids:
             try:
-                cfg = storage_service.get_sync_config(p["id"])
+                cfg = storage_service.get_sync_config(pid)
                 if not cfg or not cfg.get("cash_balance"):
                     continue
                 for c in _json.loads(cfg["cash_balance"]):
@@ -588,20 +596,18 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
                     amt = float(c.get("amount") or 0)
                     all_cash.append((ccy, amt))
             except Exception:
+                logger.exception("get_all_analytics_extra: cash parse failed for portfolio_id=%s", pid)
                 continue
-
         non_rub = {ccy for ccy, _ in all_cash if ccy not in ("RUB", "SUR", "")}
-        import asyncio as _aio
-        fx_rates = dict(zip(non_rub, await _aio.gather(*(_moex._get_fx_rate(ccy) for ccy in non_rub))))
+        fx_rates = dict(zip(non_rub, await _asyncio.gather(*(_moex._get_fx_rate(ccy) for ccy in non_rub))))
         total = 0.0
         for ccy, amt in all_cash:
             rate = 1.0 if ccy in ("RUB", "SUR", "") else (fx_rates.get(ccy) or 0.0)
             total += amt * rate
         return total
 
-    import asyncio as _asyncio
     free_cash_rub, key_rate = await _asyncio.gather(
-        _compute_free_cash_all(),
+        _compute_free_cash(),
         cbr_service.get_key_rate(),
     )
 
@@ -612,6 +618,17 @@ async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)
         "free_cash_rub": round(free_cash_rub, 2),
         "key_rate": key_rate,
     }
+
+
+@router.get("/all/analytics-extra")
+async def get_all_analytics_extra(current_user: dict = Depends(get_current_user)) -> dict:
+    """Aggregated analytics-extra across all user's portfolios."""
+    if not user_is_pro(current_user):
+        raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
+    user_id = current_user["sub"]
+    rows, portfolios_data, _origin = await _collect_all_user_rows(user_id)
+    portfolio_ids = [p["id"] for p in portfolios_data]
+    return await _build_analytics_extra(rows, portfolio_ids)
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioResponse)
@@ -803,6 +820,7 @@ async def refresh_portfolio_ratings(
             try:
                 result = await moex_service.refresh_rating_with_sources(ticker)
             except Exception:
+                logger.exception("refresh_ratings: failed for ticker=%s", ticker)
                 return
         if result.get("best") is not None:
             storage_service.update_rating_all_items_for_ticker(ticker, result["best"])
@@ -912,197 +930,10 @@ async def get_analytics_extra(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Aggregated analytics: anomalies, upcoming events, realized coupons (approx)."""
-    from datetime import date, datetime, timedelta
-
     await get_portfolio_or_403(portfolio_id, current_user)
     if not user_is_pro(current_user):
         raise HTTPException(status_code=403, detail="Доступно в тарифе Pro")
     rows = await portfolio_service.get_table(portfolio_id)
-    today = date.today()
-
-    # 1) Upcoming events (30 days): coupons + maturities + offers
-    events: list[dict] = []
-    horizon = today + timedelta(days=30)
-    for r in rows:
-        if r.type != "bond":
-            continue
-        ticker = r.ticker
-        name = r.name or ticker
-        qty = float(r.quantity or 0)
-        coupon = float(r.coupon or 0)
-        period = int(r.coupon_period or 0)
-        # Coupons
-        if r.next_coupon_date and period > 0 and coupon > 0 and qty > 0:
-            d = r.next_coupon_date
-            mat = r.maturity_date
-            while d <= horizon:
-                if mat and d >= mat:
-                    break
-                if today <= d <= horizon:
-                    events.append({
-                        "date": d.isoformat(),
-                        "type": "coupon",
-                        "ticker": ticker,
-                        "name": name,
-                        "amount": round(coupon * qty, 2),
-                    })
-                d = d + timedelta(days=period)
-        # Maturity
-        if r.maturity_date and today <= r.maturity_date <= horizon:
-            cv = float(r.current_value or 0)
-            aci_total = float(r.aci or 0) * qty
-            principal = max(0.0, cv - aci_total)
-            events.append({
-                "date": r.maturity_date.isoformat(),
-                "type": "maturity",
-                "ticker": ticker,
-                "name": name,
-                "amount": round(principal, 2),
-            })
-        # Offer / buyback
-        for fld in ("offer_date", "buyback_date"):
-            d = getattr(r, fld, None)
-            if d and today <= d <= horizon:
-                events.append({
-                    "date": d.isoformat(),
-                    "type": "offer" if fld == "offer_date" else "buyback",
-                    "ticker": ticker,
-                    "name": name,
-                    "amount": 0.0,
-                })
-    events.sort(key=lambda e: (e["date"], e["type"]))
-
-    # 2) Anomalies
-    anomalies: list[dict] = []
-    # 2a) Rating downgrades in last 14 days
-    try:
-        cutoff = (datetime.utcnow() - timedelta(days=14)).isoformat()
-        with storage_service._connect() as conn:
-            tickers = [r.ticker for r in rows if r.type == "bond"]
-            if tickers:
-                placeholders = ",".join("?" * len(tickers))
-                cursor = conn.execute(
-                    f"SELECT ticker, rating, source, recorded_at FROM rating_history "
-                    f"WHERE ticker IN ({placeholders}) AND recorded_at >= ? "
-                    f"ORDER BY ticker, recorded_at ASC",
-                    (*tickers, cutoff),
-                )
-                from app.services.rating_utils import rating_worsened
-                history_by_ticker: dict[str, list[tuple[str, str]]] = {}
-                for tkr, rating, _src, ts in cursor.fetchall():
-                    history_by_ticker.setdefault(tkr, []).append((rating, ts))
-                for tkr, hist in history_by_ticker.items():
-                    if len(hist) >= 2 and rating_worsened(hist[0][0], hist[-1][0]):
-                        anomalies.append({
-                            "type": "rating_downgrade",
-                            "ticker": tkr,
-                            "text": f"{tkr}: рейтинг снижен {hist[0][0]} → {hist[-1][0]}",
-                            "severity": "high",
-                        })
-    except Exception:
-        pass
-
-    # 2b) Sharp price drop (>=3% from previous snapshot, last 2 days)
-    try:
-        with storage_service._connect() as conn:
-            for r in rows:
-                if r.type != "bond" or not r.current_price:
-                    continue
-                cursor = conn.execute(
-                    "SELECT price FROM price_snapshots WHERE ticker = ? "
-                    "ORDER BY recorded_at DESC LIMIT 5",
-                    (r.ticker,),
-                )
-                prev_rows = cursor.fetchall()
-                if len(prev_rows) >= 2:
-                    prev = prev_rows[1][0]
-                    if prev and prev > 0:
-                        diff_pct = (r.current_price - prev) / prev * 100
-                        if diff_pct <= -3:
-                            anomalies.append({
-                                "type": "price_drop",
-                                "ticker": r.ticker,
-                                "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
-                                "severity": "medium",
-                            })
-    except Exception:
-        pass
-
-    # 2c) Imminent maturity/offer (<7 days)
-    soon = today + timedelta(days=7)
-    for r in rows:
-        if r.type != "bond":
-            continue
-        for fld, label in (("maturity_date", "погашение"), ("offer_date", "оферта"), ("buyback_date", "buyback")):
-            d = getattr(r, fld, None)
-            if d and today < d <= soon:
-                anomalies.append({
-                    "type": "imminent_event",
-                    "ticker": r.ticker,
-                    "text": f"{r.ticker}: {label} через {(d - today).days} дн.",
-                    "severity": "medium",
-                })
-        ytm_anom = _yield_to_offer_anomaly(r, today)
-        if ytm_anom:
-            anomalies.append(ytm_anom)
-
-    # 3) Realized coupons approximation: from past coupon_notifications if available
-    realized_coupons = 0.0
-    try:
-        with storage_service._connect() as conn:
-            cursor = conn.execute(
-                """
-                SELECT SUM(amount) FROM coupon_notifications
-                WHERE portfolio_id = ? AND amount IS NOT NULL
-                """,
-                (portfolio_id,),
-            )
-            row = cursor.fetchone()
-            if row and row[0]:
-                realized_coupons = float(row[0])
-    except Exception:
-        pass
-
-    # 4) Free cash (RUB equivalent) — from portfolio_sync.
-    #    FX rates are fetched in parallel; key_rate runs alongside via asyncio.gather.
-    async def _compute_free_cash() -> float:
-        try:
-            cfg = storage_service.get_sync_config(portfolio_id)
-            if not cfg or not cfg.get("cash_balance"):
-                return 0.0
-            import json as _json
-            cash_list = _json.loads(cfg["cash_balance"])
-            from app.services.moex_service import moex_service as _moex
-            # Gather distinct non-RUB FX rates concurrently.
-            non_rub = {
-                (c.get("currency") or "").upper()
-                for c in cash_list
-                if (c.get("currency") or "").upper() not in ("RUB", "SUR", "")
-            }
-            import asyncio as _aio
-            fx_rates = dict(zip(non_rub, await _aio.gather(*(_moex._get_fx_rate(ccy) for ccy in non_rub))))
-            total = 0.0
-            for c in cash_list:
-                ccy = (c.get("currency") or "").upper()
-                amt = float(c.get("amount") or 0)
-                rate = 1.0 if ccy in ("RUB", "SUR", "") else (fx_rates.get(ccy) or 0.0)
-                total += amt * rate
-            return total
-        except Exception:
-            return 0.0
-
-    import asyncio as _asyncio
-    free_cash_rub, key_rate = await _asyncio.gather(
-        _compute_free_cash(),
-        cbr_service.get_key_rate(),
-    )
-
-    return {
-        "events": events,
-        "anomalies": anomalies,
-        "realized_coupons": round(realized_coupons, 2),
-        "free_cash_rub": round(free_cash_rub, 2),
-        "key_rate": key_rate,
-    }
+    return await _build_analytics_extra(rows, [portfolio_id])
 
 
