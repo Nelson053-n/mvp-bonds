@@ -148,3 +148,5 @@ data/*.db-journal
 *.p12
 *.pfx
 *.crt
+
+.claude/
