@@ -79,357 +79,10 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 )
                 """
             )
-            # Migrations for portfolios table
-            for col, col_def in [
-                ("share_expires_at", "INTEGER"),  # UNIX timestamp, NULL = never expires
-            ]:
-                try:
-                    conn.execute(
-                        f"ALTER TABLE portfolios ADD COLUMN {col} {col_def}"
-                    )
-                except sqlite3.OperationalError:
-                    pass
-
-            # Migrations for existing databases
-            for col, col_def in [
-                ("manual_coupon", "REAL"),
-                ("company_rating", "TEXT"),
-                ("manual_coupon_rate", "REAL"),
-                ("portfolio_id", "INTEGER"),
-                ("snapshot_coupon_rate", "REAL"),  # MOEX market coupon rate for risk calc
-                ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
-                ("figi", "TEXT"),  # T-Bank instrument id, links position to operations journal
-                ("purchase_date", "TEXT"),  # ISO date (YYYY-MM-DD); NULL = unknown (optional)
-                ("custom_name", "TEXT"),   # user-set name for off-exchange (source='custom') items
-                ("custom_price", "REAL"),  # user-set current price for source='custom' items
-                ("custom_nominal", "REAL"),      # nominal of off-exchange bond (source='custom')
-                ("custom_coupon_freq", "INTEGER"),  # coupon payments per year (2/4/12)
-                ("custom_maturity", "TEXT"),     # maturity date ISO (optional)
-                ("manual_rating", "TEXT"),       # user-set credit rating; overrides auto snapshot rating
-            ]:
-                try:
-                    conn.execute(
-                        f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
-                    )
-                except sqlite3.OperationalError:
-                    pass
-
-            # Migrate users table
-            try:
-                conn.execute(
-                    "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
-                )
-                conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN tg_chat_id TEXT")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_enabled INTEGER NOT NULL DEFAULT 0")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_days INTEGER NOT NULL DEFAULT 3")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
-            except sqlite3.OperationalError:
-                pass
-
-            # Pro tier (freemium). is_pro flag + optional expiry (ISO date/None=lifetime).
-            # On first add, grant Pro to all existing (early-adopter) users.
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0")
-                conn.execute("UPDATE users SET is_pro = 1")
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute("ALTER TABLE users ADD COLUMN pro_until TEXT")
-            except sqlite3.OperationalError:
-                pass
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS coupon_notifications (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-                    item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
-                    coupon_date TEXT NOT NULL,
-                    sent_at TEXT NOT NULL,
-                    UNIQUE(item_id, coupon_date)
-                )
-                """
-            )
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS price_snapshots (
-                    item_id INTEGER PRIMARY KEY,
-                    last_price REAL NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-                """
-            )
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS rate_limits (
-                    key TEXT NOT NULL,
-                    window_start INTEGER NOT NULL,
-                    count INTEGER NOT NULL DEFAULT 1,
-                    PRIMARY KEY (key, window_start)
-                )
-                """
-            )
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS price_alerts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-                    item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
-                    ticker TEXT NOT NULL,
-                    alert_type TEXT NOT NULL CHECK(alert_type IN ('above', 'below')),
-                    target_price REAL NOT NULL,
-                    triggered INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL,
-                    triggered_at TEXT
-                )
-                """
-            )
-
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS portfolio_snapshots (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-                    snapshot_date TEXT NOT NULL,
-                    total_value REAL NOT NULL DEFAULT 0,
-                    total_cost REAL NOT NULL DEFAULT 0,
-                    securities_value REAL,
-                    UNIQUE(portfolio_id, snapshot_date)
-                )
-                """
-            )
-            # total_value = securities + cash; securities_value = securities only
-            # (NULL for snapshots taken before this column existed).
-            try:
-                conn.execute("ALTER TABLE portfolio_snapshots ADD COLUMN securities_value REAL")
-            except sqlite3.OperationalError:
-                pass
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS watchlist (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    ticker TEXT NOT NULL,
-                    instrument_type TEXT NOT NULL DEFAULT 'bond',
-                    note TEXT,
-                    created_at TEXT NOT NULL,
-                    UNIQUE(user_id, ticker, instrument_type)
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS rating_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ticker TEXT NOT NULL,
-                    rating TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    recorded_at TEXT NOT NULL
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS waitlist (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT NOT NULL UNIQUE,
-                    created_at TEXT NOT NULL
-                )
-            """)
-
-            # Pro payments (YooKassa) — for NPD bookkeeping ("Мой налог" by hand).
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS pro_payments (
-                    payment_id TEXT PRIMARY KEY,
-                    user_id INTEGER,
-                    username TEXT,
-                    plan TEXT,
-                    amount REAL,
-                    status TEXT,
-                    receipt_done INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS portfolio_sync (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    portfolio_id INTEGER NOT NULL UNIQUE REFERENCES portfolios(id) ON DELETE CASCADE,
-                    tbank_token_enc TEXT NOT NULL,
-                    tbank_token_prefix TEXT NOT NULL,
-                    tbank_account_id TEXT NOT NULL,
-                    bonds_only INTEGER NOT NULL DEFAULT 0,
-                    sync_enabled INTEGER NOT NULL DEFAULT 1,
-                    last_sync_at TEXT,
-                    last_sync_error TEXT
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS tbank_coupons (
-                    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-                    figi TEXT NOT NULL,
-                    coupons_total REAL NOT NULL DEFAULT 0,
-                    first_buy_date TEXT,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (portfolio_id, figi)
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS admin_audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    action TEXT NOT NULL,
-                    target_type TEXT,
-                    target_id INTEGER,
-                    details TEXT,
-                    ip_address TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS benchmark_snapshots (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    benchmark TEXT NOT NULL,
-                    snapshot_date TEXT NOT NULL,
-                    value REAL NOT NULL,
-                    UNIQUE(benchmark, snapshot_date)
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS password_reset_codes (
-                    code TEXT PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    expires_at INTEGER NOT NULL,
-                    attempts INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
-            """)
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_password_reset_codes_expires "
-                    "ON password_reset_codes(expires_at)"
-                )
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_benchmark_snapshots_lookup "
-                    "ON benchmark_snapshots(benchmark, snapshot_date)"
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            # Migrations for portfolio_items — add source column
-            for col, col_def in [
-                ("source", "TEXT NOT NULL DEFAULT 'manual'"),
-            ]:
-                try:
-                    conn.execute(
-                        f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
-                    )
-                except sqlite3.OperationalError:
-                    pass
-
-            # Migrations for portfolio_sync — cash balance JSON
-            for col, col_def in [
-                ("cash_balance", "TEXT"),
-                ("cash_updated_at", "TEXT"),
-                ("last_operations_sync_at", "TEXT"),  # last GetOperations fetch (ISO)
-            ]:
-                try:
-                    conn.execute(
-                        f"ALTER TABLE portfolio_sync ADD COLUMN {col} {col_def}"
-                    )
-                except sqlite3.OperationalError:
-                    pass
-
-            # Create indices
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_portfolio_items_portfolio_id "
-                    "ON portfolio_items(portfolio_id)"
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_portfolios_user_id "
-                    "ON portfolios(user_id)"
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_portfolios_share_token "
-                    "ON portfolios(share_token)"
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            try:
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio_date "
-                    "ON portfolio_snapshots(portfolio_id, snapshot_date)"
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            for idx_sql in [
-                "CREATE INDEX IF NOT EXISTS idx_items_ticker ON portfolio_items(ticker)",
-                "CREATE INDEX IF NOT EXISTS idx_coupon_notif_item ON coupon_notifications(item_id)",
-                "CREATE INDEX IF NOT EXISTS idx_alerts_item_id ON price_alerts(item_id)",
-                "CREATE INDEX IF NOT EXISTS idx_alerts_user_triggered ON price_alerts(user_id, triggered)",
-                "CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)",
-                "CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)",
-                "CREATE INDEX IF NOT EXISTS idx_rating_history_ticker_source ON rating_history(ticker, source, recorded_at)",
-                "CREATE INDEX IF NOT EXISTS idx_portfolio_sync_enabled ON portfolio_sync(sync_enabled)",
-                "CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON admin_audit_log(admin_user_id, created_at)",
-                "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON admin_audit_log(created_at)",
-            ]:
-                try:
-                    conn.execute(idx_sql)
-                except sqlite3.OperationalError:
-                    pass
+            # Versioned, incremental migrations (ALTER TABLE / CREATE INDEX).
+            # Base CREATE TABLE IF NOT EXISTS stay above; schema-mutating
+            # steps live in _run_migrations, tracked by schema_version.
+            self._run_migrations(conn)
 
             # Bootstrap user #1 if no users exist
             user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -467,6 +120,432 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             else:
                 conn.commit()
 
+
+    # Latest schema version. Bump and append a (N, self._migration_vN) pair to
+    # the `migrations` list in _run_migrations when adding new schema changes.
+    SCHEMA_VERSION = 4
+
+    def _get_schema_version(self, conn: sqlite3.Connection) -> int:
+        """Read the current schema version, creating the tracking table if absent.
+
+        Returns 0 for a brand-new DB (no schema_version row yet)."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            )
+            """
+        )
+        row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+        return row[0] if row else 0
+
+    def _set_schema_version(self, conn: sqlite3.Connection, version: int) -> None:
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (id, version) VALUES (1, ?)",
+            (version,),
+        )
+
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """Apply ordered, numbered migrations exactly once, in ascending order.
+
+        Each migration is idempotent. Pre-existing production DBs (created before
+        versioning) start at version 0 and get the full baseline applied as v1 -
+        a no-op on an already-complete schema thanks to IF NOT EXISTS / try-except.
+        """
+        current = self._get_schema_version(conn)
+
+        migrations = [
+            (1, self._migration_v1),
+            (2, self._migration_v2),
+            (3, self._migration_v3),
+            (4, self._migration_v4),
+        ]
+
+        for version, migrate in migrations:
+            if version <= current:
+                continue
+            migrate(conn)
+            self._set_schema_version(conn, version)
+            conn.commit()
+            current = version
+            logger.info("AUDIT migration applied: v%d", version)
+
+    def _migration_v1(self, conn: sqlite3.Connection) -> None:
+        """v1 — add-column migrations on the original three tables
+        (portfolios, portfolio_items, users). Fully idempotent: pre-existing
+        prod DBs already have these columns, so each ALTER is a try/except no-op."""
+        # Migrations for portfolios table
+        for col, col_def in [
+            ("share_expires_at", "INTEGER"),  # UNIX timestamp, NULL = never expires
+        ]:
+            try:
+                conn.execute(
+                    f"ALTER TABLE portfolios ADD COLUMN {col} {col_def}"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        # Migrations for existing databases
+        for col, col_def in [
+            ("manual_coupon", "REAL"),
+            ("company_rating", "TEXT"),
+            ("manual_coupon_rate", "REAL"),
+            ("portfolio_id", "INTEGER"),
+            ("snapshot_coupon_rate", "REAL"),  # MOEX market coupon rate for risk calc
+            ("deleted_at", "TEXT"),  # soft-delete timestamp (ISO 8601)
+            ("figi", "TEXT"),  # T-Bank instrument id, links position to operations journal
+            ("purchase_date", "TEXT"),  # ISO date (YYYY-MM-DD); NULL = unknown (optional)
+            ("custom_name", "TEXT"),   # user-set name for off-exchange (source='custom') items
+            ("custom_price", "REAL"),  # user-set current price for source='custom' items
+            ("custom_nominal", "REAL"),      # nominal of off-exchange bond (source='custom')
+            ("custom_coupon_freq", "INTEGER"),  # coupon payments per year (2/4/12)
+            ("custom_maturity", "TEXT"),     # maturity date ISO (optional)
+            ("manual_rating", "TEXT"),       # user-set credit rating; overrides auto snapshot rating
+        ]:
+            try:
+                conn.execute(
+                    f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        # Migrate users table
+        try:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+            )
+            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN tg_chat_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_enabled INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN coupon_notif_days INTEGER NOT NULL DEFAULT 3")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        # Pro tier (freemium). is_pro flag + optional expiry (ISO date/None=lifetime).
+        # On first add, grant Pro to all existing (early-adopter) users.
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN is_pro INTEGER NOT NULL DEFAULT 0")
+            conn.execute("UPDATE users SET is_pro = 1")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN pro_until TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+    def _migration_v2(self, conn: sqlite3.Connection) -> None:
+        """v2 — create all auxiliary tables introduced over the app's lifetime.
+        Idempotent via CREATE TABLE IF NOT EXISTS."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS coupon_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
+                coupon_date TEXT NOT NULL,
+                sent_at TEXT NOT NULL,
+                UNIQUE(item_id, coupon_date)
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS price_snapshots (
+                item_id INTEGER PRIMARY KEY,
+                last_price REAL NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rate_limits (
+                key TEXT NOT NULL,
+                window_start INTEGER NOT NULL,
+                count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (key, window_start)
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                item_id INTEGER NOT NULL REFERENCES portfolio_items(id) ON DELETE CASCADE,
+                ticker TEXT NOT NULL,
+                alert_type TEXT NOT NULL CHECK(alert_type IN ('above', 'below')),
+                target_price REAL NOT NULL,
+                triggered INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                triggered_at TEXT
+            )
+            """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                snapshot_date TEXT NOT NULL,
+                total_value REAL NOT NULL DEFAULT 0,
+                total_cost REAL NOT NULL DEFAULT 0,
+                securities_value REAL,
+                UNIQUE(portfolio_id, snapshot_date)
+            )
+            """
+        )
+        # total_value = securities + cash; securities_value = securities only
+        # (NULL for snapshots taken before this column existed).
+        try:
+            conn.execute("ALTER TABLE portfolio_snapshots ADD COLUMN securities_value REAL")
+        except sqlite3.OperationalError:
+            pass
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                ticker TEXT NOT NULL,
+                instrument_type TEXT NOT NULL DEFAULT 'bond',
+                note TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, ticker, instrument_type)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS rating_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                rating TEXT NOT NULL,
+                source TEXT NOT NULL,
+                recorded_at TEXT NOT NULL
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS waitlist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Pro payments (YooKassa) — for NPD bookkeeping ("Мой налог" by hand).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pro_payments (
+                payment_id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                username TEXT,
+                plan TEXT,
+                amount REAL,
+                status TEXT,
+                receipt_done INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_sync (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL UNIQUE REFERENCES portfolios(id) ON DELETE CASCADE,
+                tbank_token_enc TEXT NOT NULL,
+                tbank_token_prefix TEXT NOT NULL,
+                tbank_account_id TEXT NOT NULL,
+                bonds_only INTEGER NOT NULL DEFAULT 0,
+                sync_enabled INTEGER NOT NULL DEFAULT 1,
+                last_sync_at TEXT,
+                last_sync_error TEXT
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tbank_coupons (
+                portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+                figi TEXT NOT NULL,
+                coupons_total REAL NOT NULL DEFAULT 0,
+                first_buy_date TEXT,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (portfolio_id, figi)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                action TEXT NOT NULL,
+                target_type TEXT,
+                target_id INTEGER,
+                details TEXT,
+                ip_address TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS benchmark_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                benchmark TEXT NOT NULL,
+                snapshot_date TEXT NOT NULL,
+                value REAL NOT NULL,
+                UNIQUE(benchmark, snapshot_date)
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_codes (
+                code TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+
+    def _migration_v3(self, conn: sqlite3.Connection) -> None:
+        """v3 — late add-column migrations (portfolio_items.source,
+        portfolio_sync cash columns) and all index creation. Idempotent."""
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_password_reset_codes_expires "
+                "ON password_reset_codes(expires_at)"
+            )
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_benchmark_snapshots_lookup "
+                "ON benchmark_snapshots(benchmark, snapshot_date)"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        # Migrations for portfolio_items — add source column
+        for col, col_def in [
+            ("source", "TEXT NOT NULL DEFAULT 'manual'"),
+        ]:
+            try:
+                conn.execute(
+                    f"ALTER TABLE portfolio_items ADD COLUMN {col} {col_def}"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        # Migrations for portfolio_sync — cash balance JSON
+        for col, col_def in [
+            ("cash_balance", "TEXT"),
+            ("cash_updated_at", "TEXT"),
+            ("last_operations_sync_at", "TEXT"),  # last GetOperations fetch (ISO)
+        ]:
+            try:
+                conn.execute(
+                    f"ALTER TABLE portfolio_sync ADD COLUMN {col} {col_def}"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+        # Create indices
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_portfolio_items_portfolio_id "
+                "ON portfolio_items(portfolio_id)"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_portfolios_user_id "
+                "ON portfolios(user_id)"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_portfolios_share_token "
+                "ON portfolios(share_token)"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio_date "
+                "ON portfolio_snapshots(portfolio_id, snapshot_date)"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        for idx_sql in [
+            "CREATE INDEX IF NOT EXISTS idx_items_ticker ON portfolio_items(ticker)",
+            "CREATE INDEX IF NOT EXISTS idx_coupon_notif_item ON coupon_notifications(item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_alerts_item_id ON price_alerts(item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_alerts_user_triggered ON price_alerts(user_id, triggered)",
+            "CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start)",
+            "CREATE INDEX IF NOT EXISTS idx_rating_history_ticker_source ON rating_history(ticker, source, recorded_at)",
+            "CREATE INDEX IF NOT EXISTS idx_portfolio_sync_enabled ON portfolio_sync(sync_enabled)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_admin ON admin_audit_log(admin_user_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_created ON admin_audit_log(created_at)",
+        ]:
+            try:
+                conn.execute(idx_sql)
+            except sqlite3.OperationalError:
+                pass
+
+    def _migration_v4(self, conn: sqlite3.Connection) -> None:
+        """v4 — cross-process advisory lock table for broker syncs. Idempotent."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sync_locks (
+                portfolio_id INTEGER PRIMARY KEY REFERENCES portfolios(id) ON DELETE CASCADE,
+                acquired_at INTEGER NOT NULL
+            )
+            """
+        )
 
     def _write_bootstrap_admin_password(self, password: str) -> None:
         """Write the bootstrap admin password to a 0600 file next to the DB.
@@ -1174,6 +1253,48 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 "UPDATE portfolio_sync SET last_operations_sync_at = ? WHERE portfolio_id = ?",
                 (ts, portfolio_id),
             )
+            conn.commit()
+
+    def update_sync_token(self, portfolio_id: int, tbank_token_enc: str) -> None:
+        """Persist a re-encrypted broker token (lazy migration to the active key)."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE portfolio_sync SET tbank_token_enc = ? WHERE portfolio_id = ?",
+                (tbank_token_enc, portfolio_id),
+            )
+            conn.commit()
+
+    def acquire_sync_lock(
+        self, portfolio_id: int, now_ts: int, ttl_seconds: int
+    ) -> bool:
+        """Cross-process advisory lock for a portfolio sync (sync_locks table).
+
+        Returns True if the lock was acquired (no live lock held), False if
+        another worker still holds it within the TTL. A stale lock (older than
+        ``ttl_seconds`` — e.g. a crashed worker that never released) is reclaimed.
+
+        Atomic via an upsert guarded by the staleness check in its WHERE clause:
+        the row is written only when absent or expired, and rowcount tells us
+        whether we won.
+        """
+        cutoff = now_ts - ttl_seconds
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO sync_locks (portfolio_id, acquired_at)
+                VALUES (?, ?)
+                ON CONFLICT(portfolio_id) DO UPDATE SET acquired_at = excluded.acquired_at
+                WHERE sync_locks.acquired_at < ?
+                """,
+                (portfolio_id, now_ts, cutoff),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def release_sync_lock(self, portfolio_id: int) -> None:
+        """Release a previously acquired sync lock."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM sync_locks WHERE portfolio_id = ?", (portfolio_id,))
             conn.commit()
 
     def upsert_tbank_coupons(
