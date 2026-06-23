@@ -245,3 +245,89 @@ class TestSnapshotGuard:
         service.save_portfolio_snapshot(pid, total_value=0.0, total_cost=0.0)
         snaps = service.get_portfolio_snapshots(pid)
         assert any(s["date"] == today for s in snaps)
+
+
+class TestSchemaMigrations:
+    """Tests for the numbered schema-migration mechanism."""
+
+    def test_schema_version_set_after_init(self, settings_override) -> None:
+        # A fresh DB must be stamped with the latest schema version.
+        service = StorageService()
+        with service._connect() as conn:
+            assert service._get_schema_version(conn) == StorageService.SCHEMA_VERSION
+
+    def test_migrations_applied_exactly_once(
+        self, settings_override, monkeypatch
+    ) -> None:
+        # First init applies the baseline migration; a second _ensure_db() on the
+        # already-migrated DB must be a no-op (version unchanged, not re-applied).
+        service = StorageService()
+
+        calls = {"count": 0}
+        original = service._migration_v1
+
+        def counting_baseline(conn):
+            calls["count"] += 1
+            return original(conn)
+
+        monkeypatch.setattr(service, "_migration_v1", counting_baseline)
+        service._ensure_db()  # version already == SCHEMA_VERSION, must skip
+
+        assert calls["count"] == 0
+        with service._connect() as conn:
+            assert service._get_schema_version(conn) == StorageService.SCHEMA_VERSION
+
+    def test_legacy_db_without_version_gets_stamped(self, settings_override) -> None:
+        # Simulate a pre-existing prod DB created before versioning: the schema is
+        # fully built but schema_version is missing -> must be created and stamped
+        # without re-running anything destructively.
+        service = StorageService()
+        with service._connect() as conn:
+            conn.execute("DROP TABLE schema_version")
+            conn.commit()
+            assert service._get_schema_version(conn) == 0
+
+        # Re-running ensures the baseline (idempotent) and re-stamps the version.
+        service._ensure_db()
+        with service._connect() as conn:
+            assert service._get_schema_version(conn) == StorageService.SCHEMA_VERSION
+
+    def test_version_increases_monotonically(self, settings_override) -> None:
+        # Append a fake new migration past the latest version and verify only the
+        # new step is applied, the version is bumped, and it runs exactly once
+        # (all already-applied steps are skipped).
+        service = StorageService()
+        applied = []
+
+        next_version = StorageService.SCHEMA_VERSION + 1
+
+        def fake_next(conn):
+            applied.append(next_version)
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS _mig_probe (id INTEGER PRIMARY KEY)"
+            )
+
+        with service._connect() as conn:
+            current = service._get_schema_version(conn)
+            assert current == StorageService.SCHEMA_VERSION  # all baselines applied
+            migrations = [
+                (1, service._migration_v1),
+                (2, service._migration_v2),
+                (3, service._migration_v3),
+                (next_version, fake_next),
+            ]
+            for version, migrate in migrations:
+                if version <= current:
+                    continue
+                migrate(conn)
+                service._set_schema_version(conn, version)
+                conn.commit()
+                current = version
+
+        assert applied == [next_version]  # existing steps skipped, new one applied once
+        with service._connect() as conn:
+            assert service._get_schema_version(conn) == next_version
+            # Cleanup so the shared temp DB stays clean for other tests.
+            conn.execute("DROP TABLE IF EXISTS _mig_probe")
+            service._set_schema_version(conn, StorageService.SCHEMA_VERSION)
+            conn.commit()
