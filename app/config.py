@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     jwt_secret: str  # Required, no default — fail fast if not set
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 72
+    # Dedicated key for encrypting stored broker tokens (T-Bank API tokens in
+    # portfolio_sync.tbank_token_enc). Kept SEPARATE from jwt_secret so that
+    # rotating MVP_JWT_SECRET (a standard security practice) does NOT break
+    # decryption of already-stored tokens. Empty → fall back to a jwt_secret-
+    # derived key (legacy behaviour, backward compatible).
+    token_enc_key: str = ""
     # SMTP for password reset emails (optional)
     smtp_host: str = ""
     smtp_port: int = 587

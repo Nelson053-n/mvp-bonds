@@ -235,8 +235,8 @@ async def tbank_sync_enable(
         logger.exception("Unexpected error validating T-Bank token for sync/enable")
         raise HTTPException(status_code=500, detail="Ошибка подключения к Т-Банк API") from exc
 
-    # Encrypt and persist
-    token_enc = encrypt_token(payload.token, app_settings.jwt_secret)
+    # Encrypt and persist (uses the dedicated token-encryption key)
+    token_enc = encrypt_token(payload.token)
     storage_service.upsert_sync_config(
         portfolio_id=payload.portfolio_id,
         tbank_token_enc=token_enc,

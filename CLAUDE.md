@@ -52,6 +52,8 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 **Auth:** JWT tokens (PyJWT, HS256, 72h expiry) + bcrypt passwords. First startup bootstraps an admin user with an auto-generated password printed to logs.
 
+**Token encryption** (`app/services/crypto_utils.py`): T-Bank API tokens are stored in `portfolio_sync.tbank_token_enc` encrypted with Fernet. The key is derived from `MVP_TOKEN_ENC_KEY` — kept SEPARATE from `MVP_JWT_SECRET` so rotating the JWT secret does NOT break stored tokens. If `MVP_TOKEN_ENC_KEY` is unset it falls back to a `jwt_secret`-derived key (legacy). Decryption tries the active key first, then the legacy key; on a successful legacy read the token is re-encrypted under the active key (lazy migration via `decrypt_and_maybe_migrate` + `storage_service.update_sync_token`).
+
 **Dependency injection** (`app/api/deps.py`):
 - `get_current_user()` — extract/verify JWT from Bearer token
 - `get_admin_user()` — require authenticated admin
@@ -106,6 +108,7 @@ Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/
 | Variable | Required | Default |
 |---|---|---|
 | `MVP_JWT_SECRET` | Yes | — |
+| `MVP_TOKEN_ENC_KEY` | No | — (falls back to `MVP_JWT_SECRET`) |
 | `MVP_SQLITE_DB_PATH` | No | `data/portfolio.db` |
 | `MVP_LLM_MODE` | No | `stub` |
 | `MVP_OPENAI_API_KEY` | If llm_mode=openai | — |
