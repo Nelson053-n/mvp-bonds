@@ -671,6 +671,16 @@ class PortfolioService:
                             ai_comment="",
                         )
                 except Exception as exc:
+                    logger.warning(
+                        "Metrics calc failed for %s (id=%s, type=%s) in portfolio_id=%s: %s: %s",
+                        item.ticker,
+                        item.id,
+                        item.instrument_type,
+                        portfolio_id,
+                        type(exc).__name__,
+                        exc,
+                        exc_info=True,
+                    )
                     itype = (
                         "bond"
                         if item.instrument_type == "bond"
