@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/mvp-bonds
+Environment=HOME=/root
 ExecStart=/bin/bash /opt/mvp-bonds/ops/auto-deploy.sh
 StandardOutput=journal
 StandardError=journal
