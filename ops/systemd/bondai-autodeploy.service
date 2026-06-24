@@ -1,0 +1,14 @@
+[Unit]
+Description=bondai auto-deploy (triggered by timer)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mvp-bonds
+ExecStart=/bin/bash /opt/mvp-bonds/ops/auto-deploy.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bondai-autodeploy
+# Разрешаем sudo-команды нужные deploy.sh (systemctl restart bondai)
+# Сервис запускается от root через таймер — прав достаточно
