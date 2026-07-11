@@ -283,7 +283,7 @@ async def _rating_refresh_loop():
                                 continue
                             by_user.setdefault(
                                 (h["user_id"], h["tg_chat_id"]), []
-                            ).append(h["portfolio"])
+                            ).append((h["portfolio"], h["quantity"]))
                         if by_user:
                             try:
                                 if item["instrument_type"] == "stock":
@@ -294,12 +294,16 @@ async def _rating_refresh_loop():
                             except Exception:
                                 display_name = ticker
 
-                            for (_, chat_id), names in by_user.items():
-                                label = "Портфель" if len(names) == 1 else "Портфели"
+                            for (_, chat_id), holdings in by_user.items():
+                                label = "Портфель" if len(holdings) == 1 else "Портфели"
+                                holdings_line = ", ".join(
+                                    f"{name} — {int(qty) if qty == int(qty) else qty} шт."
+                                    for name, qty in holdings
+                                )
                                 msg = (
                                     f"\U0001f534 <b>Двойное ухудшение рейтинга</b>\n\n"
                                     f"Бумага: <b>{display_name}</b>\n"
-                                    f"{label}: {', '.join(names)}\n"
+                                    f"{label}: {holdings_line}\n"
                                     f"SmartLab: {history[2]} \u2192 {history[1]} \u2192 {history[0]}\n"
                                     f"Рейтинг последовательно снижался дважды — возможный риск!"
                                 )
