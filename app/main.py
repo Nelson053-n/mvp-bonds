@@ -249,7 +249,6 @@ async def _rating_refresh_loop():
 
             s = storage_service.get_all_settings()
             tg_token = s.get("tg_bot_token", "")
-            tg_chat_id = s.get("tg_chat_id", "")
 
             async def _refresh_one(item):
                 ticker = item["ticker"]
@@ -274,29 +273,40 @@ async def _rating_refresh_loop():
                         and len(history) >= 3
                         and rating_worsened(history[2], history[1])
                         and rating_worsened(history[1], history[0])
-                        and tg_token and tg_chat_id
+                        and tg_token
                     ):
-                        try:
-                            if item["instrument_type"] == "stock":
-                                snap = await moex_service.get_stock_snapshot(ticker)
-                            else:
-                                snap = await moex_service.get_bond_snapshot(ticker)
-                            display_name = f"{snap.name} ({ticker})"
-                        except Exception:
-                            display_name = ticker
-                        holders = storage_service.get_portfolios_containing_ticker(ticker)
-                        holders_line = ", ".join(
-                            f"{h['portfolio']} ({h['username']})" for h in holders
-                        ) or "—"
-                        msg = (
-                            f"\U0001f534 <b>Двойное ухудшение рейтинга</b>\n\n"
-                            f"Бумага: <b>{display_name}</b>\n"
-                            f"Портфели: {holders_line}\n"
-                            f"SmartLab: {history[2]} \u2192 {history[1]} \u2192 {history[0]}\n"
-                            f"Рейтинг последовательно снижался дважды — возможный риск!"
-                        )
-                        await notification_service.send_telegram(tg_token, tg_chat_id, msg)
-                        logger.warning("Double downgrade alert sent for %s", ticker)
+                        # Deliver per user: each holder with a TG chat configured
+                        # gets an alert listing only their own portfolios.
+                        by_user: dict = {}
+                        for h in storage_service.get_portfolios_containing_ticker(ticker):
+                            if not h["tg_chat_id"]:
+                                continue
+                            by_user.setdefault(
+                                (h["user_id"], h["tg_chat_id"]), []
+                            ).append(h["portfolio"])
+                        if by_user:
+                            try:
+                                if item["instrument_type"] == "stock":
+                                    snap = await moex_service.get_stock_snapshot(ticker)
+                                else:
+                                    snap = await moex_service.get_bond_snapshot(ticker)
+                                display_name = f"{snap.name} ({ticker})"
+                            except Exception:
+                                display_name = ticker
+
+                            for (_, chat_id), names in by_user.items():
+                                label = "Портфель" if len(names) == 1 else "Портфели"
+                                msg = (
+                                    f"\U0001f534 <b>Двойное ухудшение рейтинга</b>\n\n"
+                                    f"Бумага: <b>{display_name}</b>\n"
+                                    f"{label}: {', '.join(names)}\n"
+                                    f"SmartLab: {history[2]} \u2192 {history[1]} \u2192 {history[0]}\n"
+                                    f"Рейтинг последовательно снижался дважды — возможный риск!"
+                                )
+                                await notification_service.send_telegram(tg_token, chat_id, msg)
+                            logger.warning(
+                                "Double downgrade alert for %s sent to %d user(s)", ticker, len(by_user)
+                            )
 
                 if best_rating is not None:
                     storage_service.update_rating_all_items_for_ticker(ticker, best_rating)

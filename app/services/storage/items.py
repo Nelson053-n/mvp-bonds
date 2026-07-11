@@ -251,18 +251,18 @@ class ItemsMixin:
             return True
 
     def get_portfolios_containing_ticker(self, ticker: str) -> list[dict]:
-        """Return portfolios (with owner username) holding an active position in ticker."""
+        """Return portfolios (with owner id and TG chat) holding an active position in ticker."""
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT DISTINCT p.name, u.username
+                """SELECT DISTINCT p.name, u.id, u.tg_chat_id
                    FROM portfolio_items pi
                    JOIN portfolios p ON p.id = pi.portfolio_id
                    JOIN users u ON u.id = p.user_id
                    WHERE pi.ticker = ? AND pi.deleted_at IS NULL
-                   ORDER BY u.username, p.name""",
+                   ORDER BY u.id, p.name""",
                 (ticker,),
             ).fetchall()
-        return [{"portfolio": r[0], "username": r[1]} for r in rows]
+        return [{"portfolio": r[0], "user_id": r[1], "tg_chat_id": r[2]} for r in rows]
 
     def get_recent_rating_history(self, ticker: str, source: str, limit: int = 3) -> list[str]:
         """Return last N distinct-consecutive ratings for ticker+source (newest first)."""
