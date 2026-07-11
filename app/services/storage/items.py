@@ -227,8 +227,11 @@ class ItemsMixin:
             )
             return updated
 
-    def save_rating_history(self, ticker: str, rating: str, source: str) -> None:
-        """Save a rating observation to history (deduplicate: skip if same as last entry)."""
+    def save_rating_history(self, ticker: str, rating: str, source: str) -> bool:
+        """Save a rating observation to history (deduplicate: skip if same as last entry).
+
+        Returns True if a new entry was recorded (rating changed), False if skipped.
+        """
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
@@ -239,12 +242,27 @@ class ItemsMixin:
                 (ticker, source),
             ).fetchone()
             if last and last[0] == rating:
-                return  # no change — skip
+                return False  # no change — skip
             conn.execute(
                 "INSERT INTO rating_history (ticker, rating, source, recorded_at) VALUES (?, ?, ?, ?)",
                 (ticker, rating, source, now),
             )
             conn.commit()
+            return True
+
+    def get_portfolios_containing_ticker(self, ticker: str) -> list[dict]:
+        """Return portfolios (with owner username) holding an active position in ticker."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT DISTINCT p.name, u.username
+                   FROM portfolio_items pi
+                   JOIN portfolios p ON p.id = pi.portfolio_id
+                   JOIN users u ON u.id = p.user_id
+                   WHERE pi.ticker = ? AND pi.deleted_at IS NULL
+                   ORDER BY u.username, p.name""",
+                (ticker,),
+            ).fetchall()
+        return [{"portfolio": r[0], "username": r[1]} for r in rows]
 
     def get_recent_rating_history(self, ticker: str, source: str, limit: int = 3) -> list[str]:
         """Return last N distinct-consecutive ratings for ticker+source (newest first)."""

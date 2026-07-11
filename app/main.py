@@ -264,18 +264,34 @@ async def _rating_refresh_loop():
                 best_rating = result["best"]
 
                 if sl_rating is not None:
-                    storage_service.save_rating_history(ticker, sl_rating, "smartlab")
+                    # Alert only when the rating actually changed today — the history
+                    # is deduplicated, so a stale downgrade would otherwise re-alert daily.
+                    changed = storage_service.save_rating_history(ticker, sl_rating, "smartlab")
 
                     history = storage_service.get_recent_rating_history(ticker, "smartlab", limit=3)
                     if (
-                        len(history) >= 3
+                        changed
+                        and len(history) >= 3
                         and rating_worsened(history[2], history[1])
                         and rating_worsened(history[1], history[0])
                         and tg_token and tg_chat_id
                     ):
+                        try:
+                            if item["instrument_type"] == "stock":
+                                snap = await moex_service.get_stock_snapshot(ticker)
+                            else:
+                                snap = await moex_service.get_bond_snapshot(ticker)
+                            display_name = f"{snap.name} ({ticker})"
+                        except Exception:
+                            display_name = ticker
+                        holders = storage_service.get_portfolios_containing_ticker(ticker)
+                        holders_line = ", ".join(
+                            f"{h['portfolio']} ({h['username']})" for h in holders
+                        ) or "—"
                         msg = (
                             f"\U0001f534 <b>Двойное ухудшение рейтинга</b>\n\n"
-                            f"Бумага: <b>{ticker}</b>\n"
+                            f"Бумага: <b>{display_name}</b>\n"
+                            f"Портфели: {holders_line}\n"
                             f"SmartLab: {history[2]} \u2192 {history[1]} \u2192 {history[0]}\n"
                             f"Рейтинг последовательно снижался дважды — возможный риск!"
                         )
