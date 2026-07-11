@@ -27,7 +27,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 ## Architecture
 
-**Stack:** FastAPI (async) + SQLite + vanilla HTML/CSS/JS (single-page app in one file)
+**Stack:** FastAPI (async) + SQLite + vanilla HTML/CSS/JS (SPA: `dashboard.html` shell + static assets)
 
 **Request flow:**
 1. `app/main.py` — registers routers, starts/stops background tasks via lifespan
@@ -38,7 +38,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 6. `app/services/cache_service.py` — in-memory cache with background refresh (configurable interval, default 900s)
 7. `app/services/llm_service.py` — generates AI comments; two modes: `stub` (hardcoded) or `openai`
 8. `app/services/notification_service.py` — Telegram alerts (coupon reminders, double-downgrade detection)
-9. `app/ui/dashboard.html` — entire frontend SPA in a single file (HTML + CSS + JS)
+9. `app/ui/dashboard.html` — HTML shell of the frontend SPA (~1450 lines); JS/CSS live in `app/ui/static/` (`app.js`, `translations.js`, `styles.css`). Service worker `app/ui/sw.js` caches static assets — after ANY change to static files bump `CACHE_NAME` in `sw.js`, otherwise clients keep the old version
 
 **Background tasks** (started via lifespan in `app/main.py`):
 - DB backup on startup (rolling, keeps 3 most recent in `data/backups/`)
@@ -122,9 +122,21 @@ Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/
 
 `MVP_TG_BOT_TOKEN` powers the public bond-search Telegram bot (`app/services/telegram_bot_service.py`): when set, a long-polling loop starts in the leader worker and answers `/start`, `/help` and free-text ticker/name queries with a bond card. Unset → bot silently disabled. SMTP variables (`MVP_SMTP_*`) are optional for password reset emails.
 
+## Прод и публикация
+
+**Два прода:**
+- Локальный: `root@192.168.10.114`, каталог `/opt/mvp-bonds` (git remote `prod`).
+- Публичный: **bondai.ru** = `root@212.8.228.248`, каталог `/opt/mvp-bonds`, systemd-сервис `bondai`.
+
+**Автодеплой на bondai.ru:** systemd timer `bondai-autodeploy` (раз в 5 мин) — git fetch, сравнение с `origin/v3`, при новых коммитах `ops/deploy.sh` (smoke-проверка + откат) и TG-уведомление. Лог: `/var/log/bondai-autodeploy.log`. Деплой = обычный `git push` в `origin` (ветка `v3`), руками на сервер ходить не нужно.
+
+**Публикация отчётов без логина:** HTML-отчёт кладётся на прод в `app/ui/static/` как `report-<случайный-токен>.html` → доступен по `https://bondai.ru/static/report-<token>.html`. Файлы НЕ в git, поэтому автодеплой их не затирает. Удаление: `ssh root@212.8.228.248 rm /opt/mvp-bonds/app/ui/static/report-*.html`.
+
+**Доставка отчётов — Telegram, НЕ почта** (решение пользователя, 2026-07-10): ссылку на отчёт слать через TG-бота проекта **@bondinfoai_bot**; токен и chat_id — в SQLite `app_settings` (`tg_bot_token`/`tg_chat_id`, задаются в UI панели), НЕ в env. Готовая команда — skill `portfolio-report`. На проде нет `sqlite3` CLI — БД читать через `.venv/bin/python3`. Почту не поднимать: Gmail MCP умеет только черновики, SMTP с сервера на порт 25 отбивается (550, нет PTR), `MVP_SMTP_*` сознательно не настраиваем.
+
 ## Design system (UI)
 
-The frontend (`app/ui/dashboard.html`) uses:
+The frontend (`app/ui/dashboard.html` + `app/ui/static/styles.css`) uses:
 - Font: Inter (Google Fonts)
 - CSS variables: `--slate-50…--slate-900`, `--blue-500/600/700`, `--green-600`, `--red-600`
 - Radii: `--radius-sm` 6px / `--radius` 8px / `--radius-lg` 12px

@@ -19,16 +19,25 @@ BRANCH="v3"
 
 cd "$REPO_DIR"
 
-# Читаем .env для TG
+# Читаем .env (MVP_SQLITE_DB_PATH и пр.)
 set -a
 # shellcheck disable=SC1091
 [ -f .env ] && . ./.env
 set +a
 
-TG_TOKEN="${MVP_TG_BOT_TOKEN:-}"
-# tg_chat_id хранится в app_settings SQLite (туда же, куда пишет UI)
+# Токен и chat_id бота — в app_settings SQLite (туда же пишет UI панели);
+# sqlite3 CLI на проде нет, читаем через python из .venv
 DB_PATH="${MVP_SQLITE_DB_PATH:-$REPO_DIR/data/portfolio.db}"
-TG_CHAT="$(sqlite3 "$DB_PATH" "SELECT value FROM app_settings WHERE key='tg_chat_id' LIMIT 1" 2>/dev/null || true)"
+TG_CREDS="$("$REPO_DIR/.venv/bin/python3" -c "
+import sqlite3
+s = dict(sqlite3.connect('$DB_PATH').execute(
+    \"SELECT key, value FROM app_settings WHERE key IN ('tg_bot_token','tg_chat_id')\").fetchall())
+print(s.get('tg_bot_token', ''))
+print(s.get('tg_chat_id', ''))
+" 2>/dev/null || true)"
+TG_TOKEN="$(printf '%s\n' "$TG_CREDS" | sed -n 1p)"
+TG_CHAT="$(printf '%s\n' "$TG_CREDS" | sed -n 2p)"
+[ -z "$TG_TOKEN" ] && TG_TOKEN="${MVP_TG_BOT_TOKEN:-}"
 
 _log() {
   local ts
