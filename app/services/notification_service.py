@@ -50,14 +50,22 @@ class NotificationService:
         self,
         old_rows: "list[InstrumentMetrics]",
         new_rows: "list[InstrumentMetrics]",
+        portfolio_id: int,
     ) -> None:
-        """Compare old and new rows; send TG alerts for changes."""
+        """Compare old and new rows; alert the portfolio owner via Telegram."""
         from app.services.storage_service import storage_service
 
         s = storage_service.get_all_settings()
         token = s.get("tg_bot_token", "")
-        chat_id = s.get("tg_chat_id", "")
-        if not token or not chat_id:
+        if not token:
+            return
+
+        portfolio = storage_service.get_portfolio(portfolio_id)
+        owner = (
+            storage_service.get_user_by_id(portfolio["user_id"]) if portfolio else None
+        )
+        chat_id = (owner or {}).get("tg_chat_id")
+        if not chat_id:
             return
 
         try:
@@ -68,7 +76,10 @@ class NotificationService:
         lang = s.get("tg_lang", "ru")
 
         old_by_id: dict[int, "InstrumentMetrics"] = {r.id: r for r in old_rows}
-        messages: list[str] = []
+        today = date.today().isoformat()
+        # (dedup_key, text): the key collapses duplicates across workers,
+        # portfolios of the same owner and repeated price flapping within a day
+        messages: list[tuple[str, str]] = []
 
         for new_row in new_rows:
             old_row = old_by_id.get(new_row.id)
@@ -81,18 +92,24 @@ class NotificationService:
                 and new_row.company_rating
                 and old_row.company_rating != new_row.company_rating
             ):
+                key = (
+                    f"rating_change:{chat_id}:{new_row.ticker}:"
+                    f"{new_row.company_rating}:{today}"
+                )
                 if lang == "en":
-                    messages.append(
+                    messages.append((
+                        key,
                         f"\u26a0\ufe0f <b>Rating change</b>\n"
                         f"{new_row.name} ({new_row.ticker})\n"
                         f"{old_row.company_rating} \u2192 {new_row.company_rating}"
-                    )
+                    ))
                 else:
-                    messages.append(
+                    messages.append((
+                        key,
                         f"\u26a0\ufe0f <b>Изменение рейтинга</b>\n"
                         f"{new_row.name} ({new_row.ticker})\n"
                         f"{old_row.company_rating} \u2192 {new_row.company_rating}"
-                    )
+                    ))
 
             # Price drop
             if old_row.current_price > 0 and new_row.current_price > 0:
@@ -102,24 +119,29 @@ class NotificationService:
                     * 100
                 )
                 if drop_pct >= threshold:
+                    key = f"price_drop:{chat_id}:{new_row.ticker}:{today}"
                     if lang == "en":
-                        messages.append(
+                        messages.append((
+                            key,
                             f"\U0001f4c9 <b>Price drop</b>\n"
                             f"{new_row.name} ({new_row.ticker})\n"
                             f"Was: {old_row.current_price:.2f} \u2192 "
                             f"Now: {new_row.current_price:.2f} "
                             f"(-{drop_pct:.1f}%)"
-                        )
+                        ))
                     else:
-                        messages.append(
+                        messages.append((
+                            key,
                             f"\U0001f4c9 <b>Просадка цены</b>\n"
                             f"{new_row.name} ({new_row.ticker})\n"
                             f"Было: {old_row.current_price:.2f} \u2192 "
                             f"Стало: {new_row.current_price:.2f} "
                             f"(-{drop_pct:.1f}%)"
-                        )
+                        ))
 
-        for msg in messages:
+        for key, msg in messages:
+            if not storage_service.try_mark_notification_sent(key):
+                continue
             await self.send_telegram(token, chat_id, msg)
 
     async def check_and_send_coupon_notifications(self) -> None:

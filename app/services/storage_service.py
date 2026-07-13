@@ -123,7 +123,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -162,6 +162,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (2, self._migration_v2),
             (3, self._migration_v3),
             (4, self._migration_v4),
+            (5, self._migration_v5),
         ]
 
         for version, migrate in migrations:
@@ -543,6 +544,18 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             CREATE TABLE IF NOT EXISTS sync_locks (
                 portfolio_id INTEGER PRIMARY KEY REFERENCES portfolios(id) ON DELETE CASCADE,
                 acquired_at INTEGER NOT NULL
+            )
+            """
+        )
+
+    def _migration_v5(self, conn: sqlite3.Connection) -> None:
+        """v5 — dedup keys for one-shot notifications (price drop / rating change).
+        Idempotent."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sent_notifications (
+                key TEXT PRIMARY KEY,
+                sent_at TEXT NOT NULL
             )
             """
         )
@@ -1033,6 +1046,27 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 (now, alert_id)
             )
             conn.commit()
+
+    def try_mark_notification_sent(self, key: str) -> bool:
+        """Atomically claim a one-shot notification key.
+
+        Returns True if this call inserted the key (caller should send),
+        False if it was already claimed (another worker or an earlier
+        refresh already sent this notification). Prunes keys older than
+        30 days to keep the table small."""
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO sent_notifications (key, sent_at) VALUES (?, ?)",
+                (key, now.isoformat()),
+            )
+            conn.execute(
+                "DELETE FROM sent_notifications WHERE sent_at < ?",
+                ((now - timedelta(days=30)).isoformat(),),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
 
     # ── Watchlist ───────────────────────────────────────────────────────────

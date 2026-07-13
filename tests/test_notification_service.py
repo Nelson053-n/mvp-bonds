@@ -106,23 +106,28 @@ class TestCheckAndNotify:
     def svc(self):
         return NotificationService()
 
-    def _patch_settings(self, monkeypatch, **over):
+    def _patch_settings(self, monkeypatch, *, owner_chat_id="chat", dedup_free=True, **over):
         settings = {
             "tg_bot_token": "tok",
-            "tg_chat_id": "chat",
             "price_drop_threshold": "5.0",
             "tg_lang": "ru",
         }
         settings.update(over)
         from app.services.storage_service import storage_service
         monkeypatch.setattr(storage_service, "get_all_settings", lambda: settings)
+        monkeypatch.setattr(storage_service, "get_portfolio",
+                            lambda pid: {"id": pid, "user_id": 1})
+        monkeypatch.setattr(storage_service, "get_user_by_id",
+                            lambda uid: {"id": uid, "tg_chat_id": owner_chat_id})
+        monkeypatch.setattr(storage_service, "try_mark_notification_sent",
+                            lambda key: dedup_free)
 
     async def test_no_alert_without_token(self, monkeypatch, svc):
         self._patch_settings(monkeypatch, tg_bot_token="")
         sent = []
         monkeypatch.setattr(svc, "send_telegram",
                             lambda *a, **k: sent.append(a) or True)
-        await svc.check_and_notify([_row(1)], [_row(1)])
+        await svc.check_and_notify([_row(1)], [_row(1)], 7)
         assert sent == []
 
     async def test_rating_change_emits_message(self, monkeypatch, svc):
@@ -135,7 +140,7 @@ class TestCheckAndNotify:
 
         old = [_row(1, rating="A")]
         new = [_row(1, rating="BBB")]
-        await svc.check_and_notify(old, new)
+        await svc.check_and_notify(old, new, 7)
         assert len(sent) == 1
         assert "A" in sent[0] and "BBB" in sent[0]
         assert "рейтинг" in sent[0].lower()
@@ -147,7 +152,7 @@ class TestCheckAndNotify:
             sent.append(text)
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
-        await svc.check_and_notify([_row(1, rating="A")], [_row(1, rating="A")])
+        await svc.check_and_notify([_row(1, rating="A")], [_row(1, rating="A")], 7)
         assert sent == []
 
     async def test_price_drop_above_threshold(self, monkeypatch, svc):
@@ -158,7 +163,7 @@ class TestCheckAndNotify:
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
         # 100 → 90 = -10% ≥ 5% threshold
-        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)])
+        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)], 7)
         assert len(sent) == 1
         assert "просадка" in sent[0].lower()
 
@@ -170,7 +175,7 @@ class TestCheckAndNotify:
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
         # 100 → 98 = -2% < 5%
-        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=98.0)])
+        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=98.0)], 7)
         assert sent == []
 
     async def test_unknown_row_skipped(self, monkeypatch, svc):
@@ -181,7 +186,7 @@ class TestCheckAndNotify:
             sent.append(text)
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
-        await svc.check_and_notify([], [_row(2, rating="BBB", price=50.0)])
+        await svc.check_and_notify([], [_row(2, rating="BBB", price=50.0)], 7)
         assert sent == []
 
     async def test_english_language(self, monkeypatch, svc):
@@ -191,8 +196,40 @@ class TestCheckAndNotify:
             sent.append(text)
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
-        await svc.check_and_notify([_row(1, rating="A")], [_row(1, rating="BBB")])
+        await svc.check_and_notify([_row(1, rating="A")], [_row(1, rating="BBB")], 7)
         assert "Rating change" in sent[0]
+
+    async def test_no_alert_when_owner_has_no_chat_id(self, monkeypatch, svc):
+        """Alerts go to the portfolio owner; no owner chat_id -> nothing sent."""
+        self._patch_settings(monkeypatch, owner_chat_id=None)
+        sent = []
+        async def fake_send(t, c, text):
+            sent.append(text)
+            return True
+        monkeypatch.setattr(svc, "send_telegram", fake_send)
+        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)], 7)
+        assert sent == []
+
+    async def test_sends_to_owner_chat(self, monkeypatch, svc):
+        self._patch_settings(monkeypatch, owner_chat_id="owner-42")
+        sent = []
+        async def fake_send(token, chat_id, text):
+            sent.append(chat_id)
+            return True
+        monkeypatch.setattr(svc, "send_telegram", fake_send)
+        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)], 7)
+        assert sent == ["owner-42"]
+
+    async def test_dedup_suppresses_duplicate(self, monkeypatch, svc):
+        """A key already claimed (other worker / earlier refresh) is not re-sent."""
+        self._patch_settings(monkeypatch, dedup_free=False)
+        sent = []
+        async def fake_send(t, c, text):
+            sent.append(text)
+            return True
+        monkeypatch.setattr(svc, "send_telegram", fake_send)
+        await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)], 7)
+        assert sent == []
 
 
 class TestCouponNotifications:

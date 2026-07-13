@@ -112,7 +112,7 @@ class CacheService:
                 if old_rows:
                     try:
                         await notification_service.check_and_notify(
-                            old_rows, merged
+                            old_rows, merged, portfolio_id
                         )
                     except Exception:
                         logger.exception("Notification check failed")
