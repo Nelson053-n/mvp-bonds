@@ -86,6 +86,18 @@ class PortfolioItem:
         )
 
 
+def _pick_rating_source(item: PortfolioItem, snapshot) -> str | None:
+    """Origin of the rating actually shown, mirroring the company_rating fallback
+    chain (manual -> live snapshot -> value stored in DB)."""
+    if item.manual_rating:
+        return "manual"
+    if snapshot.company_rating:
+        return snapshot.rating_source
+    if item.company_rating:
+        return "db"
+    return None
+
+
 class PortfolioService:
     async def validate(
         self, payload: AddInstrumentInput
@@ -603,6 +615,7 @@ class PortfolioService:
                             prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
                             company_rating=item.manual_rating or snapshot.company_rating or item.company_rating,
+                            rating_source=_pick_rating_source(item, snapshot),
                             is_qual=snapshot.is_qual,
                             is_traded=snapshot.is_traded,
                             nominal=nominal,
@@ -666,6 +679,7 @@ class PortfolioService:
                             prev_close_value=round(prev_close_value, 2) if prev_close_value is not None else None,
                             weight=0.0,
                             company_rating=item.manual_rating or snapshot.company_rating or item.company_rating,
+                            rating_source=_pick_rating_source(item, snapshot),
                             dividend_yield=snapshot.dividend_yield,
                             purchase_date=item.purchase_date,
                             ai_comment="",
@@ -731,11 +745,17 @@ class PortfolioService:
             await asyncio.gather(*(_gen_comment(row) for row in raw_rows))
         )
 
-        # Persist ratings + coupon_rate to DB for risk calculation and restarts
+        # Persist ratings + coupon_rate to DB for risk calculation and restarts.
+        # The 'listlevel' proxy is not a real issuer rating — persisting it would
+        # overwrite a good stored rating whenever SmartLab/MOEX are unreachable,
+        # so keep the stored one and only refresh coupon_rate in that case.
         for row in finalized:
             if row.current_price > 0:
+                rating_to_store = (
+                    None if row.rating_source == "listlevel" else row.company_rating
+                )
                 storage_service.update_snapshot_data(
-                    row.id, portfolio_id, row.company_rating, row.coupon_rate
+                    row.id, portfolio_id, rating_to_store, row.coupon_rate
                 )
 
         return finalized

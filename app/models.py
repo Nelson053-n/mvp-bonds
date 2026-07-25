@@ -64,6 +64,10 @@ class InstrumentMetrics(BaseModel):
     prev_close_value: float | None = None  # Position value at prev close (RUB)
     weight: float
     company_rating: str | None = None
+    # Origin of company_rating: 'manual' | 'smartlab' | 'moex' | 'listlevel' | 'db' | None.
+    # 'listlevel' is a coarse listing-level proxy, NOT a real issuer rating — it must
+    # never trigger a rating-change alert nor overwrite a real rating in the DB.
+    rating_source: str | None = None
     is_qual: bool = False
     is_traded: bool = True
     coupon: float | None = None
@@ -113,6 +117,7 @@ class BondSnapshot(BaseModel):
     aci: float | None = None
     market_yield: float | None = None
     company_rating: str | None = None
+    rating_source: str | None = None  # 'smartlab' | 'moex' | 'listlevel' | None
     is_qual: bool = False
     is_traded: bool = True
     face_unit: str = "SUR"  # Валюта номинала (SUR=RUB, CNY, USD, EUR, CHF)
@@ -127,3 +132,4 @@ class StockSnapshot(BaseModel):
     prev_close_price: float | None = None  # Previous trading session close (RUB)
     dividend_yield: float | None = None
     company_rating: str | None = None
+    rating_source: str | None = None  # 'smartlab' | 'moex' | 'listlevel' | None

@@ -341,6 +341,7 @@ class MOEXService:
             prev_close_price=prev_close,
             dividend_yield=None,
             company_rating=company_rating,
+            rating_source="moex" if company_rating else None,
         )
         self._stock_snapshot_cache[secid] = (snapshot, time.time())
         return snapshot
@@ -506,14 +507,19 @@ class MOEXService:
         aci = md_row.get("ACCINT") or sec_row.get("ACCRUEDINT")
         market_yield = md_row.get("YIELD") or sec_row.get("YIELDATPREVWAPRICE")
         company_rating = await self._get_smartlab_credit_rating(secid)
+        rating_source = "smartlab" if company_rating else None
         if company_rating is None:
             company_rating = await self._get_credit_rating(secid)
-        # Last resort: derive rating from MOEX listing level
+            rating_source = "moex" if company_rating else None
+        # Last resort: derive rating from MOEX listing level. This is a coarse
+        # proxy, not an issuer rating — tagged as 'listlevel' so downstream code
+        # never alerts on it nor persists it over a real rating.
         if company_rating is None:
             _listlevel_map = {1: "AA", 2: "BBB", 3: "BB"}
             listlevel = sec_row.get("LISTLEVEL")
             try:
                 company_rating = _listlevel_map.get(int(listlevel)) if listlevel is not None else None
+                rating_source = "listlevel" if company_rating else None
             except (TypeError, ValueError):
                 pass
 
@@ -569,6 +575,7 @@ class MOEXService:
                 else None
             ),
             company_rating=company_rating,
+            rating_source=rating_source,
             is_qual=is_qual,
             is_traded=is_traded,
             face_unit=face_unit,

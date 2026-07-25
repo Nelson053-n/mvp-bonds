@@ -17,7 +17,10 @@ from app.services.notification_service import NotificationService
 from app.services.rating_utils import rating_rank, rating_worsened
 
 
-def _row(id, *, ticker="T", name="Name", price=100.0, rating=None, type="bond"):
+def _row(
+    id, *, ticker="T", name="Name", price=100.0, rating=None, type="bond",
+    rating_source="smartlab",
+):
     return InstrumentMetrics(
         id=id,
         type=type,
@@ -30,6 +33,7 @@ def _row(id, *, ticker="T", name="Name", price=100.0, rating=None, type="bond"):
         profit=0.0,
         weight=0.0,
         company_rating=rating,
+        rating_source=rating_source if rating else None,
         ai_comment="",
     )
 
@@ -106,6 +110,13 @@ class TestCheckAndNotify:
     def svc(self):
         return NotificationService()
 
+    def _patch_confirm(self, monkeypatch, svc, *, confirms=True):
+        """Stub the independent rating re-check (no real MOEX/SmartLab call)."""
+        async def fake_confirm(new_row):
+            from app.services.notification_service import _grade
+            return _grade(new_row.company_rating) if confirms else None
+        monkeypatch.setattr(svc, "_confirm_rating", fake_confirm)
+
     def _patch_settings(self, monkeypatch, *, owner_chat_id="chat", dedup_free=True, **over):
         settings = {
             "tg_bot_token": "tok",
@@ -137,6 +148,8 @@ class TestCheckAndNotify:
             sent.append(text)
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
+
+        self._patch_confirm(monkeypatch, svc)
 
         old = [_row(1, rating="A")]
         new = [_row(1, rating="BBB")]
@@ -196,6 +209,7 @@ class TestCheckAndNotify:
             sent.append(text)
             return True
         monkeypatch.setattr(svc, "send_telegram", fake_send)
+        self._patch_confirm(monkeypatch, svc)
         await svc.check_and_notify([_row(1, rating="A")], [_row(1, rating="BBB")], 7)
         assert "Rating change" in sent[0]
 
@@ -230,6 +244,149 @@ class TestCheckAndNotify:
         monkeypatch.setattr(svc, "send_telegram", fake_send)
         await svc.check_and_notify([_row(1, price=100.0)], [_row(1, price=90.0)], 7)
         assert sent == []
+
+
+class TestRatingSourceOutage:
+    """Regression: the 2026-07-25 false-alert storm.
+
+    SmartLab became unreachable, ratings silently fell back to the coarse
+    LISTLEVEL proxy ("A+" -> "BBB"), an alert went out, and five minutes later
+    the recovered source produced the mirror-image "BBB" -> "A+" alert.
+    Neither message described a real rating action.
+    """
+
+    @pytest.fixture
+    def svc(self):
+        return NotificationService()
+
+    def _patch(self, monkeypatch, svc, *, confirms=True):
+        from app.services.storage_service import storage_service
+        monkeypatch.setattr(storage_service, "get_all_settings", lambda: {
+            "tg_bot_token": "tok", "price_drop_threshold": "5.0", "tg_lang": "ru",
+        })
+        monkeypatch.setattr(storage_service, "get_portfolio",
+                            lambda pid: {"id": pid, "user_id": 1})
+        monkeypatch.setattr(storage_service, "get_user_by_id",
+                            lambda uid: {"id": uid, "tg_chat_id": "chat"})
+        monkeypatch.setattr(storage_service, "try_mark_notification_sent",
+                            lambda key: True)
+        async def fake_confirm(new_row):
+            from app.services.notification_service import _grade
+            return _grade(new_row.company_rating) if confirms else None
+        monkeypatch.setattr(svc, "_confirm_rating", fake_confirm)
+        sent = []
+        async def fake_send(t, c, text):
+            sent.append(text)
+            return True
+        monkeypatch.setattr(svc, "send_telegram", fake_send)
+        return sent
+
+    async def test_smartlab_outage_to_listlevel_is_silent(self, monkeypatch, svc):
+        """The exact 11:40 alert: SmartLab A+ -> LISTLEVEL proxy BBB."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, ticker="RU000A10DTA2", rating="A+", rating_source="smartlab")]
+        new = [_row(1, ticker="RU000A10DTA2", rating="BBB", rating_source="listlevel")]
+        await svc.check_and_notify(old, new, 7)
+        assert sent == []
+
+    async def test_listlevel_recovery_is_silent(self, monkeypatch, svc):
+        """The mirror 11:45 alert: LISTLEVEL proxy BBB -> recovered SmartLab A+."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, ticker="RU000A10DTA2", rating="BBB", rating_source="listlevel")]
+        new = [_row(1, ticker="RU000A10DTA2", rating="A+", rating_source="smartlab")]
+        await svc.check_and_notify(old, new, 7)
+        assert sent == []
+
+    async def test_db_fallback_is_silent(self, monkeypatch, svc):
+        """A rating served from the DB is a cached value, not a fresh observation."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, rating="A+", rating_source="smartlab")]
+        new = [_row(1, rating="BBB", rating_source="db")]
+        await svc.check_and_notify(old, new, 7)
+        assert sent == []
+
+    async def test_unconfirmed_change_is_silent(self, monkeypatch, svc):
+        """Trustworthy sources on both sides, but the re-check does not confirm."""
+        sent = self._patch(monkeypatch, svc, confirms=False)
+        old = [_row(1, rating="A+", rating_source="smartlab")]
+        new = [_row(1, rating="BBB", rating_source="smartlab")]
+        await svc.check_and_notify(old, new, 7)
+        assert sent == []
+
+    async def test_confirmed_real_downgrade_still_alerts(self, monkeypatch, svc):
+        """The feature must keep working for a genuine, confirmed downgrade."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, rating="A+", rating_source="smartlab")]
+        new = [_row(1, rating="BBB", rating_source="smartlab")]
+        await svc.check_and_notify(old, new, 7)
+        assert len(sent) == 1
+        assert "A+" in sent[0] and "BBB" in sent[0]
+
+    async def test_date_only_change_is_silent(self, monkeypatch, svc):
+        """'A+ (12.05.2026)' -> 'A+ (20.07.2026)' is a re-affirmation, not news."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, rating="A+ (12.05.2026)", rating_source="smartlab")]
+        new = [_row(1, rating="A+ (20.07.2026)", rating_source="smartlab")]
+        await svc.check_and_notify(old, new, 7)
+        assert sent == []
+
+    async def test_alert_shows_bare_grade(self, monkeypatch, svc):
+        """The message shows grades, not the assignment dates."""
+        sent = self._patch(monkeypatch, svc)
+        old = [_row(1, rating="A+ (12.05.2026)", rating_source="smartlab")]
+        new = [_row(1, rating="BBB (20.07.2026)", rating_source="smartlab")]
+        await svc.check_and_notify(old, new, 7)
+        assert len(sent) == 1
+        assert "12.05.2026" not in sent[0] and "20.07.2026" not in sent[0]
+
+
+class TestConfirmRating:
+    """_confirm_rating: the last gate before anything reaches the user."""
+
+    @pytest.fixture
+    def svc(self):
+        return NotificationService()
+
+    def _patch_refresh(self, monkeypatch, result=None, exc=None):
+        from app.services.moex_service import moex_service
+        async def fake_refresh(secid):
+            if exc:
+                raise exc
+            return result
+        monkeypatch.setattr(moex_service, "refresh_rating_with_sources", fake_refresh)
+
+    async def test_confirms_matching_grade(self, monkeypatch, svc):
+        self._patch_refresh(monkeypatch, {"smartlab": "BBB", "moex": None, "best": "BBB"})
+        assert await svc._confirm_rating(_row(1, rating="BBB")) == "BBB"
+
+    async def test_rejects_mismatch(self, monkeypatch, svc):
+        self._patch_refresh(monkeypatch, {"smartlab": "A+", "moex": None, "best": "A+"})
+        assert await svc._confirm_rating(_row(1, rating="BBB")) is None
+
+    async def test_rejects_when_source_unreachable(self, monkeypatch, svc):
+        self._patch_refresh(monkeypatch, {"smartlab": None, "moex": None, "best": None})
+        assert await svc._confirm_rating(_row(1, rating="BBB")) is None
+
+    async def test_rejects_on_exception(self, monkeypatch, svc):
+        self._patch_refresh(monkeypatch, exc=RuntimeError("network down"))
+        assert await svc._confirm_rating(_row(1, rating="BBB")) is None
+
+    async def test_manual_rating_needs_no_external_confirmation(self, monkeypatch, svc):
+        called = []
+        from app.services.moex_service import moex_service
+        async def fake_refresh(secid):
+            called.append(secid)
+            return {"best": None}
+        monkeypatch.setattr(moex_service, "refresh_rating_with_sources", fake_refresh)
+        row = _row(1, rating="AA", rating_source="manual")
+        assert await svc._confirm_rating(row) == "AA"
+        assert called == []
+
+    async def test_ignores_assignment_date_when_matching(self, monkeypatch, svc):
+        self._patch_refresh(
+            monkeypatch, {"smartlab": "BBB (20.07.2026)", "moex": None, "best": "BBB (20.07.2026)"}
+        )
+        assert await svc._confirm_rating(_row(1, rating="BBB (12.05.2026)")) == "BBB"
 
 
 class TestCouponNotifications:
