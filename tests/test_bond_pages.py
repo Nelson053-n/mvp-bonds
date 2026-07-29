@@ -149,10 +149,29 @@ async def test_catalog_page(client):
     assert 'data-board="TQOB"' in html
     assert 'id="cat-search"' in html
     assert 'data-col="3"' in html
-    assert "Лет до погаш." in html
+    assert 'title="Лет до погашения"' in html
     # social cards + analytics on the catalog page too
     assert 'property="og:image"' in html
     assert "107693104" in html
+
+
+async def test_catalog_table_fits_page_width(client):
+    """The 12-column table must not be clipped by the 920px article shell.
+
+    Regression: .wrap capped the page at 920px while the table asked for
+    1020px+, so the Рейтинг/Погашение/Оферта columns fell outside the visible
+    area and looked truncated.
+    """
+    resp = await client.get("/bond")
+    html = resp.text
+    # catalog opts into the wide shell
+    assert "body.catalog main.wrap{max-width:1320px}" in html
+    assert "classList.add('catalog')" in html
+    # name column is the elastic one that truncates, so numeric/rating columns keep their width
+    assert ".cat-table td.nm{max-width:190px" in html
+    assert '<td class="nm"' in html
+    # narrow screens keep the scroll, but it is announced and the name column is frozen
+    assert 'class="scroll-hint"' in html
 
 
 async def test_catalog_yield_map(client):
@@ -176,7 +195,7 @@ async def test_catalog_yield_map(client):
     assert 'id="x-chips"' in html
     assert 'id="strat-chips"' in html
     assert "Дюрация" in html
-    assert "При +2% ставки" in html
+    assert "При&nbsp;+2%" in html
 
 
 def test_macaulay_duration():
