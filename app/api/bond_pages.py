@@ -734,18 +734,21 @@ white-space:nowrap}
 #ymap-tip b{color:var(--head);display:block;margin-bottom:2px}
 #ymap-tip .ty{color:var(--green);font-weight:600}
 .ymap-note{font-size:12px;color:var(--faint);margin-top:8px}
-/* 12 columns never fit a phone: keep the horizontal scroll but make it obvious
-   it exists, and freeze the name column so a scrolled row stays identifiable. */
+/* 12 columns never fit a narrow screen: keep the horizontal scroll but make it
+   obvious it exists. Freezing the name column must cover the whole range where
+   the table scrolls, not just phones — otherwise a scrolled row on a tablet
+   loses the only cell that identifies it. The table needs a 1080px track, so the
+   scroll disappears at a 1130px viewport: that measured value is the breakpoint. */
 .scroll-hint{display:none;font-size:12px;color:var(--faint);margin:0 0 6px}
-@media(max-width:1000px){.scroll-hint{display:block}}
+@media(max-width:1129px){.scroll-hint{display:block}
+.cat-table thead th:nth-child(2),.cat-table td.nm{position:sticky;left:0;z-index:2;
+background:var(--panel);box-shadow:1px 0 0 var(--line-3)}
+.cat-table thead th:nth-child(2){z-index:3;background:var(--panel-2)}
+.cat-table tbody tr:hover td.nm{background:var(--hover-bg)}}
 @media(max-width:680px){#ymap{height:300px}
 .cat-table{font-size:12px}
 .cat-table thead th,.cat-table td{padding:7px 6px}
 .cat-table td.nm{max-width:132px}
-.cat-table thead th:nth-child(2),.cat-table td.nm{position:sticky;left:0;z-index:2;
-background:var(--panel);box-shadow:1px 0 0 var(--line-3)}
-.cat-table thead th:nth-child(2){z-index:3;background:var(--panel-2)}
-.cat-table tbody tr:hover td.nm{background:var(--hover-bg)}
 .cat-table thead th:first-child,.cat-table td.idx{display:none}}
 </style>"""
 

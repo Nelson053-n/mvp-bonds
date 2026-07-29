@@ -170,8 +170,13 @@ async def test_catalog_table_fits_page_width(client):
     # name column is the elastic one that truncates, so numeric/rating columns keep their width
     assert ".cat-table td.nm{max-width:190px" in html
     assert '<td class="nm"' in html
-    # narrow screens keep the scroll, but it is announced and the name column is frozen
+    # narrow screens keep the scroll, but it is announced and the name column is frozen.
+    # The freeze must cover the whole scrolling range: the table needs a 1080px
+    # track, so the scroll only disappears at a 1130px viewport.
     assert 'class="scroll-hint"' in html
+    assert "@media(max-width:1129px)" in html
+    sticky_block = html.split("@media(max-width:1129px)")[1].split("@media")[0]
+    assert "position:sticky" in sticky_block and "td.nm" in sticky_block
 
 
 async def test_catalog_yield_map(client):
