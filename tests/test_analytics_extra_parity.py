@@ -28,6 +28,32 @@ async def test_build_analytics_extra_returns_expected_keys():
     assert result["key_rate"] == 16.0
 
 
+@pytest.mark.asyncio
+async def test_realized_coupons_sums_tbank_payouts():
+    """realized_coupons must sum tbank_coupons.coupons_total across the portfolios.
+
+    Regression: the query read coupon_notifications.amount — a column that does
+    not exist (that table only logs which reminders were sent). Every call threw
+    OperationalError, was swallowed by the except, and the metric silently
+    stayed 0.
+    """
+    from app.api.portfolios import _build_analytics_extra
+    from app.services.storage_service import storage_service
+
+    storage_service.upsert_tbank_coupons(1, "BBG00FIGI001", 1500.50, "2026-01-10")
+    storage_service.upsert_tbank_coupons(1, "BBG00FIGI002", 249.50, "2026-02-01")
+
+    with patch("app.services.cbr_service.cbr_service.get_key_rate", new=AsyncMock(return_value=16.0)):
+        result = await _build_analytics_extra(rows=[], portfolio_ids=[1])
+
+    assert result["realized_coupons"] == 1750.0
+
+    # A portfolio without any synced coupons yields 0.0, not an error.
+    with patch("app.services.cbr_service.cbr_service.get_key_rate", new=AsyncMock(return_value=16.0)):
+        empty = await _build_analytics_extra(rows=[], portfolio_ids=[99999])
+    assert empty["realized_coupons"] == 0.0
+
+
 # ── Integration-level: both HTTP endpoints return identical key-set ───────────
 
 async def test_single_and_all_endpoints_return_same_schema(client, auth_headers):

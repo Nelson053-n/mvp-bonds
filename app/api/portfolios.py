@@ -566,15 +566,16 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
         if ytm_anom:
             anomalies.append(ytm_anom)
 
-    # 3) Realized coupons from coupon_notifications
+    # 3) Realized coupons actually paid out, from the T-Bank sync
+    # (coupon_notifications only logs which reminders were sent — no amounts).
     realized_coupons = 0.0
     if portfolio_ids:
         try:
             with storage_service._connect() as conn:
                 placeholders = ",".join("?" * len(portfolio_ids))
                 cursor = conn.execute(
-                    f"SELECT SUM(amount) FROM coupon_notifications "
-                    f"WHERE portfolio_id IN ({placeholders}) AND amount IS NOT NULL",
+                    f"SELECT SUM(coupons_total) FROM tbank_coupons "
+                    f"WHERE portfolio_id IN ({placeholders}) AND coupons_total IS NOT NULL",
                     tuple(portfolio_ids),
                 )
                 row = cursor.fetchone()
