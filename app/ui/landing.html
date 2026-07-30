@@ -797,12 +797,14 @@
     .cta-section {
       text-align: center;
       padding: 100px 24px;
-      position: relative; z-index: 1;
+      /* clip the decorative glow: at 600px it is wider than a phone and, being
+         overflow:visible, it stretched the whole document sideways */
+      position: relative; z-index: 1; overflow: hidden;
     }
     .cta-glow {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%,-50%);
-      width: 600px; height: 300px;
+      width: 600px; max-width: 100%; height: 300px;
       background: radial-gradient(ellipse, rgba(37,99,235,.25) 0%, transparent 70%);
       pointer-events: none;
     }
