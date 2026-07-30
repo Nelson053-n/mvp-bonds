@@ -268,8 +268,34 @@ footer a:hover{color:var(--link)}
 border-bottom:1px solid var(--line-3)}
 .cat-table td{padding:8px 10px;border-bottom:1px solid var(--line)}
 .cat-table td.num{text-align:right;white-space:nowrap}
+.cta-short{display:none}
 @media(max-width:680px){.topbar{padding:0 16px}.topbar-nav{gap:10px}
 .topbar-nav a.nav-link{display:none}.btn-ghost{display:none}}
+/* Below ~480px the full CTA ("Попробовать бесплатно", ~211px) no longer fits
+   next to the logo and the theme toggle, and pushed the whole page into a
+   horizontal scroll. Swap in a short label and let the logo text shrink. */
+@media(max-width:480px){.topbar{padding:0 12px;gap:8px}
+.cta-long{display:none}.cta-short{display:inline}
+.topbar-nav{gap:8px}
+.btn{padding:7px 12px}
+.topbar-logo{min-width:0}
+.logo-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* In-body CTAs and footer links are long enough to widen the page on their own:
+   .btn is globally nowrap, and the footer sits in one unbroken line. */
+.cta-box .btn{white-space:normal;padding:11px 18px;max-width:100%}
+.wrap{padding:0 14px}
+/* Single long words ("Политика конфиденциальности") are wider than a 320px
+   column and would push the page sideways on their own. overflow-wrap only
+   breaks a word that does not fit at all — no hyphens:auto, which would
+   hyphenate ordinary headings like "доход-ность". */
+h1,h2,h3{overflow-wrap:break-word}
+footer{padding:24px 16px}
+footer p{overflow-wrap:break-word}
+/* Long unbreakable tokens ("Тикер (ISIN/SECID)", "RU000A10DTA2") make an auto
+   layout table outgrow width:100%; fix the layout and let them wrap. */
+table.params{table-layout:fixed}
+table.params td{overflow-wrap:break-word}
+table.params td:first-child{width:52%}}
 """
 
 
@@ -328,8 +354,8 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
       <svg class="ic-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
     <a id="nav-login" class="btn btn-ghost" href="/app?auth=login">Войти</a>
-    <a id="nav-register" class="btn btn-primary" href="/app?auth=register">Попробовать бесплатно</a>
-    <a id="nav-portfolio" class="btn btn-primary" href="/app" style="display:none;">Мои портфели &rarr;</a>
+    <a id="nav-register" class="btn btn-primary" href="/app?auth=register"><span class="cta-long">Попробовать бесплатно</span><span class="cta-short">Начать</span></a>
+    <a id="nav-portfolio" class="btn btn-primary" href="/app" style="display:none;"><span class="cta-long">Мои портфели &rarr;</span><span class="cta-short">Портфели</span></a>
   </nav>
 </header>
 <script>
@@ -669,7 +695,7 @@ def error_page_html(icon: str, heading: str, message: str,
 
 _CATALOG_CSS = """<style>
 .cat-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
-.chips{display:flex;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{font-size:13px;font-weight:600;color:var(--text);background:var(--panel);
 border:1px solid var(--line-3);border-radius:999px;padding:6px 14px;cursor:pointer;
 transition:all .15s;font-family:inherit}

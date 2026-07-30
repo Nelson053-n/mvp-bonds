@@ -155,6 +155,27 @@ async def test_catalog_page(client):
     assert "107693104" in html
 
 
+async def test_topbar_fits_narrow_screens(client):
+    """The CTA must shrink below 480px or it widens the whole page.
+
+    Regression: "Попробовать бесплатно" (~211px) next to the logo and the theme
+    toggle did not fit a 360px viewport, so every public page had a horizontal
+    scroll. Shared shell — checked on a catalog page and a calculator page.
+    """
+    for path in ("/bond", "/calc"):
+        html = (await client.get(path)).text
+        # both labels ship in the HTML; CSS picks one, so no JS and no SEO loss
+        assert "Попробовать бесплатно" in html
+        assert '<span class="cta-short">Начать</span>' in html
+        assert ".cta-short{display:none}" in html
+        narrow = html.split("@media(max-width:480px)")[1].split("@media")[0]
+        assert ".cta-long{display:none}" in narrow
+        assert ".cta-short{display:inline}" in narrow
+        # long in-body CTAs and headings must not push the page sideways either
+        assert ".cta-box .btn{white-space:normal" in narrow
+        assert "h1,h2,h3{overflow-wrap:break-word}" in narrow
+
+
 async def test_catalog_table_fits_page_width(client):
     """The 12-column table must not be clipped by the 920px article shell.
 
