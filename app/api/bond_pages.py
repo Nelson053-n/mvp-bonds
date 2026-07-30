@@ -269,7 +269,17 @@ border-bottom:1px solid var(--line-3)}
 .cat-table td{padding:8px 10px;border-bottom:1px solid var(--line)}
 .cat-table td.num{text-align:right;white-space:nowrap}
 .cta-short{display:none}
-@media(max-width:680px){.topbar{padding:0 16px}.topbar-nav{gap:10px}
+/* The topbar must never widen the page, so it is built to survive instead of
+   relying on a breakpoint: nav may shrink, and the logo text truncates. */
+.topbar{min-width:0}
+.topbar-nav{min-width:0;flex-shrink:1}
+.topbar-logo{min-width:0}
+.logo-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The full nav (logo + 3 links + Войти + theme + CTA) needs ~843px in its widest
+   state (guest on /bond/{secid} and /calc). Below that the links and the ghost
+   button go first — this band includes phones in landscape (740x360) and the
+   iPad in portrait (768px). */
+@media(max-width:859px){.topbar{padding:0 16px}.topbar-nav{gap:10px}
 .topbar-nav a.nav-link{display:none}.btn-ghost{display:none}}
 /* Below ~480px the full CTA ("Попробовать бесплатно", ~211px) no longer fits
    next to the logo and the theme toggle, and pushed the whole page into a
@@ -278,8 +288,6 @@ border-bottom:1px solid var(--line-3)}
 .cta-long{display:none}.cta-short{display:inline}
 .topbar-nav{gap:8px}
 .btn{padding:7px 12px}
-.topbar-logo{min-width:0}
-.logo-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* In-body CTAs and footer links are long enough to widen the page on their own:
    .btn is globally nowrap, and the footer sits in one unbroken line. */
 .cta-box .btn{white-space:normal;padding:11px 18px;max-width:100%}
