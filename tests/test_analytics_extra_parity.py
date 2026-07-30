@@ -54,6 +54,44 @@ async def test_realized_coupons_sums_tbank_payouts():
     assert empty["realized_coupons"] == 0.0
 
 
+@pytest.mark.asyncio
+async def test_price_drop_anomaly_uses_prev_close():
+    """A >=3% fall against the previous close must surface as an anomaly.
+
+    Regression: the check queried "SELECT price FROM price_snapshots WHERE
+    ticker = ? ORDER BY recorded_at" — none of those three columns exist
+    (the table is item_id/last_price/updated_at and keeps a single latest price
+    per item, not a history). It raised OperationalError on every call, so the
+    price-drop anomaly never fired once.
+    """
+    from types import SimpleNamespace
+    from app.api.portfolios import _build_analytics_extra
+
+    def _bond(ticker: str, current_value: float, prev_close_value: float | None):
+        """Row carrying every field _build_analytics_extra reads."""
+        return SimpleNamespace(
+            type="bond", ticker=ticker, name=ticker,
+            current_value=current_value, prev_close_value=prev_close_value,
+            quantity=1000.0, aci=0.0, coupon=None, coupon_period=None,
+            next_coupon_date=None, maturity_date=None, offer_date=None,
+            buyback_date=None, company_rating=None, ytm=None,
+        )
+
+    rows = [
+        _bond("RU000TEST001", 96000.0, 100000.0),   # -4.0% -> anomaly
+        _bond("RU000TEST002", 99000.0, 100000.0),   # -1.0% -> below threshold
+        _bond("RU000TEST003", 50000.0, None),       # no prev close -> must not raise
+    ]
+
+    with patch("app.services.cbr_service.cbr_service.get_key_rate", new=AsyncMock(return_value=16.0)):
+        result = await _build_analytics_extra(rows=rows, portfolio_ids=[])
+
+    drops = [a for a in result["anomalies"] if a["type"] == "price_drop"]
+    assert len(drops) == 1, drops
+    assert drops[0]["ticker"] == "RU000TEST001"
+    assert "-4.0%" in drops[0]["text"]
+
+
 # ── Integration-level: both HTTP endpoints return identical key-set ───────────
 
 async def test_single_and_all_endpoints_return_same_schema(client, auth_headers):

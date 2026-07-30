@@ -518,31 +518,26 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
     except Exception:
         logger.exception("get_all_analytics_extra: rating anomaly check failed")
 
-    # 2b) Sharp price drop (>=3% from previous snapshot)
+    # 2b) Sharp price drop (>=3% vs the previous trading session close).
+    # Uses the MOEX previous-close carried on each row: price_snapshots holds a
+    # single latest price per item (item_id -> last_price), never a price history.
     try:
-        with storage_service._connect() as conn:
-            seen_drop: set[str] = set()
-            for r in rows:
-                if r.type != "bond" or not r.current_price or r.ticker in seen_drop:
-                    continue
-                cursor = conn.execute(
-                    "SELECT price FROM price_snapshots WHERE ticker = ? "
-                    "ORDER BY recorded_at DESC LIMIT 5",
-                    (r.ticker,),
-                )
-                prev_rows = cursor.fetchall()
-                if len(prev_rows) >= 2:
-                    prev = prev_rows[1][0]
-                    if prev and prev > 0:
-                        diff_pct = (r.current_price - prev) / prev * 100
-                        if diff_pct <= -3:
-                            anomalies.append({
-                                "type": "price_drop",
-                                "ticker": r.ticker,
-                                "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
-                                "severity": "medium",
-                            })
-                            seen_drop.add(r.ticker)
+        seen_drop: set[str] = set()
+        for r in rows:
+            if r.type != "bond" or r.ticker in seen_drop:
+                continue
+            prev_value = getattr(r, "prev_close_value", None)
+            if not prev_value or prev_value <= 0 or not r.current_value:
+                continue
+            diff_pct = (r.current_value - prev_value) / prev_value * 100
+            if diff_pct <= -3:
+                anomalies.append({
+                    "type": "price_drop",
+                    "ticker": r.ticker,
+                    "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
+                    "severity": "medium",
+                })
+                seen_drop.add(r.ticker)
     except Exception:
         logger.exception("get_all_analytics_extra: price drop check failed")
 
