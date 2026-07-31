@@ -29,26 +29,46 @@ async def test_build_analytics_extra_returns_expected_keys():
 
 
 @pytest.mark.asyncio
-async def test_realized_coupons_sums_tbank_payouts():
-    """realized_coupons must sum tbank_coupons.coupons_total across the portfolios.
+async def test_realized_coupons_sums_all_sources_not_just_tbank():
+    """realized_coupons must sum the per-row figure, whatever its source.
 
-    Regression: the query read coupon_notifications.amount — a column that does
-    not exist (that table only logs which reminders were sent). Every call threw
-    OperationalError, was swallowed by the except, and the metric silently
-    stayed 0.
+    Each row already carries realized_coupons computed by portfolio_service from
+    whichever source applies: the T-Bank operations journal (synced positions),
+    the MOEX coupon schedule (manual bonds with a purchase_date) or the
+    period-based estimate (custom off-exchange bonds).
+
+    Regression 1: the query read coupon_notifications.amount — a column that does
+    not exist — so every call threw OperationalError, was swallowed by the except,
+    and the metric silently stayed 0.
+    Regression 2: the replacement summed tbank_coupons directly from the DB, which
+    counted ONLY synced positions. On prod that covered 130 of 976 bonds — the 96
+    manually-added ones with a known purchase date were silently dropped.
     """
+    from types import SimpleNamespace
     from app.api.portfolios import _build_analytics_extra
-    from app.services.storage_service import storage_service
 
-    storage_service.upsert_tbank_coupons(1, "BBG00FIGI001", 1500.50, "2026-01-10")
-    storage_service.upsert_tbank_coupons(1, "BBG00FIGI002", 249.50, "2026-02-01")
+    def _row(ticker: str, realized):
+        return SimpleNamespace(
+            type="bond", ticker=ticker, name=ticker,
+            current_value=100000.0, prev_close_value=100000.0,
+            quantity=1000.0, aci=0.0, coupon=None, coupon_period=None,
+            next_coupon_date=None, maturity_date=None, offer_date=None,
+            buyback_date=None, company_rating=None, ytm=None,
+            realized_coupons=realized,
+        )
+
+    rows = [
+        _row("RU000SYNCED1", 1500.50),   # T-Bank synced
+        _row("RU000MANUAL1", 249.50),    # manual bond, from the MOEX schedule
+        _row("RU000NODATE1", None),      # no purchase date -> unknown, contributes 0
+    ]
 
     with patch("app.services.cbr_service.cbr_service.get_key_rate", new=AsyncMock(return_value=16.0)):
-        result = await _build_analytics_extra(rows=[], portfolio_ids=[1])
+        result = await _build_analytics_extra(rows=rows, portfolio_ids=[1])
 
     assert result["realized_coupons"] == 1750.0
 
-    # A portfolio without any synced coupons yields 0.0, not an error.
+    # No rows at all yields 0.0, not an error.
     with patch("app.services.cbr_service.cbr_service.get_key_rate", new=AsyncMock(return_value=16.0)):
         empty = await _build_analytics_extra(rows=[], portfolio_ids=[99999])
     assert empty["realized_coupons"] == 0.0
