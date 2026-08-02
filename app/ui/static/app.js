@@ -2689,6 +2689,16 @@
           const [y, m, day] = d.split('-');
           td.title = `Куплено ${day}.${m}.${y}`;
         }
+        // No purchase date and no known coupon history -> realized coupons cannot
+        // be computed for this bond. Flag it, since the fix is one field away.
+        // realized_coupons === null means "unknown" (0 is a legitimate value:
+        // the first coupon may simply not be due yet), and T-Bank positions
+        // covered by the operations journal already carry a number, so they are
+        // excluded automatically — their profit does not depend on this date.
+        const needsDate = field === 'purchase_price'
+          && row.type === 'bond'
+          && !row.purchase_date
+          && row.realized_coupons == null;
         if (isReadOnly) {
           td.textContent = fmt(row[field]);
           return td;
@@ -2718,7 +2728,21 @@
         input.addEventListener('blur', commit);
         input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
         input.addEventListener('wheel', e => e.preventDefault(), { passive: false });
-        td.appendChild(input); return td;
+        td.appendChild(input);
+        if (needsDate) {
+          const hint = document.createElement('button');
+          hint.type = 'button';
+          hint.className = 'date-hint-btn';
+          // Inline SVG rather than an emoji: renders identically everywhere,
+          // including systems without an emoji font.
+          hint.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4">'
+            + '<rect x="1.7" y="3" width="12.6" height="11.3" rx="1.6"/><path d="M1.7 6.6h12.6M5.2 1.7v2.6M10.8 1.7v2.6"/></svg>';
+          hint.title = 'Не указана дата покупки — полученные купоны не учитываются в полной прибыли. Нажмите, чтобы указать.';
+          hint.setAttribute('aria-label', 'Указать дату покупки');
+          hint.addEventListener('click', (e) => { e.stopPropagation(); openEditInstrumentModal(row); });
+          td.appendChild(hint);
+        }
+        return td;
       }
 
       function createCouponRateCell(row) {

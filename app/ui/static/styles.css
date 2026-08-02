@@ -717,6 +717,20 @@ td.col-name a:hover { text-decoration: underline; }
 .editable-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .coupon-input { width: 42px; }
 
+/* Bond with no purchase date: its realized coupons cannot be computed.
+   Opens the edit modal on the exact field that fixes it. */
+.date-hint-btn {
+  margin-left: 4px; padding: 0; width: 18px; height: 18px;
+  border: none; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle; color: var(--amber-400, #f59e0b);
+  opacity: .8; transition: opacity .15s, transform .1s;
+}
+.date-hint-btn:hover { opacity: 1; transform: scale(1.15); }
+.date-hint-btn:focus-visible {
+  outline: 2px solid var(--blue-500); outline-offset: 1px; border-radius: 3px; opacity: 1;
+}
+
 /* ── MONTHLY CHART ───────────────────────────────────────── */
 #monthly-chart { width: 100%; display: block; border-radius: var(--radius-sm); }
 /* Safety net: prevent any canvas from inflating its parent's width when window is resized down */
