@@ -730,6 +730,12 @@ td.col-name a:hover { text-decoration: underline; }
 .date-hint-btn:focus-visible {
   outline: 2px solid var(--blue-500); outline-offset: 1px; border-radius: 3px; opacity: 1;
 }
+/* Exactly one of the two copies is shown. On a phone the buy-price column is far
+   past the right edge of the scrollable table, so the hint rides in the name
+   cell instead — the one column always in view. */
+.date-hint-mobile { display: none; }
+body.mobile-mode .date-hint-mobile { display: inline-flex; }
+body.mobile-mode td:not(.col-name) > .date-hint-btn { display: none; }
 
 /* ── MONTHLY CHART ───────────────────────────────────────── */
 #monthly-chart { width: 100%; display: block; border-radius: var(--radius-sm); }
