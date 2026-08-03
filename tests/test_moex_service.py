@@ -425,3 +425,48 @@ class TestFxBondConversion:
         assert abs(snap.aci - 1139.27) < 1.0
         # Sanity: НКД must never exceed the nominal for a normal bond.
         assert snap.aci < snap.nominal
+
+
+class TestMaturedBondLogging:
+    """A matured bond has no price on the exchange by definition — that is not
+    an error and must not be logged at ERROR level."""
+
+    @staticmethod
+    def _make_service(monkeypatch, matdate: str):
+        svc = MOEXService()
+
+        async def fake_fetch(url):
+            return {
+                "securities": {
+                    "columns": ["SECID", "BOARDID", "SHORTNAME", "PREVPRICE",
+                                "FACEVALUE", "FACEUNIT", "MATDATE", "LISTLEVEL"],
+                    "data": [["RU000TEST", "TQCB", "Test Bond", None,
+                              1000, "SUR", matdate, 1]],
+                },
+                "marketdata": {
+                    "columns": ["SECID", "BOARDID", "LAST", "LCLOSE"],
+                    "data": [["RU000TEST", "TQCB", None, None]],
+                },
+            }
+
+        monkeypatch.setattr(svc, "_fetch", fake_fetch)
+        return svc
+
+    async def test_matured_bond_logs_debug_not_error(self, monkeypatch, caplog):
+        svc = self._make_service(monkeypatch, "2020-01-01")
+
+        with caplog.at_level("DEBUG", logger="app.services.moex_service"):
+            with pytest.raises(PriceNotFoundError):
+                await svc.get_bond_snapshot("RU000TEST")
+
+        assert not [r for r in caplog.records if r.levelname == "ERROR"]
+        assert any("погашена" in r.getMessage() for r in caplog.records)
+
+    async def test_active_bond_without_price_still_logs_error(self, monkeypatch, caplog):
+        svc = self._make_service(monkeypatch, "2030-01-01")
+
+        with caplog.at_level("DEBUG", logger="app.services.moex_service"):
+            with pytest.raises(PriceNotFoundError):
+                await svc.get_bond_snapshot("RU000TEST")
+
+        assert [r for r in caplog.records if r.levelname == "ERROR"]

@@ -427,7 +427,15 @@ class MOEXService:
             or sec_row.get("PREVLEGALCLOSEPRICE")
         )
         if clean_price_percent is None:
-            logger.error("Не удалось получить цену облигации %s", secid)
+            # У погашенной бумаги цены на бирже нет и не будет — это норма,
+            # логируем на уровне DEBUG, чтобы не засорять лог ошибками.
+            matured = self._parse_date(sec_row.get("MATDATE"))
+            if matured and matured <= date.today():
+                logger.debug(
+                    "Нет цены облигации %s: погашена %s", secid, matured.isoformat()
+                )
+            else:
+                logger.error("Не удалось получить цену облигации %s", secid)
             raise PriceNotFoundError(secid, "облигация")
 
         # Previous trading session close % of face, for the "day P&L" mode.
