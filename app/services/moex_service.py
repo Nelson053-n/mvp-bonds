@@ -427,13 +427,12 @@ class MOEXService:
             or sec_row.get("PREVLEGALCLOSEPRICE")
         )
         if clean_price_percent is None:
-            # У погашенной бумаги цены на бирже нет и не будет — это норма,
-            # логируем на уровне DEBUG, чтобы не засорять лог ошибками.
-            matured = self._parse_date(sec_row.get("MATDATE"))
-            if matured and matured <= date.today():
-                logger.debug(
-                    "Нет цены облигации %s: погашена %s", secid, matured.isoformat()
-                )
+            # Пустой securities = бумаги на торговом эндпоинте нет вовсе:
+            # погашена, внебиржевая или снята с торгов. Цены у неё не будет
+            # никогда, поэтому это норма, а не сбой — в лог на уровне DEBUG.
+            # Сетевые ошибки и 5xx сюда не доходят: их ловит _fetch.
+            if not data.get("securities", {}).get("data"):
+                logger.debug("Нет цены облигации %s: не торгуется на MOEX", secid)
             else:
                 logger.error("Не удалось получить цену облигации %s", secid)
             raise PriceNotFoundError(secid, "облигация")
