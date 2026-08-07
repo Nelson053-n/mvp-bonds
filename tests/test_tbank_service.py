@@ -86,3 +86,61 @@ class TestTbankCouponsStorage:
         removed = service.delete_tbank_coupons(TEST_PORTFOLIO_ID, "FIGI_DEL")
         assert removed == 1
         assert "FIGI_DEL" not in service.get_tbank_coupons(TEST_PORTFOLIO_ID)
+
+
+class TestTLSContext:
+    """T-Bank switched to a Russian Trusted Root CA certificate on 2026-08-07.
+    That root is in neither certifi nor the system store, so verification failed
+    and sync stopped working. Trust is widened for the T-Bank client ONLY."""
+
+    def test_russian_root_ca_bundled(self) -> None:
+        """The CA file must ship with the repo — a missing file silently breaks sync."""
+        from app.services.tbank_service import _RU_ROOT_CA
+        assert _RU_ROOT_CA.is_file(), f"CA bundle missing: {_RU_ROOT_CA}"
+
+    def test_context_trusts_russian_root(self) -> None:
+        from app.services.tbank_service import _ssl_context
+
+        subjects = [
+            str(field)
+            for cert in _ssl_context().get_ca_certs()
+            for rdn in cert.get("subject", ())
+            for field in rdn
+        ]
+        assert any("Russian Trusted Root CA" in s for s in subjects)
+
+    def test_verification_stays_enabled(self) -> None:
+        """verify=False would make the fix a security hole, not a fix."""
+        import ssl
+
+        from app.services.tbank_service import _ssl_context
+
+        ctx = _ssl_context()
+        assert ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ctx.check_hostname is True
+
+    def test_default_certifi_roots_still_present(self) -> None:
+        """The Russian root is ADDED to the usual roots, not swapped in for them."""
+        import ssl
+
+        import certifi
+
+        from app.services.tbank_service import _ssl_context
+
+        plain = ssl.create_default_context(cafile=certifi.where())
+        assert len(_ssl_context().get_ca_certs()) == len(plain.get_ca_certs()) + 1
+
+    def test_other_services_unaffected(self) -> None:
+        """MOEX/YooKassa/Telegram must keep using plain certifi — the widened
+        trust is scoped to the T-Bank client only."""
+        import ssl
+
+        import certifi
+
+        plain_subjects = [
+            str(field)
+            for cert in ssl.create_default_context(cafile=certifi.where()).get_ca_certs()
+            for rdn in cert.get("subject", ())
+            for field in rdn
+        ]
+        assert not any("Russian Trusted" in s for s in plain_subjects)

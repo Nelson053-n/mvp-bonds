@@ -4,14 +4,47 @@ Uses T-Bank REST API (no SDK). Token is passed per-request or decrypted from DB.
 """
 
 import logging
+import ssl
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import certifi
 import httpx
 
 if TYPE_CHECKING:
     from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
+
+# С 07.08.2026 invest-public-api.tinkoff.ru отдаёт сертификат, выпущенный
+# «Russian Trusted Root CA» (Минцифры). Этого корня нет ни в certifi, ни в
+# системном хранилище Ubuntu, поэтому проверка падала с
+# CERTIFICATE_VERIFY_FAILED и синк не работал вовсе.
+#
+# Доверие расширяется ТОЛЬКО для клиента T-Bank: контекст берёт обычные
+# корни certifi ПЛЮС корень Минцифры. Остальные исходящие запросы
+# (MOEX, ЮKassa, Telegram) продолжают использовать certifi без изменений.
+# Проверка сертификата не отключается — verify=False недопустим.
+_RU_ROOT_CA = Path(__file__).resolve().parents[2] / "certs" / "russian_trusted_root_ca.pem"
+
+
+@lru_cache(maxsize=1)
+def _ssl_context() -> ssl.SSLContext:
+    """SSL context trusting the usual CAs plus the Russian Trusted Root CA."""
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    if _RU_ROOT_CA.is_file():
+        try:
+            ctx.load_verify_locations(cafile=str(_RU_ROOT_CA))
+        except ssl.SSLError:
+            logger.exception("Не удалось загрузить корневой сертификат %s", _RU_ROOT_CA)
+    else:
+        logger.error(
+            "Корневой сертификат %s не найден — TLS к T-Bank API работать не будет",
+            _RU_ROOT_CA,
+        )
+    return ctx
+
 
 _BASE = "https://invest-public-api.tinkoff.ru/rest"
 _ACCOUNTS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts"
@@ -69,7 +102,7 @@ class TBankService:
 
     async def get_accounts(self) -> list[dict]:
         """Return [{id, name, type}] for the token."""
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
             resp = await client.post(_ACCOUNTS_URL, json={}, headers=self._headers)
         self._check_response(resp)
         return [
@@ -79,7 +112,7 @@ class TBankService:
 
     async def get_positions(self, account_id: str) -> list[dict]:
         """Return raw positions list from GetPortfolio."""
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
             resp = await client.post(
                 _PORTFOLIO_URL,
                 json={"accountId": account_id},
@@ -95,7 +128,7 @@ class TBankService:
         instrumentType=='currency'. Currency code is parsed from ticker prefix
         (T-Bank uses RUB000UTSTOM / USD000UTSTOM / EUR_RUB__TOM / CNYRUB_TOM …).
         """
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
             resp = await client.post(
                 _PORTFOLIO_URL,
                 json={"accountId": account_id},
@@ -124,7 +157,7 @@ class TBankService:
         Each item: {figi, date, operation_type, payment}. payment is signed RUB
         (MoneyValue units/nano); coupons come back positive.
         """
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, verify=_ssl_context()) as client:
             resp = await client.post(
                 _OPERATIONS_URL,
                 json={

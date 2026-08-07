@@ -149,4 +149,8 @@ data/*.db-journal
 *.pfx
 *.crt
 
+# Публичный корневой CA Минцифры — нужен для TLS к T-Bank API,
+# не секрет, должен ехать на прод обычным деплоем
+!certs/russian_trusted_root_ca.pem
+
 .claude/
