@@ -3,6 +3,7 @@
 Uses T-Bank REST API (no SDK). Token is passed per-request or decrypted from DB.
 """
 
+import asyncio
 import logging
 import ssl
 from functools import lru_cache
@@ -51,6 +52,11 @@ _ACCOUNTS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.UsersService/Get
 _PORTFOLIO_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio"
 _OPERATIONS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetOperations"
 
+# Retries for transient network failures. Kept short: the sync loop runs every
+# 10 minutes, so a long backoff would just collide with the next cycle.
+_RETRY_ATTEMPTS = 3
+_RETRY_DELAYS = (1.0, 3.0)  # pauses between attempts 1→2 and 2→3
+
 # T-Bank REST API returns lowercase instrument types
 _TYPE_MAP = {
     "bond": "bond",
@@ -87,6 +93,36 @@ class TBankService:
             "Content-Type": "application/json",
         }
 
+    async def _post(self, url: str, payload: dict, timeout: float = 15) -> httpx.Response:
+        """POST to the T-Bank API, retrying transient network failures.
+
+        A single ConnectTimeout used to fail the whole sync and leave the
+        portfolio stale for a full 10-minute cycle (observed on prod
+        2026-08-08 04:41). Only connection-level errors are retried: HTTP
+        errors surface as TBankError from _check_response and must NOT be
+        repeated — a 401 disables sync on purpose, and hammering a 429
+        rate-limit makes it worse.
+        """
+        last_exc: httpx.RequestError | None = None
+        for attempt in range(_RETRY_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=timeout, verify=_ssl_context()) as client:
+                    return await client.post(url, json=payload, headers=self._headers)
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout,
+                    httpx.WriteTimeout, httpx.PoolTimeout, httpx.RemoteProtocolError) as exc:
+                last_exc = exc
+                if attempt + 1 < _RETRY_ATTEMPTS:
+                    delay = _RETRY_DELAYS[attempt]
+                    logger.warning(
+                        "T-Bank %s: %s (попытка %d/%d), повтор через %.1fс",
+                        url.rsplit("/", 1)[-1], type(exc).__name__,
+                        attempt + 1, _RETRY_ATTEMPTS, delay,
+                    )
+                    await asyncio.sleep(delay)
+        raise TBankError(
+            f"Т-Банк API недоступен после {_RETRY_ATTEMPTS} попыток: {last_exc}"
+        )
+
     def _check_response(self, resp: httpx.Response) -> None:
         if resp.status_code == 401:
             raise TBankError("Неверный токен Т-Банка")
@@ -102,8 +138,7 @@ class TBankService:
 
     async def get_accounts(self) -> list[dict]:
         """Return [{id, name, type}] for the token."""
-        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
-            resp = await client.post(_ACCOUNTS_URL, json={}, headers=self._headers)
+        resp = await self._post(_ACCOUNTS_URL, {})
         self._check_response(resp)
         return [
             {"id": a["id"], "name": a.get("name", ""), "type": a.get("type", "")}
@@ -112,12 +147,7 @@ class TBankService:
 
     async def get_positions(self, account_id: str) -> list[dict]:
         """Return raw positions list from GetPortfolio."""
-        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
-            resp = await client.post(
-                _PORTFOLIO_URL,
-                json={"accountId": account_id},
-                headers=self._headers,
-            )
+        resp = await self._post(_PORTFOLIO_URL, {"accountId": account_id})
         self._check_response(resp)
         return resp.json().get("positions", [])
 
@@ -128,12 +158,7 @@ class TBankService:
         instrumentType=='currency'. Currency code is parsed from ticker prefix
         (T-Bank uses RUB000UTSTOM / USD000UTSTOM / EUR_RUB__TOM / CNYRUB_TOM …).
         """
-        async with httpx.AsyncClient(timeout=15, verify=_ssl_context()) as client:
-            resp = await client.post(
-                _PORTFOLIO_URL,
-                json={"accountId": account_id},
-                headers=self._headers,
-            )
+        resp = await self._post(_PORTFOLIO_URL, {"accountId": account_id})
         self._check_response(resp)
         data = resp.json()
         positions = data.get("positions", [])
@@ -157,17 +182,16 @@ class TBankService:
         Each item: {figi, date, operation_type, payment}. payment is signed RUB
         (MoneyValue units/nano); coupons come back positive.
         """
-        async with httpx.AsyncClient(timeout=30, verify=_ssl_context()) as client:
-            resp = await client.post(
-                _OPERATIONS_URL,
-                json={
-                    "accountId": account_id,
-                    "from": from_date,
-                    "to": to_date,
-                    "state": "OPERATION_STATE_EXECUTED",
-                },
-                headers=self._headers,
-            )
+        resp = await self._post(
+            _OPERATIONS_URL,
+            {
+                "accountId": account_id,
+                "from": from_date,
+                "to": to_date,
+                "state": "OPERATION_STATE_EXECUTED",
+            },
+            timeout=30,
+        )
         self._check_response(resp)
         out: list[dict] = []
         for op in resp.json().get("operations", []):

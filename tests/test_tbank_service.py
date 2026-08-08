@@ -3,7 +3,7 @@
 import pytest
 
 from app.services.storage_service import StorageService
-from app.services.tbank_service import TBankService
+from app.services.tbank_service import TBankError, TBankService
 
 TEST_PORTFOLIO_ID = 1
 
@@ -144,3 +144,90 @@ class TestTLSContext:
             for field in rdn
         ]
         assert not any("Russian Trusted" in s for s in plain_subjects)
+
+
+class TestNetworkRetry:
+    """A single ConnectTimeout used to fail the whole sync and leave the
+    portfolio stale for a full 10-minute cycle (prod, 2026-08-08 04:41).
+    Transient network errors are retried; HTTP errors are NOT."""
+
+    @staticmethod
+    def _service(monkeypatch, side_effects):
+        """side_effects: list of exceptions to raise / responses to return, in order."""
+        import httpx
+
+        from app.services import tbank_service as ts
+
+        svc = TBankService("token")
+        calls = {"n": 0}
+
+        class FakeClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                item = side_effects[calls["n"]]
+                calls["n"] += 1
+                if isinstance(item, Exception):
+                    raise item
+                return item
+
+        monkeypatch.setattr(ts.httpx, "AsyncClient", lambda **kw: FakeClient())
+        monkeypatch.setattr(ts.asyncio, "sleep", lambda d: _noop())
+        return svc, calls
+
+    async def test_retries_then_succeeds(self, monkeypatch):
+        """First attempt times out, second works → sync survives the blip."""
+        import httpx
+
+        ok = httpx.Response(200, json={"accounts": []}, request=httpx.Request("POST", "http://x"))
+        svc, calls = self._service(monkeypatch, [httpx.ConnectTimeout("boom"), ok])
+
+        result = await svc.get_accounts()
+
+        assert result == []
+        assert calls["n"] == 2
+
+    async def test_gives_up_after_all_attempts(self, monkeypatch):
+        """All attempts fail → a user-facing TBankError, not a raw httpx error."""
+        import httpx
+
+        from app.services.tbank_service import _RETRY_ATTEMPTS
+
+        svc, calls = self._service(
+            monkeypatch, [httpx.ConnectTimeout("boom")] * _RETRY_ATTEMPTS
+        )
+
+        with pytest.raises(TBankError):
+            await svc.get_accounts()
+        assert calls["n"] == _RETRY_ATTEMPTS
+
+    async def test_http_401_is_not_retried(self, monkeypatch):
+        """An auth failure must fail fast: sync gets disabled on 401, and
+        repeating the call would just burn attempts against a dead token."""
+        import httpx
+
+        resp = httpx.Response(401, json={}, request=httpx.Request("POST", "http://x"))
+        svc, calls = self._service(monkeypatch, [resp])
+
+        with pytest.raises(TBankError):
+            await svc.get_accounts()
+        assert calls["n"] == 1
+
+    async def test_http_429_is_not_retried(self, monkeypatch):
+        """Hammering a rate limit makes it worse — one call, then surface it."""
+        import httpx
+
+        resp = httpx.Response(429, json={}, request=httpx.Request("POST", "http://x"))
+        svc, calls = self._service(monkeypatch, [resp])
+
+        with pytest.raises(TBankError):
+            await svc.get_accounts()
+        assert calls["n"] == 1
+
+
+async def _noop():
+    return None
