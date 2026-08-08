@@ -506,3 +506,85 @@ class TestUntradedBondLogging:
         with caplog.at_level("DEBUG", logger="app.services.moex_service"):
             with pytest.raises(DataFetchError):
                 await svc.get_bond_snapshot("RU000TEST")
+
+
+class TestStockPriceBeforeSessionOpen:
+    """Between ~03:00 and 07:00 UTC MOEX clears LAST and leaves LCLOSE empty.
+    Without a PREV* fallback every stock lost its price overnight — 1747 errors
+    a day on prod, and portfolios were priced without those positions.
+
+    Shapes below are taken from the live ISS API (SMLT, 2026-08-08).
+    """
+
+    @staticmethod
+    def _payload(last, lclose, prevprice=371.0, prevlegal=379.4, prevwap=377.2):
+        return {
+            "securities": {
+                "columns": ["SECID", "SHORTNAME", "PREVPRICE",
+                            "PREVLEGALCLOSEPRICE", "PREVWAPRICE", "PREVDATE"],
+                "data": [["SMLT", "Самолет", prevprice,
+                          prevlegal, prevwap, "2026-08-07"]],
+            },
+            "marketdata": {
+                "columns": ["SECID", "LAST", "LCLOSE"],
+                "data": [["SMLT", last, lclose]],
+            },
+        }
+
+    @staticmethod
+    def _service(monkeypatch, payload):
+        svc = MOEXService()
+
+        async def fake_fetch(url):
+            return payload
+
+        async def no_rating(secid):
+            return None
+
+        monkeypatch.setattr(svc, "_fetch", fake_fetch)
+        monkeypatch.setattr(svc, "_get_credit_rating", no_rating)
+        return svc
+
+    async def test_price_falls_back_to_prev_close(self, monkeypatch):
+        """Session not open: LAST and LCLOSE are None → price comes from PREVPRICE."""
+        svc = self._service(monkeypatch, self._payload(last=None, lclose=None))
+
+        snap = await svc.get_stock_snapshot("SMLT")
+
+        assert snap.current_price == 371.0
+
+    async def test_no_phantom_day_change_before_open(self, monkeypatch):
+        """PREVPRICE (371) must not be compared against PREVLEGALCLOSEPRICE
+        (379.4) — that would invent a -2.2% move that never happened."""
+        svc = self._service(monkeypatch, self._payload(last=None, lclose=None))
+
+        snap = await svc.get_stock_snapshot("SMLT")
+
+        assert snap.prev_close_price == snap.current_price
+
+    async def test_intraday_price_still_wins(self, monkeypatch):
+        """With trading open, LAST is used and the day change stays real."""
+        svc = self._service(monkeypatch, self._payload(last=380.0, lclose=None))
+
+        snap = await svc.get_stock_snapshot("SMLT")
+
+        assert snap.current_price == 380.0
+        # LCLOSE is empty → yesterday comes from PREV*, so the day change is real
+        assert snap.prev_close_price == 379.4
+
+    async def test_lclose_still_used_as_yesterday(self, monkeypatch):
+        """LAST + LCLOSE both present → classic intraday vs yesterday close."""
+        svc = self._service(monkeypatch, self._payload(last=380.0, lclose=375.0))
+
+        snap = await svc.get_stock_snapshot("SMLT")
+
+        assert snap.current_price == 380.0
+        assert snap.prev_close_price == 375.0
+
+    async def test_no_price_at_all_still_raises(self, monkeypatch):
+        """A stock with no price anywhere is still a genuine error."""
+        svc = self._service(monkeypatch, self._payload(
+            last=None, lclose=None, prevprice=None, prevlegal=None, prevwap=None))
+
+        with pytest.raises(PriceNotFoundError):
+            await svc.get_stock_snapshot("SMLT")

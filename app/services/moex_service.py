@@ -306,7 +306,17 @@ class MOEXService:
         md_row = self._get_first_row(data.get("marketdata", {}))
 
         name = sec_row.get("SHORTNAME") or sec_row.get("SECNAME") or secid
-        current_price = md_row.get("LAST") or md_row.get("LCLOSE")
+        # Before the session opens MOEX clears LAST and leaves LCLOSE empty, so
+        # both intraday fields are None between ~03:00 and 07:00 UTC. Falling
+        # back to the previous close keeps the portfolio priced overnight —
+        # same chain the bond branch already uses.
+        current_price = (
+            md_row.get("LAST")
+            or md_row.get("LCLOSE")
+            or sec_row.get("PREVPRICE")
+            or sec_row.get("PREVLEGALCLOSEPRICE")
+            or sec_row.get("PREVWAPRICE")
+        )
         if not current_price:
             logger.error("Не удалось получить цену акции %s", secid)
             raise PriceNotFoundError(secid, "акция")
@@ -315,15 +325,21 @@ class MOEXService:
         # Previous trading session close, for the "day P&L" mode.
         #   • current = LAST (intraday)        → prev = LCLOSE (yesterday's close)
         #   • current = LCLOSE (today's close) → prev = yesterday via PREV* fields
+        #   • current = PREV* (session not open) → prev = current ⇒ zero day change
         #   • neither / no prev source         → prev = current ⇒ zero day change
         prev_close = None
         has_last = md_row.get("LAST") is not None
+        has_intraday = has_last or md_row.get("LCLOSE") is not None
         if has_last and md_row.get("LCLOSE") is not None:
             try:
                 prev_close = float(md_row.get("LCLOSE"))
             except (TypeError, ValueError):
                 prev_close = None
-        if prev_close is None:
+        # Only look for a yesterday-close when the current price is an intraday
+        # one. If current_price ITSELF came from a PREV* field (session not open
+        # yet), comparing it against another PREV* field would invent a day
+        # change out of two different flavours of the same close.
+        if prev_close is None and has_intraday:
             for cand in (sec_row.get("PREVLEGALCLOSEPRICE"), sec_row.get("PREVPRICE")):
                 if cand is not None:
                     try:
