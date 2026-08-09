@@ -549,3 +549,119 @@ class TestDoubleDowngradeCondition:
     def test_no_fire_without_telegram_config(self):
         assert self._double_downgrade(["BBB", "A", "AA"], tg_token="") is False
         assert self._double_downgrade(["BBB", "A", "AA"], tg_chat_id="") is False
+
+
+class TestCheckPriceAlerts:
+    """check_price_alerts() shipped but was never scheduled AND called a
+    non-existent cache_service.get(), so it would have raised AttributeError
+    on the first run. Users could create alerts that never fired."""
+
+    @staticmethod
+    def _setup(monkeypatch, alerts, cached_rows, *, token="tok"):
+        """Wire storage/cache/telegram fakes; returns (svc, sent, triggered)."""
+        from app.services import notification_service as ns
+
+        svc = NotificationService()
+        sent = []
+        triggered = []
+
+        class FakeStorage:
+            def get_setting(self, key, default=""):
+                return token if key == "tg_bot_token" else default
+
+            def get_all_active_price_alerts(self):
+                return alerts
+
+            def mark_price_alert_triggered(self, alert_id):
+                triggered.append(alert_id)
+
+            def _connect(self):
+                return self
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def execute(self, sql, params):
+                return self
+
+            def fetchone(self):
+                return (1, "SBER")
+
+        class FakeCache:
+            def rows(self, portfolio_id):
+                return cached_rows
+
+        monkeypatch.setattr(ns, "storage_service", FakeStorage(), raising=False)
+        import app.services.storage_service as ss
+        import app.services.cache_service as cs
+        monkeypatch.setattr(ss, "storage_service", FakeStorage())
+        monkeypatch.setattr(cs, "cache_service", FakeCache())
+
+        async def fake_send(token, chat_id, text):
+            sent.append(text)
+            return True
+
+        monkeypatch.setattr(svc, "send_telegram", fake_send)
+        return svc, sent, triggered
+
+    @staticmethod
+    def _alert(alert_type, target, item_id=1):
+        return {
+            "id": 10, "user_id": 1, "item_id": item_id, "ticker": "SBER",
+            "alert_type": alert_type, "target_price": target, "tg_chat_id": "42",
+        }
+
+    async def test_above_alert_fires(self, monkeypatch):
+        """Price rose past the target → notification sent and alert marked."""
+        svc, sent, triggered = self._setup(
+            monkeypatch, [self._alert("above", 250.0)], [_row(1, ticker="SBER", price=283.0)]
+        )
+
+        await svc.check_price_alerts()
+
+        assert len(sent) == 1
+        assert "SBER" in sent[0]
+        assert triggered == [10]
+
+    async def test_below_alert_fires(self, monkeypatch):
+        svc, sent, triggered = self._setup(
+            monkeypatch, [self._alert("below", 300.0)], [_row(1, ticker="SBER", price=283.0)]
+        )
+
+        await svc.check_price_alerts()
+
+        assert len(sent) == 1
+        assert triggered == [10]
+
+    async def test_not_reached_stays_silent(self, monkeypatch):
+        """The important negative: a target that hasn't been hit must not fire."""
+        svc, sent, triggered = self._setup(
+            monkeypatch, [self._alert("above", 400.0)], [_row(1, ticker="SBER", price=283.0)]
+        )
+
+        await svc.check_price_alerts()
+
+        assert sent == []
+        assert triggered == []
+
+    async def test_cold_cache_is_skipped(self, monkeypatch):
+        """An empty cache must not crash or invent a price."""
+        svc, sent, triggered = self._setup(
+            monkeypatch, [self._alert("above", 1.0)], []
+        )
+
+        await svc.check_price_alerts()
+
+        assert sent == []
+
+    async def test_no_token_returns_early(self, monkeypatch):
+        svc, sent, _ = self._setup(
+            monkeypatch, [self._alert("above", 1.0)], [_row(1, price=283.0)], token=""
+        )
+
+        await svc.check_price_alerts()
+
+        assert sent == []

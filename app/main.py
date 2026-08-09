@@ -205,6 +205,25 @@ async def _notification_loop():
             logger.exception("notification_loop: coupon check failed")
 
 
+async def _price_alert_loop():
+    """Check price alerts right after each cache refresh.
+
+    check_price_alerts() existed but was never scheduled: users could create
+    an alert (UI + endpoints + Pro limits all worked) and no notification
+    would ever be sent. Tied to the cache interval so alerts fire against
+    freshly refreshed MOEX prices rather than on a timer of their own.
+    """
+    from app.services.cache_service import cache_service
+    from app.services.notification_service import notification_service
+
+    while True:
+        await asyncio.sleep(cache_service.refresh_interval)
+        try:
+            await notification_service.check_price_alerts()
+        except Exception:
+            logger.exception("price_alert_loop: price alert check failed")
+
+
 async def _tbank_sync_loop():
     """Sync all enabled T-Bank portfolios every 10 minutes."""
     SYNC_INTERVAL = 600
@@ -512,6 +531,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_cleanup_shares_loop())
         asyncio.create_task(_snapshot_loop())
         asyncio.create_task(_notification_loop())
+        asyncio.create_task(_price_alert_loop())
         asyncio.create_task(_rating_refresh_loop())
         asyncio.create_task(_tbank_sync_loop())
         asyncio.create_task(_daily_backup_loop())

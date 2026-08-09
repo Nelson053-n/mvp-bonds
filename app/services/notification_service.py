@@ -341,14 +341,16 @@ class NotificationService:
             if not item_row:
                 continue
 
-            # Get cached table data for this portfolio
-            cached = cache_service.get(item_row["portfolio_id"])
+            # Get cached table data for this portfolio. Only warm caches are
+            # useful here: rows() on a cold portfolio returns an empty list,
+            # and refreshing it from a notification loop would hammer MOEX.
+            cached = cache_service.rows(item_row["portfolio_id"])
             if not cached:
                 continue
 
             current_price = None
             for cached_row in cached:
-                if hasattr(cached_row, 'id') and cached_row.id == item_id:
+                if cached_row.id == item_id:
                     current_price = cached_row.current_price
                     break
 
