@@ -8,7 +8,11 @@
 #
 # Гейт: после git pull проверяем `python -c 'import app.main'`. Если импорт
 # падает — ОТКАТЫВАЕМ pull на прежний HEAD и НЕ трогаем работающий сервис.
-# Только при успешном импорте делаем restart + health-curl.
+# Только при успешном импорте перезапускаем воркеры + health-curl.
+#
+# Перезапуск по умолчанию graceful (SIGHUP, без простоя). Полный рестарт нужен
+# при смене .env или юнита — SIGHUP их не перечитывает:
+#   DEPLOY_FORCE_RESTART=1 ops/deploy.sh   (или systemctl restart bondai)
 #
 # Запуск на проде: cd /opt/mvp-bonds && ops/deploy.sh
 set -euo pipefail
@@ -37,12 +41,36 @@ if ! .venv/bin/python3 -c 'import app.main' ; then
 fi
 echo "✓ импорт ок"
 
-echo "▶ restart bondai…"
-systemctl restart bondai
-sleep 4
+# Перезапуск воркеров без простоя: uvicorn держит слушающий сокет в
+# родительском процессе и по SIGHUP пересоздаёт воркеров по одному, не
+# закрывая сокет — соединения ждут в backlog вместо Connection refused.
+# `systemctl restart` убивал родителя вместе с сокетом: замер под нагрузкой
+# 10.08 дал 46 отбитых запросов из 400 (~2.3с), при SIGHUP — 0 из 400.
+#
+# SIGHUP переиспользует родителя, поэтому НЕ перечитывает .env и не проходит
+# ExecStartPre. Смену переменных окружения катить руками:
+#   systemctl restart bondai
+# Код подхватывается штатно — воркеры стартуют заново и импортируют его с нуля.
+MAIN_PID="$(systemctl show bondai -p MainPID --value)"
+if [ "${DEPLOY_FORCE_RESTART:-0}" = "1" ] || [ -z "$MAIN_PID" ] || [ "$MAIN_PID" = "0" ]; then
+  echo "▶ restart bondai (полный)…"
+  systemctl restart bondai
+else
+  echo "▶ graceful-reload bondai (SIGHUP → $MAIN_PID)…"
+  kill -HUP "$MAIN_PID"
+fi
+sleep 6
 
+# Health с ретраем: после SIGHUP воркеры перезапускаются по одному, и первый
+# запрос может прийти раньше, чем последний из них поднялся.
 echo "▶ health-check…"
-code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8002/ || echo 000)"
+code=000
+for attempt in 1 2 3 4 5; do
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8002/ || echo 000)"
+  [ "$code" = "200" ] && break
+  echo "  попытка $attempt: HTTP $code, жду 3с…"
+  sleep 3
+done
 if [ "$code" != "200" ]; then
   echo "✗ health-check вернул $code (ожидался 200) — проверь journalctl -u bondai"
   exit 1
