@@ -57,7 +57,13 @@ if [ "${DEPLOY_FORCE_RESTART:-0}" = "1" ] || [ -z "$MAIN_PID" ] || [ "$MAIN_PID"
   systemctl restart bondai
 else
   echo "▶ graceful-reload bondai (SIGHUP → $MAIN_PID)…"
-  kill -HUP "$MAIN_PID"
+  # Гонка: процесс мог умереть между чтением MainPID и сигналом. Без отката
+  # set -e оборвал бы деплой на мёртвом сервисе (Restart=always его не
+  # поднимет — для systemd юнит всё ещё «активен»).
+  if ! kill -HUP "$MAIN_PID" 2>/dev/null; then
+    echo "  SIGHUP не доставлен (процесс $MAIN_PID исчез) — полный restart"
+    systemctl restart bondai
+  fi
 fi
 sleep 6
 
