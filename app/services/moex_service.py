@@ -13,6 +13,12 @@ from app.exceptions import PriceNotFoundError, DataFetchError, RatingNotFoundErr
 
 logger = logging.getLogger(__name__)
 
+# Retries for transient MOEX failures. Kept short: the cache loop runs every
+# 300s and refreshes portfolios concurrently, so a long backoff would stack up.
+_RETRY_ATTEMPTS = 3
+_RETRY_DELAYS = (0.5, 1.5)  # pauses between attempts 1→2 and 2→3
+_RETRY_STATUS = frozenset({500, 502, 503, 504})
+
 
 class SourceStats:
     """Statistics for a single external data source."""
@@ -609,26 +615,53 @@ class MOEXService:
         return snapshot
 
     async def _fetch(self, url: str) -> dict[str, Any]:
+        """GET a MOEX ISS endpoint, retrying transient failures.
+
+        MOEX briefly returns 502/500 or truncated JSON several times a day
+        (1088x 502 and 76x 500 over three days on prod). A single blip used to
+        wipe the price for every instrument in the refresh cycle: on 2026-08-10
+        two such seconds produced 762 PriceNotFoundError, 353 of them bonds
+        that had a working PREV* fallback. Only transient failures are retried
+        — 4xx means a wrong URL or a missing security and will not change.
+        """
         logger.debug("Fetching data from %s", url)
         src = self.sources["moex_price"]
-        async with httpx.AsyncClient(timeout=30) as client:
+        last_error: tuple[int | None, str] | None = None
+
+        for attempt in range(_RETRY_ATTEMPTS):
             try:
-                response = await client.get(url)
-                response.raise_for_status()
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    data = response.json()
                 src.record_hit()
-                return response.json()
+                return data
             except httpx.HTTPStatusError as exc:
-                src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
-                logger.error("HTTP error %s while fetching %s", exc.response.status_code, url)
-                raise DataFetchError(url, f"HTTP {exc.response.status_code}") from exc
+                code = exc.response.status_code
+                if code not in _RETRY_STATUS:
+                    src.record_error(code, f"HTTP {code}")
+                    logger.error("HTTP error %s while fetching %s", code, url)
+                    raise DataFetchError(url, f"HTTP {code}") from exc
+                last_error = (code, f"HTTP {code}")
             except httpx.RequestError as exc:
-                src.record_error(None, str(exc)[:80])
-                logger.error("Request error while fetching %s: %s", url, exc)
-                raise DataFetchError(url, str(exc)) from exc
+                last_error = (None, str(exc)[:80])
             except ValueError as exc:
-                src.record_error(None, "Invalid JSON")
-                logger.error("Invalid JSON response from %s", url)
-                raise DataFetchError(url, "Invalid JSON response") from exc
+                last_error = (None, "Invalid JSON")
+
+            if attempt + 1 < _RETRY_ATTEMPTS:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning(
+                    "MOEX %s (попытка %d/%d), повтор через %.1fс: %s",
+                    last_error[1], attempt + 1, _RETRY_ATTEMPTS, delay, url,
+                )
+                await asyncio.sleep(delay)
+
+        code, message = last_error
+        src.record_error(code, message)
+        logger.error(
+            "MOEX недоступен после %d попыток (%s): %s", _RETRY_ATTEMPTS, message, url
+        )
+        raise DataFetchError(url, message)
 
     @staticmethod
     def _get_first_row(dataset: dict[str, Any]) -> dict[str, Any]:

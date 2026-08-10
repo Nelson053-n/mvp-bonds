@@ -588,3 +588,122 @@ class TestStockPriceBeforeSessionOpen:
 
         with pytest.raises(PriceNotFoundError):
             await svc.get_stock_snapshot("SMLT")
+
+
+class TestFetchRetry:
+    """_fetch must retry transient MOEX failures (502/500/timeout/bad JSON) and
+    must NOT retry 4xx, which never changes on repeat."""
+
+    @pytest.fixture(autouse=True)
+    def _no_sleep(self, monkeypatch):
+        import app.services.moex_service as m
+
+        async def _instant(_):
+            return None
+
+        monkeypatch.setattr(m.asyncio, "sleep", _instant)
+
+    def _patch_client(self, monkeypatch, responses):
+        """Each .get() consumes the next item: an Exception is raised, an int is
+        an HTTP status, a dict is a successful JSON body."""
+        import app.services.moex_service as m
+        calls = {"n": 0}
+
+        class _FakeResp:
+            def __init__(self, item):
+                self._item = item
+                self.status_code = item if isinstance(item, int) else 200
+
+            def raise_for_status(self):
+                if isinstance(self._item, int):
+                    raise m.httpx.HTTPStatusError(
+                        f"HTTP {self._item}", request=None, response=self
+                    )
+
+            def json(self):
+                if self._item == "badjson":
+                    raise ValueError("Expecting value")
+                return self._item
+
+        class _FakeClient:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, headers=None):
+                idx = calls["n"]
+                calls["n"] += 1
+                item = responses[idx]
+                if isinstance(item, Exception):
+                    raise item
+                return _FakeResp(item)
+
+        monkeypatch.setattr(m.httpx, "AsyncClient", _FakeClient)
+        return calls
+
+    async def test_retries_502_then_succeeds(self, monkeypatch):
+        """The prod case: MOEX blips 502 once, the retry gets real data."""
+        svc = MOEXService()
+        calls = self._patch_client(monkeypatch, [502, {"securities": {"data": [[1]]}}])
+
+        data = await svc._fetch("http://moex/x.json")
+
+        assert calls["n"] == 2
+        assert data == {"securities": {"data": [[1]]}}
+
+    async def test_retries_timeout_then_succeeds(self, monkeypatch):
+        import app.services.moex_service as m
+        svc = MOEXService()
+        calls = self._patch_client(
+            monkeypatch, [m.httpx.ConnectTimeout("boom"), {"ok": True}]
+        )
+
+        assert await svc._fetch("http://moex/x.json") == {"ok": True}
+        assert calls["n"] == 2
+
+    async def test_retries_invalid_json_then_succeeds(self, monkeypatch):
+        svc = MOEXService()
+        calls = self._patch_client(monkeypatch, ["badjson", {"ok": True}])
+
+        assert await svc._fetch("http://moex/x.json") == {"ok": True}
+        assert calls["n"] == 2
+
+    async def test_gives_up_after_all_attempts(self, monkeypatch):
+        """Every attempt fails → DataFetchError, exactly _RETRY_ATTEMPTS tries."""
+        import app.services.moex_service as m
+        from app.exceptions import DataFetchError
+        svc = MOEXService()
+        calls = self._patch_client(monkeypatch, [502] * m._RETRY_ATTEMPTS)
+
+        with pytest.raises(DataFetchError):
+            await svc._fetch("http://moex/x.json")
+
+        assert calls["n"] == m._RETRY_ATTEMPTS
+
+    async def test_404_is_not_retried(self, monkeypatch):
+        """A missing security must fail fast — retrying it only wastes cycles."""
+        from app.exceptions import DataFetchError
+        svc = MOEXService()
+        calls = self._patch_client(monkeypatch, [404, {"ok": True}])
+
+        with pytest.raises(DataFetchError):
+            await svc._fetch("http://moex/x.json")
+
+        assert calls["n"] == 1
+
+    async def test_success_records_hit_once(self, monkeypatch):
+        """Stats must count one hit after a retry, not one per attempt."""
+        svc = MOEXService()
+        src = svc.sources["moex_price"]
+        before_hits, before_errors = src.hits, src.errors
+        self._patch_client(monkeypatch, [502, {"ok": True}])
+
+        await svc._fetch("http://moex/x.json")
+
+        assert src.hits == before_hits + 1
+        assert src.errors == before_errors  # a recovered blip is not an error
