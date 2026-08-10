@@ -8,6 +8,15 @@ is **not** auto-deployed by `git pull`. Apply changes here to the server manuall
 Mirror of `/etc/nginx/sites-enabled/mvp-bonds`. The app listens on `127.0.0.1:8000`;
 nginx terminates TLS for `bondai.ru` and reverse-proxies to it.
 
+## gzip (`nginx-gzip.conf`)
+
+Mirror of the "Gzip Settings" block in `/etc/nginx/nginx.conf` (http context,
+server-wide). Ubuntu's default leaves `gzip_types` commented out, so nginx
+compressed `text/html` only and shipped JS/CSS/XML uncompressed — `app.js` alone
+was 485 KB per visitor. Applied on prod 2026-08-10; first load of `/app` dropped
+from 586 KB to 120 KB. Rollout: paste the block into `nginx.conf`, then
+`nginx -t && systemctl reload nginx`.
+
 ### www.bondai.ru → bondai.ru redirect (pending DNS)
 
 `www.bondai.ru` currently **does not resolve** — there is no DNS A-record for it.
