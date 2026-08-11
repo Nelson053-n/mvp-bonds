@@ -324,7 +324,15 @@ class MOEXService:
             or sec_row.get("PREVWAPRICE")
         )
         if not current_price:
-            logger.error("Не удалось получить цену акции %s", secid)
+            # Пустой securities = бумаги на торговом эндпоинте нет вовсе:
+            # иностранная (BIG — акция американской Big Lots из синка Т-Банка),
+            # делистингованная или снятая с торгов. Цены у неё не будет никогда,
+            # поэтому это норма, а не сбой — тот же критерий, что у облигаций.
+            # Сетевые ошибки и 5xx сюда не доходят: их ловит _fetch.
+            if not data.get("securities", {}).get("data"):
+                logger.debug("Нет цены акции %s: не торгуется на MOEX", secid)
+            else:
+                logger.error("Не удалось получить цену акции %s", secid)
             raise PriceNotFoundError(secid, "акция")
         company_rating = await self._get_credit_rating(secid)
 

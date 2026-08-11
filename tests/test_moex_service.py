@@ -707,3 +707,61 @@ class TestFetchRetry:
 
         assert src.hits == before_hits + 1
         assert src.errors == before_errors  # a recovered blip is not an error
+
+
+class TestUnlistedStockLogLevel:
+    """Бумаги, которой нет на MOEX, цены не будет никогда — это норма, а не
+    сбой. На проде так вела себя BIG (акция американской Big Lots из синка
+    Т-Банка): 72 ERROR в сутки, заглушавшие настоящие проблемы. При этом
+    существующая бумага без цены — по-прежнему аномалия и остаётся ERROR."""
+
+    @staticmethod
+    def _service(monkeypatch, payload):
+        svc = MOEXService()
+
+        async def fake_fetch(url):
+            return payload
+
+        async def no_rating(secid):
+            return None
+
+        monkeypatch.setattr(svc, "_fetch", fake_fetch)
+        monkeypatch.setattr(svc, "_get_credit_rating", no_rating)
+        return svc
+
+    async def test_unlisted_stock_is_not_logged_as_error(self, monkeypatch, caplog):
+        """Пустой securities → DEBUG, не ERROR."""
+        import logging
+        svc = self._service(monkeypatch, {
+            "securities": {"columns": [], "data": []},
+            "marketdata": {"columns": [], "data": []},
+        })
+        with caplog.at_level(logging.DEBUG, logger="app.services.moex_service"):
+            with pytest.raises(PriceNotFoundError):
+                await svc.get_stock_snapshot("BIG")
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert not errors, f"отсутствующая бумага не должна давать ERROR: {[r.message for r in errors]}"
+        assert any("не торгуется" in r.getMessage() for r in caplog.records)
+
+    async def test_listed_stock_without_price_still_errors(self, monkeypatch, caplog):
+        """Бумага ЕСТЬ в справочнике, но цены нет ни в одном поле — это
+        настоящая аномалия, понижение уровня её глушить не должно."""
+        import logging
+        svc = self._service(monkeypatch, {
+            "securities": {
+                "columns": ["SECID", "SHORTNAME", "PREVPRICE",
+                            "PREVLEGALCLOSEPRICE", "PREVWAPRICE"],
+                "data": [["SMLT", "Самолет", None, None, None]],
+            },
+            "marketdata": {
+                "columns": ["SECID", "LAST", "LCLOSE"],
+                "data": [["SMLT", None, None]],
+            },
+        })
+        with caplog.at_level(logging.DEBUG, logger="app.services.moex_service"):
+            with pytest.raises(PriceNotFoundError):
+                await svc.get_stock_snapshot("SMLT")
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert errors, "существующая бумага без цены обязана остаться ERROR"
