@@ -1,11 +1,11 @@
 # Ops
 
-Versioned operational config that lives on the prod server (`192.168.10.114`) but
+Versioned operational config that lives on the prod server (`212.8.228.248`) but
 is **not** auto-deployed by `git pull`. Apply changes here to the server manually.
 
 ## nginx (`nginx-bondai.conf`)
 
-Mirror of `/etc/nginx/sites-enabled/mvp-bonds`. The app listens on `127.0.0.1:8000`;
+Mirror of `/etc/nginx/sites-available/bondai.ru`. The app listens on `127.0.0.1:8002`;
 nginx terminates TLS for `bondai.ru` and reverse-proxies to it.
 
 ## gzip (`nginx-gzip.conf`)
