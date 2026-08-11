@@ -3,10 +3,22 @@
 Versioned operational config that lives on the prod server (`212.8.228.248`) but
 is **not** auto-deployed by `git pull`. Apply changes here to the server manually.
 
-## nginx (`nginx-bondai.conf`)
+## nginx (`nginx-bondai.conf`) — DRAFT, не накатывать как есть
 
-Mirror of `/etc/nginx/sites-available/bondai.ru`. The app listens on `127.0.0.1:8002`;
-nginx terminates TLS for `bondai.ru` and reverse-proxies to it.
+**Это не зеркало прода, а черновик.** Он ссылается на сертификат
+`/etc/letsencrypt/live/bondai.ru/`, которого не существует: боевой конфиг
+(`/etc/nginx/sites-available/bondai.ru`) использует ОБЩИЙ сертификат
+`bananagen.ru` на 18 доменов. Применение файла как есть роняет `nginx -t`,
+а reload отвергает конфигурацию целиком — лягут все сайты сервера.
+
+Приложение слушает `127.0.0.1:8002`, nginx терминирует TLS и проксирует к нему.
+Подробности расхождений — в шапке самого файла.
+
+### Что применено точечно (11.08.2026)
+
+`server_tokens off` вынесен в http-контекст `nginx.conf` (рядом с gzip) — теперь
+`Server: nginx` без версии на всех 11 сайтах. `client_max_body_size` не нужен
+(глобальные 20m щедрее), `proxy_read_timeout` не нужен (ноль 504 при дефолтных 60s).
 
 ## gzip (`nginx-gzip.conf`)
 
