@@ -194,7 +194,7 @@
         const response = await fetch(url, fetchOpts);
         if (response.status === 401 && !isReadOnly) {
           clearUserState();
-          toast(t('auth.sessionExpired') || 'Сессия истекла, войдите заново', 'warn');
+          toast(t('auth.sessionExpired', 'Сессия истекла, войдите заново'), 'warn');
           setTimeout(() => showLoginScreen(), 1200);
           throw new Error('session_expired');
         }
@@ -2631,7 +2631,7 @@
         const now = new Date();
         const curYear = now.getFullYear();
         const buttons = [
-          { label: t('chart.yearAhead') || 'На год вперёд', value: 'year-ahead' },
+          { label: t('chart.yearAhead', 'На год вперёд'), value: 'year-ahead' },
           { label: String(curYear), value: String(curYear) },
           { label: String(curYear + 1), value: String(curYear + 1) },
           { label: String(curYear + 2), value: String(curYear + 2) },
@@ -4224,10 +4224,10 @@
       const ioImportAllStatusEl = document.getElementById('io-import-all-status');
 
       document.getElementById('export-all-btn').addEventListener('click', async () => {
-        setStatus(ioExportAllStatusEl, t('io.exporting') || 'Экспорт...');
+        setStatus(ioExportAllStatusEl, t('io.exporting', 'Экспорт...'));
         try {
           const r = await apiFetch('/portfolios/export-all');
-          if (!r.ok) throw new Error(t('io.exportError') || 'Ошибка экспорта');
+          if (!r.ok) throw new Error(t('io.exportError', 'Ошибка экспорта'));
           const blob = await r.blob();
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -5113,7 +5113,7 @@
                 btn2.style.outlineOffset = '2px';
                 setTimeout(() => { if (btn2) { btn2.style.outline = ''; btn2.style.outlineOffset = ''; } }, 2000);
               }
-              setAuthMsg(t('auth.createAccountHint') || 'Введите логин и пароль, затем нажмите «Зарегистрироваться»', 'success');
+              setAuthMsg(t('auth.createAccountHint', 'Введите логин и пароль, затем нажмите «Зарегистрироваться»'), 'success');
               if (usernameInput) usernameInput.focus();
             } else if (usernameInput) usernameInput.focus();
             // Float label logic
@@ -6900,7 +6900,7 @@
             toast(e.detail || 'Ошибка', 'error');
             btn.disabled = false;
           }
-        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); btn.disabled = false; }
+        } catch(e) { toast(t('err.network', 'Ошибка сети'), 'error'); btn.disabled = false; }
       }
 
       async function adminDeleteUser(userId, username) {
@@ -6915,7 +6915,7 @@
             const e = await r.json();
             toast(e.detail || 'Ошибка', 'error');
           }
-        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
+        } catch(e) { toast(t('err.network', 'Ошибка сети'), 'error'); }
       }
 
       async function adminDeletePortfolio(portfolioId, name) {
@@ -6929,7 +6929,7 @@
             const e = await r.json();
             toast(e.detail || 'Ошибка', 'error');
           }
-        } catch(e) { toast(t('err.network') || 'Ошибка сети', 'error'); }
+        } catch(e) { toast(t('err.network', 'Ошибка сети'), 'error'); }
       }
 
       async function adminLoadBackups() {
@@ -7304,7 +7304,7 @@
         if (!newName) return;
         try {
           const r = await apiFetch(`/portfolios/${id}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: newName }) });
-          if (!r.ok) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); return; }
+          if (!r.ok) { toast(t('err.saveFailed', 'Ошибка сохранения'), 'error'); return; }
           document.getElementById(`sp-name-${id}`).textContent = newName;
           document.getElementById(`sp-name-${id}`).style.display = '';
           document.getElementById(`sp-input-${id}`).style.display = 'none';
@@ -7313,7 +7313,7 @@
           // Update portfolio selector
           await loadPortfolios();
           updatePortfolioSelector();
-        } catch(e) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); }
+        } catch(e) { toast(t('err.saveFailed', 'Ошибка сохранения'), 'error'); }
       }
 
       async function settingsDeletePortfolio(id, name) {
@@ -7345,10 +7345,10 @@
             method: 'PATCH', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ name: newName }),
           });
-          if (!r.ok) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); return; }
+          if (!r.ok) { toast(t('err.saveFailed', 'Ошибка сохранения'), 'error'); return; }
           await loadPortfolios();
           updatePortfolioSelector();
-        } catch(e) { toast(t('err.saveFailed') || 'Ошибка сохранения', 'error'); }
+        } catch(e) { toast(t('err.saveFailed', 'Ошибка сохранения'), 'error'); }
       }
 
       async function topbarDeletePortfolio() {
@@ -8397,7 +8397,7 @@
         } catch(e) {
           btn.disabled = false;
           btn.textContent = '✓ Добавить всё в портфель';
-          toast(t('err.addFailed') || 'Ошибка добавления. Попробуйте ещё раз.', 'error');
+          toast(t('err.addFailed', 'Ошибка добавления. Попробуйте ещё раз.'), 'error');
         }
       }
 
@@ -8426,9 +8426,16 @@
         });
       });
 
-      function t(key) {
-        if (typeof TRANSLATIONS === 'undefined') return key;
-        return TRANSLATIONS[window._lang]?.[key] ?? TRANSLATIONS['ru']?.[key] ?? key;
+      // Второй аргумент — текст на случай отсутствующего ключа. Без него
+      // возвращается сам ключ: старая идиома с оператором || НЕ работала,
+      // потому что непустая строка-ключ истинна и запасной текст не брался —
+      // пользователь видел 'auth.sessionExpired' вместо сообщения.
+      function t(key, fallback) {
+        if (typeof TRANSLATIONS === 'undefined') return fallback ?? key;
+        return TRANSLATIONS[window._lang]?.[key]
+            ?? TRANSLATIONS['ru']?.[key]
+            ?? fallback
+            ?? key;
       }
 
       function applyLang(lang) {
