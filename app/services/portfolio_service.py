@@ -700,9 +700,10 @@ class PortfolioService:
                         if item.instrument_type == "bond"
                         else "stock"
                     )
-                    loss = round(
-                        -(item.purchase_price * item.quantity), 2
-                    )
+                    # Прибыль НЕ считаем: отсутствие котировки — это незнание
+                    # цены, а не падение до нуля. Прежний loss=-(цена×кол-во)
+                    # вносил фиктивный убыток в итог портфеля (у BIG, акции
+                    # американской Big Lots из синка Т-Банка, — -923.58 ₽).
                     return InstrumentMetrics(
                         id=item.id,
                         type=itype,
@@ -712,7 +713,8 @@ class PortfolioService:
                         purchase_price=item.purchase_price,
                         quantity=item.quantity,
                         current_value=0.0,
-                        profit=loss,
+                        profit=0.0,
+                        no_market_data=True,
                         weight=0.0,
                         company_rating=None,
                         coupon=item.manual_coupon,

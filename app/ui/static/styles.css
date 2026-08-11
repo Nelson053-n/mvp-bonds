@@ -1121,3 +1121,11 @@ body.mobile-mode #chart-wrap { min-width: 560px; }
 @media (max-width: 700px) {
   #performers-row { grid-template-columns: 1fr !important; }
 }
+
+/* Ячейка без рыночных данных: бумаги нет на MOEX (например, иностранная,
+   приехавшая синком брокера). Приглушаем, чтобы прочерк читался как
+   «неизвестно», а не как ноль. */
+td.no-market-data {
+  color: var(--text-muted);
+  cursor: help;
+}

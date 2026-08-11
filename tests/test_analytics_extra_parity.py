@@ -134,3 +134,38 @@ async def test_single_and_all_endpoints_return_same_schema(client, auth_headers)
     )
     expected = {"events", "anomalies", "realized_coupons", "free_cash_rub", "key_rate"}
     assert single_keys == expected
+
+
+async def test_missing_price_does_not_invent_a_loss():
+    """Бумага без котировки на MOEX не должна давать фиктивный убыток.
+
+    Регрессия: в fallback-ветке стояло profit = -(purchase_price * quantity),
+    поэтому позиция, цену которой получить не удалось, выглядела как
+    обнулившаяся. На проде так вела себя BIG (акция американской Big Lots,
+    приехавшая синком Т-Банка): -923.58 ₽ фиктивного убытка в итоге портфеля.
+    Отсутствие котировки — это незнание цены, а не падение до нуля.
+    """
+    from unittest.mock import AsyncMock, patch
+    from app.exceptions import PriceNotFoundError
+    from app.services.portfolio_service import portfolio_service
+
+    raw_item = {
+        "id": 1, "portfolio_id": 1, "ticker": "BIG", "instrument_type": "stock",
+        "quantity": 18.0, "purchase_price": 51.31,
+        "manual_coupon": None, "figi": "BBG000J0D904", "source": "tbank",
+    }
+
+    with patch("app.services.portfolio_service.storage_service.get_items",
+               return_value=[raw_item]), \
+         patch("app.services.portfolio_service.storage_service.get_tbank_coupons",
+               return_value={}), \
+         patch("app.services.moex_service.moex_service.get_stock_snapshot",
+               new=AsyncMock(side_effect=PriceNotFoundError("BIG", "акция"))):
+        rows = await portfolio_service.get_table_fresh(1)
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.ticker == "BIG"
+    assert row.no_market_data is True, "строка должна быть помечена как «нет данных»"
+    assert row.profit == 0.0, f"фиктивный убыток вернулся: profit={row.profit}"
+    assert row.current_value == 0.0

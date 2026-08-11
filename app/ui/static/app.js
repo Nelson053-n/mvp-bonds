@@ -3591,10 +3591,19 @@
           tr.appendChild(nameTd);
 
           tr.appendChild(createRatingCell(row.company_rating));
-          addCell(tr, fmt(row.current_price));
+          // Котировки нет (бумаги нет на MOEX — например, иностранная из
+          // синка брокера). Показываем прочерк: ноль читался бы как реальная
+          // цена, обнулившаяся до нуля.
+          const noData = row.no_market_data === true;
+          const priceTd = addCell(tr, noData ? '—' : fmt(row.current_price));
+          if (noData) {
+            priceTd.classList.add('no-market-data');
+            priceTd.title = t('table.noMarketData', 'Нет данных: бумага не торгуется на MOEX');
+          }
           tr.appendChild(createEditableCell(row, 'quantity', ''));
           tr.appendChild(createEditableCell(row, 'purchase_price', ''));
-          addCell(tr, fmt(row.current_value));
+          const valueTd = addCell(tr, noData ? '—' : fmt(row.current_value));
+          if (noData) valueTd.classList.add('no-market-data');
 
           // Profit cell — total or day P&L depending on global mode
           const profitTotal = Number(row.profit || 0);
@@ -3606,6 +3615,12 @@
           if (profitVal === null || Math.round(profitVal) === 0) {
             profitTd.textContent = '—';
             profitTd.style.color = 'var(--text-muted)';
+            // Без пояснения прочерк читается как «прибыль не изменилась»,
+            // тогда как здесь она просто не вычислима.
+            if (noData) {
+              profitTd.classList.add('no-market-data');
+              profitTd.title = t('table.noMarketData', 'Нет данных: бумага не торгуется на MOEX');
+            }
           } else {
             profitTd.textContent = (profitVal > 0 ? '+' : '−') + fmt(Math.abs(profitVal));
             if (profitVal > 0) profitTd.classList.add('profit-positive');

@@ -70,6 +70,11 @@ class InstrumentMetrics(BaseModel):
     rating_source: str | None = None
     is_qual: bool = False
     is_traded: bool = True
+    # Котировку получить не удалось (бумаги нет на MOEX — например,
+    # иностранная, приехавшая синком брокера). Отличает «данных нет» от
+    # честного нуля: без флага такая позиция выглядит как обнулившаяся,
+    # с убытком на всю сумму покупки.
+    no_market_data: bool = False
     coupon: float | None = None
     coupon_period: int | None = None
     coupon_rate: float | None = None  # Ставка купона в % от номинала
