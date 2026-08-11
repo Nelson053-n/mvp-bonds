@@ -76,9 +76,22 @@ NEW_HEAD="$(git rev-parse HEAD)"
 SHORT_NEW="${NEW_HEAD:0:8}"
 SHORT_OLD="${LOCAL_HEAD:0:8}"
 
+# Каким путём перезапустились воркеры. При успехе вывод deploy.sh в лог не
+# попадает, а путь важен: graceful не перечитывает .env, и по логу должно быть
+# видно, был ли простой. Фолбэк "?" — если deploy.sh промолчал (нечего катить).
+if printf '%s' "$DEPLOY_LOG" | grep -q "SIGHUP не доставлен"; then
+  RESTART_MODE="полный restart (SIGHUP не доставлен)"
+elif printf '%s' "$DEPLOY_LOG" | grep -q "graceful-reload"; then
+  RESTART_MODE="graceful-reload (SIGHUP, без простоя)"
+elif printf '%s' "$DEPLOY_LOG" | grep -q "restart bondai (полный)"; then
+  RESTART_MODE="полный restart"
+else
+  RESTART_MODE="?"
+fi
+
 if [ "$DEPLOY_OK" = "1" ]; then
-  _log "✓ авто-деплой ок: $SHORT_OLD → $SHORT_NEW (+$BEHIND коммит(ов))"
-  _tg "✅ <b>bondai авто-деплой</b>%0A%2B$BEHIND коммит(ов): <code>$SHORT_OLD → $SHORT_NEW</code>"
+  _log "✓ авто-деплой ок: $SHORT_OLD → $SHORT_NEW (+$BEHIND коммит(ов)), рестарт: $RESTART_MODE"
+  _tg "✅ <b>bondai авто-деплой</b>%0A%2B$BEHIND коммит(ов): <code>$SHORT_OLD → $SHORT_NEW</code>%0A$RESTART_MODE"
 else
   _log "✗ авто-деплой ПРОВАЛИЛСЯ (deploy.sh вернул ненулевой код)"
   _log "$DEPLOY_LOG"

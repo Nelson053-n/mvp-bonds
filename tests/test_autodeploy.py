@@ -103,3 +103,57 @@ def test_service_calls_auto_deploy_sh():
     """bondai-autodeploy.service должен запускать auto-deploy.sh."""
     content = (SYSTEMD_DIR / "bondai-autodeploy.service").read_text()
     assert "auto-deploy.sh" in content
+
+
+def _detect_restart_mode(deploy_log: str) -> str:
+    """Прогоняет РЕАЛЬНЫЙ блок определения пути из auto-deploy.sh.
+
+    Блок вырезается из скрипта, а не копируется в тест: иначе тест продолжит
+    проходить после того, как маркеры в deploy.sh переименуют.
+    """
+    content = (OPS_DIR / "auto-deploy.sh").read_text()
+    start = content.index('if printf \'%s\' "$DEPLOY_LOG" | grep -q "SIGHUP не доставлен"')
+    end = content.index("fi", content.index('RESTART_MODE="?"')) + 2
+    block = content[start:end]
+    script = f'DEPLOY_LOG={subprocess.list2cmdline([deploy_log])}\n{block}\nprintf "%s" "$RESTART_MODE"'
+    return subprocess.run(
+        ["bash", "-c", script], capture_output=True, text=True, check=True
+    ).stdout
+
+
+def test_restart_mode_graceful():
+    """Обычный деплой → graceful-reload, без простоя."""
+    mode = _detect_restart_mode(
+        "✓ импорт ок\n▶ graceful-reload bondai (SIGHUP → 12345)…\n✓ деплой ок: HTTP 200"
+    )
+    assert "graceful" in mode
+
+
+def test_restart_mode_forced():
+    """DEPLOY_FORCE_RESTART=1 → полный restart."""
+    mode = _detect_restart_mode(
+        "✓ импорт ок\n▶ restart bondai (полный)…\n✓ деплой ок: HTTP 200"
+    )
+    assert mode == "полный restart"
+
+
+def test_restart_mode_race_beats_graceful():
+    """Гонка: в выводе есть ОБА маркера — победить должен откат, не graceful."""
+    mode = _detect_restart_mode(
+        "▶ graceful-reload bondai (SIGHUP → 999)…\n"
+        "  SIGHUP не доставлен (процесс 999 исчез) — полный restart\n"
+        "✓ деплой ок: HTTP 200"
+    )
+    assert "не доставлен" in mode
+    assert mode != "graceful-reload (SIGHUP, без простоя)"
+
+
+def test_restart_mode_markers_match_deploy_sh():
+    """Маркеры в auto-deploy.sh должны существовать в deploy.sh.
+
+    Ловит рассинхрон: переименовали сообщение в deploy.sh — лог автодеплоя
+    молча начнёт писать "?" вместо пути.
+    """
+    deploy = (OPS_DIR / "deploy.sh").read_text()
+    for marker in ("SIGHUP не доставлен", "graceful-reload", "restart bondai (полный)"):
+        assert marker in deploy, f"маркер {marker!r} пропал из deploy.sh"
