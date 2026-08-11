@@ -4,6 +4,7 @@ Sends alerts when instrument ratings change, prices drop significantly,
 or coupon payments are upcoming.
 """
 
+import asyncio
 import logging
 from datetime import date, timedelta
 from typing import TYPE_CHECKING
@@ -14,6 +15,13 @@ if TYPE_CHECKING:
     from app.models import InstrumentMetrics
 
 logger = logging.getLogger(__name__)
+
+# Retries for transient network failures. Уведомления одноразовые: купон,
+# алерт и понижение рейтинга не повторяются следующим циклом, поэтому
+# потерянный ConnectTimeout — это потерянное навсегда сообщение
+# (4 таких за 11.08). Паузы короткие: отправка идёт внутри фоновых задач.
+_RETRY_ATTEMPTS = 3
+_RETRY_DELAYS = (1.0, 3.0)  # паузы между попытками 1→2 и 2→3
 
 
 # Ratings from SmartLab may carry an assignment date: "A+ (12.05.2026)".
@@ -48,34 +56,59 @@ def _is_real_rating_change(
 
 
 class NotificationService:
+    async def _post_telegram(self, token: str, payload: dict, what: str) -> bool:
+        """POST в Telegram Bot API с ретраем транзиентных сетевых сбоев.
+
+        Ретраятся только ошибки соединения: HTTP-ответ означает, что Telegram
+        нас услышал, и повтор ничего не изменит — 400 при кривой разметке или
+        403 при блокировке бота повторятся так же, а долбёжка 429 усугубит
+        rate-limit. 5xx на стороне Telegram — редкий случай, который закроет
+        следующий цикл фоновой задачи.
+        """
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        last_exc: Exception | None = None
+        for attempt in range(_RETRY_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    logger.warning(
+                        "Telegram API returned %d (%s): %s",
+                        resp.status_code, what, resp.text[:200],
+                    )
+                    return False
+                return True
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout,
+                    httpx.WriteTimeout, httpx.PoolTimeout, httpx.RemoteProtocolError) as exc:
+                last_exc = exc
+                if attempt + 1 < _RETRY_ATTEMPTS:
+                    delay = _RETRY_DELAYS[attempt]
+                    logger.warning(
+                        "Telegram %s: %s (попытка %d/%d), повтор через %.1fс",
+                        what, type(exc).__name__,
+                        attempt + 1, _RETRY_ATTEMPTS, delay,
+                    )
+                    await asyncio.sleep(delay)
+            except Exception:
+                logger.exception("Failed to send Telegram message (%s)", what)
+                return False
+        logger.error(
+            "Telegram недоступен после %d попыток (%s): %s",
+            _RETRY_ATTEMPTS, what, last_exc,
+        )
+        return False
+
     async def send_telegram(
         self, token: str, chat_id: str, text: str
     ) -> bool:
         """Send a message via Telegram Bot API."""
         if not token or not chat_id:
             return False
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(
-                    url,
-                    json={
-                        "chat_id": chat_id,
-                        "text": text,
-                        "parse_mode": "HTML",
-                    },
-                )
-                if resp.status_code != 200:
-                    logger.warning(
-                        "Telegram API returned %d: %s",
-                        resp.status_code,
-                        resp.text,
-                    )
-                    return False
-                return True
-        except Exception:
-            logger.exception("Failed to send Telegram message")
-            return False
+        return await self._post_telegram(
+            token,
+            {"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            "message",
+        )
 
     async def check_and_notify(
         self,
@@ -294,22 +327,9 @@ class NotificationService:
             f"Количество: {quantity:.0f}\n"
             f"Ожидаемая выплата: {total:.2f} \u20bd"
         )
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.post(
-                    f"https://api.telegram.org/bot{token}/sendMessage",
-                    json={"chat_id": chat_id, "text": text},
-                )
-                if r.status_code != 200:
-                    logger.warning(
-                        "Telegram coupon notification returned %d: %s",
-                        r.status_code, r.text,
-                    )
-                    return False
-                return True
-        except Exception as exc:
-            logger.warning("Failed to send coupon notification: %s", exc)
-            return False
+        return await self._post_telegram(
+            token, {"chat_id": chat_id, "text": text}, f"coupon {ticker}"
+        )
 
     async def check_price_alerts(self) -> None:
         """Check all active price alerts and send Telegram notifications."""

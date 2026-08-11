@@ -644,7 +644,9 @@ class MOEXService:
                     raise DataFetchError(url, f"HTTP {code}") from exc
                 last_error = (code, f"HTTP {code}")
             except httpx.RequestError as exc:
-                last_error = (None, str(exc)[:80])
+                # У ConnectTimeout и подобных str(exc) часто пустой — тогда в
+                # логе оставалось "MOEX  (попытка 1/3)" без причины сбоя.
+                last_error = (None, str(exc)[:80] or type(exc).__name__)
             except ValueError as exc:
                 last_error = (None, "Invalid JSON")
 

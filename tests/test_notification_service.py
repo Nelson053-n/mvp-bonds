@@ -10,6 +10,7 @@ Covered:
 All outbound Telegram traffic is mocked — no real HTTP is performed.
 """
 
+import httpx
 import pytest
 
 from app.models import InstrumentMetrics
@@ -665,3 +666,84 @@ class TestCheckPriceAlerts:
         await svc.check_price_alerts()
 
         assert sent == []
+
+
+class TestTelegramRetry:
+    """Транзиентный ConnectTimeout не должен терять уведомление: купон, алерт
+    и понижение рейтинга одноразовые — следующий цикл их не повторит."""
+
+    @pytest.fixture
+    def svc(self):
+        return NotificationService()
+
+    @pytest.fixture(autouse=True)
+    def _no_sleep(self, monkeypatch):
+        async def _instant(_):
+            return None
+        monkeypatch.setattr(
+            "app.services.notification_service.asyncio.sleep", _instant
+        )
+
+    def _patch_seq(self, monkeypatch, items):
+        """Каждый .post() берёт следующий элемент: исключение — бросается,
+        _FakeResp — возвращается. Считает число реальных попыток."""
+        calls = {"n": 0}
+
+        class _SeqClient:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None):
+                idx = calls["n"]
+                calls["n"] += 1
+                item = items[idx]
+                if isinstance(item, Exception):
+                    raise item
+                return item
+
+        monkeypatch.setattr(
+            "app.services.notification_service.httpx.AsyncClient",
+            lambda *a, **k: _SeqClient(),
+        )
+        return calls
+
+    async def test_retries_connect_timeout_then_succeeds(self, monkeypatch, svc):
+        """Ровно тот прод-случай 11.08: ConnectTimeout, затем успех."""
+        calls = self._patch_seq(
+            monkeypatch, [httpx.ConnectTimeout("boom"), _FakeResp(200)]
+        )
+        assert await svc.send_telegram("tok", "chat", "hi") is True
+        assert calls["n"] == 2
+
+    async def test_gives_up_after_all_attempts(self, monkeypatch, svc):
+        import app.services.notification_service as ns
+        calls = self._patch_seq(
+            monkeypatch, [httpx.ConnectTimeout("boom")] * ns._RETRY_ATTEMPTS
+        )
+        assert await svc.send_telegram("tok", "chat", "hi") is False
+        assert calls["n"] == ns._RETRY_ATTEMPTS
+
+    async def test_http_error_is_not_retried(self, monkeypatch, svc):
+        """400/403/429 — Telegram нас услышал; повтор ничего не изменит."""
+        calls = self._patch_seq(
+            monkeypatch, [_FakeResp(429, "Too Many Requests"), _FakeResp(200)]
+        )
+        assert await svc.send_telegram("tok", "chat", "hi") is False
+        assert calls["n"] == 1
+
+    async def test_coupon_notification_also_retries(self, monkeypatch, svc):
+        """Вторая точка отправки должна идти через тот же ретрай."""
+        calls = self._patch_seq(
+            monkeypatch, [httpx.ReadTimeout("slow"), _FakeResp(200)]
+        )
+        ok = await svc._send_coupon_telegram(
+            "tok", "chat", "Портфель", "SU26238RMFS4", "2026-09-01", 34.9, 10
+        )
+        assert ok is True
+        assert calls["n"] == 2
