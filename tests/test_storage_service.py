@@ -331,3 +331,64 @@ class TestSchemaMigrations:
             conn.execute("DROP TABLE IF EXISTS _mig_probe")
             service._set_schema_version(conn, StorageService.SCHEMA_VERSION)
             conn.commit()
+
+
+class TestRatingRefreshSelection:
+    """Выборка тикеров для ночного обхода кредитных рейтингов."""
+
+    @pytest.fixture
+    def service(self, settings_override) -> StorageService:
+        return StorageService()
+
+    def test_custom_items_excluded_from_rating_refresh(
+        self, service: StorageService
+    ) -> None:
+        """Внебиржевые бумаги не должны попадать в обход рейтингов.
+
+        Регрессия: «тикер» custom-бумаги — произвольная подпись
+        пользователя, она подставлялась в URL SmartLab. Тот на любой
+        мусорный путь отдаёт HTTP 200 со страницей-списком (не 404),
+        и парсер присваивал бумаге рейтинг с чужой страницы: все 8
+        таких позиций на проде получили "D" — дефолт, в том числе
+        «Газпром нефть» и «Черкизово».
+        """
+        service.add_item(
+            ticker="SBER", instrument_type="stock", quantity=1,
+            purchase_price=100.0, portfolio_id=TEST_PORTFOLIO_ID,
+        )
+        service.add_item(
+            ticker="ТАК СЕБЕ", instrument_type="bond", quantity=1,
+            purchase_price=100.0, portfolio_id=TEST_PORTFOLIO_ID,
+            source="custom",
+        )
+
+        tickers = {i["ticker"] for i in service.get_all_portfolio_items_for_rating()}
+
+        assert "SBER" in tickers, "биржевая бумага обязана остаться в обходе"
+        assert "ТАК СЕБЕ" not in tickers, (
+            "произвольная подпись пользователя не должна уходить в SmartLab"
+        )
+
+    def test_mixed_ticker_still_refreshed(self, service: StorageService) -> None:
+        """Тикер, который у одного пользователя биржевой, а у другого custom.
+
+        Фильтровать надо по составу ВСЕЙ группы: если хоть одна позиция
+        биржевая, рейтинг нужен. Наивный `MIN(source)='custom'` выкинул бы
+        такую бумагу из обхода целиком.
+        """
+        service.add_item(
+            ticker="RU000A10AU73", instrument_type="bond", quantity=1,
+            purchase_price=100.0, portfolio_id=TEST_PORTFOLIO_ID,
+            source="custom",
+        )
+        service.add_item(
+            ticker="RU000A10AU73", instrument_type="bond", quantity=1,
+            purchase_price=100.0, portfolio_id=TEST_PORTFOLIO_ID,
+            source="tbank",
+        )
+
+        tickers = {i["ticker"] for i in service.get_all_portfolio_items_for_rating()}
+
+        assert "RU000A10AU73" in tickers, (
+            "у группы есть биржевая позиция — рейтинг обновлять надо"
+        )

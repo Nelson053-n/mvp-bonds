@@ -884,13 +884,25 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         return [{"id": r[0], "user_id": r[1], "name": r[2]} for r in rows]
 
     def get_all_portfolio_items_for_rating(self) -> list[dict]:
-        """Return one item per unique ticker (for daily rating refresh)."""
+        """Return one item per unique ticker (for daily rating refresh).
+
+        Внебиржевые (source='custom') исключены: их «тикер» — произвольная
+        подпись пользователя («ТАК СЕБЕ», «Газпром нефть»), она подставляется
+        в URL SmartLab. Тот на любой мусорный путь отдаёт HTTP 200 со страницей
+        -списком, а не 404, поэтому парсер выуживал оттуда рейтинг и присваивал
+        его чужой бумаге — все 8 таких позиций получили "D" (дефолт).
+
+        Фильтр по МИНИМУМУ source в группе, а не по MIN(id): один и тот же
+        тикер бывает биржевым у одного пользователя и custom у другого —
+        такую группу обходить надо.
+        """
         with self._connect() as conn:
             rows = conn.execute("""
                 SELECT MIN(id) as id, MIN(portfolio_id) as portfolio_id, ticker, instrument_type
                 FROM portfolio_items
                 WHERE deleted_at IS NULL
                 GROUP BY ticker
+                HAVING SUM(CASE WHEN source = 'custom' THEN 0 ELSE 1 END) > 0
                 ORDER BY ticker
             """).fetchall()
         return [{"id": r[0], "portfolio_id": r[1], "ticker": r[2], "instrument_type": r[3]} for r in rows]
