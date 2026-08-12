@@ -16,7 +16,7 @@ from app.services.coupon_schedule_service import coupon_schedule_service
 from app.services.llm_service import llm_service
 from app.services.moex_service import moex_service
 from app.services.storage_service import storage_service
-from app.exceptions import ValidationError, InstrumentNotFoundError
+from app.exceptions import ValidationError, InstrumentNotFoundError, PriceNotFoundError
 
 if TYPE_CHECKING:
     from app.services.cache_service import CacheService
@@ -685,16 +685,31 @@ class PortfolioService:
                             ai_comment="",
                         )
                 except Exception as exc:
-                    logger.warning(
-                        "Metrics calc failed for %s (id=%s, type=%s) in portfolio_id=%s: %s: %s",
-                        item.ticker,
-                        item.id,
-                        item.instrument_type,
-                        portfolio_id,
-                        type(exc).__name__,
-                        exc,
-                        exc_info=True,
-                    )
+                    # Отсутствие котировки — штатная ситуация (бумага снята с
+                    # торгов, погашена или иностранная из синка брокера), а не
+                    # сбой: позиция всё равно вернётся с no_market_data. Пишем
+                    # коротким INFO без трассировки — иначе одна такая бумага
+                    # даёт сотни WARNING со стеком в сутки. Всё остальное —
+                    # настоящая поломка расчёта, её видно полностью.
+                    if isinstance(exc, PriceNotFoundError):
+                        logger.info(
+                            "Нет котировки для %s (id=%s, type=%s) в portfolio_id=%s",
+                            item.ticker,
+                            item.id,
+                            item.instrument_type,
+                            portfolio_id,
+                        )
+                    else:
+                        logger.warning(
+                            "Metrics calc failed for %s (id=%s, type=%s) in portfolio_id=%s: %s: %s",
+                            item.ticker,
+                            item.id,
+                            item.instrument_type,
+                            portfolio_id,
+                            type(exc).__name__,
+                            exc,
+                            exc_info=True,
+                        )
                     itype = (
                         "bond"
                         if item.instrument_type == "bond"
