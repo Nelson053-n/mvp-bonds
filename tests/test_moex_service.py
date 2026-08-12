@@ -86,6 +86,46 @@ class TestMOEXServiceHelpers:
 
         assert result == ""
 
+    def test_footer_link_is_not_parsed_as_rating(
+        self, service: MOEXService
+    ) -> None:
+        """Подвал SmartLab не должен давать кредитный рейтинг.
+
+        Регрессия: фолбэк «найти букву рядом со словом рейтинг» цеплял
+        ссылку «Рейтинг брокеров» в подвале и возвращал "A" для ЛЮБОЙ
+        страницы. У ОФЗ рейтинга на странице нет вовсе — они получали
+        фальшивый "A" (105 записей в rating_history на проде), а один
+        раз даже "D", то есть дефолт у госбумаги.
+        """
+        # реальный фрагмент подвала smart-lab.ru, рейтинга бумаги здесь нет
+        footer = (
+            '<li class="footer__sub-item">'
+            '<a class="footer__link" href="/crypto/">Форум криптовалют</a></li>'
+            '<li class="footer__sub-item">'
+            '<a class="footer__link" href="/forex/">Форум Forex</a></li>'
+            '<li class="footer__sub-item">'
+            '<a class="footer__link" href="/brokers-rating/">Рейтинг брокеров</a>'
+            '</li>'
+        )
+
+        # Проверяем ПАРСЕР ЦЕЛИКОМ, а не отдельный хелпер: регрессия здесь —
+        # это возврат фолбэка вторым проходом, и тест на _find_rating_with_label
+        # её бы не заметил.
+        assert service._extract_rating_from_html(footer) is None, (
+            "буква из подвала не должна становиться кредитным рейтингом"
+        )
+
+    def test_labelled_rating_still_parsed(self, service: MOEXService) -> None:
+        """Настоящий рейтинг из размеченного блока по-прежнему читается."""
+        html = (
+            '<div class="linear-progress-bar__text">AA-</div>'
+            '<span>28.03.2026</span>'
+        )
+        result = service._find_rating_with_label(html)
+
+        assert result is not None, "размеченный рейтинг должен находиться"
+        assert result[0] == "AA-"
+
     def test_normalize_rating_valid_with_ru(self, service: MOEXService) -> None:
         """Test _normalize_rating_value strips ru prefix."""
         result = service._normalize_rating_value("ruAAA")

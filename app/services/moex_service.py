@@ -1012,9 +1012,7 @@ class MOEXService:
             self._credit_rating_cache.set_error(cache_key)
             return None
 
-        rating_match = self._find_rating_with_label(html)
-        if rating_match is None:
-            rating_match = self._find_rating_anywhere(html)
+        rating_match = self._extract_rating_from_html(html)
 
         if rating_match is None:
             src.record_miss()
@@ -1029,6 +1027,19 @@ class MOEXService:
         result = rating if rating_date is None else f"{rating} ({rating_date})"
         self._credit_rating_cache[cache_key] = result
         return result
+
+    @staticmethod
+    def _extract_rating_from_html(text: str) -> tuple[str, int] | None:
+        """Кредитный рейтинг со страницы SmartLab — только из размеченного блока.
+
+        Раньше при неудаче был второй проход «найти букву рядом со словом
+        рейтинг». В подвале сайта есть ссылка «Рейтинг брокеров», буква из
+        соседнего слова попадала в окно ±120 символов — и проход возвращал
+        "A" для ЛЮБОЙ страницы. У ОФЗ рейтинга на странице нет вовсе, они
+        получали фальшивый "A" (105 записей в rating_history), а один раз
+        "D" — дефолт у госбумаги. Отсутствие рейтинга честнее выдумки.
+        """
+        return MOEXService._find_rating_with_label(text)
 
     @staticmethod
     def _find_rating_with_label(text: str) -> tuple[str, int] | None:
@@ -1061,28 +1072,6 @@ class MOEXService:
         if normalized is None:
             return None
         return normalized, match.start(1)
-
-    @staticmethod
-    def _find_rating_anywhere(text: str) -> tuple[str, int] | None:
-        pattern = re.compile(
-            r"\b(ru(?:AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|"
-            r"B[+-]?|CCC|CC|C|D)(?:\(EXP\))?|"
-            r"AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|"
-            r"CCC|CC|C|D)\b",
-            re.IGNORECASE,
-        )
-        for match in pattern.finditer(text):
-            normalized = MOEXService._normalize_rating_value(match.group(1))
-            if normalized is None:
-                continue
-
-            start = max(0, match.start(1) - 120)
-            end = min(len(text), match.end(1) + 120)
-            window = text[start:end].lower()
-            if "рейтинг" in window or "rating" in window:
-                return normalized, match.start(1)
-
-        return None
 
     @staticmethod
     def _find_nearest_dotted_date(
