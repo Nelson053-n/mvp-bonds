@@ -765,3 +765,53 @@ class TestUnlistedStockLogLevel:
 
         errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
         assert errors, "существующая бумага без цены обязана остаться ERROR"
+
+
+class TestCacheEviction:
+    """Кэши не должны расти бесконечно. На проде воркер-лидер набрал 701 МБ
+    RSS при MemoryHigh=750 (3726 срабатываний throttling): TTL проверялся
+    только при чтении, а протухшие записи не удалялись никогда — каталог
+    /bond прогревает ~2700 бумаг, и они оседали в памяти навсегда.
+
+    Тесты намеренно НЕ подменяют потолки через monkeypatch: подмена
+    перекрывала бы отключённое вытеснение, и тест проходил бы на сломанном
+    коде. Работаем с боевыми SNAPSHOT_CACHE_MAX / MAX_ENTRIES.
+    """
+
+    def test_snapshot_cache_stays_bounded(self):
+        """Кладём вдвое больше потолка — размер обязан остаться в пределах."""
+        svc = MOEXService()
+        limit = MOEXService.SNAPSHOT_CACHE_MAX
+        for i in range(limit * 2):
+            svc._snapshot_cache_put(svc._bond_snapshot_cache, f"B{i}", object())
+
+        assert len(svc._bond_snapshot_cache) <= limit, (
+            f"кэш не ограничен: {len(svc._bond_snapshot_cache)} > {limit}"
+        )
+        assert f"B{limit * 2 - 1}" in svc._bond_snapshot_cache, "последняя запись потеряна"
+
+    def test_expired_entries_are_dropped_first(self):
+        """Протухшие вытесняются раньше свежих."""
+        import app.services.moex_service as m
+        svc = MOEXService()
+        limit = MOEXService.SNAPSHOT_CACHE_MAX
+        old_ts = m.time.time() - 10_000
+        for i in range(limit):
+            svc._stock_snapshot_cache[f"OLD{i}"] = (object(), old_ts)
+
+        svc._snapshot_cache_put(svc._stock_snapshot_cache, "FRESH", object())
+
+        assert "FRESH" in svc._stock_snapshot_cache
+        assert len(svc._stock_snapshot_cache) < limit, "протухшие должны были уйти"
+
+    def test_rating_cache_stays_bounded(self):
+        """_RatingCache тоже ограничен: рейтинги ~2700 бумаг каталога иначе
+        остаются навсегда."""
+        import app.services.moex_service as m
+        c = m._RatingCache()
+        limit = m._RatingCache.MAX_ENTRIES
+        for i in range(limit * 2):
+            c[f"SEC{i}"] = "ruAA"
+
+        assert len(c) <= limit, f"кэш рейтингов не ограничен: {len(c)} > {limit}"
+        assert c[f"SEC{limit * 2 - 1}"] == "ruAA", "последняя запись потеряна"

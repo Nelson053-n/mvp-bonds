@@ -118,7 +118,22 @@ class _RatingCache:
     def __getitem__(self, key: str):
         return self._data[key][0]
 
+    MAX_ENTRIES = 4000
+
     def __setitem__(self, key: str, value) -> None:
+        # Протухшие записи удаляются только при чтении того же ключа, поэтому
+        # рейтинги бумаг, запрошенных однажды (каталог /bond — ~2700 штук),
+        # оставались в памяти навсегда. При переполнении подчищаем истёкшие,
+        # а если не помогло — вытесняем самые старые.
+        if len(self._data) >= self.MAX_ENTRIES:
+            for k in [k for k in list(self._data) if not self._fresh(k)]:
+                self._data.pop(k, None)
+                self._errored.discard(k)
+            if len(self._data) >= self.MAX_ENTRIES:
+                oldest = sorted(self._data, key=lambda k: self._data[k][1])
+                for k in oldest[: self.MAX_ENTRIES // 10]:
+                    self._data.pop(k, None)
+                    self._errored.discard(k)
         self._data[key] = (value, time.time())
         self._errored.discard(key)
 
@@ -148,10 +163,15 @@ class MOEXService:
 
     FX_RATE_TTL = 3600   # 1 hour cache for FX rates
     SNAPSHOT_TTL = 60    # 60 sec cache for bond/stock snapshots
+    # Потолок снапшот-кэшей. Без вытеснения TTL проверялся только при чтении,
+    # а протухшие записи не удалялись никогда: каталог /bond прогревает ~2700
+    # бумаг, и они оседали в памяти воркера-лидера навсегда. На проде это дало
+    # 701 МБ RSS при MemoryHigh=750 МБ и 3726 срабатываний throttling.
+    SNAPSHOT_CACHE_MAX = 1200
 
     def __init__(self) -> None:
         self._credit_rating_cache = _RatingCache()
-        self._is_qual_cache: dict[str, bool] = {}
+        self._is_qual_cache: dict[str, tuple[bool, bool]] = {}  # secid -> (is_qual, is_traded)
         self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
         self._bond_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
         self._stock_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
@@ -161,6 +181,26 @@ class MOEXService:
             "smartlab": SourceStats("smartlab", "Smart-Lab (рейтинг)"),
             "moex_fx": SourceStats("moex_fx", "MOEX ISS (валюты)"),
         }
+
+    def _snapshot_cache_put(
+        self, cache: dict[str, tuple[Any, float]], secid: str, snapshot: Any
+    ) -> None:
+        """Положить снапшот в кэш, вытеснив лишнее при достижении потолка.
+
+        Сначала выбрасываем протухшие по TTL — их обычно большинство, ведь
+        SNAPSHOT_TTL всего 60с. Если и после этого места нет (редкий всплеск),
+        добиваем самыми старыми записями. Та же схема, что у _cache_put в
+        bond_pages.py.
+        """
+        if len(cache) >= self.SNAPSHOT_CACHE_MAX:
+            now = time.time()
+            for k in [k for k, v in cache.items() if now - v[1] > self.SNAPSHOT_TTL]:
+                cache.pop(k, None)
+            if len(cache) >= self.SNAPSHOT_CACHE_MAX:
+                oldest = sorted(cache, key=lambda k: cache[k][1])
+                for k in oldest[: max(1, self.SNAPSHOT_CACHE_MAX // 10)]:
+                    cache.pop(k, None)
+        cache[secid] = (snapshot, time.time())
 
     def get_sources_status(self) -> list[dict]:
         return [s.to_dict() for s in self.sources.values()]
@@ -373,7 +413,7 @@ class MOEXService:
             company_rating=company_rating,
             rating_source="moex" if company_rating else None,
         )
-        self._stock_snapshot_cache[secid] = (snapshot, time.time())
+        self._snapshot_cache_put(self._stock_snapshot_cache, secid, snapshot)
         return snapshot
 
     def invalidate_snapshot_cache(self, secid: str) -> None:
@@ -619,7 +659,7 @@ class MOEXService:
             fx_rate=fx_rate,
             is_floater=is_floater,
         )
-        self._bond_snapshot_cache[secid] = (snapshot, time.time())
+        self._snapshot_cache_put(self._bond_snapshot_cache, secid, snapshot)
         return snapshot
 
     async def _fetch(self, url: str) -> dict[str, Any]:
@@ -890,6 +930,13 @@ class MOEXService:
         except Exception:
             pass  # default: not qual, is traded
 
+        # Квал-статус и торгуемость почти статичны, TTL им не нужен — но и расти
+        # бесконечно словарь не должен: по записи на каждый запрошенный secid.
+        # При переполнении сбрасываем целиком: это метаданные, перечитать их
+        # дешевле, чем тащить в память историю всех бумаг каталога.
+        if len(self._is_qual_cache) >= self.SNAPSHOT_CACHE_MAX * 3:
+            logger.debug("is_qual cache overflow (%d), сбрасываю", len(self._is_qual_cache))
+            self._is_qual_cache.clear()
         self._is_qual_cache[secid] = (is_qual, is_traded)
         return is_qual, is_traded
 
