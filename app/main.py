@@ -264,7 +264,12 @@ async def _rating_refresh_loop():
         await asyncio.sleep(secs_to_3am)
         try:
             items = storage_service.get_all_portfolio_items_for_rating()
-            sem = asyncio.Semaphore(3)
+            # 2, а не 3: SmartLab начал отвечать 429 на трёх параллельных
+            # запросах — за сутки 700 WARNING, из них 93 исчерпали все
+            # ретраи и оставили 82 бумаги без свежего рейтинга. Обход
+            # 541 тикера занимал ~54с, при 2 потоках будет ~80с — для
+            # ночной задачи это ничего не значит.
+            sem = asyncio.Semaphore(2)
 
             s = storage_service.get_all_settings()
             tg_token = s.get("tg_bot_token", "")
