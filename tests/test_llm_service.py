@@ -47,9 +47,15 @@ class TestLLMServiceStubValidate:
         assert result.warnings == []
 
     async def test_validate_bond_ticker_ofz(self, service: LLMService) -> None:
-        """Test bond ticker validation with ОФЗ marker."""
+        """Test bond ticker validation with ОФЗ marker.
+
+        Кириллическая запись «ОФЗ-26238» человекочитаемая, но не биржевой
+        тикер: на MOEX выпуск зовётся SU26238RMFS4, и именно secid уходит
+        в URL. С 21.08 кириллица в тикере разрешена только внебиржевым
+        бумагам (is_custom), поэтому здесь и ISIN-форма выпуска.
+        """
         payload = AddInstrumentInput(
-            ticker="ОФЗ-26238",
+            ticker="RU000A105G99",
             quantity=10,
             purchase_price=920.0,
         )

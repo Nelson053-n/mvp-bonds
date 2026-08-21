@@ -1,7 +1,14 @@
 from datetime import date
+import re
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+# Тикер биржевой бумаги подставляется в URL внешних API:
+#   iss.moex.com/.../securities/{secid}.json  и  smart-lab.ru/q/bonds/{secid}/
+# Без проверки формата в путь пролезали бы «/», «..» и «?». Хост подменить
+# нельзя (netloc в шаблоне), но путь и query становились управляемыми.
+_EXCHANGE_TICKER_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 
 
 InstrumentType = Literal["stock", "bond"]
@@ -22,6 +29,22 @@ class AddInstrumentInput(BaseModel):
     custom_nominal: float | None = Field(None, gt=0)        # face value, custom bonds
     custom_coupon_freq: int | None = Field(None, gt=0)      # coupon payments per year (2/4/12)
     custom_maturity: date | None = None                     # maturity date, custom bonds
+
+    @model_validator(mode="after")
+    def _check_ticker(self) -> "AddInstrumentInput":
+        """Формат тикера строгий только для биржевых бумаг.
+
+        У внебиржевых (is_custom) «тикер» — произвольная подпись пользователя
+        («ТАК СЕБЕ», «ОФЗ 29007», «Газпром нефть-006Р-02R»), и в MOEX она не
+        уходит: get_table_fresh обрабатывает source='custom' без сети. Общий
+        pattern на поле сломал бы 6 живых позиций на проде.
+        """
+        if not self.is_custom and not _EXCHANGE_TICKER_RE.match(self.ticker):
+            raise ValueError(
+                "Тикер биржевой бумаги может содержать только латиницу, "
+                "цифры, точку, дефис и подчёркивание"
+            )
+        return self
 
 
 class UpdateInstrumentInput(BaseModel):
