@@ -169,6 +169,12 @@ class MOEXService:
     # 701 МБ RSS при MemoryHigh=750 МБ и 3726 срабатываний throttling.
     SNAPSHOT_CACHE_MAX = 1200
 
+    _UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0 Safari/537.36"
+    )
+
     def __init__(self) -> None:
         self._credit_rating_cache = _RatingCache()
         self._is_qual_cache: dict[str, tuple[bool, bool]] = {}  # secid -> (is_qual, is_traded)
@@ -181,6 +187,35 @@ class MOEXService:
             "smartlab": SourceStats("smartlab", "Smart-Lab (рейтинг)"),
             "moex_fx": SourceStats("moex_fx", "MOEX ISS (валюты)"),
         }
+        self._http: httpx.AsyncClient | None = None
+
+    def _get_http(self) -> httpx.AsyncClient:
+        """Один переиспользуемый HTTP-клиент на процесс.
+
+        Раньше каждый запрос открывал свой `httpx.AsyncClient`, а тот на старте
+        строит SSLContext и грузит в него весь корневой бандл certifi. Замерено
+        на проде: **703 КБ на контекст**, и после освобождения RSS не
+        возвращается ОС (аллокатор удерживает арены) — 300 контекстов дали
+        +206 МБ невозвратной памяти. Отсюда воркеры по 250–320 МБ и 23437
+        срабатываний memory.high при MemoryHigh=750.
+
+        Общий клиент строит контекст ОДИН раз и заодно переиспользует
+        keep-alive соединения к iss.moex.com вместо нового TLS-хендшейка
+        на каждый из сотен запросов обхода.
+        """
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(
+                timeout=httpx.Timeout(15.0, connect=10.0),
+                limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
+                headers={"User-Agent": self._UA},
+            )
+        return self._http
+
+    async def aclose(self) -> None:
+        """Закрыть общий клиент (вызывается на shutdown приложения)."""
+        if self._http is not None and not self._http.is_closed:
+            await self._http.aclose()
+        self._http = None
 
     def _snapshot_cache_put(
         self, cache: dict[str, tuple[Any, float]], secid: str, snapshot: Any
@@ -255,10 +290,10 @@ class MOEXService:
             f"?iss.meta=off&iss.only=securities.current"
         )
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._get_http()
+            resp = await client.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
             current = data.get("securities.current", {})
             cols = current.get("columns", [])
             rows = current.get("data", [])
@@ -291,10 +326,10 @@ class MOEXService:
             f"securities/{index_id}.json?iss.meta=off&iss.only=marketdata"
         )
         try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._get_http()
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
             md = data.get("marketdata", {})
             cols = md.get("columns", [])
             rows = md.get("data", [])
@@ -317,10 +352,10 @@ class MOEXService:
             f"&iss.only=history&history.columns=TRADEDATE,CLOSE"
         )
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._get_http()
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
             hist = data.get("history", {})
             cols = hist.get("columns", [])
             rows = hist.get("data", [])
@@ -432,10 +467,10 @@ class MOEXService:
             "?iss.meta=off&iss.only=coupons&limit=50"
         )
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._get_http()
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
         except Exception as exc:
             logger.debug("bondization fetch failed for %s: %s", secid, exc)
             return None
@@ -678,10 +713,10 @@ class MOEXService:
 
         for attempt in range(_RETRY_ATTEMPTS):
             try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    data = response.json()
+                client = self._get_http()
+                response = await client.get(url, timeout=30)
+                response.raise_for_status()
+                data = response.json()
                 src.record_hit()
                 return data
             except httpx.HTTPStatusError as exc:
@@ -786,10 +821,10 @@ class MOEXService:
 
         url = f"{settings.moex_base_url}/securities/{secid}/description.json"
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                data = response.json()
+            client = self._get_http()
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
         except httpx.HTTPStatusError as exc:
             src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
             logger.warning(
@@ -900,12 +935,12 @@ class MOEXService:
         is_traded = True
 
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                desc_resp, boards_resp = await asyncio.gather(
-                    client.get(url_desc),
-                    client.get(url_boards),
-                    return_exceptions=True,
-                )
+            client = self._get_http()
+            desc_resp, boards_resp = await asyncio.gather(
+                client.get(url_desc),
+                client.get(url_boards),
+                return_exceptions=True,
+            )
 
             if not isinstance(desc_resp, Exception):
                 desc_resp.raise_for_status()
@@ -968,10 +1003,10 @@ class MOEXService:
         html: str | None = None
         for attempt in range(len(SMARTLAB_RETRY_DELAYS) + 1):
             try:
-                async with httpx.AsyncClient(timeout=8) as client:
-                    response = await client.get(url, headers=headers)
-                    response.raise_for_status()
-                    html = response.text
+                client = self._get_http()
+                response = await client.get(url, headers=headers, timeout=8)
+                response.raise_for_status()
+                html = response.text
                 break
             except httpx.HTTPStatusError as exc:
                 last_exc = exc

@@ -567,6 +567,15 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Failed to stop Telegram bond-search bot on shutdown")
         _release_leader_lock()
+    # Общие HTTP-клиенты живут весь процесс — закрываем явно, иначе
+    # при graceful-reload (SIGHUP) остаются висеть открытые соединения.
+    try:
+        from app.services.moex_service import moex_service
+        from app.services.tbank_service import aclose_client as tbank_aclose
+        await moex_service.aclose()
+        await tbank_aclose()
+    except Exception:
+        logger.exception("Failed to close HTTP clients on shutdown")
     try:
         storage_service.checkpoint()
         logger.info("WAL checkpoint completed")

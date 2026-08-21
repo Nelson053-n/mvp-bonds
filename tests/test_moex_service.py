@@ -333,7 +333,7 @@ class TestSmartLabRetry:
             async def __aexit__(self, *a):
                 return False
 
-            async def get(self, url, headers=None):
+            async def get(self, url, headers=None, timeout=None):
                 idx = calls["n"]
                 calls["n"] += 1
                 item = responses[idx]
@@ -341,7 +341,9 @@ class TestSmartLabRetry:
                     raise item
                 return _FakeResp(item)
 
-        monkeypatch.setattr(m.httpx, "AsyncClient", _FakeClient)
+        # Клиент теперь общий на сервис (_get_http), а не создаётся на каждый
+        # запрос — подменяем геттер, иначе фейк просто не подхватится.
+        monkeypatch.setattr(m.MOEXService, "_get_http", lambda self: _FakeClient())
         return calls
 
     async def test_retries_then_succeeds(self, monkeypatch):
@@ -675,7 +677,7 @@ class TestFetchRetry:
             async def __aexit__(self, *a):
                 return False
 
-            async def get(self, url, headers=None):
+            async def get(self, url, headers=None, timeout=None):
                 idx = calls["n"]
                 calls["n"] += 1
                 item = responses[idx]
@@ -683,7 +685,9 @@ class TestFetchRetry:
                     raise item
                 return _FakeResp(item)
 
-        monkeypatch.setattr(m.httpx, "AsyncClient", _FakeClient)
+        # Клиент теперь общий на сервис (_get_http), а не создаётся на каждый
+        # запрос — подменяем геттер, иначе фейк просто не подхватится.
+        monkeypatch.setattr(m.MOEXService, "_get_http", lambda self: _FakeClient())
         return calls
 
     async def test_retries_502_then_succeeds(self, monkeypatch):

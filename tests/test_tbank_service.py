@@ -168,14 +168,16 @@ class TestNetworkRetry:
             async def __aexit__(self, *a):
                 return False
 
-            async def post(self, url, json=None, headers=None):
+            async def post(self, url, json=None, headers=None, timeout=None):
                 item = side_effects[calls["n"]]
                 calls["n"] += 1
                 if isinstance(item, Exception):
                     raise item
                 return item
 
-        monkeypatch.setattr(ts.httpx, "AsyncClient", lambda **kw: FakeClient())
+        # Клиент теперь общий на модуль (_get_client), а не создаётся на
+        # каждый POST — подменяем геттер, иначе фейк не подхватится.
+        monkeypatch.setattr(ts, "_get_client", lambda: FakeClient())
         monkeypatch.setattr(ts.asyncio, "sleep", lambda d: _noop())
         return svc, calls
 
