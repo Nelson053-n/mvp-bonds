@@ -802,16 +802,18 @@ async def refresh_portfolio_ratings(
         if item.get("ticker") and item.get("source") != "custom"
     }
     updated = 0
-    sem = asyncio.Semaphore(3)
+    # Свой семафор убран: лимит на SmartLab теперь внутри
+    # _get_smartlab_credit_rating и общий на процесс, поэтому этот путь
+    # больше не складывается с ночным обходом и синком T-Bank в 5+
+    # одновременных запросов (21.08: 260 запросов за час, 52 отказа).
 
     async def _refresh_one(ticker: str) -> None:
         nonlocal updated
-        async with sem:
-            try:
-                result = await moex_service.refresh_rating_with_sources(ticker)
-            except Exception:
-                logger.exception("refresh_ratings: failed for ticker=%s", ticker)
-                return
+        try:
+            result = await moex_service.refresh_rating_with_sources(ticker)
+        except Exception:
+            logger.exception("refresh_ratings: failed for ticker=%s", ticker)
+            return
         if result.get("best") is not None:
             storage_service.update_rating_all_items_for_ticker(ticker, result["best"])
             updated += 1

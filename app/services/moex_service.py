@@ -169,6 +169,10 @@ class MOEXService:
     # 701 МБ RSS при MemoryHigh=750 МБ и 3726 срабатываний throttling.
     SNAPSHOT_CACHE_MAX = 1200
 
+    # Потолок одновременных запросов к SmartLab на весь процесс. Сайт отвечает
+    # 429 уже на трёх параллельных (b363040), поэтому 2.
+    SMARTLAB_CONCURRENCY = 2
+
     _UA = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -188,6 +192,28 @@ class MOEXService:
             "moex_fx": SourceStats("moex_fx", "MOEX ISS (валюты)"),
         }
         self._http: httpx.AsyncClient | None = None
+        self._smartlab_sem: asyncio.Semaphore | None = None
+
+    def _get_smartlab_sem(self) -> asyncio.Semaphore:
+        """Ограничитель параллельных запросов к SmartLab — общий на процесс.
+
+        Раньше лимит стоял у ВЫЗЫВАЮЩИХ, и каждый знал только про себя:
+        ночной обход (main.py, 2), пересчёт рейтингов портфеля
+        (portfolios.py, 3) и синк T-Bank через notification_service (без
+        ограничения вовсе). В сумме они легко давали 5+ одновременных
+        запросов, и SmartLab отвечал 429: 21.08 в 04:00 синк дал 260
+        запросов по 132 бумагам, 52 из них исчерпали все ретраи.
+
+        Ограничитель здесь, в единственной точке входа, действует сразу
+        на все пути — новый вызывающий не сможет его обойти по забывчивости.
+
+        Создаётся лениво: сервис — модульный синглтон, а Semaphore
+        привязывается к текущему event loop. Создание в __init__ на импорте
+        привязало бы его к чужому (или ещё не существующему) циклу.
+        """
+        if self._smartlab_sem is None:
+            self._smartlab_sem = asyncio.Semaphore(self.SMARTLAB_CONCURRENCY)
+        return self._smartlab_sem
 
     def _get_http(self) -> httpx.AsyncClient:
         """Один переиспользуемый HTTP-клиент на процесс.
@@ -1004,7 +1030,10 @@ class MOEXService:
         for attempt in range(len(SMARTLAB_RETRY_DELAYS) + 1):
             try:
                 client = self._get_http()
-                response = await client.get(url, headers=headers, timeout=8)
+                # Ограничитель охватывает только сетевой вызов: попадание в
+                # кэш (проверено выше) очереди не ждёт.
+                async with self._get_smartlab_sem():
+                    response = await client.get(url, headers=headers, timeout=8)
                 response.raise_for_status()
                 html = response.text
                 break
