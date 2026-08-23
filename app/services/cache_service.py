@@ -24,6 +24,12 @@ class PortfolioCache:
 
 
 class CacheService:
+    # Сколько портфелей обновляется одновременно в фоновом цикле. Внутри
+    # каждого — Semaphore(8) на бумаги, значит суммарный параллелизм
+    # запросов к MOEX равен REFRESH_CONCURRENCY × 8 и должен укладываться
+    # в max_connections общего HTTP-клиента (32).
+    REFRESH_CONCURRENCY = 4
+
     def __init__(self) -> None:
         self._caches: dict[int, PortfolioCache] = {}  # portfolio_id -> cache
         self._refresh_task: asyncio.Task[None] | None = None
@@ -195,13 +201,24 @@ class CacheService:
             try:
                 portfolio_ids = list(self._caches.keys())
                 if portfolio_ids:
+                    # Портфели обновляются пачками, а не все разом. Внутри
+                    # каждого свой Semaphore(8) на бумаги, поэтому gather по
+                    # всем 136 портфелям давал до 1088 одновременных запросов
+                    # к MOEX. Пока у каждого запроса был свой AsyncClient со
+                    # своим пулом, это сходило с рук; с общим клиентом
+                    # (9ac8f44, max_connections=32) очередь за соединением
+                    # стала упираться в таймаут: 38302 PoolTimeout за сутки.
+                    # 4 портфеля × 8 бумаг = 32 — ровно под размер пула.
+                    sem = asyncio.Semaphore(self.REFRESH_CONCURRENCY)
+
                     async def _refresh_one(pid: int) -> None:
-                        try:
-                            await self.refresh(pid)
-                        except Exception:
-                            logger.exception(
-                                "Background refresh error for portfolio_id=%d", pid
-                            )
+                        async with sem:
+                            try:
+                                await self.refresh(pid)
+                            except Exception:
+                                logger.exception(
+                                    "Background refresh error for portfolio_id=%d", pid
+                                )
                     await asyncio.gather(*(_refresh_one(pid) for pid in portfolio_ids))
             except Exception:
                 logger.exception("Background cache refresh error")

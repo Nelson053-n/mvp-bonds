@@ -232,7 +232,11 @@ class MOEXService:
         if self._http is None or self._http.is_closed:
             self._http = httpx.AsyncClient(
                 timeout=httpx.Timeout(15.0, connect=10.0),
-                limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
+                # Пул с запасом: фоновый цикл держит до
+                # CacheService.REFRESH_CONCURRENCY × 8 = 32 соединений, а
+                # сверху приходят запросы пользователей и ночной обход.
+                # При 32 упирались в очередь → 38302 PoolTimeout за сутки.
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
                 headers={"User-Agent": self._UA},
             )
         return self._http
