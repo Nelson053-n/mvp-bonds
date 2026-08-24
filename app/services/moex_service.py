@@ -173,6 +173,22 @@ class MOEXService:
     # 429 уже на трёх параллельных (b363040), поэтому 2.
     SMARTLAB_CONCURRENCY = 2
 
+    # Минимальный интервал МЕЖДУ запросами к SmartLab (секунды).
+    #
+    # Одного семафора мало: он ограничивает одновременность, а SmartLab режет
+    # по ЧАСТОТЕ. Замер на проде 24.08: обход прошёл 732 тикера за 51с — это
+    # ~14 запросов/с при лимите 2 одновременных, и первая 429 прилетела уже
+    # на седьмом запросе. Два потока подряд шлют столько же в минуту, сколько
+    # и пять, просто ровнее — поэтому 148 запросов исчерпывали ретраи.
+    #
+    # 0.25с → не более 4 запросов/с. Обход 732 тикеров займёт ~3 минуты
+    # вместо 51с; для ночной задачи в 03:00 это не имеет значения.
+    SMARTLAB_MIN_INTERVAL = 0.25
+
+    # Пауза после явного 429: повтор через 0.5с прилетал в тот же закрытый
+    # лимит. Отодвигает и общий слот, чтобы притормозили все вызывающие.
+    SMARTLAB_RATE_LIMIT_BACKOFF = 3.0
+
     _UA = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -193,6 +209,8 @@ class MOEXService:
         }
         self._http: httpx.AsyncClient | None = None
         self._smartlab_sem: asyncio.Semaphore | None = None
+        self._smartlab_gate: asyncio.Lock | None = None
+        self._smartlab_next_at: float = 0.0
 
     def _get_smartlab_sem(self) -> asyncio.Semaphore:
         """Ограничитель параллельных запросов к SmartLab — общий на процесс.
@@ -214,6 +232,29 @@ class MOEXService:
         if self._smartlab_sem is None:
             self._smartlab_sem = asyncio.Semaphore(self.SMARTLAB_CONCURRENCY)
         return self._smartlab_sem
+
+    async def _smartlab_throttle(self) -> None:
+        """Выдержать SMARTLAB_MIN_INTERVAL с прошлого запроса к SmartLab.
+
+        Семафор ограничивает ОДНОВРЕМЕННОСТЬ, а SmartLab режет по ЧАСТОТЕ —
+        поэтому нужен ещё и интервал. Держим общее на процесс время
+        следующего разрешённого запроса; каждый вызывающий сдвигает его на
+        интервал вперёд и спит до своего слота. Так запросы выстраиваются в
+        ровный поток вместо пачки, даже когда их шлют разные задачи.
+
+        Lock создаётся лениво по той же причине, что и семафор: примитивы
+        asyncio привязываются к текущему event loop, а сервис — модульный
+        синглтон, живущий с момента импорта.
+        """
+        if self._smartlab_gate is None:
+            self._smartlab_gate = asyncio.Lock()
+        async with self._smartlab_gate:
+            now = asyncio.get_running_loop().time()
+            wait = self._smartlab_next_at - now
+            # Первый запрос после паузы не ждёт: слот в прошлом.
+            self._smartlab_next_at = max(now, self._smartlab_next_at) + self.SMARTLAB_MIN_INTERVAL
+        if wait > 0:
+            await asyncio.sleep(wait)
 
     def _get_http(self) -> httpx.AsyncClient:
         """Один переиспользуемый HTTP-клиент на процесс.
@@ -1034,6 +1075,9 @@ class MOEXService:
         for attempt in range(len(SMARTLAB_RETRY_DELAYS) + 1):
             try:
                 client = self._get_http()
+                # Пауза ДО захвата семафора: спящий запрос не должен занимать
+                # слот и блокировать соседей.
+                await self._smartlab_throttle()
                 # Ограничитель охватывает только сетевой вызов: попадание в
                 # кэш (проверено выше) очереди не ждёт.
                 async with self._get_smartlab_sem():
@@ -1055,7 +1099,20 @@ class MOEXService:
                         "SmartLab HTTP %s for %s (attempt %d) — retrying",
                         code, secid, attempt + 1,
                     )
-                    await asyncio.sleep(SMARTLAB_RETRY_DELAYS[attempt])
+                    delay = SMARTLAB_RETRY_DELAYS[attempt]
+                    if code == 429:
+                        # Сайт прямо говорит «слишком часто» — фиксированных
+                        # 0.5/1.5с мало, иначе повтор прилетает в тот же
+                        # закрытый лимит и тратит попытку впустую (24.08:
+                        # 148 запросов исчерпали ретраи, 234 из 442 повторов
+                        # снова получили 429). Ждём заметно дольше и заодно
+                        # отодвигаем общий слот, чтобы притормозили все.
+                        delay = max(delay, self.SMARTLAB_RATE_LIMIT_BACKOFF)
+                        loop = asyncio.get_running_loop()
+                        self._smartlab_next_at = max(
+                            self._smartlab_next_at, loop.time() + delay
+                        )
+                    await asyncio.sleep(delay)
                     continue
                 src.record_error(code, f"HTTP {code}")
                 logger.warning("SmartLab HTTP error %s for %s", code, secid)
