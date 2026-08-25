@@ -204,6 +204,21 @@ class UsersMixin:
             conn.commit()
             return int(cursor.rowcount)
 
+    def clear_tg_chat_id(self, tg_chat_id: str) -> int:
+        """Снять подписку у всех, у кого этот chat_id: бот заблокирован.
+
+        Гасим по chat_id, а не по user_id: вызывающий (отправка) знает только
+        адрес. Возвращает число затронутых строк — 0 означает, что адрес уже
+        снят или принадлежит не пользователю, а глобальным настройкам.
+        """
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET tg_chat_id = NULL WHERE tg_chat_id = ?",
+                (tg_chat_id,),
+            )
+            conn.commit()
+            return int(cursor.rowcount)
+
     def get_user_by_username_for_reset(self, username: str) -> dict | None:
         """Returns minimal user info for password reset (email, tg_chat_id)."""
         with self._connect() as conn:

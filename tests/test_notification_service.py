@@ -747,3 +747,93 @@ class TestTelegramRetry:
         )
         assert ok is True
         assert calls["n"] == 2
+
+
+class TestUnsubscribeOn403:
+    """403 = бот заблокирован: адрес недоставляем, подписку надо снять.
+
+    Без этого купонные напоминания уходят в стену каждые 6 часов —
+    на проде так копилось по 8 WARNING в сутки на одного заблокировавшего.
+    """
+
+    @pytest.fixture
+    def svc(self):
+        return NotificationService()
+
+    _BLOCKED = '{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked by the user"}'
+
+    async def test_403_clears_subscription(self, monkeypatch, svc):
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        _patch_client(monkeypatch, response=_FakeResp(403, self._BLOCKED))
+
+        assert await svc.send_telegram("tok", "chat42", "hi") is False
+        assert cleared == ["chat42"]
+
+    async def test_403_on_coupon_path_clears_too(self, monkeypatch, svc):
+        """Купонные напоминания идут мимо send_telegram — тоже должны гасить."""
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        _patch_client(monkeypatch, response=_FakeResp(403, self._BLOCKED))
+
+        ok = await svc._send_coupon_telegram(
+            "tok", "chat7", "Портфель", "RU000A10EQD0", "2026-09-01", 10.0, 5
+        )
+        assert ok is False
+        assert cleared == ["chat7"]
+
+    async def test_other_errors_keep_subscription(self, monkeypatch, svc):
+        """400/429 — не повод отписывать: адрес рабочий."""
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        for code in (400, 429, 500):
+            _patch_client(monkeypatch, response=_FakeResp(code, "err"))
+            await svc.send_telegram("tok", "chat42", "hi")
+        assert cleared == []
+
+    async def test_storage_failure_does_not_break_send(self, monkeypatch, svc):
+        """Сбой БД при гашении не должен ронять фоновую задачу отправки."""
+        from app.services.storage_service import storage_service
+
+        def boom(chat_id):
+            raise RuntimeError("db locked")
+
+        monkeypatch.setattr(storage_service, "clear_tg_chat_id", boom)
+        _patch_client(monkeypatch, response=_FakeResp(403, self._BLOCKED))
+        assert await svc.send_telegram("tok", "chat42", "hi") is False
+
+    def test_clear_tg_chat_id_hits_only_matching_user(self):
+        """SQL-уровень: гасим ровно того, у кого этот адрес."""
+        from app.services.storage_service import storage_service
+
+        uid = storage_service.create_user("blocked_user_403", "pw-hash")
+        other = storage_service.create_user("kept_user_403", "pw-hash")
+        storage_service.update_user_tg_chat_id(uid, "chat-blocked")
+        storage_service.update_user_tg_chat_id(other, "chat-kept")
+
+        assert storage_service.clear_tg_chat_id("chat-blocked") == 1
+        assert storage_service.get_user_by_id(uid)["tg_chat_id"] is None
+        assert storage_service.get_user_by_id(other)["tg_chat_id"] == "chat-kept"
+
+    def test_admin_alert_channel_survives(self):
+        """app_settings.tg_chat_id — админский канал алертов, его не трогаем."""
+        from app.services.storage_service import storage_service
+
+        storage_service.set_setting("tg_chat_id", "admin-chat")
+        storage_service.clear_tg_chat_id("admin-chat")
+        assert storage_service.get_all_settings()["tg_chat_id"] == "admin-chat"
