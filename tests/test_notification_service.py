@@ -750,10 +750,11 @@ class TestTelegramRetry:
 
 
 class TestUnsubscribeOn403:
-    """403 = бот заблокирован: адрес недоставляем, подписку надо снять.
+    """Недоставляемый адрес — подписку надо снять.
 
-    Без этого купонные напоминания уходят в стену каждые 6 часов —
-    на проде так копилось по 8 WARNING в сутки на одного заблокировавшего.
+    Два случая: 403 «bot was blocked» и 400 «chat not found» (чат удалён
+    или id сменился). Без этого купонные напоминания уходят в стену каждые
+    6 часов — на проде так копилось по 8 WARNING в сутки на одного.
     """
 
     @pytest.fixture
@@ -792,8 +793,12 @@ class TestUnsubscribeOn403:
         assert ok is False
         assert cleared == ["chat7"]
 
-    async def test_other_errors_keep_subscription(self, monkeypatch, svc):
-        """400/429 — не повод отписывать: адрес рабочий."""
+    _NOT_FOUND = '{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}'
+    _BAD_MARKUP = ('{"ok":false,"error_code":400,'
+                   '"description":"Bad Request: can\'t parse entities"}')
+
+    async def test_400_chat_not_found_clears_subscription(self, monkeypatch, svc):
+        """«chat not found» — адрес мёртв так же, как при блокировке."""
         from app.services.storage_service import storage_service
 
         cleared = []
@@ -801,7 +806,53 @@ class TestUnsubscribeOn403:
             storage_service, "clear_tg_chat_id",
             lambda chat_id: cleared.append(chat_id) or 1,
         )
-        for code in (400, 429, 500):
+        _patch_client(monkeypatch, response=_FakeResp(400, self._NOT_FOUND))
+
+        assert await svc.send_telegram("tok", "chat42", "hi") is False
+        assert cleared == ["chat42"]
+
+    async def test_400_chat_not_found_on_coupon_path_clears_too(
+        self, monkeypatch, svc
+    ):
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        _patch_client(monkeypatch, response=_FakeResp(400, self._NOT_FOUND))
+
+        ok = await svc._send_coupon_telegram(
+            "tok", "chat7", "Портфель", "RU000A10EQD0", "2026-09-01", 10.0, 5
+        )
+        assert ok is False
+        assert cleared == ["chat7"]
+
+    async def test_400_bad_markup_keeps_subscription(self, monkeypatch, svc):
+        """Кривая разметка — НАШ баг, адрес рабочий. Отписывать нельзя."""
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        _patch_client(monkeypatch, response=_FakeResp(400, self._BAD_MARKUP))
+
+        await svc.send_telegram("tok", "chat42", "hi")
+        assert cleared == []
+
+    async def test_other_errors_keep_subscription(self, monkeypatch, svc):
+        """429/5xx — не повод отписывать: адрес рабочий."""
+        from app.services.storage_service import storage_service
+
+        cleared = []
+        monkeypatch.setattr(
+            storage_service, "clear_tg_chat_id",
+            lambda chat_id: cleared.append(chat_id) or 1,
+        )
+        for code in (429, 500):
             _patch_client(monkeypatch, response=_FakeResp(code, "err"))
             await svc.send_telegram("tok", "chat42", "hi")
         assert cleared == []

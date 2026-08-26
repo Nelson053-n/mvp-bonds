@@ -56,12 +56,13 @@ def _is_real_rating_change(
 
 
 class NotificationService:
-    def _disable_subscription(self, chat_id: str | None, what: str) -> None:
-        """Снять подписку после 403: бот заблокирован, слать туда больше нечего.
+    def _disable_subscription(self, chat_id: str | None, what: str,
+                              reason: str) -> None:
+        """Снять подписку: адрес недоставляем, слать туда больше нечего.
 
-        Telegram отдаёт 403 не только на блокировку (бывает «chat not found»
-        для удалённого аккаунта), но исход один: адрес недоставляем, и без
-        сброса купонные напоминания уходят в стену каждые 6 часов.
+        Два случая ведут сюда — 403 «bot was blocked» и 400 «chat not found»
+        (чат удалён или id сменился). Исход один: без сброса купонные
+        напоминания уходят в стену каждые 6 часов.
 
         Глобальный app_settings.tg_chat_id не трогаем — это админский канал
         алертов о сбоях фоновых задач, потерять его молча дороже, чем
@@ -74,12 +75,14 @@ class NotificationService:
         try:
             rows = storage_service.clear_tg_chat_id(str(chat_id))
         except Exception:
-            logger.exception("Failed to clear tg_chat_id after 403 (%s)", what)
+            logger.exception(
+                "Failed to clear tg_chat_id after %s (%s)", reason, what,
+            )
             return
         if rows:
             logger.warning(
-                "AUDIT tg_unsubscribe: chat_id=%s users=%d reason=403 (%s)",
-                chat_id, rows, what,
+                "AUDIT tg_unsubscribe: chat_id=%s users=%d reason=%s (%s)",
+                chat_id, rows, reason, what,
             )
 
     async def _post_telegram(self, token: str, payload: dict, what: str) -> bool:
@@ -103,7 +106,18 @@ class NotificationService:
                         resp.status_code, what, resp.text[:200],
                     )
                     if resp.status_code == 403:
-                        self._disable_subscription(payload.get("chat_id"), what)
+                        self._disable_subscription(
+                            payload.get("chat_id"), what, "403",
+                        )
+                    elif (resp.status_code == 400
+                            and "chat not found" in resp.text.lower()):
+                        # Только этот 400: остальные (кривая разметка, слишком
+                        # длинное сообщение) — наш баг, адрес при них рабочий,
+                        # и снимать по ним подписку значит наказать
+                        # пользователя за нашу ошибку.
+                        self._disable_subscription(
+                            payload.get("chat_id"), what, "400_chat_not_found",
+                        )
                     return False
                 return True
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout,
