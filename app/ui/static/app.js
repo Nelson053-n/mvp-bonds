@@ -7468,6 +7468,12 @@
         const tgId = document.getElementById('acc-tg-chat').value.trim();
         const st = document.getElementById('acc-tg-status');
         if (!tgId) { st.textContent = t('settings.account.tgRequired'); st.className = 'status error'; return; }
+        // @username Bot API не принимает: sendMessage вернёт «chat not found».
+        if (!/^-?\d{1,32}$/.test(tgId)) {
+          st.textContent = t('settings.account.tgNotNumeric', 'Chat ID — это число, а не @username');
+          st.className = 'status error';
+          return;
+        }
         try {
           const r = await apiFetch('/auth/me/telegram', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tg_chat_id: tgId }) });
           if (r.status === 204) { st.textContent = t('settings.account.tgSaved'); st.className = 'status ok'; }

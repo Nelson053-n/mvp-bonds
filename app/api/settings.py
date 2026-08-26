@@ -1,5 +1,7 @@
+import re
+
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_current_user, get_admin_user
 from app.services.storage_service import storage_service
@@ -7,12 +9,32 @@ from app.services.notification_service import notification_service
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# Telegram chat_id: число, для групп/каналов со знаком минус.
+_CHAT_ID_RE = re.compile(r"-?\d{1,32}")
+
 
 class NotificationSettings(BaseModel):
     tg_bot_token: str = Field(default="", max_length=200)
     tg_chat_id: str = Field(default="", max_length=64)
     price_drop_threshold: float = Field(default=5.0, ge=0.1, le=100.0)
     tg_lang: str = Field(default="ru", pattern="^(ru|en)$")
+
+    @field_validator("tg_chat_id")
+    @classmethod
+    def _numeric_chat_id(cls, v: str) -> str:
+        """Chat ID — только число: @username Bot API не принимает.
+
+        Пустая строка допустима — это отключение канала алертов.
+        """
+        v = v.strip()
+        if not v:
+            return v
+        if not _CHAT_ID_RE.fullmatch(v):
+            raise ValueError(
+                "Chat ID — это число (например -100123456789), а не @username. "
+                "Узнать ID: напишите @userinfobot в Telegram."
+            )
+        return v
 
 
 class PersonalNotificationsInput(BaseModel):

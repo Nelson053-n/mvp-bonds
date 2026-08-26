@@ -3,8 +3,10 @@ Authentication API routes: register, login, get current user.
 """
 
 import logging
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_current_user
 from app.exceptions import AuthError
@@ -13,6 +15,9 @@ from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Telegram chat_id: число, для групп/каналов со знаком минус.
+_CHAT_ID_RE = re.compile(r"-?\d{1,32}")
 
 
 class RegisterInput(BaseModel):
@@ -151,6 +156,25 @@ async def get_my_portfolios_stats(
 
 class UpdateTelegramInput(BaseModel):
     tg_chat_id: str = Field(..., max_length=64)
+
+    @field_validator("tg_chat_id")
+    @classmethod
+    def _numeric_chat_id(cls, v: str) -> str:
+        """Chat ID — только число: @username Bot API не принимает.
+
+        Введённый «@user» уходил в sendMessage как есть и возвращал 400
+        «chat not found» при каждой рассылке, а сам адрес молча оставался
+        в базе. Пустая строка допустима — это отвязка Telegram.
+        """
+        v = v.strip()
+        if not v:
+            return v
+        if not _CHAT_ID_RE.fullmatch(v):
+            raise ValueError(
+                "Chat ID — это число (например 123456789), а не @username. "
+                "Узнать свой ID: напишите @userinfobot в Telegram."
+            )
+        return v
 
 
 @router.post("/me/telegram", status_code=status.HTTP_204_NO_CONTENT)
