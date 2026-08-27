@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=115">
+    <link rel="stylesheet" href="/static/styles.css?v=116">
   </head>
   <body>
 
@@ -120,6 +120,23 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button id="sold-banner-sync-btn" class="btn" style="font-size:12px;height:28px;padding:0 12px;background:var(--red-600);border-color:var(--red-600);">Привести к виду брокера</button>
                 <button id="sold-banner-keep-btn" class="btn btn-secondary" style="font-size:12px;height:28px;padding:0 12px;">Оставить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telegram отвязан нами: в поле лежал @username вместо числового ID -->
+        <div id="tg-reset-banner" style="display:none;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <span style="font-size:18px;line-height:1;">✈️</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px;" data-i18n="tgReset.title">Telegram отключён</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;word-break:break-word;" data-i18n="tgReset.text">
+                В настройках был указан @username, а Telegram принимает только числовой ID — уведомления и восстановление пароля не работали. Укажите числовой ID: напишите @userinfobot, он пришлёт ваш.
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="tg-reset-fix-btn" class="btn" style="font-size:12px;height:28px;padding:0 12px;" data-i18n="tgReset.fix">Указать ID</button>
+                <button id="tg-reset-dismiss-btn" class="btn btn-secondary" style="font-size:12px;height:28px;padding:0 12px;" data-i18n="tgReset.dismiss">Скрыть</button>
               </div>
             </div>
           </div>
@@ -1439,8 +1456,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=115"></script>
-    <script src="/static/app.js?v=115"></script>
+    <script src="/static/translations.js?v=116"></script>
+    <script src="/static/app.js?v=116"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

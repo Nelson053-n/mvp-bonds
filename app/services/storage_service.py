@@ -247,6 +247,16 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         except sqlite3.OperationalError:
             pass
 
+        # Telegram отвязан не пользователем, а нами: в поле лежал @username,
+        # который Bot API не резолвит. Флаг нужен, чтобы показать баннер именно
+        # им, а не всем, кто Telegram просто никогда не подключал.
+        try:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN tg_chat_id_reset INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
+
         # Pro tier (freemium). is_pro flag + optional expiry (ISO date/None=lifetime).
         # On first add, grant Pro to all existing (early-adopter) users.
         try:

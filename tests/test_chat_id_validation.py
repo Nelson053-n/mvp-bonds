@@ -94,3 +94,65 @@ class TestEndpointRejects:
             headers=auth_headers,
         )
         assert r.status_code == 204
+
+
+class TestResetFlag:
+    """tg_chat_id_reset отличает «отвязали за него» от «никогда не подключал».
+
+    Без флага баннер пришлось бы показывать всем, у кого пустой chat_id —
+    то есть большинству пользователей, ни разу не трогавших Telegram.
+    """
+
+    def test_auto_clear_raises_flag(self) -> None:
+        """Снятие подписки по 403/400 помечает пользователя."""
+        from app.services.storage_service import storage_service
+
+        storage_service.update_user_tg_chat_id(1, "@ls_lx")
+        assert storage_service.clear_tg_chat_id("@ls_lx") == 1
+
+        user = storage_service.get_user_by_id(1)
+        assert user["tg_chat_id"] is None
+        assert user["tg_chat_id_reset"] is True
+
+    def test_entering_valid_id_lowers_flag(self) -> None:
+        """Пользователь исправил ввод — баннер больше не нужен."""
+        from app.services.storage_service import storage_service
+
+        storage_service.update_user_tg_chat_id(1, "@ls_lx")
+        storage_service.clear_tg_chat_id("@ls_lx")
+        assert storage_service.get_user_by_id(1)["tg_chat_id_reset"] is True
+
+        storage_service.update_user_tg_chat_id(1, "555111222")
+        user = storage_service.get_user_by_id(1)
+        assert user["tg_chat_id"] == "555111222"
+        assert user["tg_chat_id_reset"] is False
+
+    def test_manual_unlink_keeps_flag_untouched(self) -> None:
+        """Обнуление ≠ ввод: флаг гасит только непустое значение.
+
+        Иначе автоснятие (оно тоже пишет NULL) сбрасывало бы собственный флаг.
+        """
+        from app.services.storage_service import storage_service
+
+        storage_service.update_user_tg_chat_id(1, "@ls_lx")
+        storage_service.clear_tg_chat_id("@ls_lx")
+        storage_service.update_user_tg_chat_id(1, None)
+        assert storage_service.get_user_by_id(1)["tg_chat_id_reset"] is True
+
+    async def test_api_exposes_flag(self, client, auth_headers) -> None:
+        from app.services.storage_service import storage_service
+
+        storage_service.update_user_tg_chat_id(1, "@ls_lx")
+        storage_service.clear_tg_chat_id("@ls_lx")
+
+        r = await client.get("/auth/me/portfolios-stats", headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json()["tg_chat_id_reset"] is True
+
+    async def test_flag_false_for_untouched_user(self, client, auth_headers) -> None:
+        """Тот, кого не трогали, баннер видеть не должен."""
+        from app.services.storage_service import storage_service
+
+        storage_service.update_user_tg_chat_id(1, "123456789")
+        r = await client.get("/auth/me/portfolios-stats", headers=auth_headers)
+        assert r.json()["tg_chat_id_reset"] is False

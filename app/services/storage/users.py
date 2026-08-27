@@ -59,7 +59,7 @@ class UsersMixin:
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, is_pro, pro_until FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, is_pro, pro_until, tg_chat_id_reset FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -75,6 +75,7 @@ class UsersMixin:
             "tg_chat_id": row[6],
             "is_pro": _pro_active(row[7], row[8]),
             "pro_until": row[8],
+            "tg_chat_id_reset": bool(row[9]),
         }
 
     def get_all_users(self) -> list[dict]:
@@ -196,11 +197,22 @@ class UsersMixin:
             return True
 
     def update_user_tg_chat_id(self, user_id: int, tg_chat_id: str | None) -> int:
+        """Записать chat_id пользователя; ввод нового гасит флаг-баннер.
+
+        Сброс флага только при непустом значении: обнуление приходит и из
+        автоматического снятия подписки, где баннер как раз нужен показать.
+        """
         with self._connect() as conn:
-            cursor = conn.execute(
-                "UPDATE users SET tg_chat_id = ? WHERE id = ?",
-                (tg_chat_id, user_id),
-            )
+            if tg_chat_id:
+                cursor = conn.execute(
+                    "UPDATE users SET tg_chat_id = ?, tg_chat_id_reset = 0 WHERE id = ?",
+                    (tg_chat_id, user_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "UPDATE users SET tg_chat_id = ? WHERE id = ?",
+                    (tg_chat_id, user_id),
+                )
             conn.commit()
             return int(cursor.rowcount)
 
@@ -210,10 +222,13 @@ class UsersMixin:
         Гасим по chat_id, а не по user_id: вызывающий (отправка) знает только
         адрес. Возвращает число затронутых строк — 0 означает, что адрес уже
         снят или принадлежит не пользователю, а глобальным настройкам.
+
+        Ставим tg_chat_id_reset: отвязали не по воле пользователя, и он должен
+        увидеть в интерфейсе, почему уведомления перестали приходить.
         """
         with self._connect() as conn:
             cursor = conn.execute(
-                "UPDATE users SET tg_chat_id = NULL WHERE tg_chat_id = ?",
+                "UPDATE users SET tg_chat_id = NULL, tg_chat_id_reset = 1 WHERE tg_chat_id = ?",
                 (tg_chat_id,),
             )
             conn.commit()

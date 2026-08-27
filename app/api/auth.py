@@ -150,6 +150,8 @@ async def get_my_portfolios_stats(
     return {
         "email": user.get("email") if user else None,
         "tg_chat_id": user.get("tg_chat_id") if user else None,
+        # Telegram отвязали мы, а не пользователь: фронт показывает баннер.
+        "tg_chat_id_reset": bool(user.get("tg_chat_id_reset")) if user else False,
         "portfolios": portfolios,
     }
 

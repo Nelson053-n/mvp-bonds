@@ -4692,6 +4692,7 @@
           loadDonateLink();
           showDashboard();
           await loadPortfolios();
+          if (window.checkTgResetBanner) window.checkTgResetBanner();
           // Calculate total value of all portfolios (non-blocking)
           if (portfolios.length > 1) {
             calculateAllPortfoliosTotal().then(val => {
@@ -7484,6 +7485,40 @@
       // Load account on settings tab open
       document.querySelector('[data-panel="panel-settings"]')?.addEventListener('click', () => {
         setTimeout(settingsLoadAccount, 100);
+      });
+
+      // ── БАННЕР «Telegram отвязан» ────────────────────────────────
+      // Показывается тем, у кого в поле лежал @username: Bot API его не
+      // резолвит, адрес обнулили за них. Скрытие запоминаем локально —
+      // серверный флаг гаснет, только когда введён рабочий ID.
+      const TG_RESET_DISMISS_KEY = 'mvp_tg_reset_dismissed';
+
+      window.checkTgResetBanner = checkTgResetBanner;
+      async function checkTgResetBanner() {
+        const banner = document.getElementById('tg-reset-banner');
+        if (!banner) return;
+        if (localStorage.getItem(TG_RESET_DISMISS_KEY) === '1') return;
+        try {
+          const r = await apiFetch('/auth/me/portfolios-stats');
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d.tg_chat_id_reset) banner.style.display = '';
+        } catch (e) {}
+      }
+
+      document.getElementById('tg-reset-fix-btn')?.addEventListener('click', () => {
+        document.getElementById('tg-reset-banner').style.display = 'none';
+        showPanel('panel-settings');
+        document.querySelector('.stab-btn[data-stab="stab-account"]')?.click();
+        setTimeout(() => {
+          const inp = document.getElementById('acc-tg-chat');
+          if (inp) { inp.focus(); inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+        }, 150);
+      });
+
+      document.getElementById('tg-reset-dismiss-btn')?.addEventListener('click', () => {
+        localStorage.setItem(TG_RESET_DISMISS_KEY, '1');
+        document.getElementById('tg-reset-banner').style.display = 'none';
       });
 
       // ── WATCHLIST ─────────────────────────────────────────────────
