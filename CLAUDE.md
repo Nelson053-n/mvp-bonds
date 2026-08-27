@@ -78,7 +78,11 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 **Audit logging:** All data mutations logged at INFO level with `AUDIT` prefix: `AUDIT add_item`, `AUDIT delete_item`, `AUDIT update_item`, `AUDIT restore_item`, etc. Includes affected IDs, field changes, and result counts.
 
-**Schema migrations:** Inline in `storage_service._ensure_db()` — no migration files. Pattern: `ALTER TABLE ... ADD COLUMN` wrapped in `try/except OperationalError: pass`. New tables created with `IF NOT EXISTS`.
+**Schema migrations:** Versioned, no migration files. `storage_service.SCHEMA_VERSION` + `_run_migrations()` holding a `(N, self._migration_vN)` list; each step is idempotent (`IF NOT EXISTS` / `try/except OperationalError: pass`) and gets its own `conn.commit()`.
+
+To add a column: bump `SCHEMA_VERSION`, append the pair, write `_migration_vN(conn)`. Do NOT add `ALTER TABLE` to the older block inside `_ensure_db()` — nothing commits after it, so the DDL is rolled back when the connection closes and the column silently never appears.
+
+Note the deploy interaction: migrations run in the lifespan startup, and the default graceful-reload (SIGHUP) does not re-run it. A new column needs `systemctl restart bondai` (or `DEPLOY_FORCE_RESTART=1 ops/deploy.sh`).
 
 **LLM mode:** Controlled by `MVP_LLM_MODE` env var (`stub` or `openai`). Tests always use `stub`.
 
