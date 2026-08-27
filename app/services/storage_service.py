@@ -123,7 +123,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 6
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -163,6 +163,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (3, self._migration_v3),
             (4, self._migration_v4),
             (5, self._migration_v5),
+            (6, self._migration_v6),
         ]
 
         for version, migrate in migrations:
@@ -244,16 +245,6 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
         try:
             conn.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
-        except sqlite3.OperationalError:
-            pass
-
-        # Telegram отвязан не пользователем, а нами: в поле лежал @username,
-        # который Bot API не резолвит. Флаг нужен, чтобы показать баннер именно
-        # им, а не всем, кто Telegram просто никогда не подключал.
-        try:
-            conn.execute(
-                "ALTER TABLE users ADD COLUMN tg_chat_id_reset INTEGER NOT NULL DEFAULT 0"
-            )
         except sqlite3.OperationalError:
             pass
 
@@ -569,6 +560,21 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             """
         )
+
+    def _migration_v6(self, conn: sqlite3.Connection) -> None:
+        """v6 — флаг «Telegram отвязали за пользователя, а не он сам».
+
+        В поле лежал @username, который Bot API не резолвит; адрес обнулили,
+        и человеку надо показать в интерфейсе, почему уведомления пропали.
+        Отличает его от большинства, у кого chat_id пуст просто потому, что
+        Telegram никогда не подключали. Идемпотентна.
+        """
+        try:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN tg_chat_id_reset INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
 
     def _write_bootstrap_admin_password(self, password: str) -> None:
         """Write the bootstrap admin password to a 0600 file next to the DB.
