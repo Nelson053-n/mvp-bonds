@@ -81,4 +81,48 @@ if [ "$code" != "200" ]; then
   echo "✗ health-check вернул $code (ожидался 200) — проверь journalctl -u bondai"
   exit 1
 fi
+
+# Health по / не трогает БД: это публичная страница. 27.08 сломанная миграция
+# оставила код читать несуществующую колонку users.tg_chat_id_reset — импорт
+# прошёл, health прошёл, а /auth/me три часа отдавал 500 (81 отказ).
+#
+# Дёргаем путь, который реально читает users, сервисным JWT. Без токена
+# проверка бессмысленна: get_current_user отсекает запрос до похода в БД.
+echo "▶ smoke-запрос к БД (/auth/me/portfolios-stats)…"
+DB_PROBE="$(.venv/bin/python3 - <<'PYEOF' 2>&1
+import sqlite3, urllib.error, urllib.request
+from app.config import settings
+from app.services.auth_service import auth_service
+
+con = sqlite3.connect(f"file:{settings.sqlite_db_path}?mode=ro", uri=True)
+row = con.execute("SELECT id, username FROM users ORDER BY id LIMIT 1").fetchone()
+if not row:
+    print("SKIP таблица users пуста")
+    raise SystemExit
+token = auth_service.create_token(row[0], row[1], False)
+req = urllib.request.Request(
+    "http://127.0.0.1:8002/auth/me/portfolios-stats",
+    headers={"Authorization": f"Bearer {token}"},
+)
+try:
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        print(f"OK HTTP {resp.status}")
+except urllib.error.HTTPError as exc:
+    # 4xx — путь жив, отвечает осмысленно. 5xx — код и схема разошлись.
+    print(f"{'FAIL' if exc.code >= 500 else 'OK'} HTTP {exc.code}")
+except Exception as exc:
+    print(f"FAIL {type(exc).__name__}: {exc}")
+PYEOF
+)"
+echo "  $DB_PROBE"
+case "$DB_PROBE" in
+  OK*|SKIP*) ;;
+  *)
+    echo "✗ ПУТЬ К БД ОТВЕЧАЕТ ОШИБКОЙ — откатываю на $PREV_HEAD и перезапускаю"
+    git reset --hard "$PREV_HEAD"
+    systemctl restart bondai
+    exit 1
+    ;;
+esac
+
 echo "✓ деплой ок: HTTP $code, HEAD $NEW_HEAD"

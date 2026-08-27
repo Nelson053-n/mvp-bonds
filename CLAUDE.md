@@ -82,7 +82,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 
 To add a column: bump `SCHEMA_VERSION`, append the pair, write `_migration_vN(conn)`. Do NOT add `ALTER TABLE` to the older block inside `_ensure_db()` — nothing commits after it, so the DDL is rolled back when the connection closes and the column silently never appears.
 
-Note the deploy interaction: migrations run in the lifespan startup, and the default graceful-reload (SIGHUP) does not re-run it. A new column needs `systemctl restart bondai` (or `DEPLOY_FORCE_RESTART=1 ops/deploy.sh`).
+Deploy applies them automatically: `ops/deploy.sh` runs `python -c 'import app.main'` as its smoke gate, and that import constructs `storage_service`, so `_run_migrations` executes there — before the workers are reloaded. No manual restart needed.
 
 **LLM mode:** Controlled by `MVP_LLM_MODE` env var (`stub` or `openai`). Tests always use `stub`.
 
