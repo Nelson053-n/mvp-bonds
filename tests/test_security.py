@@ -97,6 +97,38 @@ class TestAuthFlow:
         )
         assert r.status_code in (400, 401, 403)
 
+    async def test_login_password_over_72_bytes(self, client: AsyncClient) -> None:
+        """Пароль длиннее 72 байт не роняет login в 500.
+
+        bcrypt кидает ValueError вместо усечения, и необработанный он уходил
+        из /auth/login как 500 (31.08 на проде). Проверяем оба исхода: верный
+        длинный пароль пускает, изменённый ПОСЛЕ 72-го байта — тоже (усечение
+        делает хвост незначимым), а расхождение внутри первых 72 байт — нет.
+        """
+        username = _uniq("long")
+        long_pass = "x" * 100
+        r = await client.post(
+            "/auth/register", json={"username": username, "password": long_pass}
+        )
+        assert r.status_code == 201
+
+        r = await client.post(
+            "/auth/login", json={"username": username, "password": long_pass}
+        )
+        assert r.status_code == 200
+
+        # Отличие за пределами 72 байт срезается вместе с хвостом.
+        r = await client.post(
+            "/auth/login", json={"username": username, "password": "x" * 72 + "y" * 28}
+        )
+        assert r.status_code == 200
+
+        # Отличие внутри значимых 72 байт по-прежнему отклоняется.
+        r = await client.post(
+            "/auth/login", json={"username": username, "password": "y" + "x" * 99}
+        )
+        assert r.status_code in (400, 401, 403)
+
     async def test_protected_endpoint_without_token(self, client: AsyncClient) -> None:
         """Protected endpoint returns 4xx without auth (401 or 403)."""
         r = await client.get("/portfolios")

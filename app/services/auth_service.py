@@ -19,6 +19,18 @@ from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
+# bcrypt отказывается работать с паролем длиннее 72 байт (ValueError), а не
+# молча его обрезает. Без явного среза длинный пароль на /auth/login давал 500
+# вместо 401 (31.08: 4 отказа с одного IP). Режем ровно там, где пароль уходит
+# в bcrypt, — и при хэшировании, и при проверке, иначе пользователь с длинным
+# паролем не смог бы войти под уже сохранённым хэшем.
+_BCRYPT_MAX_BYTES = 72
+
+
+def _bcrypt_bytes(password: str) -> bytes:
+    return password.encode()[:_BCRYPT_MAX_BYTES]
+
+
 # Precomputed bcrypt hash of an unguessable random secret; used to equalize
 # the cost of login attempts for non-existent usernames.
 _DUMMY_BCRYPT_HASH = bcrypt.hashpw(secrets.token_bytes(32), bcrypt.gensalt())
@@ -63,7 +75,7 @@ class AuthService:
         if not username or not password:
             raise AuthError("Имя пользователя и пароль обязательны")
 
-        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        password_hash = bcrypt.hashpw(_bcrypt_bytes(password), bcrypt.gensalt()).decode()
 
         try:
             user_id = storage_service.create_user(username, password_hash)
@@ -97,10 +109,10 @@ class AuthService:
         if not user:
             # Constant-time bcrypt path against a dummy hash so timing
             # doesn't disclose whether the username exists.
-            bcrypt.checkpw(password.encode(), _DUMMY_BCRYPT_HASH)
+            bcrypt.checkpw(_bcrypt_bytes(password), _DUMMY_BCRYPT_HASH)
             return None
 
-        if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        if not bcrypt.checkpw(_bcrypt_bytes(password), user["password_hash"].encode()):
             return None
 
         logger.info("User logged in: %s (id=%d)", username, user["id"])
@@ -141,9 +153,9 @@ class AuthService:
         user = storage_service.get_user_by_id(user_id)
         if not user:
             return False
-        if not bcrypt.checkpw(old_password.encode(), user["password_hash"].encode()):
+        if not bcrypt.checkpw(_bcrypt_bytes(old_password), user["password_hash"].encode()):
             return False
-        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        new_hash = bcrypt.hashpw(_bcrypt_bytes(new_password), bcrypt.gensalt()).decode()
         storage_service.update_user_password(user_id, new_hash)
         logger.info("Password changed for user_id=%d", user_id)
         return True
@@ -288,7 +300,7 @@ class AuthService:
         if user_id is None:
             return False
 
-        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        new_hash = bcrypt.hashpw(_bcrypt_bytes(new_password), bcrypt.gensalt()).decode()
         storage_service.update_user_password(user_id, new_hash)
         logger.info("Password reset for user_id=%d", user_id)
         return True

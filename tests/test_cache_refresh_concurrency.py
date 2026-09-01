@@ -53,17 +53,51 @@ class TestBackgroundRefreshConcurrency:
     async def test_concurrency_fits_connection_pool(self):
         """Суммарный параллелизм не должен превышать пул общего клиента.
 
-        REFRESH_CONCURRENCY × Semaphore(8) внутри портфеля — это и есть
-        нагрузка на пул httpx. Если кто-то поднимет лимит, не сверившись
-        с max_connections, вернётся PoolTimeout.
+        Считаем ЧЕСТНО, по соединениям, а не по бумагам: одна бумага в
+        get_bond_snapshot делает до 4 запросов (snapshot + последний купон +
+        рейтинг SmartLab + рейтинг MOEX), поэтому нагрузка на пул это
+        REFRESH_CONCURRENCY × Semaphore(8) × 4, а не × 8. Прежний вариант
+        теста сверял 4×8=32 с пулом 100 и пропускал реальные 128.
         """
-        import httpx
         from app.services.moex_service import moex_service
 
         client = moex_service._get_http()
         pool_limit = client._transport._pool._max_connections
-        per_portfolio = 8  # portfolio_service.get_table_fresh
-        assert CacheService.REFRESH_CONCURRENCY * per_portfolio <= pool_limit, (
-            f"{CacheService.REFRESH_CONCURRENCY}×{per_portfolio} не влезает "
-            f"в пул {pool_limit}"
+        per_portfolio = 8      # portfolio_service.get_table_fresh
+        per_instrument = 4     # HTTP-вызовов внутри get_bond_snapshot
+        peak = CacheService.REFRESH_CONCURRENCY * per_portfolio * per_instrument
+        assert peak <= pool_limit, (
+            f"{CacheService.REFRESH_CONCURRENCY}×{per_portfolio}×{per_instrument}"
+            f"={peak} не влезает в пул {pool_limit}"
+        )
+
+    async def test_keepalive_covers_peak_concurrency(self):
+        """max_keepalive должен покрывать пиковый параллелизм.
+
+        Соединения сверх max_keepalive закрываются сразу после ответа и
+        оседают в TIME-WAIT. На проде при keepalive=20 и пике 128 это дало
+        833 TIME-WAIT к iss.moex.com и PoolTimeout, растущий с аптаймом
+        (29.08: 0 → 31.08: 60224) при живом MOEX.
+        """
+        from app.services.moex_service import moex_service
+
+        pool = moex_service._get_http()._transport._pool
+        assert pool._max_keepalive_connections >= pool._max_connections, (
+            f"keepalive {pool._max_keepalive_connections} меньше пула "
+            f"{pool._max_connections}: избыток соединений уйдёт в TIME-WAIT"
+        )
+
+    async def test_fetch_does_not_override_pool_timeout(self):
+        """_fetch не должен передавать скалярный timeout в client.get.
+
+        httpx.Timeout(30) перетирает ВСЕ поля клиента, включая pool, — слот
+        в пуле ждали 30с вместо 15с, что вдвое дольше держало задачу и
+        разгоняло очередь.
+        """
+        import inspect
+        from app.services.moex_service import MOEXService
+
+        src = inspect.getsource(MOEXService._fetch)
+        assert "timeout=" not in src.split("client.get(")[1].split(")")[0], (
+            "client.get в _fetch снова со своим timeout — он перетрёт pool-таймаут"
         )

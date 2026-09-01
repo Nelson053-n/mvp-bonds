@@ -273,11 +273,22 @@ class MOEXService:
         if self._http is None or self._http.is_closed:
             self._http = httpx.AsyncClient(
                 timeout=httpx.Timeout(15.0, connect=10.0),
-                # Пул с запасом: фоновый цикл держит до
-                # CacheService.REFRESH_CONCURRENCY × 8 = 32 соединений, а
-                # сверху приходят запросы пользователей и ночной обход.
-                # При 32 упирались в очередь → 38302 PoolTimeout за сутки.
-                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+                # Считать пул надо по СОЕДИНЕНИЯМ, а не по бумагам: фоновый
+                # цикл держит REFRESH_CONCURRENCY(4) × Semaphore(8) = 32
+                # бумаги, но каждая бумага в get_bond_snapshot — до 4 запросов
+                # (snapshot + последний купон + SmartLab + рейтинг MOEX), то
+                # есть пик 128. Прежние 100 считались как 4×8=32 и пик не
+                # покрывали; 160 оставляет запас на запросы пользователей.
+                #
+                # max_keepalive равен пулу намеренно. Соединения сверх него
+                # закрываются сразу после ответа и оседают в TIME-WAIT: при
+                # keepalive=20 из каждых 128 закрывалось 108 → 833 TIME-WAIT
+                # к iss.moex.com за 3 суток аптайма, эфемерные порты выедались
+                # и новые соединения ждали слот. PoolTimeout нарастал ВМЕСТЕ
+                # С АПТАЙМОМ (29.08: 0, 30.08: 258, 31.08: 60224) при
+                # неизменном коде и живом MOEX — 32 параллельных запроса с
+                # сервера проходили за 1.2с без единой ошибки.
+                limits=httpx.Limits(max_connections=160, max_keepalive_connections=160),
                 headers={"User-Agent": self._UA},
             )
         return self._http
@@ -785,7 +796,12 @@ class MOEXService:
         for attempt in range(_RETRY_ATTEMPTS):
             try:
                 client = self._get_http()
-                response = await client.get(url, timeout=30)
+                # Без своего timeout: httpx.Timeout(30) — это скаляр, он
+                # перетирает ВСЕ поля клиента, включая pool. Ожидание слота в
+                # пуле растягивалось до 30с вместо 15с и держало задачу вдвое
+                # дольше, разгоняя очередь. Клиентские 15с/connect 10с здесь
+                # и нужны.
+                response = await client.get(url)
                 response.raise_for_status()
                 data = response.json()
                 src.record_hit()
