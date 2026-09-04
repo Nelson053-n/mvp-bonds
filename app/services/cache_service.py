@@ -85,7 +85,15 @@ class CacheService:
                 )
                 # Custom (off-exchange) rows never carry a MOEX price — exclude
                 # them from the coverage check so they don't skew the ratio.
-                priced_rows = [r for r in merged if getattr(r, "source", None) != "custom"]
+                # Same for no_market_data rows (matured/delisted, MOEX returns
+                # an empty securities block): they are unpriced forever, so a
+                # portfolio holding 5 of 32 sat below the 90% bar on every
+                # cycle — 247 false "partial fetch" skips a day for one user.
+                priced_rows = [
+                    r for r in merged
+                    if getattr(r, "source", None) != "custom"
+                    and not getattr(r, "no_market_data", False)
+                ]
                 priced_ok = sum(1 for r in priced_rows if r.current_price > 0)
                 # Only snapshot when MOEX returned prices for (nearly) all exchange
                 # instruments. A partial fetch (e.g. MOEX rate-limited the batch)

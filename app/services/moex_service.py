@@ -779,7 +779,7 @@ class MOEXService:
         self._snapshot_cache_put(self._bond_snapshot_cache, secid, snapshot)
         return snapshot
 
-    async def _fetch(self, url: str) -> dict[str, Any]:
+    async def _fetch(self, url: str, source: str = "moex_price") -> dict[str, Any]:
         """GET a MOEX ISS endpoint, retrying transient failures.
 
         MOEX briefly returns 502/500 or truncated JSON several times a day
@@ -790,7 +790,7 @@ class MOEXService:
         — 4xx means a wrong URL or a missing security and will not change.
         """
         logger.debug("Fetching data from %s", url)
-        src = self.sources["moex_price"]
+        src = self.sources[source]
         last_error: tuple[int | None, str] | None = None
 
         for attempt in range(_RETRY_ATTEMPTS):
@@ -907,28 +907,14 @@ class MOEXService:
             return None
 
         url = f"{settings.moex_base_url}/securities/{secid}/description.json"
+        # Через общий _fetch: те же ретраи 502/таймаутов, что у котировок.
+        # Прямой client.get без повтора терял MOEX-рейтинг для всех 777
+        # тикеров за один вялый час MOEX (03.09.2026), а str(exc) у
+        # httpx-таймаутов пустой — в логе не было видно даже причины.
         try:
-            client = self._get_http()
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
-        except httpx.HTTPStatusError as exc:
-            src.record_error(exc.response.status_code, f"HTTP {exc.response.status_code}")
-            logger.warning(
-                "MOEX description HTTP error %s for %s",
-                exc.response.status_code,
-                secid,
-            )
-            self._credit_rating_cache[secid] = None
-            return None
-        except httpx.RequestError as exc:
-            src.record_error(None, str(exc)[:80])
+            data = await self._fetch(url, source="moex_rating")
+        except DataFetchError as exc:
             logger.warning("MOEX description request error for %s: %s", secid, exc)
-            self._credit_rating_cache[secid] = None
-            return None
-        except ValueError:
-            src.record_error(None, "Invalid JSON")
-            logger.warning("Invalid JSON from MOEX description for %s", secid)
             self._credit_rating_cache[secid] = None
             return None
 

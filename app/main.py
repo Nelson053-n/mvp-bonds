@@ -264,18 +264,22 @@ async def _rating_refresh_loop():
         await asyncio.sleep(secs_to_3am)
         try:
             items = storage_service.get_all_portfolio_items_for_rating()
-            # Свой семафор здесь больше не нужен: лимит на SmartLab теперь
-            # внутри _get_smartlab_credit_rating и общий на процесс. Внешний
-            # тормозил бы заодно и запрос к MOEX, который в ограничении не
-            # нуждается (refresh_rating_with_sources идёт в оба источника
-            # параллельно).
+            # Лимит на SmartLab живёт внутри _get_smartlab_credit_rating, но
+            # запрос description.json к MOEX там не ограничен: gather по всем
+            # тикерам выстреливал 777 запросов разом при пуле 160, и на вялом
+            # MOEX (03.09.2026) все 777 упёрлись в pool timeout за 16 секунд.
+            # Семафор здесь не тормозит SmartLab (его пропускная способность —
+            # интервал 0.25с, а не число задач), но растягивает MOEX-запросы
+            # на те же ~3 минуты, что и так занимает цикл.
+            sem = asyncio.Semaphore(8)
             s = storage_service.get_all_settings()
             tg_token = s.get("tg_bot_token", "")
 
             async def _refresh_one(item):
                 ticker = item["ticker"]
                 try:
-                    result = await moex_service.refresh_rating_with_sources(ticker)
+                    async with sem:
+                        result = await moex_service.refresh_rating_with_sources(ticker)
                 except Exception as exc:
                     logger.warning("Rating refresh failed for %s: %s", ticker, exc)
                     return

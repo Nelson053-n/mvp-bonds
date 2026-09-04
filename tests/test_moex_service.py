@@ -859,3 +859,66 @@ class TestCacheEviction:
 
         assert len(c) <= limit, f"кэш рейтингов не ограничен: {len(c)} > {limit}"
         assert c[f"SEC{limit * 2 - 1}"] == "ruAA", "последняя запись потеряна"
+
+
+class TestCreditRatingDescriptionRetry:
+    """description.json (MOEX-рейтинг) ходит через общий _fetch с ретраями.
+
+    Прод, 03.09.2026 03:00: прямой client.get без повтора — и все 777
+    тикеров дневного обновления потеряли MOEX-рейтинг за 16 секунд, а в логе
+    «request error for X: » с пустой причиной (str() у httpx-таймаутов пуст).
+    """
+
+    def _service(self):
+        import app.services.moex_service as m
+        return m.MOEXService()
+
+    def _patch(self, monkeypatch, responses):
+        import app.services.moex_service as m
+        calls = {"n": 0}
+
+        class _Resp:
+            def __init__(self, payload):
+                self._p = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        class _Client:
+            async def get(self, url, **kw):
+                item = responses[calls["n"]]
+                calls["n"] += 1
+                if isinstance(item, Exception):
+                    raise item
+                return _Resp(item)
+
+        monkeypatch.setattr(m.MOEXService, "_get_http", lambda self: _Client())
+        monkeypatch.setattr(m, "_RETRY_DELAYS", (0, 0))
+        return calls
+
+    async def test_timeout_then_success(self, monkeypatch):
+        import app.services.moex_service as m
+        svc = self._service()
+        payload = {"description": {
+            "columns": ["name", "title", "value"],
+            "data": [["CREDITRATING", "Рейтинг", "ruAA-"]],
+        }}
+        calls = self._patch(monkeypatch, [m.httpx.PoolTimeout(""), payload])
+        result = await svc._get_credit_rating("SECID1")
+        assert calls["n"] == 2
+        assert result is not None and "AA-" in result
+
+    async def test_exhausted_retries_return_none(self, monkeypatch, caplog):
+        import logging
+        import app.services.moex_service as m
+        svc = self._service()
+        calls = self._patch(monkeypatch, [m.httpx.PoolTimeout("")] * 3)
+        with caplog.at_level(logging.WARNING, logger="app.services.moex_service"):
+            result = await svc._get_credit_rating("SECID2")
+        assert result is None
+        assert calls["n"] == 3
+        # причина сбоя в логе не пустая — виден тип исключения
+        assert any("PoolTimeout" in r.getMessage() for r in caplog.records)
