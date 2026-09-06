@@ -57,6 +57,12 @@ _OPERATIONS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsServ
 _RETRY_ATTEMPTS = 3
 _RETRY_DELAYS = (1.0, 3.0)  # pauses between attempts 1→2 and 2→3
 
+# figi, у которых брокер не отдаёт ни средней, ни текущей цены (заблокированная
+# или делистингованная бумага). Состояние постоянное, а синк идёт раз в 10 минут:
+# одна такая позиция давала 142 одинаковых WARNING в сутки. Предупреждаем один
+# раз за жизнь процесса, дальше DEBUG.
+_no_price_warned: set[str] = set()
+
 # T-Bank REST API returns lowercase instrument types
 _TYPE_MAP = {
     "bond": "bond",
@@ -284,7 +290,10 @@ class TBankService:
             if purchase_price <= 0:
                 purchase_price = _money_value(pos.get("currentPrice"))
             if purchase_price <= 0:
-                logger.warning("No price for figi=%s, skipping", pos.get("figi"))
+                figi = pos.get("figi") or ""
+                level = logging.DEBUG if figi in _no_price_warned else logging.WARNING
+                _no_price_warned.add(figi)
+                logger.log(level, "No price for figi=%s, skipping", figi)
                 continue
 
             ticker = pos.get("ticker", "")
