@@ -5,6 +5,7 @@ Server-rendered HTML built from the same MOEX data the app already fetches
 cached in-memory for _PAGE_TTL seconds and served with public Cache-Control,
 so crawler traffic never hammers MOEX/SmartLab.
 """
+import asyncio
 import json
 import logging
 import re
@@ -37,7 +38,14 @@ _CATALOG_TTL = 3600    # rendered catalog page cache
 _NOTFOUND_TTL = 600    # negative cache: unknown secids (protects MOEX from crawler junk)
 _PAGE_CACHE_MAX = 800
 
+# Сколько ещё отдавать протухшую страницу, пока её обновляет один воркер.
+# Промах кэша стоит запроса рейтинга к SmartLab, а тот ограничен 4 зап/с на
+# процесс: при обходе ботом десятки страниц вставали в эту очередь и не
+# укладывались в 60с nginx (31.08: YandexBot, 31×504 за минуту). Устаревшая
+# на несколько минут цена лучше, чем 504 в индексе поисковика.
+_PAGE_STALE_TTL = 6 * 3600
 _page_cache: dict[str, tuple[str, float]] = {}
+_page_locks: dict[str, asyncio.Lock] = {}
 _notfound_cache: dict[str, float] = {}
 _catalog_cache: tuple[str, float] | None = None
 _sitemap_cache: tuple[str, float] | None = None
@@ -623,6 +631,31 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
     return _page_shell(title, meta_desc, url, jsonld, body, og_type="article")
 
 
+async def _build_bond_page(secid: str) -> str | None:
+    """Fetch + render one bond page. None means "no such bond" (404)."""
+    try:
+        snapshot = await moex_service.get_bond_snapshot(secid, rating_optional=True)
+    except MOEXError:
+        if len(_notfound_cache) > 2000:
+            _notfound_cache.clear()
+        _notfound_cache[secid] = time.time()
+        return None
+    except Exception as exc:
+        logger.warning("bond_page: snapshot failed for %s: %s", secid, exc)
+        return None
+
+    all_bonds = await _catalog_bonds()
+    me = next((b for b in all_bonds if b["ticker"] == secid), None)
+    board = me["board"] if me else None
+    my_yield = (me or {}).get("market_yield") or snapshot.market_yield or 0
+    pool = [b for b in all_bonds if b["ticker"] != secid and (board is None or b["board"] == board)]
+    related = sorted(pool, key=lambda b: abs((b.get("market_yield") or 0) - my_yield))[:8]
+
+    html = _render_bond_page(snapshot, board, related)
+    _cache_put(secid, html)
+    return html
+
+
 @router.api_route("/bond/{secid}", response_class=HTMLResponse, methods=["GET", "HEAD"])
 async def bond_page(secid: str) -> HTMLResponse:
     """Public SEO page for a single bond (no auth)."""
@@ -638,26 +671,32 @@ async def bond_page(secid: str) -> HTMLResponse:
     if nf and now - nf < _NOTFOUND_TTL:
         return _render_404()
 
+    # Один рендер на бумагу: без этого 31 бот на одну страницу давал 31
+    # параллельный поход в SmartLab, и все они ждали общую очередь 4 зап/с.
+    lock = _page_locks.get(secid)
+    if lock is None:
+        lock = _page_locks.setdefault(secid, asyncio.Lock())
+
+    if lock.locked() and cached and now - cached[1] < _PAGE_STALE_TTL:
+        # Обновление уже идёт у соседа — отдаём протухшую копию, а не ждём.
+        return HTMLResponse(cached[0], headers=_PUBLIC_CACHE)
+
     try:
-        snapshot = await moex_service.get_bond_snapshot(secid)
-    except MOEXError:
-        if len(_notfound_cache) > 2000:
-            _notfound_cache.clear()
-        _notfound_cache[secid] = now
-        return _render_404()
-    except Exception as exc:
-        logger.warning("bond_page: snapshot failed for %s: %s", secid, exc)
-        return _render_404()
+        async with lock:
+            # Победитель гонки уже положил свежую страницу, пока мы ждали.
+            fresh = _page_cache.get(secid)
+            if fresh and time.time() - fresh[1] < _PAGE_TTL:
+                return HTMLResponse(fresh[0], headers=_PUBLIC_CACHE)
+            html = await _build_bond_page(secid)
+    finally:
+        if not lock.locked() and len(_page_locks) > _PAGE_CACHE_MAX:
+            _page_locks.pop(secid, None)
 
-    all_bonds = await _catalog_bonds()
-    me = next((b for b in all_bonds if b["ticker"] == secid), None)
-    board = me["board"] if me else None
-    my_yield = (me or {}).get("market_yield") or snapshot.market_yield or 0
-    pool = [b for b in all_bonds if b["ticker"] != secid and (board is None or b["board"] == board)]
-    related = sorted(pool, key=lambda b: abs((b.get("market_yield") or 0) - my_yield))[:8]
-
-    html = _render_bond_page(snapshot, board, related)
-    _cache_put(secid, html)
+    if html is None:
+        # Бумаги нет — но если под рукой есть недавняя копия, она честнее 404.
+        if cached and time.time() - cached[1] < _PAGE_STALE_TTL:
+            return HTMLResponse(cached[0], headers=_PUBLIC_CACHE)
+        return _render_404()
     return HTMLResponse(html, headers=_PUBLIC_CACHE)
 
 

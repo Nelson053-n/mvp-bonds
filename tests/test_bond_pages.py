@@ -59,7 +59,7 @@ def _isolate(monkeypatch):
 
 
 async def test_bond_page_renders(client, monkeypatch):
-    async def fake_snapshot(secid):
+    async def fake_snapshot(secid, **kwargs):
         return _make_snapshot()
 
     monkeypatch.setattr(moex_service, "get_bond_snapshot", fake_snapshot)
@@ -87,7 +87,7 @@ async def test_bond_page_renders(client, monkeypatch):
 async def test_bond_page_cached(client, monkeypatch):
     calls = {"n": 0}
 
-    async def fake_snapshot(secid):
+    async def fake_snapshot(secid, **kwargs):
         calls["n"] += 1
         return _make_snapshot()
 
@@ -97,8 +97,44 @@ async def test_bond_page_cached(client, monkeypatch):
     assert calls["n"] == 1  # second hit served from page cache
 
 
+async def test_bond_page_concurrent_requests_render_once(client, monkeypatch):
+    """Пачка одновременных запросов на одну бумагу = один поход в MOEX.
+
+    Регрессия 31.08.2026: краулер прислал 31 запрос на /bond/ за минуту, каждый
+    промах кэша шёл в SmartLab (лимит 4 зап/с на процесс), очередь вылезла за
+    таймаут nginx и все они получили 504. Лок держит один рендер на бумагу.
+    """
+    import asyncio
+
+    calls = {"n": 0}
+
+    async def slow_snapshot(secid, **kwargs):
+        calls["n"] += 1
+        await asyncio.sleep(0.05)   # имитация похода в сеть
+        return _make_snapshot()
+
+    monkeypatch.setattr(moex_service, "get_bond_snapshot", slow_snapshot)
+    results = await asyncio.gather(
+        *(client.get("/bond/SU26238RMFS4") for _ in range(10))
+    )
+    assert all(r.status_code == 200 for r in results)
+    assert calls["n"] == 1
+
+
+async def test_bond_page_survives_rating_outage(client, monkeypatch):
+    """Страница отдаётся, даже если рейтинг недоступен — он не обязателен."""
+    async def fake_snapshot(secid, **kwargs):
+        assert kwargs.get("rating_optional") is True
+        return _make_snapshot(company_rating=None)
+
+    monkeypatch.setattr(moex_service, "get_bond_snapshot", fake_snapshot)
+    resp = await client.get("/bond/SU26238RMFS4")
+    assert resp.status_code == 200
+    assert "ОФЗ 26238" in resp.text
+
+
 async def test_bond_page_unknown_404(client, monkeypatch):
-    async def fake_snapshot(secid):
+    async def fake_snapshot(secid, **kwargs):
         raise PriceNotFoundError(secid, "облигация")
 
     monkeypatch.setattr(moex_service, "get_bond_snapshot", fake_snapshot)
@@ -115,7 +151,7 @@ async def test_bond_page_invalid_secid_404(client):
 
 
 async def test_bond_page_html_escapes_name(client, monkeypatch):
-    async def fake_snapshot(secid):
+    async def fake_snapshot(secid, **kwargs):
         return _make_snapshot(name='<script>alert(1)</script>')
 
     monkeypatch.setattr(moex_service, "get_bond_snapshot", fake_snapshot)
@@ -125,7 +161,7 @@ async def test_bond_page_html_escapes_name(client, monkeypatch):
 
 
 async def test_yield_to_offer_note(client, monkeypatch):
-    async def fake_snapshot(secid):
+    async def fake_snapshot(secid, **kwargs):
         return _make_snapshot(
             market_yield=2293.0,
             offer_date=date.today() + timedelta(days=20),

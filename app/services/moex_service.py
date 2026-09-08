@@ -195,8 +195,13 @@ class MOEXService:
         "Chrome/123.0 Safari/537.36"
     )
 
+    # Сколько бумаг одновременно догружают рейтинг в фоне. Ограничитель нужен,
+    # чтобы обход каталога ботом не наплодил тысячу висящих задач.
+    RATING_WARM_MAX = 64
+
     def __init__(self) -> None:
         self._credit_rating_cache = _RatingCache()
+        self._rating_warm_tasks: dict[str, asyncio.Task] = {}
         self._is_qual_cache: dict[str, tuple[bool, bool]] = {}  # secid -> (is_qual, is_traded)
         self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
         self._bond_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
@@ -211,6 +216,32 @@ class MOEXService:
         self._smartlab_sem: asyncio.Semaphore | None = None
         self._smartlab_gate: asyncio.Lock | None = None
         self._smartlab_next_at: float = 0.0
+
+    def _warm_rating_bg(self, secid: str) -> None:
+        """Догрузить рейтинг в фоне — страница отдаётся, не дожидаясь SmartLab.
+
+        Ссылку на задачу держим в _rating_warm_tasks: без неё сборщик мусора
+        может собрать задачу до завершения. Повторный прогрев той же бумаги
+        не запускаем — иначе обход ботом породит по задаче на каждый запрос.
+        """
+        if secid in self._rating_warm_tasks:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        if len(self._rating_warm_tasks) >= self.RATING_WARM_MAX:
+            return
+
+        async def _run() -> None:
+            try:
+                await self._get_smartlab_credit_rating(secid)
+            except Exception as exc:
+                logger.debug("rating warm failed for %s: %s", secid, exc)
+            finally:
+                self._rating_warm_tasks.pop(secid, None)
+
+        self._rating_warm_tasks[secid] = loop.create_task(_run())
 
     def _get_smartlab_sem(self) -> asyncio.Semaphore:
         """Ограничитель параллельных запросов к SmartLab — общий на процесс.
@@ -590,7 +621,16 @@ class MOEXService:
 
         return {"value": last_value, "period_days": period_days}
 
-    async def get_bond_snapshot(self, ticker: str) -> BondSnapshot:
+    async def get_bond_snapshot(
+        self, ticker: str, *, rating_optional: bool = False
+    ) -> BondSnapshot:
+        """Снапшот бумаги с MOEX.
+
+        rating_optional=True — не ждать SmartLab, если рейтинга нет в кэше:
+        он ограничен 4 зап/с на процесс, и при массовом обходе очередь за ним
+        выходит за таймаут nginx. Публичной SEO-странице рейтинг желателен,
+        но не обязателен: лучше отдать её без рейтинга, чем 504.
+        """
         secid = ticker.upper().strip()
         cached = self._bond_snapshot_cache.get(secid)
         if cached and (time.time() - cached[1]) < self.SNAPSHOT_TTL:
@@ -700,11 +740,17 @@ class MOEXService:
         next_coupon_date = self._parse_date(sec_row.get("NEXTCOUPON"))
         aci = md_row.get("ACCINT") or sec_row.get("ACCRUEDINT")
         market_yield = md_row.get("YIELD") or sec_row.get("YIELDATPREVWAPRICE")
-        company_rating = await self._get_smartlab_credit_rating(secid)
-        rating_source = "smartlab" if company_rating else None
-        if company_rating is None:
-            company_rating = await self._get_credit_rating(secid)
-            rating_source = "moex" if company_rating else None
+        if rating_optional and f"smartlab:{secid}" not in self._credit_rating_cache:
+            # Холодный кэш: сетевой поход отдаём фоновой задаче, страницу не держим.
+            company_rating = None
+            rating_source = None
+            self._warm_rating_bg(secid)
+        else:
+            company_rating = await self._get_smartlab_credit_rating(secid)
+            rating_source = "smartlab" if company_rating else None
+            if company_rating is None:
+                company_rating = await self._get_credit_rating(secid)
+                rating_source = "moex" if company_rating else None
         # Last resort: derive rating from MOEX listing level. This is a coarse
         # proxy, not an issuer rating — tagged as 'listlevel' so downstream code
         # never alerts on it nor persists it over a real rating.
