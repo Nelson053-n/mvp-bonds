@@ -19,6 +19,7 @@ import httpx
 
 from app.config import settings
 from app.services.moex_service import moex_service
+from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +197,27 @@ class TelegramBotService:
         self._token = ""
         self._running = False
 
+    @staticmethod
+    def _resolve_token() -> str:
+        """Токен бота: сначала app_settings (задаётся в UI), потом env.
+
+        Весь остальной код проекта (notification_service, алерты фоновых
+        задач) читает tg_bot_token из БД, и админ задаёт его в панели.
+        Бот же смотрел только в env — при заданном в UI токене
+        MVP_TG_BOT_TOKEN оставался пустым, enabled=False, и публичный поиск
+        облигаций молча не запускался, хотя сам бот был жив.
+        """
+        try:
+            token = storage_service.get_setting("tg_bot_token", "")
+        except Exception:
+            # БД может быть недоступна на раннем старте — тогда решает env.
+            logger.warning("tg-bot: не удалось прочитать tg_bot_token из БД")
+            token = ""
+        return (token or settings.tg_bot_token or "").strip()
+
     @property
     def enabled(self) -> bool:
-        return bool(settings.tg_bot_token)
+        return bool(self._resolve_token())
 
     async def _call(self, client: httpx.AsyncClient, method: str, **payload):
         url = _API.format(token=self._token, method=method)
@@ -338,9 +357,9 @@ class TelegramBotService:
 
     async def run_polling(self) -> None:
         """Long-poll Telegram getUpdates until cancelled. Safe to await in a task."""
-        if not self.enabled:
+        self._token = self._resolve_token()
+        if not self._token:
             return
-        self._token = settings.tg_bot_token
         self._running = True
         offset = 0
         logger.info("tg-bot: starting long-polling")

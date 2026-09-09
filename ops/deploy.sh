@@ -10,6 +10,10 @@
 # падает — ОТКАТЫВАЕМ pull на прежний HEAD и НЕ трогаем работающий сервис.
 # Только при успешном импорте перезапускаем воркеры + health-curl.
 #
+# Зависимости из requirements.txt ставятся автоматически, но только когда сам
+# файл изменился в этом деплое. После установки перезапуск принудительно
+# полный: SIGHUP переиспользует родительский процесс и новый пакет не увидит.
+#
 # Перезапуск по умолчанию graceful (SIGHUP, без простоя). Полный рестарт нужен
 # при смене .env или юнита — SIGHUP их не перечитывает:
 #   DEPLOY_FORCE_RESTART=1 ops/deploy.sh   (или systemctl restart bondai)
@@ -32,6 +36,29 @@ if [ "$NEW_HEAD" = "$PREV_HEAD" ]; then
 fi
 echo "▶ новый HEAD: $NEW_HEAD"
 
+# Зависимости ставим ДО smoke-импорта: пакет, добавленный в requirements.txt,
+# иначе на прод не попадает вовсе. 09.09 так и вышло с reportlab — экспорт PDF
+# отдавал 500, потому что деплой ставил только код. Smoke-гейт этого не ловит:
+# reportlab импортируется внутри функции, а не на верхнем уровне модуля.
+#
+# Ставим только при изменившемся requirements.txt: обычный деплой не должен
+# ходить в сеть на каждом коммите. При сбое установки откатываем pull и НЕ
+# трогаем работающий сервис — как и при упавшем импорте.
+if ! git diff --quiet "$PREV_HEAD" "$NEW_HEAD" -- requirements.txt; then
+  echo "▶ requirements.txt изменился — ставлю зависимости…"
+  if ! .venv/bin/pip install -q -r requirements.txt; then
+    echo "✗ pip install УПАЛ — откатываю pull на $PREV_HEAD, сервис НЕ трогаю"
+    git reset --hard "$PREV_HEAD"
+    exit 1
+  fi
+  echo "✓ зависимости установлены"
+  # Новый пакет виден только свежему процессу: SIGHUP переиспользует родителя
+  # со старым sys.path и уже импортированными модулями.
+  DEPS_CHANGED=1
+else
+  echo "▶ requirements.txt не менялся — установку пропускаю"
+fi
+
 echo "▶ smoke-импорт app.main (env из .env)…"
 set -a; . ./.env; set +a
 if ! .venv/bin/python3 -c 'import app.main' ; then
@@ -52,7 +79,8 @@ echo "✓ импорт ок"
 #   systemctl restart bondai
 # Код подхватывается штатно — воркеры стартуют заново и импортируют его с нуля.
 MAIN_PID="$(systemctl show bondai -p MainPID --value)"
-if [ "${DEPLOY_FORCE_RESTART:-0}" = "1" ] || [ -z "$MAIN_PID" ] || [ "$MAIN_PID" = "0" ]; then
+if [ "${DEPLOY_FORCE_RESTART:-0}" = "1" ] || [ "${DEPS_CHANGED:-0}" = "1" ] \
+   || [ -z "$MAIN_PID" ] || [ "$MAIN_PID" = "0" ]; then
   echo "▶ restart bondai (полный)…"
   systemctl restart bondai
 else
