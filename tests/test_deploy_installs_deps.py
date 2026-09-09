@@ -169,3 +169,45 @@ def test_nginx_header_does_not_collide_with_sed_anchor():
         )
     assert "limit_req zone=bond_rl" in "\n".join(body)
     assert "return 444" in "\n".join(body)
+
+
+# ── Самообновление деплой-скрипта ────────────────────────────────────────────
+
+def test_autodeploy_runs_fresh_deploy_script():
+    """auto-deploy.sh обязан запускать СВЕЖУЮ версию deploy.sh.
+
+    bash читает файл целиком при старте, а git pull происходит уже ВНУТРИ
+    deploy.sh. Поэтому правки самого скрипта иначе применяются только со
+    следующего деплоя: 09.09 накатка конфигов nginx доехала на прод, но в том
+    же деплое не выполнилась — в памяти bash была старая копия.
+    """
+    script = (REPO_ROOT / "ops" / "auto-deploy.sh").read_text(encoding="utf-8")
+    assert "git show" in script, (
+        "свежая версия deploy.sh должна доставаться из origin перед запуском"
+    )
+    assert "RUN_DEPLOY" in script
+
+
+def test_autodeploy_does_not_stage_ops_before_pull():
+    """Обновление скрипта не должно трогать индекс.
+
+    `git checkout origin/... -- ops/` положил бы staged-правки ровно в файлы,
+    которые придёт обновить `git pull --ff-only` внутри deploy.sh — git
+    отменил бы слияние («local changes would be overwritten»).
+    """
+    script = (REPO_ROOT / "ops" / "auto-deploy.sh").read_text(encoding="utf-8")
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        assert not (stripped.startswith("git checkout") and "ops/" in stripped), (
+            f"индекс трогать нельзя: {stripped}"
+        )
+
+
+def test_autodeploy_falls_back_to_local_script():
+    """Если свежую копию достать не удалось — работаем текущей, а не падаем."""
+    script = (REPO_ROOT / "ops" / "auto-deploy.sh").read_text(encoding="utf-8")
+    assert "DEPLOY_SCRIPT" in script.split("RUN_DEPLOY=")[2], (
+        "нужен фолбэк на локальную копию скрипта"
+    )

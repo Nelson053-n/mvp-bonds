@@ -70,7 +70,27 @@ BEHIND="$(git rev-list HEAD..origin/$BRANCH --count)"
 _log "origin/$BRANCH впереди на $BEHIND коммит(ов): $LOCAL_HEAD → $REMOTE_HEAD — деплоим…"
 
 # --- 3. деплоим через атомарный скрипт ---
-DEPLOY_LOG="$(bash "$DEPLOY_SCRIPT" 2>&1)" && DEPLOY_OK=1 || DEPLOY_OK=0
+# Сам deploy.sh берём СВЕЖИЙ: bash читает файл целиком при старте, а git pull
+# происходит уже ВНУТРИ него — то есть правки самого скрипта иначе применяются
+# только со СЛЕДУЮЩЕГО деплоя. 09.09 так и вышло: накатка конфигов nginx
+# доехала на прод, но в этом же деплое не выполнилась (в памяти bash была
+# старая копия).
+#
+# Индекс при этом НЕ трогаем: `git checkout origin/... -- ops/` положил бы
+# staged-правки ровно в те файлы, которые придёт обновить `git pull --ff-only`
+# внутри deploy.sh, и git отменил бы слияние. Поэтому достаём во временный
+# файл — рабочее дерево обновит сам deploy.sh под своим гейтом с откатом.
+FRESH_DEPLOY="$(mktemp)"
+if git show "origin/$BRANCH:ops/deploy.sh" > "$FRESH_DEPLOY" 2>/dev/null \
+   && [ -s "$FRESH_DEPLOY" ]; then
+  RUN_DEPLOY="$FRESH_DEPLOY"
+else
+  # Не смогли достать (сбой git, нет файла в ветке) — работаем текущей копией.
+  RUN_DEPLOY="$DEPLOY_SCRIPT"
+fi
+
+DEPLOY_LOG="$(bash "$RUN_DEPLOY" 2>&1)" && DEPLOY_OK=1 || DEPLOY_OK=0
+rm -f "$FRESH_DEPLOY"
 
 NEW_HEAD="$(git rev-parse HEAD)"
 SHORT_NEW="${NEW_HEAD:0:8}"
