@@ -95,3 +95,77 @@ def test_user_force_restart_flag_still_honoured(script):
     assert "DEPLOY_FORCE_RESTART=1\n" not in script, (
         "внутренняя логика не должна присваивать пользовательскую переменную"
     )
+
+
+# ── Накатка конфигов nginx ───────────────────────────────────────────────────
+
+def test_deploy_applies_nginx_configs(script):
+    """Конфиги nginx катятся деплоем, а не руками на сервере.
+
+    Иначе правила (limit_req, 444 для сканеров) живут только в /etc: не
+    воспроизводятся, теряются при потере сервера и разъезжаются с репозиторием.
+    """
+    assert "nginx-prod-sites-bondai.ru" in script
+    assert "nginx-prod-conf.d-bondai-ratelimit.conf" in script
+    assert "systemctl reload nginx" in script
+
+
+def test_nginx_applied_only_when_changed(script):
+    """Обычный деплой не должен трогать nginx."""
+    block = script[_exec_line(script, "NGINX_SITE_SRC="):_exec_line(script, "-c 'import app.main'")]
+    assert "git diff --quiet" in block, (
+        "конфиги должны применяться только при их изменении в этом деплое"
+    )
+
+
+def test_nginx_failure_restores_previous_config(script):
+    """Битый конфиг роняет ВСЕ сайты сервера — нужен бэкап и откат."""
+    block = script[_exec_line(script, "NGINX_SITE_SRC="):_exec_line(script, "-c 'import app.main'")]
+    assert "nginx -t" in block, "перед reload обязательна проверка конфига"
+    assert "NGINX_BAK" in block, "нужен бэкап прежних файлов"
+    assert "прежний конфиг восстановлен" in block, "нужен откат при сбое"
+
+
+def test_nginx_test_result_not_swallowed_by_pipe(script):
+    """`nginx -t | tail` вернул бы код tail — битый конфиг прошёл бы проверку.
+
+    Регрессия поймана при написании: пайп проглатывал ошибку, и reload
+    выполнялся на неисправном конфиге.
+    """
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") or "nginx -t" not in stripped:
+            continue
+        if "if " in stripped:
+            assert "|" not in stripped.split("nginx -t")[1].split("&&")[0], (
+                f"результат nginx -t проглатывается пайпом: {stripped}"
+            )
+
+
+def test_repo_header_stripped_before_install(script):
+    """В git у site-файла есть шапка-комментарий; на сервер идёт чистый конфиг."""
+    assert "/^server {/,$p" in script, (
+        "шапка репозитория должна отрезаться при накатке"
+    )
+
+
+def test_nginx_header_does_not_collide_with_sed_anchor():
+    """В шапке конфига не должно быть строки, начинающейся с "server {".
+
+    deploy.sh вырезает тело через sed -n '/^server {/,$p'. Если такая строка
+    появится в шапке-комментарии (например в примере команды), sed зацепится
+    за неё и утащит хвост комментариев в конфиг — nginx его отвергнет и
+    положит все сайты сервера. Поймано вхолостую при написании накатки.
+    """
+    path = REPO_ROOT / "ops" / "nginx-prod-sites-bondai.ru"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    first = next(i for i, l in enumerate(lines) if l.startswith("server {"))
+    body = lines[first:]
+    assert body[0] == "server {"
+    # Всё до тела — комментарии или пустые строки, ни одного «server {».
+    for line in lines[:first]:
+        assert not line.startswith("server {"), (
+            f"шапка содержит якорь sed: {line!r}"
+        )
+    assert "limit_req zone=bond_rl" in "\n".join(body)
+    assert "return 444" in "\n".join(body)

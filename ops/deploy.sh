@@ -59,6 +59,47 @@ else
   echo "▶ requirements.txt не менялся — установку пропускаю"
 fi
 
+# Конфиги nginx катятся из репозитория — на сервере руками их не правят.
+# Файлы ops/nginx-prod-* — зеркало /etc; применяем только когда они менялись
+# в этом деплое.
+#
+# Битый конфиг nginx отвергается ЦЕЛИКОМ и роняет все ~11 сайтов сервера,
+# поэтому: бэкап → копирование → nginx -t → reload, и при любой осечке
+# возврат прежних файлов. Приложение при этом не трогаем: nginx и bondai
+# перезапускаются независимо.
+NGINX_SITE_SRC="ops/nginx-prod-sites-bondai.ru"
+NGINX_SITE_DST="/etc/nginx/sites-available/bondai.ru"
+NGINX_ZONE_SRC="ops/nginx-prod-conf.d-bondai-ratelimit.conf"
+NGINX_ZONE_DST="/etc/nginx/conf.d/bondai-ratelimit.conf"
+
+if ! git diff --quiet "$PREV_HEAD" "$NEW_HEAD" -- "$NGINX_SITE_SRC" "$NGINX_ZONE_SRC"; then
+  echo "▶ конфиги nginx изменились — применяю…"
+  NGINX_BAK="/root/nginx-bak-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$NGINX_BAK"
+  cp -a "$NGINX_SITE_DST" "$NGINX_BAK/" 2>/dev/null || true
+  cp -a "$NGINX_ZONE_DST" "$NGINX_BAK/" 2>/dev/null || true
+
+  # В репозитории у site-файла есть шапка-комментарий для читателя; на сервер
+  # уходит конфиг начиная с первого server-блока.
+  sed -n '/^server {/,$p' "$NGINX_SITE_SRC" > "$NGINX_SITE_DST"
+  cp "$NGINX_ZONE_SRC" "$NGINX_ZONE_DST"
+
+  # Без пайпа: `nginx -t | tail` вернул бы код tail, и битый конфиг прошёл бы
+  # проверку. Вывод показываем отдельно.
+  if nginx -t 2>&1 && systemctl reload nginx; then
+    echo "✓ nginx применён (бэкап: $NGINX_BAK)"
+  else
+    echo "✗ nginx НЕ ПРИНЯЛ конфиг — возвращаю прежний и продолжаю деплой кода"
+    cp -a "$NGINX_BAK/bondai.ru" "$NGINX_SITE_DST" 2>/dev/null || true
+    cp -a "$NGINX_BAK/bondai-ratelimit.conf" "$NGINX_ZONE_DST" 2>/dev/null || true
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx
+    echo "  прежний конфиг восстановлен"
+    exit 1
+  fi
+else
+  echo "▶ конфиги nginx не менялись — пропускаю"
+fi
+
 echo "▶ smoke-импорт app.main (env из .env)…"
 set -a; . ./.env; set +a
 if ! .venv/bin/python3 -c 'import app.main' ; then
