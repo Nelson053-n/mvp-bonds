@@ -105,13 +105,13 @@ server {
     } # managed by Certbot
 
 
-    # Сканеры, пришедшие по HTTP, до redirect-правил Certbot успевают попасть
-    # в общий access.log (~13 записей в сутки). Правило 444 живёт в HTTPS-блоке
-    # и применяется только после редиректа, поэтому глушим их и здесь.
-    location ~* ^/(.*/)?((wp-admin|wp-login|wp-includes|wp-json|wp-content|wordpress|xmlrpc|phpmyadmin)(\.php)?(/|$)|\.(env|git|aws|ssh)(/|$)) {
-        access_log off;
-        return 444;
-    }
+    # ЗАМЕТКА: сканеры по HTTP попадают в общий access.log (~13 записей в сутки
+    # от bondai) — правило 444 живёт в HTTPS-блоке и применяется только ПОСЛЕ
+    # редиректа. Добавлять сюда location бесполезно: `if ... return 301` выше
+    # отрабатывает на фазе rewrite, ДО выбора location, и блок недостижим
+    # (проверено на проде 10.09). Лечится только правкой директив Certbot,
+    # а их перезапишет продление общего сертификата на 18 доменов — не стоит
+    # тринадцати строк лога.
 
     listen 80;
     server_name bondai.ru www.bondai.ru;
