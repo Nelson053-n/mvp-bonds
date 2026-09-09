@@ -105,6 +105,14 @@ server {
     } # managed by Certbot
 
 
+    # Сканеры, пришедшие по HTTP, до redirect-правил Certbot успевают попасть
+    # в общий access.log (~13 записей в сутки). Правило 444 живёт в HTTPS-блоке
+    # и применяется только после редиректа, поэтому глушим их и здесь.
+    location ~* ^/(.*/)?((wp-admin|wp-login|wp-includes|wp-json|wp-content|wordpress|xmlrpc|phpmyadmin)(\.php)?(/|$)|\.(env|git|aws|ssh)(/|$)) {
+        access_log off;
+        return 444;
+    }
+
     listen 80;
     server_name bondai.ru www.bondai.ru;
     return 404; # managed by Certbot
