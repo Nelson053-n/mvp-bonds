@@ -3,6 +3,29 @@
 Versioned operational config that lives on the prod server (`212.8.228.248`) but
 is **not** auto-deployed by `git pull`. Apply changes here to the server manually.
 
+## nginx прода — ЗЕРКАЛО (`nginx-prod-sites-bondai.ru`, `nginx-prod-conf.d-bondai-ratelimit.conf`)
+
+Копии РАБОЧИХ конфигов с 212.8.228.248, снятые 10.09.2026. В отличие от
+черновика ниже, эти файлы соответствуют проду один в один (кроме шапки-комментария).
+
+* `nginx-prod-sites-bondai.ru` → `/etc/nginx/sites-available/bondai.ru`.
+  Содержит: правило `444` для сканеров, `limit_req` на `/bond`, таймауты 90с.
+* `nginx-prod-conf.d-bondai-ratelimit.conf` → `/etc/nginx/conf.d/`.
+  Объявляет зону `bond_rl`; без неё `nginx -t` упадёт с `unknown limit_req zone`.
+
+Автодеплой их НЕ применяет — nginx читает свою копию из `/etc`. Файлы лежат в git
+ради истории и восстановления. **Правишь на сервере — обнови и здесь**, иначе
+разъедутся. Порядок накатки и бэкапа — в шапке самого файла.
+
+Гочи, за которые уже платили (09.09):
+* `location /bond` префиксом захватывает и API `/bonds/*` — автодополнение
+  получало 429. Нужен regex `^/bond(/|$)`.
+* В regex сканеров обязателен якорь на границу сегмента, иначе `/static/app.env`
+  режется молча (`access_log off` — следов не остаётся). Группа `(\.php)?` нужна
+  для `/wp-login.php`.
+* regex-локации проверяются ПО ПОРЯДКУ и приоритетнее префиксных: правило `444`
+  должно стоять ДО `^/bond`.
+
 ## nginx (`nginx-bondai.conf`) — DRAFT, не накатывать как есть
 
 **Это не зеркало прода, а черновик.** Он ссылается на сертификат
