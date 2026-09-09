@@ -136,10 +136,7 @@ async def export_portfolio_pdf(
 # ── PDF generation ────────────────────────────────────────────────────────────
 
 def _generate_pdf(portfolio_name: str, rows, lang: str = "ru") -> bytes:
-    try:
-        return _generate_pdf_reportlab(portfolio_name, rows, lang)
-    except ImportError:
-        return _generate_pdf_fpdf(portfolio_name, rows, lang)
+    return _generate_pdf_reportlab(portfolio_name, rows, lang)
 
 
 def _find_cyrillic_font() -> tuple[str, str | None]:
@@ -490,64 +487,3 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
 
     doc.build(elements)
     return buf.getvalue()
-
-
-# ── Fallback: fpdf2 ───────────────────────────────────────────────────────────
-
-def _generate_pdf_fpdf(portfolio_name: str, rows, lang: str) -> bytes:
-    """Fallback using fpdf2 (no Cyrillic support — ASCII only)."""
-    from fpdf import FPDF
-
-    t = lambda key: _t(lang, key)
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", size=16)
-    pdf.cell(0, 10, t("title"), ln=True)
-    pdf.set_font("Helvetica", size=11)
-    pdf.cell(0, 8, f"{t('portfolio')}: {portfolio_name}", ln=True)
-    pdf.cell(0, 8, f"{t('generated')}: {date.today().isoformat()}", ln=True)
-    pdf.ln(5)
-
-    total_value = sum(r.current_value or 0 for r in rows)
-    total_cost  = sum((r.purchase_price or 0) * (r.quantity or 0) for r in rows)
-    total_pnl   = total_value - total_cost
-
-    pdf.set_font("Helvetica", "B", size=9)
-    headers = [t("col_n"), t("col_ticker"), t("col_name"), t("col_qty"),
-               t("col_buy"), t("col_cur"), t("col_value"), t("col_pnl"),
-               t("col_rating"), t("col_ytm"), t("col_maturity")]
-    widths  = [8, 18, 60, 12, 22, 22, 22, 22, 14, 14, 18]
-    for h, w in zip(headers, widths):
-        pdf.cell(w, 7, h[:12], border=1)
-    pdf.ln()
-
-    pdf.set_font("Helvetica", size=8)
-    for i, row in enumerate(rows, 1):
-        pnl = round(((row.current_price or 0) - (row.purchase_price or 0)) * (row.quantity or 0), 0)
-        sign = "+" if pnl >= 0 else ""
-        mat = row.maturity_date.strftime("%m/%Y") if row.maturity_date else "-"
-        ytm = f"{row.market_yield:.1f}%" if getattr(row, "market_yield", None) else "-"
-        vals = [
-            str(i),
-            str(row.ticker or ""),
-            str(row.name or "")[:30],
-            str(int(row.quantity or 0)),
-            f"{row.purchase_price or 0:.2f}",
-            f"{row.current_price or 0:.2f}",
-            f"{row.current_value or 0:.0f}",
-            f"{sign}{pnl:.0f}",
-            str(row.company_rating or "-"),
-            ytm,
-            mat,
-        ]
-        for v, w in zip(vals, widths):
-            pdf.cell(w, 6, str(v)[:14], border=1)
-        pdf.ln()
-
-    # Total row
-    pdf.set_font("Helvetica", "B", size=8)
-    pnl_s = "+" if total_pnl >= 0 else ""
-    pdf.cell(sum(widths[:7]), 7, f"{t('total_row')}: {total_value:,.0f}  P&L: {pnl_s}{total_pnl:,.0f}", border=1)
-    pdf.ln()
-
-    return pdf.output()
