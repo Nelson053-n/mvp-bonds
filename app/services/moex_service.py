@@ -163,6 +163,11 @@ class MOEXService:
 
     FX_RATE_TTL = 3600   # 1 hour cache for FX rates
     SNAPSHOT_TTL = 60    # 60 sec cache for bond/stock snapshots
+    # Купон из bondization: 6ч. Значение объявляется раз в купонный период,
+    # внутри суток не меняется. Отрицательный результат (истории нет) кэшируем
+    # короче, чтобы бумага «ожила» после публикации.
+    LAST_COUPON_TTL = 6 * 3600
+    LAST_COUPON_MISS_TTL = 900
     # Потолок снапшот-кэшей. Без вытеснения TTL проверялся только при чтении,
     # а протухшие записи не удалялись никогда: каталог /bond прогревает ~2700
     # бумаг, и они оседали в памяти воркера-лидера навсегда. На проде это дало
@@ -202,6 +207,11 @@ class MOEXService:
     def __init__(self) -> None:
         self._credit_rating_cache = _RatingCache()
         self._rating_warm_tasks: dict[str, asyncio.Task] = {}
+        # Последний известный купон из bondization: secid -> (значение, ts).
+        # История купонов меняется раз в купонный период (месяц-квартал),
+        # поэтому TTL длинный — иначе фолбэк бьёт по MOEX на каждом обновлении
+        # кэша: в портфеле на 232 бумаги 126 идут этим путём.
+        self._last_coupon_cache: dict[str, tuple[dict | None, float]] = {}
         self._is_qual_cache: dict[str, tuple[bool, bool]] = {}  # secid -> (is_qual, is_traded)
         self._fx_rate_cache: dict[str, tuple[float, float]] = {}  # currency -> (rate, timestamp)
         self._bond_snapshot_cache: dict[str, tuple[Any, float]] = {}  # secid -> (snapshot, ts)
@@ -575,6 +585,13 @@ class MOEXService:
         Returns {"value": float, "period_days": int} or None if unavailable.
         Only called when MOEX reports COUPONVALUE=0 (floater / not yet announced).
         """
+        cached = self._last_coupon_cache.get(secid)
+        if cached is not None:
+            value, ts = cached
+            ttl = self.LAST_COUPON_TTL if value else self.LAST_COUPON_MISS_TTL
+            if (time.time() - ts) < ttl:
+                return value
+
         url = (
             f"{settings.moex_base_url}/securities/{secid}/bondization.json"
             "?iss.meta=off&iss.only=coupons&limit=50"
@@ -586,11 +603,14 @@ class MOEXService:
             data = resp.json()
         except Exception as exc:
             logger.debug("bondization fetch failed for %s: %s", secid, exc)
+            # Сетевой сбой не кэшируем: это временно, иначе бумага осталась бы
+            # без купона на весь MISS_TTL из-за одного блипа MOEX.
             return None
 
         cols = data.get("coupons", {}).get("columns", [])
         rows = data.get("coupons", {}).get("data", [])
         if not cols or not rows:
+            self._last_coupon_cache[secid] = (None, time.time())
             return None
 
         # Find last row with a non-zero value
@@ -606,6 +626,7 @@ class MOEXService:
                 last_end = r.get("coupondate")
 
         if last_value is None:
+            self._last_coupon_cache[secid] = (None, time.time())
             return None
 
         # Calculate actual period length in days
@@ -619,7 +640,11 @@ class MOEXService:
             except Exception:
                 pass
 
-        return {"value": last_value, "period_days": period_days}
+        result = {"value": last_value, "period_days": period_days}
+        if len(self._last_coupon_cache) > 4000:
+            self._last_coupon_cache.clear()
+        self._last_coupon_cache[secid] = (result, time.time())
+        return result
 
     async def get_bond_snapshot(
         self, ticker: str, *, rating_optional: bool = False
@@ -699,19 +724,30 @@ class MOEXService:
         coupon = sec_row.get("COUPONVALUE")
         coupon_period = sec_row.get("COUPONPERIOD")
         coupon_rate = sec_row.get("COUPONPERCENT")  # Ставка купона в %
-        bond_type = sec_row.get("BONDTYPE", "")  # "Флоатер" for floaters
+        bond_type = sec_row.get("BONDTYPE", "")
 
-        # Floater detection by bond type — independent of whether MOEX
-        # currently reports a coupon (it may already know the announced one).
+        # Тип бумаги MOEX отдаёт РУССКОЙ ФРАЗОЙ, а не словом «Флоатер»:
+        # фактические значения на TQCB+TQOB — «Облигация с плавающим купоном»
+        # (620 бумаг), «Структурная облигация», «Облигация с фиксированным
+        # (неизвестным) купоном» и т.п. Проверка на подстроки «флоатер»/«float»
+        # не совпадала ни с одним из них, поэтому is_floater всегда был False,
+        # фолбэк на bondization не запускался и купон оставался нулём:
+        # 163 бумаги в реальных портфелях показывали 0 (14.09, Селигдар9Р).
+        _bt = (bond_type or "").lower()
         is_floater = (
-            "флоатер" in (bond_type or "").lower()
-            or "float" in (bond_type or "").lower()
+            "флоатер" in _bt
+            or "float" in _bt
+            or "плавающ" in _bt          # «Облигация с плавающим купоном»
         )
         # When MOEX has no coupon yet (COUPONVALUE=0) fetch last known from bondization
         coupon_unknown = (coupon is None or float(coupon) == 0) and (
             coupon_rate is None or float(coupon_rate) == 0
         )
-        if is_floater and coupon_unknown:
+        # Фолбэк нужен не только флоатерам: купон бывает неизвестен и у
+        # структурных, амортизируемых и «фиксированных (неизвестных)» бумаг.
+        # Критерий — сам факт отсутствия купона у ТОРГУЕМОЙ бумаги, а не её тип;
+        # bondization всё равно вернёт None, если истории купонов нет.
+        if coupon_unknown:
             last_coupon = await self.get_last_known_coupon(secid)
             if last_coupon:
                 coupon = last_coupon["value"]
