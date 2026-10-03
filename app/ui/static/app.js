@@ -7478,7 +7478,12 @@
         try {
           const r = await apiFetch('/auth/me/telegram', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tg_chat_id: tgId }) });
           if (r.status === 204) { st.textContent = t('settings.account.tgSaved'); st.className = 'status ok'; }
-          else { st.textContent = t('settings.account.tgError'); st.className = 'status error'; }
+          else {
+            // 400 — бот не может написать в чат; в detail инструкция, что сделать.
+            const d = await r.json().catch(() => ({}));
+            st.textContent = typeof d.detail === 'string' ? d.detail : t('settings.account.tgError');
+            st.className = 'status error';
+          }
         } catch(e) { st.textContent = t('settings.account.tgConnError'); st.className = 'status error'; }
       });
 

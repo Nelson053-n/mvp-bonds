@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.api.deps import get_current_user
 from app.exceptions import AuthError
 from app.services.auth_service import auth_service
+from app.services.notification_service import notification_service
 from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
@@ -185,9 +186,19 @@ async def update_telegram(
     current_user: dict = Depends(get_current_user),
 ) -> None:
     """Save user's personal Telegram Chat ID for password recovery."""
-    storage_service.update_user_tg_chat_id(
-        current_user["sub"], payload.tg_chat_id.strip() or None
-    )
+    chat_id = payload.tg_chat_id.strip() or None
+    token = storage_service.get_setting("tg_bot_token", "")
+    if chat_id and token:
+        reachable = await notification_service.check_chat_reachable(token, chat_id)
+        if reachable is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Бот не может написать в этот чат. Откройте "
+                       "@bondinfoai_bot в Telegram, нажмите «Start» и сохраните "
+                       "Chat ID ещё раз. Если уже нажимали — сверьте ID "
+                       "у @userinfobot.",
+            )
+    storage_service.update_user_tg_chat_id(current_user["sub"], chat_id)
 
 
 class ForgotPasswordInput(BaseModel):
