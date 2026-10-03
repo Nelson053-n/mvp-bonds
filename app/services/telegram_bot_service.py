@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import date
 from html import escape as h
 
@@ -221,6 +222,7 @@ class TelegramBotService:
 
     async def _call(self, client: httpx.AsyncClient, method: str, **payload):
         url = _API.format(token=self._token, method=method)
+        started = time.monotonic()
         try:
             resp = await client.post(url, json=payload)
             data = resp.json()
@@ -228,7 +230,13 @@ class TelegramBotService:
                 logger.warning("tg-bot %s failed: %s", method, data.get("description"))
             return data
         except Exception as exc:
-            logger.warning("tg-bot %s error: %s", method, exc)
+            # str() у сетевых исключений httpx бывает пустым — в логе было
+            # «getUpdates error: » без причины. Тип и длительность отличают
+            # таймаут от обрыва соединения посреди long-poll.
+            logger.warning(
+                "tg-bot %s error: %s %r after %.1fs",
+                method, type(exc).__name__, exc, time.monotonic() - started,
+            )
             return {"ok": False}
 
     async def _send(self, client, chat_id, text, keyboard=None):
