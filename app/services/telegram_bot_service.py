@@ -222,20 +222,33 @@ class TelegramBotService:
 
     async def _call(self, client: httpx.AsyncClient, method: str, **payload):
         url = _API.format(token=self._token, method=method)
-        started = time.monotonic()
-        try:
-            resp = await client.post(url, json=payload)
-            data = resp.json()
-            if not data.get("ok"):
-                logger.warning("tg-bot %s failed: %s", method, data.get("description"))
-            return data
-        except Exception as exc:
+        # getUpdates на проде падал ReadError('') через 0.1с — раньше, чем
+        # Telegram мог ответить: keep-alive соединение от прошлого long-poll
+        # уже закрыто на той стороне. Повтор идёт по новому соединению.
+        # Только для getUpdates: он идемпотентен, а sendMessage при повторе
+        # мог бы уйти дважды.
+        attempts = 2 if method == "getUpdates" else 1
+        for attempt in range(attempts):
+            started = time.monotonic()
+            try:
+                resp = await client.post(url, json=payload)
+                data = resp.json()
+                if not data.get("ok"):
+                    logger.warning("tg-bot %s failed: %s", method, data.get("description"))
+                return data
+            except (httpx.ReadError, httpx.RemoteProtocolError) as exc:
+                if attempt + 1 < attempts:
+                    logger.debug("tg-bot %s: %s, повтор", method, type(exc).__name__)
+                    continue
+                err = exc
+            except Exception as exc:
+                err = exc
             # str() у сетевых исключений httpx бывает пустым — в логе было
             # «getUpdates error: » без причины. Тип и длительность отличают
             # таймаут от обрыва соединения посреди long-poll.
             logger.warning(
                 "tg-bot %s error: %s %r after %.1fs",
-                method, type(exc).__name__, exc, time.monotonic() - started,
+                method, type(err).__name__, err, time.monotonic() - started,
             )
             return {"ok": False}
 
