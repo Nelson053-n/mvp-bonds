@@ -26,7 +26,7 @@ def _fake_client(monkeypatch, *, status: int = 200, text: str = '{"ok":true}',
     real = httpx.AsyncClient
     monkeypatch.setattr(
         ns_mod.httpx, "AsyncClient",
-        lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
+        lambda **kw: real(**{**kw, "transport": httpx.MockTransport(handler)}),
     )
     return calls
 

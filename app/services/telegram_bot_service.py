@@ -21,6 +21,7 @@ import httpx
 from app.config import settings
 from app.services.moex_service import moex_service
 from app.services.storage_service import storage_service
+from app.services.telegram_net import telegram_transport
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +385,9 @@ class TelegramBotService:
         self._running = True
         offset = 0
         logger.info("tg-bot: starting long-polling")
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT, transport=telegram_transport(),
+        ) as client:
             # Drop any webhook so getUpdates works; ignore failure.
             await self._call(client, "deleteWebhook", drop_pending_updates=False)
             while self._running:

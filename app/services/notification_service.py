@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from app.services.telegram_net import telegram_transport
+
 if TYPE_CHECKING:
     from app.models import InstrumentMetrics
 
@@ -98,7 +100,9 @@ class NotificationService:
         last_exc: Exception | None = None
         for attempt in range(_RETRY_ATTEMPTS):
             try:
-                async with httpx.AsyncClient(timeout=10) as client:
+                async with httpx.AsyncClient(
+                    timeout=10, transport=telegram_transport(),
+                ) as client:
                     resp = await client.post(url, json=payload)
                 if resp.status_code != 200:
                     logger.warning(
@@ -159,7 +163,9 @@ class NotificationService:
                     "коды восстановления пароля и уведомления.",
         }
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(
+                timeout=10, transport=telegram_transport(),
+            ) as client:
                 resp = await client.post(url, json=payload)
         except Exception as exc:
             logger.warning(

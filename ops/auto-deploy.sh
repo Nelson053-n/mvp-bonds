@@ -48,10 +48,18 @@ _log() {
 _tg() {
   local msg="$1"
   [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ] && return 0
-  curl -sS --max-time 10 \
-    -d "chat_id=${TG_CHAT}&text=${msg}&parse_mode=HTML" \
-    "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-    > /dev/null 2>&1 || true
+  # Сначала адрес из DNS, затем известные адреса Bot API — список тот же,
+  # что KNOWN_IPS в app/services/telegram_net.py (с 09.10.2026 DNS-адрес
+  # 149.154.166.110 с прода недоступен).
+  local resolve
+  for resolve in "" "api.telegram.org:443:149.154.167.220" "api.telegram.org:443:149.154.166.110"; do
+    curl -sS --fail --connect-timeout 5 --max-time 10 \
+      ${resolve:+--resolve "$resolve"} \
+      -d "chat_id=${TG_CHAT}&text=${msg}&parse_mode=HTML" \
+      "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+      > /dev/null 2>&1 && return 0
+  done
+  return 0
 }
 
 # --- 1. fetch ---
