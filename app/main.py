@@ -209,7 +209,7 @@ async def _telegram_routes_loop():
     """Раз в 5 минут проверяет каждый маршрут до api.telegram.org.
 
     Сообщает только о смене состояния. Алерт уходит в Telegram, пока жив хоть
-    один маршрут; при полном сбое доставить его некуда — остаётся ERROR в логе.
+    один маршрут; при полном сбое — письмом на MVP_ALERT_EMAIL.
     """
     from app.services import telegram_net
     from app.services.notification_service import notification_service
@@ -223,7 +223,10 @@ async def _telegram_routes_loop():
                 level, text = change
                 logger.log(level, "telegram_routes: %s", text)
                 s = storage_service.get_all_settings()
-                if level != logging.ERROR and s.get("tg_bot_token") and s.get("tg_chat_id"):
+                if level == logging.ERROR:
+                    await notification_service.send_alert_email(
+                        "bondai.ru: Telegram недоступен", text)
+                elif s.get("tg_bot_token") and s.get("tg_chat_id"):
                     await notification_service.send_telegram(
                         s["tg_bot_token"], s["tg_chat_id"], text)
         except Exception:

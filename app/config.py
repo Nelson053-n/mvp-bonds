@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # Куда слать письмо, когда Telegram недоступен по всем маршрутам —
+    # алерт через сам Telegram в этот момент не доставить.
+    alert_email: str = ""
     max_portfolios_per_user: int = 50     # Pro safety net (effectively unlimited)
     max_items_per_portfolio: int = 200
     # Freemium limits — applied to non-Pro users only (Pro is unlimited).
