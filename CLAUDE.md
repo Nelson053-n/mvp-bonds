@@ -136,7 +136,7 @@ Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/
 
 **Публикация отчётов без логина:** HTML-отчёт кладётся на прод в `app/ui/static/` как `report-<случайный-токен>.html` → доступен по `https://bondai.ru/static/report-<token>.html`. Файлы НЕ в git, поэтому автодеплой их не затирает. Удаление: `ssh root@212.8.228.248 rm /opt/mvp-bonds/app/ui/static/report-*.html`.
 
-**Доставка отчётов — Telegram, НЕ почта** (решение пользователя, 2026-07-10): ссылку на отчёт слать через TG-бота проекта **@bondinfoai_bot**; токен и chat_id — в SQLite `app_settings` (`tg_bot_token`/`tg_chat_id`, задаются в UI панели), НЕ в env. Готовая команда — skill `portfolio-report`. На проде нет `sqlite3` CLI — БД читать через `.venv/bin/python3`. Почту не поднимать: Gmail MCP умеет только черновики, SMTP с сервера на порт 25 отбивается (550, нет PTR), `MVP_SMTP_*` сознательно не настраиваем.
+**Доставка отчётов — Telegram, НЕ почта** (решение пользователя, 2026-07-10): ссылку на отчёт слать через TG-бота проекта **@bondinfoai_bot**; токен и chat_id — в SQLite `app_settings` (`tg_bot_token`/`tg_chat_id`, задаются в UI панели), НЕ в env. Готовая команда — skill `portfolio-report`. На проде нет `sqlite3` CLI — БД читать через `.venv/bin/python3`. Отчёты почтой не слать. SMTP при этом настроен (2026-10-11) — только для алерта «Telegram недоступен по всем маршрутам» на `MVP_ALERT_EMAIL` и для кодов сброса пароля: ящик Beget `alert@bondai.ru`, `smtp.beget.com:2525` STARTTLS (порт 25 с сервера по-прежнему отбивается). Ключи `MVP_SMTP_*` — только в `.env` на проде.
 
 ## Design system (UI)
 
