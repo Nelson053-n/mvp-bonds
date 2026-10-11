@@ -8,6 +8,7 @@ import smtplib
 import time
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 
 import bcrypt
 import httpx
@@ -273,6 +274,9 @@ class AuthService:
         msg["Subject"] = subject
         msg["From"] = settings.smtp_from
         msg["To"] = email
+        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
+        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
+        msg["Date"] = formatdate(localtime=True)
         try:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
                 smtp.ehlo()
@@ -371,6 +375,9 @@ class AuthService:
         msg["Subject"] = "Bond AI — email привязан к аккаунту"
         msg["From"] = settings.smtp_from
         msg["To"] = email
+        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
+        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
+        msg["Date"] = formatdate(localtime=True)
         try:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
                 smtp.ehlo()

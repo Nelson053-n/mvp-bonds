@@ -55,6 +55,9 @@ async def test_alert_email_sent(smtp) -> None:
     (addr, frm, to, msg), = smtp
     assert addr == ("smtp.beget.com", 2525)
     assert frm == "alerts@bondai.ru" and to == ["admin@example.com"]
+    # Без Message-ID Gmail отбивает: 550 5.7.1 (так и было на проде).
+    assert "Message-ID: <" in msg and "@bondai.ru>" in msg
+    assert "\nDate: " in msg
 
 
 async def test_not_configured_skips(smtp, monkeypatch) -> None:

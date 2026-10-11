@@ -9,6 +9,7 @@ import logging
 import smtplib
 from datetime import date, timedelta
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 from typing import TYPE_CHECKING
 
 import httpx
@@ -200,6 +201,9 @@ class NotificationService:
         msg["Subject"] = subject
         msg["From"] = settings.smtp_from
         msg["To"] = settings.alert_email
+        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
+        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
+        msg["Date"] = formatdate(localtime=True)
 
         def _send() -> None:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
