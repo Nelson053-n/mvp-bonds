@@ -128,6 +128,21 @@ async def probe_routes() -> dict[str, bool]:
     return dict(zip(ips, results))
 
 
+def confirm(confirmed: dict[str, bool], prev_raw: dict[str, bool] | None,
+            cur_raw: dict[str, bool]) -> dict[str, bool]:
+    """Подтверждённое состояние: меняется, только если два замера подряд совпали.
+
+    149.154.166.110 мигал — пропадал на один замер каждые 30–60 минут, и
+    каждый раз уходило два алерта (12 за 2.3 часа 10–11.10). Новый адрес без
+    подтверждённой истории считаем рабочим, пока два замера не скажут иное.
+    """
+    return {
+        ip: ok if prev_raw is not None and prev_raw.get(ip) == ok
+        else confirmed.get(ip, True)
+        for ip, ok in cur_raw.items()
+    }
+
+
 def describe_change(prev: dict[str, bool] | None,
                     cur: dict[str, bool]) -> tuple[int, str] | None:
     """Что сообщить о смене доступности маршрутов; None — сообщать нечего.

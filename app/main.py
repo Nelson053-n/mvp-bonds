@@ -208,17 +208,28 @@ async def _notification_loop():
 async def _telegram_routes_loop():
     """Раз в 5 минут проверяет каждый маршрут до api.telegram.org.
 
-    Сообщает только о смене состояния. Алерт уходит в Telegram, пока жив хоть
-    один маршрут; при полном сбое — письмом на MVP_ALERT_EMAIL.
+    Сообщает только о смене подтверждённого состояния (два замера подряд).
+    Алерт уходит в Telegram, пока жив хоть один маршрут; при полном сбое —
+    письмом на MVP_ALERT_EMAIL. Состояние хранится в app_settings: иначе после
+    каждого деплоя тот же сбой объявлялся заново.
     """
     from app.services import telegram_net
     from app.services.notification_service import notification_service
-    prev = None
+    try:
+        confirmed = json.loads(storage_service.get_setting("tg_routes_state", "{}"))
+    except Exception:
+        logger.exception("telegram_routes_loop: битый tg_routes_state, начинаем с нуля")
+        confirmed = {}
+    prev_raw = None
     while True:
         try:
             cur = await telegram_net.probe_routes()
-            change = telegram_net.describe_change(prev, cur)
-            prev = cur
+            new = telegram_net.confirm(confirmed, prev_raw, cur)
+            prev_raw = cur
+            change = telegram_net.describe_change(confirmed, new)
+            if new != confirmed:
+                storage_service.set_setting("tg_routes_state", json.dumps(new))
+                confirmed = new
             if change:
                 level, text = change
                 logger.log(level, "telegram_routes: %s", text)

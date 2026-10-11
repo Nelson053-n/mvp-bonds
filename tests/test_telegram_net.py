@@ -124,3 +124,23 @@ class TestDescribeChange:
     def test_recovery_is_info(self) -> None:
         level, _ = describe_change({"a": False, "b": True}, {"a": True, "b": True})
         assert level == logging.INFO
+
+
+class TestConfirm:
+    def test_needs_two_equal_probes(self) -> None:
+        from app.services.telegram_net import confirm
+        assert confirm({"a": True}, {"a": True}, {"a": False}) == {"a": True}
+        assert confirm({"a": True}, {"a": False}, {"a": False}) == {"a": False}
+
+    def test_first_probe_keeps_confirmed(self) -> None:
+        from app.services.telegram_net import confirm
+        assert confirm({"a": False}, None, {"a": True}) == {"a": False}
+
+    def test_unknown_ip_assumed_up(self) -> None:
+        from app.services.telegram_net import confirm
+        assert confirm({}, None, {"b": False}) == {"b": True}
+
+    def test_dropped_ip_forgotten(self) -> None:
+        """Адрес пропал из кандидатов — не висит «недоступным» навсегда."""
+        from app.services.telegram_net import confirm
+        assert confirm({"a": False, "b": True}, {"b": True}, {"b": True}) == {"b": True}
