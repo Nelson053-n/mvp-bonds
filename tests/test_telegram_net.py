@@ -36,6 +36,8 @@ class _FakeInner(httpcore.AsyncNetworkBackend):
 @pytest.fixture(autouse=True)
 def _reset_routes(monkeypatch):
     telegram_net.routes.preferred = None
+    telegram_net.routes.proxy_until = 0.0
+    monkeypatch.setattr(telegram_net.settings, "tg_socks_proxy", "")
 
     async def fake_resolve():
         return ["149.154.166.110"]
@@ -144,3 +146,89 @@ class TestConfirm:
         """Адрес пропал из кандидатов — не висит «недоступным» навсегда."""
         from app.services.telegram_net import confirm
         assert confirm({"a": False, "b": True}, {"b": True}, {"b": True}) == {"b": True}
+
+
+async def _http_server():
+    async def handle(reader, writer):
+        await reader.readuntil(b"\r\n\r\n")
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+        await writer.drain()
+        writer.close()
+    return await asyncio.start_server(handle, "127.0.0.1", 0)
+
+
+async def _socks_server(target_port: int, seen: list, reply: int = 0):
+    """Минимальный SOCKS5: любой CONNECT ведёт на локальный HTTP-сервер."""
+    async def handle(reader, writer):
+        assert await reader.readexactly(3) == b"\x05\x01\x00"
+        writer.write(b"\x05\x00")
+        ver, cmd, _, atyp = await reader.readexactly(4)
+        name = await reader.readexactly((await reader.readexactly(1))[0])
+        port = int.from_bytes(await reader.readexactly(2), "big")
+        seen.append((name.decode(), port))
+        if reply:
+            writer.write(bytes([5, reply, 0, 1]) + b"\0" * 6)
+            await writer.drain()
+            writer.close()
+            return
+        writer.write(b"\x05\x00\x00\x01" + b"\x7f\x00\x00\x01" + port.to_bytes(2, "big"))
+        up_r, up_w = await asyncio.open_connection("127.0.0.1", target_port)
+
+        async def pipe(r, w):
+            try:
+                while data := await r.read(65536):
+                    w.write(data)
+                    await w.drain()
+            finally:
+                w.close()
+        await asyncio.gather(pipe(reader, up_w), pipe(up_r, writer))
+    return await asyncio.start_server(handle, "127.0.0.1", 0)
+
+
+async def test_falls_back_to_socks_proxy_end_to_end() -> None:
+    """Прямой адрес отказывает — запрос уходит через SOCKS5, имя резолвит прокси."""
+    http = await _http_server()
+    hport = http.sockets[0].getsockname()[1]
+    seen: list = []
+    socks = await _socks_server(hport, seen)
+    sport = socks.sockets[0].getsockname()[1]
+    try:
+        async with httpx.AsyncClient(
+            transport=telegram_transport(["127.0.0.2", f"socks5://127.0.0.1:{sport}"]),
+            timeout=5,
+        ) as client:
+            r = await client.get(f"http://{TG_HOST}:{hport}/")
+        assert r.text == "ok"
+        assert seen == [(TG_HOST, hport)]
+    finally:
+        for srv in (http, socks):
+            srv.close()
+            await srv.wait_closed()
+
+
+async def test_socks_refusal_is_connect_error() -> None:
+    seen: list = []
+    socks = await _socks_server(1, seen, reply=5)
+    sport = socks.sockets[0].getsockname()[1]
+    try:
+        backend = _FailoverBackend(httpcore.AnyIOBackend(), ips=[f"socks5://127.0.0.1:{sport}"])
+        with pytest.raises(httpcore.ConnectError):
+            await backend.connect_tcp(TG_HOST, 443, timeout=5)
+    finally:
+        socks.close()
+        await socks.wait_closed()
+
+
+async def test_proxy_last_then_first_after_use(monkeypatch) -> None:
+    monkeypatch.setattr(telegram_net.settings, "tg_socks_proxy", "127.0.0.1:1082")
+    cands = await telegram_net.routes.candidates()
+    assert cands[-1] == "socks5://127.0.0.1:1082"
+    _FailoverBackend._remember("socks5://127.0.0.1:1082")
+    cands = await telegram_net.routes.candidates()
+    assert cands[0] == "socks5://127.0.0.1:1082"
+    # Прокси не становится «предпочтительным прямым адресом».
+    assert telegram_net.routes.preferred is None
+
+
+async def test_no_proxy_configured() -> None:
+    assert not any(c.startswith("socks5://") for c in await telegram_net.routes.candidates())

@@ -59,6 +59,11 @@ _tg() {
       "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
       > /dev/null 2>&1 && return 0
   done
+  # Последний маршрут — SOCKS5-прокси (MVP_TG_SOCKS_PROXY из .env), как в telegram_net.
+  [ -n "${MVP_TG_SOCKS_PROXY:-}" ] && curl -sS --fail --connect-timeout 5 --max-time 15 \
+    --socks5-hostname "$MVP_TG_SOCKS_PROXY" \
+    -d "chat_id=${TG_CHAT}&text=${msg}&parse_mode=HTML" \
+    "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" > /dev/null 2>&1
   return 0
 }
 

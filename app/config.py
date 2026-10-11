@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # Куда слать письмо, когда Telegram недоступен по всем маршрутам —
     # алерт через сам Telegram в этот момент не доставить.
     alert_email: str = ""
+    # Резервный маршрут до api.telegram.org: SOCKS5 host:port (на проде —
+    # туннель wg-google, 127.0.0.1:1082). Пусто — без прокси.
+    tg_socks_proxy: str = ""
     max_portfolios_per_user: int = 50     # Pro safety net (effectively unlimited)
     max_items_per_portfolio: int = 200
     # Freemium limits — applied to non-Pro users only (Pro is unlimited).

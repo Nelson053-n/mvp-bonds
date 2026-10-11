@@ -8,15 +8,22 @@ api.telegram.org. Второй адрес Bot API, 149.154.167.220, при эт�
 
 Подменяется только TCP-соединение: TLS по-прежнему идёт с SNI и проверкой
 сертификата для api.telegram.org, поэтому чужой адрес в списке не пройдёт.
+
+Последний маршрут — SOCKS5-прокси (MVP_TG_SOCKS_PROXY) на случай, когда с
+прода недоступны все адреса Telegram. На проде это туннель wg-google
+(nanabanana) через Нидерланды; у него свой сторож с переключением нод.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import socket
+import time
 
 import httpcore
 import httpx
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +34,8 @@ KNOWN_IPS = ("149.154.167.220", "149.154.166.110")
 # второго адреса дело бы просто не доходило.
 _CONNECT_TIMEOUT = 5.0
 _DNS_TIMEOUT = 3.0
+_PROXY_PREFIX = "socks5://"
+PROXY_FIRST_SECONDS = 300
 
 
 async def _resolve() -> list[str]:
@@ -44,53 +53,121 @@ async def _resolve() -> list[str]:
 
 
 class _Routes:
-    """Последний рабочий адрес процесса — его пробуем первым."""
+    """Последний рабочий прямой адрес процесса — его пробуем первым.
+
+    Прокси (MVP_TG_SOCKS_PROXY) — последний маршрут. Если сработал только он,
+    PROXY_FIRST_SECONDS пробуем его первым: иначе каждое подключение при полном
+    сбое прямых адресов теряло бы по 5с на каждом из них.
+    """
 
     def __init__(self) -> None:
         self.preferred: str | None = None
+        self.proxy_until = 0.0
 
     async def candidates(self) -> list[str]:
         ordered = [self.preferred] if self.preferred else []
         ordered += await _resolve()
         ordered += KNOWN_IPS
-        return list(dict.fromkeys(ordered))
+        direct = list(dict.fromkeys(ordered))
+        proxy = [_PROXY_PREFIX + settings.tg_socks_proxy] if settings.tg_socks_proxy else []
+        if proxy and time.monotonic() < self.proxy_until:
+            return proxy + direct
+        return direct + proxy
 
 
 routes = _Routes()
+
+async def _read_exact(stream, n: int, timeout: float) -> bytes:
+    buf = b""
+    while len(buf) < n:
+        chunk = await stream.read(n - len(buf), timeout)
+        if not chunk:
+            raise httpcore.ConnectError("SOCKS5: соединение закрыто")
+        buf += chunk
+    return buf
+
+
+async def _socks5_connect(stream, host: str, port: int, timeout: float) -> None:
+    """CONNECT через SOCKS5 без авторизации; имя резолвит сам прокси."""
+    await stream.write(b"\x05\x01\x00", timeout)
+    if await _read_exact(stream, 2, timeout) != b"\x05\x00":
+        raise httpcore.ConnectError("SOCKS5: прокси не принял метод без авторизации")
+    name = host.encode()
+    await stream.write(
+        b"\x05\x01\x00\x03" + bytes([len(name)]) + name + port.to_bytes(2, "big"),
+        timeout,
+    )
+    ver, rep, _, atyp = await _read_exact(stream, 4, timeout)
+    if ver != 5 or rep != 0:
+        raise httpcore.ConnectError(f"SOCKS5: отказ CONNECT, код {rep}")
+    if atyp == 1:
+        await _read_exact(stream, 4 + 2, timeout)
+    elif atyp == 4:
+        await _read_exact(stream, 16 + 2, timeout)
+    else:
+        (alen,) = await _read_exact(stream, 1, timeout)
+        await _read_exact(stream, alen + 2, timeout)
 
 
 class _FailoverBackend(httpcore.AsyncNetworkBackend):
     def __init__(self, inner: httpcore.AsyncNetworkBackend,
                  ips: list[str] | None = None) -> None:
         self._inner = inner
-        # Явный список — для проверки одного маршрута: тогда preferred не трогаем.
+        # Явный список — для проверки одного маршрута: тогда состояние не трогаем.
         self._ips = ips
+
+    async def _open(self, route: str, port: int, timeout: float,
+                    local_address, socket_options):
+        if not route.startswith(_PROXY_PREFIX):
+            return await self._inner.connect_tcp(
+                route, port, timeout, local_address, socket_options)
+        phost, _, pport = route[len(_PROXY_PREFIX):].rpartition(":")
+        stream = await self._inner.connect_tcp(
+            phost, int(pport), timeout, local_address, socket_options)
+        try:
+            await _socks5_connect(stream, TG_HOST, port, timeout)
+        except Exception as exc:
+            await stream.aclose()
+            if isinstance(exc, (httpcore.ConnectError, httpcore.ConnectTimeout)):
+                raise
+            raise httpcore.ConnectError(f"SOCKS5: {type(exc).__name__} {exc}") from exc
+        return stream
 
     async def connect_tcp(self, host, port, timeout=None, local_address=None,
                           socket_options=None):
         if host != TG_HOST:
             return await self._inner.connect_tcp(
                 host, port, timeout, local_address, socket_options)
-        ips = self._ips or await routes.candidates()
-        per_ip = min(timeout or _CONNECT_TIMEOUT, _CONNECT_TIMEOUT)
+        candidates = self._ips or await routes.candidates()
+        per_route = min(timeout or _CONNECT_TIMEOUT, _CONNECT_TIMEOUT)
         last_exc: Exception | None = None
-        for ip in ips:
+        for route in candidates:
             try:
-                stream = await self._inner.connect_tcp(
-                    ip, port, per_ip, local_address, socket_options)
+                stream = await self._open(
+                    route, port, per_route, local_address, socket_options)
             except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
                 last_exc = exc
                 continue
-            if self._ips is None and ip != routes.preferred:
-                if routes.preferred:
-                    logger.warning(
-                        "telegram: маршрут %s недоступен, переключились на %s",
-                        routes.preferred, ip,
-                    )
-                routes.preferred = ip
+            if self._ips is None:
+                self._remember(route)
             return stream
         assert last_exc is not None  # candidates() всегда содержит KNOWN_IPS
         raise last_exc
+
+    @staticmethod
+    def _remember(route: str) -> None:
+        if route.startswith(_PROXY_PREFIX):
+            if time.monotonic() >= routes.proxy_until:
+                logger.warning("telegram: прямые адреса недоступны, работаем через %s", route)
+            routes.proxy_until = time.monotonic() + PROXY_FIRST_SECONDS
+            return
+        if route != routes.preferred:
+            if routes.preferred:
+                logger.warning(
+                    "telegram: маршрут %s недоступен, переключились на %s",
+                    routes.preferred, route,
+                )
+            routes.preferred = route
 
     async def connect_unix_socket(self, path, timeout=None, socket_options=None):
         return await self._inner.connect_unix_socket(path, timeout, socket_options)
