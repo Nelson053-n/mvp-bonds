@@ -16,6 +16,7 @@ api.telegram.org. Второй адрес Bot API, 149.154.167.220, при эт�
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import socket
 import time
@@ -255,3 +256,45 @@ def describe_change(prev: dict[str, bool] | None,
             + "; работаем через " + ", ".join(up)
         )
     return logging.INFO, "Telegram: все маршруты снова доступны (" + ", ".join(up) + ")"
+
+
+async def watch_routes() -> None:
+    """Раз в 5 минут проверяет каждый маршрут до api.telegram.org.
+
+    Сообщает только о смене подтверждённого состояния (два замера подряд).
+    Алерт уходит в Telegram, пока жив хоть один маршрут; при полном сбое —
+    письмом на MVP_ALERT_EMAIL. Состояние хранится в app_settings: иначе после
+    каждого деплоя тот же сбой объявлялся заново.
+    """
+    # Лениво: notification_service сам импортирует этот модуль.
+    from app.services.notification_service import notification_service
+    from app.services.storage_service import storage_service
+
+    try:
+        confirmed = json.loads(storage_service.get_setting("tg_routes_state", "{}"))
+    except Exception:
+        logger.exception("telegram_routes: битый tg_routes_state, начинаем с нуля")
+        confirmed = {}
+    prev_raw = None
+    while True:
+        try:
+            cur = await probe_routes()
+            new = confirm(confirmed, prev_raw, cur)
+            prev_raw = cur
+            change = describe_change(confirmed, new)
+            if new != confirmed:
+                storage_service.set_setting("tg_routes_state", json.dumps(new))
+                confirmed = new
+            if change:
+                level, text = change
+                logger.log(level, "telegram_routes: %s", text)
+                s = storage_service.get_all_settings()
+                if level == logging.ERROR:
+                    await notification_service.send_alert_email(
+                        "bondai.ru: Telegram недоступен", text)
+                elif s.get("tg_bot_token") and s.get("tg_chat_id"):
+                    await notification_service.send_telegram(
+                        s["tg_bot_token"], s["tg_chat_id"], text)
+        except Exception:
+            logger.exception("telegram_routes: probe failed")
+        await asyncio.sleep(300)

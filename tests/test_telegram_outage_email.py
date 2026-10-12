@@ -7,7 +7,7 @@ import logging
 
 import pytest
 
-import app.main as main_mod
+from app.services.storage_service import storage_service
 import app.services.mailer as mailer_mod
 from app.config import settings
 from app.services import telegram_net
@@ -96,16 +96,16 @@ async def _run(monkeypatch, probes: list[dict], store: dict | None = None):
         if calls["n"] >= len(probes):
             raise asyncio.CancelledError
 
-    st = main_mod.storage_service
+    st = storage_service
     monkeypatch.setattr(telegram_net, "probe_routes", probe)
     monkeypatch.setattr(notification_service, "send_alert_email", fake_email)
     monkeypatch.setattr(notification_service, "send_telegram", fake_tg)
-    monkeypatch.setattr(main_mod.asyncio, "sleep", sleep)
+    monkeypatch.setattr(telegram_net.asyncio, "sleep", sleep)
     monkeypatch.setattr(st, "get_all_settings", lambda: {"tg_bot_token": "T", "tg_chat_id": "1"})
     monkeypatch.setattr(st, "get_setting", lambda k, d="": store.get(k, d))
     monkeypatch.setattr(st, "set_setting", lambda k, v: store.__setitem__(k, v))
     with pytest.raises(asyncio.CancelledError):
-        await main_mod._telegram_routes_loop()
+        await telegram_net.watch_routes()
     return emails, tgs, store
 
 

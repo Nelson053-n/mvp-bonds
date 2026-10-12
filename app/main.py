@@ -205,46 +205,6 @@ async def _notification_loop():
             logger.exception("notification_loop: coupon check failed")
 
 
-async def _telegram_routes_loop():
-    """Раз в 5 минут проверяет каждый маршрут до api.telegram.org.
-
-    Сообщает только о смене подтверждённого состояния (два замера подряд).
-    Алерт уходит в Telegram, пока жив хоть один маршрут; при полном сбое —
-    письмом на MVP_ALERT_EMAIL. Состояние хранится в app_settings: иначе после
-    каждого деплоя тот же сбой объявлялся заново.
-    """
-    from app.services import telegram_net
-    from app.services.notification_service import notification_service
-    try:
-        confirmed = json.loads(storage_service.get_setting("tg_routes_state", "{}"))
-    except Exception:
-        logger.exception("telegram_routes_loop: битый tg_routes_state, начинаем с нуля")
-        confirmed = {}
-    prev_raw = None
-    while True:
-        try:
-            cur = await telegram_net.probe_routes()
-            new = telegram_net.confirm(confirmed, prev_raw, cur)
-            prev_raw = cur
-            change = telegram_net.describe_change(confirmed, new)
-            if new != confirmed:
-                storage_service.set_setting("tg_routes_state", json.dumps(new))
-                confirmed = new
-            if change:
-                level, text = change
-                logger.log(level, "telegram_routes: %s", text)
-                s = storage_service.get_all_settings()
-                if level == logging.ERROR:
-                    await notification_service.send_alert_email(
-                        "bondai.ru: Telegram недоступен", text)
-                elif s.get("tg_bot_token") and s.get("tg_chat_id"):
-                    await notification_service.send_telegram(
-                        s["tg_bot_token"], s["tg_chat_id"], text)
-        except Exception:
-            logger.exception("telegram_routes_loop: probe failed")
-        await asyncio.sleep(300)
-
-
 async def _price_alert_loop():
     """Check price alerts right after each cache refresh.
 
@@ -582,7 +542,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_tbank_sync_loop())
         asyncio.create_task(_daily_backup_loop())
         asyncio.create_task(_benchmark_snapshot_loop())
-        asyncio.create_task(_telegram_routes_loop())
+        from app.services import telegram_net
+        asyncio.create_task(telegram_net.watch_routes())
         # Public Telegram bond-search bot — only in the leader so a single
         # getUpdates poller exists per token (avoids 409 conflicts). No-op if
         # MVP_TG_BOT_TOKEN is unset.
