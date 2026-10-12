@@ -97,3 +97,16 @@ async def test_change_email_sends_confirmation(client, auth_headers, smtp) -> No
     assert r.status_code == 200, r.text
     assert r.json()["smtp_available"] is True
     assert [to for _, to, _ in smtp] == [["u@example.com"]]
+
+
+async def test_reset_code_telegram_uses_shared_sender(monkeypatch) -> None:
+    """Код сброса в Telegram идёт через notification_service: с повтором и снятием мёртвого chat_id."""
+    from app.services.notification_service import notification_service
+    sent: list = []
+
+    async def fake_send(token, chat_id, text):
+        sent.append((token, chat_id, text))
+        return True
+    monkeypatch.setattr(notification_service, "send_telegram", fake_send)
+    assert await auth_service._send_telegram_reset("T", "42", "123456", "bob") is True
+    assert sent and sent[0][:2] == ("T", "42") and "123456" in sent[0][2]

@@ -8,14 +8,13 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-import httpx
 import jwt
 
 from app.config import settings
 from app.exceptions import AuthError
 from app.services import mailer
 from app.services.storage_service import storage_service
-from app.services.telegram_net import telegram_transport
+from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -231,18 +230,9 @@ class AuthService:
                 f"Код подтверждения: <b>{code}</b>\n\n"
                 f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
             )
-        try:
-            async with httpx.AsyncClient(
-                timeout=10, transport=telegram_transport(),
-            ) as client:
-                r = await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-                )
-                return r.status_code == 200
-        except Exception as e:
-            logger.warning("Telegram reset send failed: %s", e)
-            return False
+        # Общий путь отправки: повтор при сетевом сбое и снятие мёртвого chat_id
+        # (403 / «chat not found»), как у остальных уведомлений.
+        return await notification_service.send_telegram(bot_token, chat_id, text)
 
     async def _send_email_reset(self, email: str, code: str, username: str, lang: str = "ru") -> bool:
         if lang == "en":
