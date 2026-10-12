@@ -3,6 +3,7 @@
 Алерт через сам Telegram в этот момент не доставить — остаётся почта.
 """
 import asyncio
+import json
 import logging
 
 import pytest
@@ -78,8 +79,10 @@ async def _run(monkeypatch, probes: list[dict], store: dict | None = None):
     tgs: list = []
     seq = iter(probes)
 
-    async def probe():
-        return next(seq)
+    async def probe(include_proxy=True):
+        r = next(seq)
+        proxy_calls.append((calls["n"], include_proxy))
+        return {k: v for k, v in r.items() if include_proxy or not k.startswith("socks5://")}
 
     async def fake_email(subject, body):
         emails.append((subject, body))
@@ -90,6 +93,7 @@ async def _run(monkeypatch, probes: list[dict], store: dict | None = None):
         return True
 
     calls = {"n": 0}
+    proxy_calls: list = []
 
     async def sleep(_):
         calls["n"] += 1
@@ -106,6 +110,7 @@ async def _run(monkeypatch, probes: list[dict], store: dict | None = None):
     monkeypatch.setattr(st, "set_setting", lambda k, v: store.__setitem__(k, v))
     with pytest.raises(asyncio.CancelledError):
         await telegram_net.watch_routes()
+    _run.proxy_calls = proxy_calls
     return emails, tgs, store
 
 
@@ -139,3 +144,31 @@ async def test_restart_does_not_repeat_alert(monkeypatch) -> None:
     assert len(tgs1) == 1
     _, tgs2, _ = await _run(monkeypatch, [DOWN, DOWN, DOWN], store=store)
     assert tgs2 == []
+
+
+P = "socks5://127.0.0.1:1082"
+UP_P = {**UP, P: True}
+DOWN_P = {**DOWN, P: True}
+PROXY_DEAD = {**UP, P: False}
+
+
+async def test_proxy_probed_rarely_while_direct_up(monkeypatch) -> None:
+    """Туннель общий с nanabanana: при живых прямых адресах — раз в 6 циклов."""
+    await _run(monkeypatch, [UP_P] * 12)
+    assert sum(p for _, p in _run.proxy_calls) == 2
+
+
+async def test_proxy_probed_every_cycle_when_direct_down(monkeypatch) -> None:
+    # Цикл 1: прямой адрес упал → прокси проверяется в ТОМ ЖЕ цикле, не через 5 мин.
+    await _run(monkeypatch, [UP_P, DOWN_P, DOWN_P] + [DOWN_P] * 5)
+    assert (1, True) in _run.proxy_calls
+    assert all(p for cycle, p in _run.proxy_calls if cycle >= 2)
+
+
+async def test_dead_proxy_confirmed_by_two_real_probes(monkeypatch) -> None:
+    """Пропущенные циклы не подтверждают и не сбрасывают состояние прокси."""
+    _, tgs, store = await _run(monkeypatch, [PROXY_DEAD] * 8)
+    # Настоящие замеры прокси — циклы 0 и 6: оба «мёртв» → один алерт.
+    # Цикл 7 прокси не проверяет — это НЕ повод объявить «снова доступны».
+    assert len(tgs) == 1 and P in tgs[0]
+    assert json.loads(store["tg_routes_state"])[P] is False

@@ -37,6 +37,10 @@ _CONNECT_TIMEOUT = 5.0
 _DNS_TIMEOUT = 3.0
 _PROXY_PREFIX = "socks5://"
 PROXY_FIRST_SECONDS = 300
+# Туннель wg-google общий с nanabanana: пока прямые адреса живы, прокси
+# проверяем раз в PROXY_PROBE_EVERY циклов (30 мин), а не каждые 5 мин —
+# 48 соединений в сутки вместо 288.
+PROXY_PROBE_EVERY = 6
 
 
 _dns_failing = False
@@ -203,9 +207,10 @@ def telegram_transport(ips: list[str] | None = None) -> httpx.AsyncHTTPTransport
     return transport
 
 
-async def probe_routes() -> dict[str, bool]:
+async def probe_routes(include_proxy: bool = True) -> dict[str, bool]:
     """HTTPS-запрос к Telegram через каждый маршрут по отдельности."""
-    ips = await routes.candidates()
+    ips = [r for r in await routes.candidates()
+           if include_proxy or not r.startswith(_PROXY_PREFIX)]
 
     async def one(ip: str) -> bool:
         try:
@@ -275,12 +280,27 @@ async def watch_routes() -> None:
     except Exception:
         logger.exception("telegram_routes: битый tg_routes_state, начинаем с нуля")
         confirmed = {}
-    prev_raw = None
+    prev_raw: dict[str, bool] | None = None
+    direct_down = False
+    tick = 0
     while True:
         try:
-            cur = await probe_routes()
+            probe_proxy = (tick % PROXY_PROBE_EVERY == 0 or direct_down or any(
+                not ok for r, ok in confirmed.items() if not r.startswith(_PROXY_PREFIX)))
+            tick += 1
+            cur = await probe_routes(include_proxy=probe_proxy)
+            direct_down = any(not ok for r, ok in cur.items() if not r.startswith(_PROXY_PREFIX))
+            if direct_down and not probe_proxy:
+                # Прямой адрес упал только что — проверить запасной путь сразу,
+                # а не через цикл.
+                cur = await probe_routes(include_proxy=True)
             new = confirm(confirmed, prev_raw, cur)
-            prev_raw = cur
+            # Непроверенный в этот раз прокси сохраняет подтверждённое состояние,
+            # а prev_raw — его последний НАСТОЯЩИЙ замер: подставить старое
+            # значение как новый замер значило бы подтвердить его вслепую.
+            new.update({r: ok for r, ok in confirmed.items()
+                        if r.startswith(_PROXY_PREFIX) and r not in cur})
+            prev_raw = {**(prev_raw or {}), **cur}
             change = describe_change(confirmed, new)
             if new != confirmed:
                 storage_service.set_setting("tg_routes_state", json.dumps(new))
