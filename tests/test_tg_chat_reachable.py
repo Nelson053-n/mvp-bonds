@@ -115,3 +115,11 @@ class TestEndpoint:
         r = await self._post(client, auth_headers, "")
         assert r.status_code == 204
         assert seen == []
+
+
+    async def test_same_id_not_rechecked(self, client, auth_headers, monkeypatch) -> None:
+        """Повторное сохранение того же ID не шлёт тестовое сообщение снова."""
+        seen = self._check(monkeypatch, True)
+        assert (await self._post(client, auth_headers, "19975908")).status_code == 204
+        assert (await self._post(client, auth_headers, "19975908")).status_code == 204
+        assert len(seen) == 1

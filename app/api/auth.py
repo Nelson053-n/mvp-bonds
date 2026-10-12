@@ -188,7 +188,9 @@ async def update_telegram(
     """Save user's personal Telegram Chat ID for password recovery."""
     chat_id = payload.tg_chat_id.strip() or None
     token = storage_service.get_setting("tg_bot_token", "")
-    if chat_id and token:
+    current = (storage_service.get_user_by_id(current_user["sub"]) or {}).get("tg_chat_id")
+    # Тот же ID уже проверен при сохранении — не слать тестовое сообщение на каждый клик.
+    if chat_id and token and chat_id != current:
         reachable = await notification_service.check_chat_reachable(token, chat_id)
         if reachable is False:
             raise HTTPException(
