@@ -12,6 +12,8 @@ import httpx
 import pytest
 
 from app.services import telegram_net
+
+_REAL_RESOLVE = telegram_net._resolve  # autouse-фикстура ниже подменяет _resolve
 from app.services.telegram_net import (
     TG_HOST, _FailoverBackend, describe_change, telegram_transport,
 )
@@ -232,3 +234,19 @@ async def test_proxy_last_then_first_after_use(monkeypatch) -> None:
 
 async def test_no_proxy_configured() -> None:
     assert not any(c.startswith("socks5://") for c in await telegram_net.routes.candidates())
+
+
+async def test_dns_failure_warns_once(monkeypatch, caplog) -> None:
+    """Упавший DNS: один WARNING на сбой, а не на каждое подключение."""
+    import socket as _socket
+    monkeypatch.setattr(telegram_net, "_dns_failing", False)
+
+    async def boom(*a, **k):
+        raise _socket.gaierror("down")
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(loop, "getaddrinfo", boom)
+    with caplog.at_level(logging.DEBUG, logger="app.services.telegram_net"):
+        for _ in range(5):
+            assert await _REAL_RESOLVE() == []
+    warns = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warns) == 1

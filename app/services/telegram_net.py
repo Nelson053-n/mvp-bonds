@@ -38,7 +38,17 @@ _PROXY_PREFIX = "socks5://"
 PROXY_FIRST_SECONDS = 300
 
 
+_dns_failing = False
+
+
 async def _resolve() -> list[str]:
+    """Адреса из DNS; при сбое — пусто (выручат KNOWN_IPS).
+
+    Резолв идёт на каждое подключение, поэтому о сбое пишем WARNING один раз,
+    повторы — DEBUG, и INFO при восстановлении: иначе при упавшем резолвере
+    десятки одинаковых строк в час, хотя связь при этом работает.
+    """
+    global _dns_failing
     try:
         infos = await asyncio.wait_for(
             asyncio.get_running_loop().getaddrinfo(
@@ -47,8 +57,13 @@ async def _resolve() -> list[str]:
             _DNS_TIMEOUT,
         )
     except Exception as exc:
-        logger.warning("telegram: DNS %s не ответил: %s", TG_HOST, type(exc).__name__)
+        log = logger.debug if _dns_failing else logger.warning
+        log("telegram: DNS %s не ответил: %s", TG_HOST, type(exc).__name__)
+        _dns_failing = True
         return []
+    if _dns_failing:
+        logger.info("telegram: DNS %s снова отвечает", TG_HOST)
+        _dns_failing = False
     return [info[4][0] for info in infos]
 
 
