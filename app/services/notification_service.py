@@ -6,15 +6,13 @@ or coupon payments are upcoming.
 
 import asyncio
 import logging
-import smtplib
 from datetime import date, timedelta
-from email.mime.text import MIMEText
-from email.utils import formatdate, make_msgid
 from typing import TYPE_CHECKING
 
 import httpx
 
 from app.config import settings
+from app.services import mailer
 from app.services.telegram_net import telegram_transport
 
 if TYPE_CHECKING:
@@ -189,37 +187,14 @@ class NotificationService:
         return None
 
     async def send_alert_email(self, subject: str, body: str) -> bool:
-        """Письмо админу на MVP_ALERT_EMAIL через SMTP (те же MVP_SMTP_*).
-
-        Канал на случай, когда недоступен сам Telegram. Тот же STARTTLS, что
-        у писем сброса пароля; smtplib блокирующий — уходит в поток.
-        """
-        if not (settings.alert_email and settings.smtp_host and settings.smtp_from):
-            logger.warning("alert email skipped: MVP_ALERT_EMAIL/MVP_SMTP_* не заданы")
+        """Письмо админу на MVP_ALERT_EMAIL — канал на случай, когда недоступен сам Telegram."""
+        if not settings.alert_email:
+            logger.warning("alert email skipped: MVP_ALERT_EMAIL не задан")
             return False
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = subject
-        msg["From"] = settings.smtp_from
-        msg["To"] = settings.alert_email
-        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
-        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
-        msg["Date"] = formatdate(localtime=True)
-
-        def _send() -> None:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                if settings.smtp_user and settings.smtp_password:
-                    smtp.login(settings.smtp_user, settings.smtp_password)
-                smtp.sendmail(settings.smtp_from, [settings.alert_email], msg.as_string())
-
-        try:
-            await asyncio.to_thread(_send)
-        except Exception as exc:
-            logger.error("alert email failed: %s %s", type(exc).__name__, exc)
-            return False
-        logger.info("AUDIT alert_email sent: %s", subject)
-        return True
+        ok = await mailer.send_mail(settings.alert_email, subject, body, "alert")
+        if not ok:
+            logger.error("alert email не отправлено: %s", subject)
+        return ok
 
     async def send_telegram(
         self, token: str, chat_id: str, text: str

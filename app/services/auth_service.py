@@ -4,11 +4,8 @@ Authentication service for user registration, login, and JWT token management.
 
 import logging
 import secrets
-import smtplib
 import time
 from datetime import datetime, timedelta, timezone
-from email.mime.text import MIMEText
-from email.utils import formatdate, make_msgid
 
 import bcrypt
 import httpx
@@ -16,6 +13,7 @@ import jwt
 
 from app.config import settings
 from app.exceptions import AuthError
+from app.services import mailer
 from app.services.storage_service import storage_service
 from app.services.telegram_net import telegram_transport
 
@@ -207,12 +205,8 @@ class AuthService:
                     sent_via.append("telegram")
 
         if user["email"]:
-            if not settings.smtp_host or not settings.smtp_from:
-                logger.warning("Email set for user %s but SMTP not configured", username)
-            else:
-                ok = self._send_email_reset(user["email"], code, username, lang=lang)
-                if ok:
-                    sent_via.append("email")
+            if await self._send_email_reset(user["email"], code, username, lang=lang):
+                sent_via.append("email")
 
         if not sent_via:
             logger.warning(
@@ -250,10 +244,7 @@ class AuthService:
             logger.warning("Telegram reset send failed: %s", e)
             return False
 
-    def _send_email_reset(self, email: str, code: str, username: str, lang: str = "ru") -> bool:
-        if not settings.smtp_host or not settings.smtp_from:
-            logger.warning("SMTP not configured — cannot send email reset code")
-            return False
+    async def _send_email_reset(self, email: str, code: str, username: str, lang: str = "ru") -> bool:
         if lang == "en":
             body = (
                 f"Bond AI — Password Recovery\n\n"
@@ -270,24 +261,7 @@ class AuthService:
                 f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
             )
             subject = "Bond AI — код восстановления пароля"
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = subject
-        msg["From"] = settings.smtp_from
-        msg["To"] = email
-        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
-        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
-        msg["Date"] = formatdate(localtime=True)
-        try:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                if settings.smtp_user and settings.smtp_password:
-                    smtp.login(settings.smtp_user, settings.smtp_password)
-                smtp.sendmail(settings.smtp_from, [email], msg.as_string())
-            return True
-        except Exception as e:
-            logger.warning("Email reset send failed: %s", e)
-            return False
+        return await mailer.send_mail(email, subject, body, "password_reset")
 
     def confirm_password_reset(self, code: str, new_password: str, client_ip: str = "") -> bool:
         """Apply reset code and set new password. Returns True on success.
@@ -346,7 +320,7 @@ class AuthService:
                 self._RESET_CODE_MAX_ATTEMPTS, invalidated,
             )
 
-    def change_email(self, user_id: int, email: str) -> dict:
+    async def change_email(self, user_id: int, email: str) -> dict:
         """Update user email. Returns dict with success flag and smtp_available."""
         user = storage_service.get_user_by_id(user_id)
         if not user:
@@ -354,42 +328,23 @@ class AuthService:
         clean_email = email.strip() or None
         storage_service.update_user_email(user_id, clean_email)
         logger.info("Email updated for user_id=%d", user_id)
-        smtp_available = bool(settings.smtp_host and settings.smtp_from)
+        smtp_available = mailer.smtp_configured()
         if smtp_available and clean_email:
-            self._send_email_confirmation(clean_email, user.get("username", ""))
+            await self._send_email_confirmation(clean_email, user.get("username", ""))
         return {"ok": True, "smtp_available": smtp_available}
 
-    def _send_email_confirmation(self, email: str, username: str) -> bool:
+    async def _send_email_confirmation(self, email: str, username: str) -> bool:
         """Send a confirmation notice that email has been saved to the account."""
-        if not settings.smtp_host or not settings.smtp_from:
-            return False
-        msg = MIMEText(
+        return await mailer.send_mail(
+            email,
+            "Bond AI — email привязан к аккаунту",
             f"Bond AI — подтверждение email\n\n"
             f"Аккаунт: {username}\n"
             f"Ваш email {email} был успешно привязан к аккаунту Bond AI.\n\n"
             f"Теперь вы сможете использовать его для восстановления пароля.\n"
             f"Если вы не привязывали этот email — проигнорируйте письмо.",
-            "plain",
-            "utf-8",
+            "email_confirmation",
         )
-        msg["Subject"] = "Bond AI — email привязан к аккаунту"
-        msg["From"] = settings.smtp_from
-        msg["To"] = email
-        # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
-        msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)
-        msg["Date"] = formatdate(localtime=True)
-        try:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                if settings.smtp_user and settings.smtp_password:
-                    smtp.login(settings.smtp_user, settings.smtp_password)
-                smtp.sendmail(settings.smtp_from, [email], msg.as_string())
-            logger.info("Confirmation email sent to %s for user %s", email, username)
-            return True
-        except Exception as e:
-            logger.warning("Confirmation email send failed: %s", e)
-            return False
 
     def verify_token(self, token: str) -> dict | None:
         """

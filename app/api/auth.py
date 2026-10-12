@@ -135,7 +135,7 @@ async def change_email(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Change current user's email. Returns smtp_available flag."""
-    result = auth_service.change_email(current_user["sub"], payload.email)
+    result = await auth_service.change_email(current_user["sub"], payload.email)
     if not result["ok"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пользователь не найден")
     return {"smtp_available": result["smtp_available"]}

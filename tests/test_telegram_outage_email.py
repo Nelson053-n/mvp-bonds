@@ -8,7 +8,7 @@ import logging
 import pytest
 
 import app.main as main_mod
-import app.services.notification_service as ns_mod
+import app.services.mailer as mailer_mod
 from app.config import settings
 from app.services import telegram_net
 from app.services.notification_service import notification_service
@@ -42,7 +42,7 @@ class _FakeSMTP:
 @pytest.fixture
 def smtp(monkeypatch):
     _FakeSMTP.sent = []
-    monkeypatch.setattr(ns_mod.smtplib, "SMTP", _FakeSMTP)
+    monkeypatch.setattr(mailer_mod.smtplib, "SMTP", _FakeSMTP)
     monkeypatch.setattr(settings, "smtp_host", "smtp.beget.com")
     monkeypatch.setattr(settings, "smtp_port", 2525)
     monkeypatch.setattr(settings, "smtp_from", "alerts@bondai.ru")
