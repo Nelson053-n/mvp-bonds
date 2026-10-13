@@ -52,7 +52,9 @@ class UpdateInstrumentInput(BaseModel):
     purchase_price: float = Field(..., gt=0)
     purchase_date: date | None = None  # optional
     current_price: float | None = Field(None, gt=0)  # custom items: update live price
-    manual_rating: str | None = Field(None, max_length=16)  # user-set credit rating override
+    # Рейтинг выводится на публичной share-странице; без проверки формата туда
+    # уходил HTML (аудит 12.10.2026, M8). На проде все 106 значений проходят.
+    manual_rating: str | None = Field(None, max_length=16, pattern=r"^$|^[A-Za-zА-Яа-яЁё0-9+\-.() /]{1,16}$")  # user-set credit rating override
     custom_nominal: float | None = Field(None, gt=0)        # face value, custom bonds
     custom_coupon_freq: int | None = Field(None, gt=0)      # coupon payments per year (2/4/12)
     custom_maturity: date | None = None                     # maturity date, custom bonds

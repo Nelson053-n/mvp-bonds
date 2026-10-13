@@ -2468,14 +2468,16 @@
         const cost = b.total_cost ? fmt(b.total_cost) + ' ₽' : '';
         const row = document.createElement('div');
         row.className = 'wiz-bond-row';
+        // Строки из MOEX — в innerHTML только экранированными.
+        const e = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
         row.innerHTML = `
-          <div class="wiz-bond-icon">${b.ticker.substring(0,2)}</div>
+          <div class="wiz-bond-icon">${e(String(b.ticker).substring(0,2))}</div>
           <div style="flex:1;min-width:0;">
-            <div class="wiz-bond-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.name}</div>
-            <div class="wiz-bond-meta">${b.ticker} · ${b.lots} лот · погашение ${mat}</div>
+            <div class="wiz-bond-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(b.name)}</div>
+            <div class="wiz-bond-meta">${e(b.ticker)} · ${e(b.lots)} лот · погашение ${e(mat)}</div>
           </div>
           <div class="wiz-bond-right">
-            <div class="wiz-bond-yield">${b.coupon_percent}%</div>
+            <div class="wiz-bond-yield">${e(b.coupon_percent)}%</div>
             <div class="wiz-bond-cost">${cost}</div>
           </div>
         `;

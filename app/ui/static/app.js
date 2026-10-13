@@ -1635,7 +1635,7 @@
               <span>YTM:</span><span style="text-align:right;font-weight:700;color:${primaryClr};">${r.market_yield.toFixed(2)}%</span>
               <span>Срок:</span><span style="text-align:right;color:${primaryClr};">${p.yrs.toFixed(2)} г</span>
               <span>Доля:</span><span style="text-align:right;color:${primaryClr};">${sharePct}% (${cv} ₽)</span>
-              <span>Рейтинг:</span><span style="text-align:right;color:${p.color};font-weight:600;">${ratingLabel}</span>
+              <span>Рейтинг:</span><span style="text-align:right;color:${p.color};font-weight:600;">${esc(ratingLabel)}</span>
               ${couponLine ? `<span>Купон:</span><span style="text-align:right;color:${primaryClr};">${r.coupon_rate.toFixed(2)}%</span>` : ''}
             </div>
             ${dateLine ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.18);font-size:10px;color:${mutedClr};">${dateLine}</div>` : ''}
@@ -5064,7 +5064,7 @@
                       <p class="auth-desc" data-i18n="login.desc">Войдите или создайте аккаунт</p>
                       <div style="display:flex;flex-direction:column;gap:18px;">
                         <div class="fl-wrap">
-                          <input type="text" id="auth-username" class="fl-input${savedUsername ? ' has-val' : ''}" value="${savedUsername}" autocomplete="username">
+                          <input type="text" id="auth-username" class="fl-input${savedUsername ? ' has-val' : ''}" value="${esc(savedUsername)}" autocomplete="username">
                           <label class="fl-label" for="auth-username" data-i18n="auth.username">Имя пользователя</label>
                         </div>
                         <div class="fl-wrap">
@@ -6292,7 +6292,7 @@
                 <div>Последний: <b style="color:var(--text-primary);">${_fmtAgo(s.last_attempt_ago)}</b></div>
               </div>
               ${s.last_error_code ? `<div style="margin-top:8px;font-size:10px;color:var(--red-400);background:rgba(248,113,113,.08);border-radius:4px;padding:4px 8px;">
-                HTTP ${s.last_error_code}${s.last_error_msg ? ': ' + s.last_error_msg : ''}
+                HTTP ${s.last_error_code}${s.last_error_msg ? ': ' + esc(s.last_error_msg) : ''}
               </div>` : ''}
             `;
             body.appendChild(card);
@@ -8001,15 +8001,15 @@
           div.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
               <span style="font-size:11px;font-weight:700;letter-spacing:.5px;color:${riskClr};text-transform:uppercase;">${riskLbl}</span>
-              <span style="font-size:11px;font-weight:600;color:var(--text-muted);">${c.ticker||''}</span>
+              <span style="font-size:11px;font-weight:600;color:var(--text-muted);">${esc(c.ticker||'')}</span>
             </div>
-            <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:8px;line-height:1.3;">${c.name||c.ticker||'—'}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:8px;line-height:1.3;">${esc(c.name||c.ticker||'—')}</div>
             <div style="display:flex;gap:12px;margin-bottom:10px;">
               <span style="font-size:11px;color:var(--text-muted);">Купон <strong style="color:var(--text-secondary);">${coupon}</strong></span>
               <span style="font-size:11px;color:var(--text-muted);">YTM <strong style="color:var(--text-secondary);">${ytm}</strong></span>
             </div>
             <div style="font-size:11px;color:var(--blue-400);background:rgba(59,130,246,.08);border-radius:6px;padding:5px 8px;margin-bottom:10px;">${esc(c.rationale)}</div>
-            <button onclick="addRecommendedBond('${esc(c.ticker||'')}',${c.purchase_price||100})"
+            <button data-ticker="${esc(c.ticker||'')}" data-price="${Number(c.purchase_price)||100}" onclick="addRecommendedBond(this.dataset.ticker, Number(this.dataset.price))"
               style="width:100%;height:28px;font-size:12px;font-weight:600;background:var(--blue-600);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:.15s;"
               onmouseover="this.style.background='var(--blue-700)'" onmouseout="this.style.background='var(--blue-600)'">
               ${t('rec.add')}
