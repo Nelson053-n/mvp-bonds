@@ -5,6 +5,12 @@ import logging
 import os
 from pathlib import Path
 
+# Файлы, которые создаёт сервис (база, бэкапы, lock), — только владельцу.
+# Сервер общий с другими проектами; с umask 022 новые бэкапы базы получали
+# права 644 и читались любым пользователем (аудит 12.10.2026, H2). Ставим до
+# импорта сервисов: storage_service открывает базу при импорте.
+os.umask(0o077)
+
 from fastapi import FastAPI, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles

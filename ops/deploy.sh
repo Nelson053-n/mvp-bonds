@@ -100,6 +100,17 @@ else
   echo "▶ конфиги nginx не менялись — пропускаю"
 fi
 
+# Секреты и база — только владельцу. До 12.10.2026 .env, portfolio.db и бэкапы
+# были 644, а data/ — 755: на сервере с соседними сервисами (www-data,
+# nanabanana, infodash) любой из них читал JWT-секрет и ключ шифрования
+# токенов T-Bank (аудит, H2). Идемпотентно и на каждом деплое — права,
+# расширенные руками, вернутся. Сервис работает от root и доступ не теряет.
+echo "▶ права на секреты и данные…"
+chmod 600 .env
+chmod 700 data
+[ -d data/backups ] && chmod 700 data/backups
+find data -type f -exec chmod 600 {} +
+
 echo "▶ smoke-импорт app.main (env из .env)…"
 set -a; . ./.env; set +a
 if ! .venv/bin/python3 -c 'import app.main' ; then
