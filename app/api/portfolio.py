@@ -133,6 +133,9 @@ async def restore_instrument(
 ) -> dict[str, bool]:
     """Restore a soft-deleted instrument."""
     await get_portfolio_or_403(portfolio_id, current_user)
+    # Восстановление тоже добавляет бумагу в портфель (аудит M6).
+    if storage_service.count_items(portfolio_id) >= app_settings.max_items_per_portfolio:
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
     restored = storage_service.restore_item(item_id, portfolio_id)
     if not restored:
         raise HTTPException(status_code=404, detail="Удалённая строка не найдена")
@@ -234,6 +237,10 @@ async def move_instrument(
     """Move instrument to another portfolio owned by the same user."""
     await get_portfolio_or_403(portfolio_id, current_user)
     await get_portfolio_or_403(payload.target_portfolio_id, current_user)
+    # Перенос не должен переполнять целевой портфель (аудит M6).
+    if (payload.target_portfolio_id != portfolio_id
+            and storage_service.count_items(payload.target_portfolio_id) >= app_settings.max_items_per_portfolio):
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
 
     moved = storage_service.move_instrument(item_id, portfolio_id, payload.target_portfolio_id)
     if not moved:

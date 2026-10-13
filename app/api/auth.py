@@ -138,7 +138,7 @@ async def change_password(
 
 
 class ChangeUsernameInput(BaseModel):
-    new_username: str = Field(..., min_length=3, max_length=64, pattern=_USERNAME_PATTERN)
+    new_username: str = Field(..., min_length=3, max_length=32, pattern=_USERNAME_PATTERN)
 
 
 @router.patch("/me/username", status_code=status.HTTP_204_NO_CONTENT)
@@ -147,6 +147,13 @@ async def change_username(
     current_user: dict = Depends(get_current_user),
 ) -> None:
     """Change current user's username."""
+    # Ответ 409/204 раскрывает, занято ли имя: без лимита это перебор логинов
+    # в обход лимита регистраций (аудит M9).
+    if not storage_service.check_rate_limit(f"change_username:{current_user['sub']}", 3600, 10):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много попыток. Попробуйте позже",
+        )
     ok = auth_service.change_username(current_user["sub"], payload.new_username)
     if not ok:
         raise HTTPException(
@@ -246,6 +253,16 @@ async def create_telegram_link(current_user: dict = Depends(get_current_user)) -
     storage_service.create_tg_link_nonce(
         current_user["sub"], nonce, int(time.time()) + _TG_LINK_TTL)
     return {"url": f"https://t.me/{settings.tg_bot_username}?start=link_{nonce}"}
+
+
+@router.get("/me/telegram/link/status")
+async def telegram_link_status(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ждёт ли ссылка привязки нажатия Start (код ещё не погашен ботом)."""
+    user = storage_service.get_user_by_id(current_user["sub"]) or {}
+    return {
+        "pending": storage_service.has_tg_link_nonce(current_user["sub"], int(time.time())),
+        "tg_chat_id": user.get("tg_chat_id"),
+    }
 
 
 class ForgotPasswordInput(BaseModel):

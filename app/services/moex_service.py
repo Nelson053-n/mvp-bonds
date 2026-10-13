@@ -22,7 +22,8 @@ _SECID_RE = re.compile(r"^(?=.*[A-Z0-9])[A-Z0-9._-]{1,32}$")
 
 
 def valid_secid(secid: str) -> bool:
-    return bool(_SECID_RE.match(secid))
+    # fullmatch, а не match: «$» в re.match пропускает завершающий «\n».
+    return bool(_SECID_RE.fullmatch(secid))
 
 # Retries for transient MOEX failures. Kept short: the cache loop runs every
 # 300s and refreshes portfolios concurrently, so a long backoff would stack up.

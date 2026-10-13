@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, get_portfolio_or_403, user_is_pro
+from app.api.deps import get_current_user, get_portfolio_or_403, portfolio_limit_refusal, user_is_pro
 from app.services.moex_service import valid_secid
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
@@ -119,7 +119,7 @@ async def create_portfolio(
 ) -> dict:
     """Create a new portfolio for current user."""
     user_id = current_user["sub"]
-    refusal = _portfolio_limit_refusal(current_user)
+    refusal = portfolio_limit_refusal(current_user)
     if refusal:
         raise HTTPException(status_code=400, detail=refusal)
     portfolio_id = storage_service.create_portfolio(user_id, payload.name)
@@ -163,21 +163,6 @@ async def export_all_portfolios(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=all_portfolios.csv"},
     )
-
-
-def _portfolio_limit_refusal(current_user: dict) -> str | None:
-    """Текст отказа, если новый портфель превысит лимит тарифа; иначе None.
-
-    Общий для создания и импорта: import-all создавал портфели в обход лимита
-    free-тарифа (аудит 12.10.2026, M6).
-    """
-    pro = user_is_pro(current_user)
-    limit = app_settings.max_portfolios_per_user if pro else app_settings.free_max_portfolios
-    if storage_service.count_portfolios(current_user["sub"]) < limit:
-        return None
-    if pro:
-        return f"Максимум {limit} портфелей на аккаунт"
-    return f"На бесплатном тарифе — до {limit} портфелей. Оформите Pro для большего."
 
 
 @router.post("/import-all")
@@ -249,7 +234,7 @@ async def import_all_portfolios(
             if len(portfolio_name) > 100:
                 errors.append(f"Строка {i}: название портфеля длиннее 100 символов")
                 continue
-            refusal = _portfolio_limit_refusal(current_user)
+            refusal = portfolio_limit_refusal(current_user)
             if refusal:
                 errors.append(f"Строка {i}: {refusal}")
                 continue
@@ -902,6 +887,9 @@ async def merge_portfolio(
         raise HTTPException(status_code=400, detail="Нельзя объединить портфель с самим собой")
     await get_portfolio_or_403(portfolio_id, current_user)
     await get_portfolio_or_403(target_id, current_user)
+    # Слияние не должно переполнять целевой портфель (аудит M6).
+    if storage_service.count_items(target_id) + storage_service.count_items(portfolio_id) > app_settings.max_items_per_portfolio:
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
     moved = storage_service.merge_portfolios(portfolio_id, target_id)
     return {"moved": moved}
 

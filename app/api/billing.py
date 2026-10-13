@@ -117,7 +117,14 @@ def _grant_pro_from_payment(payment: dict) -> bool:
         except ValueError:
             pass
     until = (base + timedelta(days=days)).isoformat()
-    storage_service.set_user_pro(user_id, True, until)
+    try:
+        storage_service.set_user_pro(user_id, True, until)
+    except Exception:
+        # Pro не выдан — снять заявку на платёж, иначе повтор уведомления
+        # ЮKassa счёл бы его дублем, и оплата пропала бы навсегда.
+        if payment_id:
+            storage_service.delete_pro_payment(payment_id)
+        raise
     logger.info("AUDIT pro_granted_via_payment: user_id=%d plan=%s until=%s", user_id, plan, until)
     return True
 

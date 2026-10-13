@@ -24,6 +24,7 @@ from datetime import date
 import httpx
 
 from app.config import settings
+from app.services.moex_service import valid_secid
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,8 @@ class CouponScheduleService:
 
     async def _fetch_schedule(self, secid: str) -> list[tuple[date, float]] | None:
         """Return [(coupon_date, value_per_bond), ...] or None on failure."""
+        if not valid_secid(secid):  # secid идёт в путь URL MOEX (аудит M7)
+            return None
         base = settings.moex_base_url.rstrip("/")
         url = f"{base}/securities/{secid}/bondization.json?iss.meta=off&limit=100"
         try:

@@ -3272,7 +3272,7 @@
             const rBg = isTop ? 'rgba(34,197,94,.15)' : isMid ? 'rgba(59,130,246,.15)' : 'rgba(251,191,36,.15)';
             const rColor = isTop ? '#4ade80' : isMid ? '#60a5fa' : '#fbbf24';
             const rBorder = isTop ? 'rgba(34,197,94,.3)' : isMid ? 'rgba(59,130,246,.25)' : 'rgba(251,191,36,.3)';
-            ratingHtml = `<span class="pw-rating-badge" style="background:${rBg};color:${rColor};border-color:${rBorder};">${ratingValue}</span>`;
+            ratingHtml = `<span class="pw-rating-badge" style="background:${rBg};color:${rColor};border-color:${rBorder};">${esc(ratingValue)}</span>`;
           } else if (b.listlevel) {
             const lvlLabel = ['', 'Ур.1', 'Ур.2', 'Ур.3'][b.listlevel] || `Ур.${b.listlevel}`;
             const lvlColor = b.listlevel === 1 ? '#4ade80' : b.listlevel === 2 ? '#60a5fa' : '#94a3b8';
@@ -7482,7 +7482,6 @@
       let tgLinkPoll = null;
       document.getElementById('acc-tg-btn').addEventListener('click', async () => {
         const st = document.getElementById('acc-tg-status');
-        // Окно открываем синхронно по клику: открытое после await блокирует Safari.
         const win = window.open('', '_blank');
         try {
           const r = await apiFetch('/auth/me/telegram/link', { method: 'POST' });
@@ -7509,9 +7508,11 @@
           tgLinkPoll = setInterval(async () => {
             tries += 1;
             try {
-              const rr = await apiFetch('/auth/me/portfolios-stats');
+              // Признак привязки — бот погасил одноразовый код. По одному
+              // tg_chat_id судить нельзя: при повторной привязке он уже есть.
+              const rr = await apiFetch('/auth/me/telegram/link/status');
               const dd = rr.ok ? await rr.json() : {};
-              if (dd.tg_chat_id) {
+              if (dd.pending === false && dd.tg_chat_id) {
                 clearInterval(tgLinkPoll);
                 renderTgState(dd.tg_chat_id);
                 st.textContent = t('settings.account.tgConnected');
@@ -8224,7 +8225,11 @@
             ? 'Купоны для бумаг из Т-Банка берутся из журнала операций — дата покупки на полную прибыль не влияет.'
             : 'Учитывает полученные купоны в полной прибыли.';
         }
-        document.getElementById('edit-modal-rating').value = row.company_rating != null ? row.company_rating : '';
+        const ratingInput = document.getElementById('edit-modal-rating');
+        ratingInput.value = row.company_rating != null ? row.company_rating : '';
+        // Исходное значение: авто-рейтинг (SmartLab с датой бывает длиннее 16
+        // символов) не должен уходить как ручной при любой правке количества.
+        ratingInput.dataset.initial = ratingInput.value;
         document.getElementById('edit-modal-status').textContent = '';
         modal.style.display = 'flex';
         setTimeout(() => document.getElementById('edit-modal-price').focus(), 80);
@@ -8247,7 +8252,9 @@
         try {
           const payload = { quantity: qty, purchase_price: price };
           if (dateVal) payload.purchase_date = dateVal;
-          payload.manual_rating = (document.getElementById('edit-modal-rating').value || '').trim();
+          const ratingEl = document.getElementById('edit-modal-rating');
+          const ratingVal = (ratingEl.value || '').trim();
+          if (ratingVal !== (ratingEl.dataset.initial || '').trim()) payload.manual_rating = ratingVal;
           if (_editIsCustom) {
             const cp = parseFloat(document.getElementById('edit-modal-curprice').value);
             if (cp > 0) payload.current_price = cp;

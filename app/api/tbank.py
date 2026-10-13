@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, user_can_autosync, FREE_AUTOSYNC_DAYS
+from app.api.deps import get_current_user, user_can_autosync, FREE_AUTOSYNC_DAYS, portfolio_limit_refusal
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.crypto_utils import encrypt_token
@@ -97,12 +97,11 @@ async def import_tbank_portfolio(
     """Import a T-Bank account as a new portfolio."""
     user_id = current_user["sub"]
 
-    count = storage_service.count_portfolios(user_id)
-    if count >= app_settings.max_portfolios_per_user:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Максимум {app_settings.max_portfolios_per_user} портфелей на аккаунт",
-        )
+    # Тот же лимит тарифа, что при обычном создании: раньше здесь стоял только
+    # общий Pro-потолок, и free-пользователь обходил free_max_portfolios (M6).
+    refusal = portfolio_limit_refusal(current_user)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
 
     svc = TBankService(payload.token)
 

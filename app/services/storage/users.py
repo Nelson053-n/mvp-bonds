@@ -232,6 +232,15 @@ class UsersMixin:
             )
             conn.commit()
 
+    def has_tg_link_nonce(self, user_id: int, now_ts: int) -> bool:
+        """Есть ли у пользователя непогашенный и непросроченный код привязки."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM tg_link_nonces WHERE user_id = ? AND expires_at > ? LIMIT 1",
+                (user_id, now_ts),
+            ).fetchone()
+        return row is not None
+
     def consume_tg_link_nonce(self, nonce: str, now_ts: int) -> int | None:
         """Погасить код привязки атомарно; user_id или None (нет/просрочен/уже использован)."""
         with self._connect() as conn:

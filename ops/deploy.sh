@@ -94,7 +94,9 @@ if ! git diff --quiet "$PREV_HEAD" "$NEW_HEAD" -- "$NGINX_SITE_SRC" "$NGINX_ZONE
     cp -a "$NGINX_BAK/bondai-ratelimit.conf" "$NGINX_ZONE_DST" 2>/dev/null || true
     nginx -t >/dev/null 2>&1 && systemctl reload nginx
     echo "  прежний конфиг восстановлен"
-    exit 1
+    # Раньше здесь был exit 1: код уже подтянут git pull, но сервис не
+    # перезапускался, а следующий запуск таймера видел HEAD == origin и
+    # больше не деплоил — новый код на диске, старый в памяти.
   fi
 else
   echo "▶ конфиги nginx не менялись — пропускаю"
@@ -175,11 +177,13 @@ from app.config import settings
 from app.services.auth_service import auth_service
 
 con = sqlite3.connect(f"file:{settings.sqlite_db_path}?mode=ro", uri=True)
-row = con.execute("SELECT id, username FROM users ORDER BY id LIMIT 1").fetchone()
+row = con.execute("SELECT id, username, token_version FROM users ORDER BY id LIMIT 1").fetchone()
 if not row:
     print("SKIP таблица users пуста")
     raise SystemExit
-token = auth_service.create_token(row[0], row[1], False)
+# token_version обязателен: без него после смены пароля пользователем проба
+# получала бы 401 и молча переставала проверять работу с портфелями.
+token = auth_service.create_token(row[0], row[1], False, row[2])
 req = urllib.request.Request(
     "http://127.0.0.1:8002/auth/me/portfolios-stats",
     headers={"Authorization": f"Bearer {token}"},

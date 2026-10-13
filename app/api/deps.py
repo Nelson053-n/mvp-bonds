@@ -49,6 +49,24 @@ def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
+def portfolio_limit_refusal(current_user: dict) -> str | None:
+    """Текст отказа, если новый портфель превысит лимит тарифа; иначе None.
+
+    Единая проверка для всех путей создания портфеля (создание, import-all,
+    импорт из Т-Банка): по отдельности они обходили free-лимит (аудит
+    12.10.2026, M6).
+    """
+    from app.config import settings as app_settings
+    from app.services.storage_service import storage_service
+    pro = user_is_pro(current_user)
+    limit = app_settings.max_portfolios_per_user if pro else app_settings.free_max_portfolios
+    if storage_service.count_portfolios(current_user["sub"]) < limit:
+        return None
+    if pro:
+        return f"Максимум {limit} портфелей на аккаунт"
+    return f"На бесплатном тарифе — до {limit} портфелей. Оформите Pro для большего."
+
+
 def user_is_pro(current_user: dict) -> bool:
     """Effective Pro status read live from the DB (never trust the JWT)."""
     from app.services.storage_service import storage_service
@@ -98,7 +116,16 @@ async def get_optional_user(request: Request) -> dict | None:
         return None
 
     token = auth_header[7:]
-    return auth_service.verify_token(token)
+    payload = auth_service.verify_token(token)
+    if payload is None:
+        return None
+    # Та же сверка версии и прав, что в get_current_user: отозванный сменой
+    # пароля токен не должен приниматься и на маршрутах с опциональным входом.
+    user = storage_service.get_user_by_id(payload.get("sub"))
+    if user is None or int(payload.get("tv", 0)) != user["token_version"]:
+        return None
+    payload["is_admin"] = user["is_admin"]
+    return payload
 
 
 async def get_portfolio_or_403(portfolio_id: int, current_user: dict) -> dict:

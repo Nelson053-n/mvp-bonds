@@ -13,6 +13,8 @@ from pathlib import Path
 os.umask(0o077)
 
 from fastapi import FastAPI, Depends, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -609,6 +611,28 @@ _API_PREFIXES = (
     "/settings/", "/admin/", "/watchlist/", "/tbank/",
     "/health", "/api-info",
 )
+
+
+# Поля форм входа/регистрации/профиля → понятное сообщение. Стандартный 422
+# отдаёт detail списком, а фронт выводит String(detail) — пользователь видел
+# «[object Object]» после того, как у username появился белый список символов.
+_AUTH_FIELD_MESSAGES = {
+    "username": "Имя: 3–32 символа — буквы, цифры и _ . @ + -",
+    "new_username": "Имя: 3–32 символа — буквы, цифры и _ . @ + -",
+    "password": "Пароль — не короче 6 символов",
+    "new_password": "Пароль — не короче 6 символов",
+    "email": "Неверный формат email",
+    "tg_chat_id": "Неверный Telegram ID",
+}
+
+
+@app.exception_handler(RequestValidationError)
+async def auth_validation_handler(request: Request, exc: RequestValidationError):
+    if not request.url.path.startswith("/auth/"):
+        return await request_validation_exception_handler(request, exc)
+    fields = [str(e.get("loc", ())[-1]) for e in exc.errors() if e.get("loc")]
+    msgs = list(dict.fromkeys(_AUTH_FIELD_MESSAGES.get(f, "Проверьте введённые данные") for f in fields))
+    return JSONResponse(status_code=422, content={"detail": "; ".join(msgs) or "Проверьте введённые данные"})
 
 
 @app.exception_handler(404)

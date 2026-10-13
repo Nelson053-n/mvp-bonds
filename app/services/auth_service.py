@@ -266,9 +266,11 @@ class AuthService:
         """Apply reset code and set new password. Returns True on success.
 
         Defenses against code-space brute-force:
-        - per-IP rate limit on FAILED confirm attempts (window-based, via SQLite) —
-          successful resets do not consume the window, so a legitimate user can
-          always reset even if an attacker has exhausted the IP they share;
+        - per-IP limit on FAILED confirm attempts (window-based, via SQLite),
+          checked in the route BEFORE this call: a blocked IP gets 429 without
+          the code being looked at — including a correct one, so a legitimate
+          user behind the same NAT as an attacker waits out the 15-min window
+          (аудит 12.10.2026, H1: раньше заблокированный IP перебирал коды);
         - per-code wrong-attempt counter — every live code dies after
           _RESET_CODE_MAX_ATTEMPTS guesses from any source.
 

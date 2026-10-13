@@ -1218,6 +1218,12 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             conn.commit()
             return cursor.rowcount == 1
 
+    def delete_pro_payment(self, payment_id: str) -> None:
+        """Снять заявку на платёж (Pro не удалось выдать — повтор уведомления должен пройти)."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM pro_payments WHERE payment_id = ?", (payment_id,))
+            conn.commit()
+
     def get_pro_payments(self, limit: int = 200) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(

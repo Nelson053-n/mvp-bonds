@@ -98,7 +98,8 @@ async def cmd_anomalies(pid: int):
     if not p:
         _p(f"portfolio {pid} not found")
         return
-    tok = auth_service.create_token(p["user_id"], "ops", False)
+    owner = storage_service.get_user_by_id(p["user_id"]) or {}
+    tok = auth_service.create_token(p["user_id"], "ops", False, owner.get("token_version", 0))
     req = urllib.request.Request(
         f"http://127.0.0.1:8000/portfolios/{pid}/analytics-extra",
         headers={"Authorization": "Bearer " + tok},
@@ -161,7 +162,8 @@ def cmd_token(user_id: int):
     from app.services.storage_service import storage_service
     u = storage_service.get_user_by_id(user_id)
     name = u.get("username", "user") if u else "user"
-    _p(auth_service.create_token(user_id, name, bool(u.get("is_admin")) if u else False))
+    _p(auth_service.create_token(user_id, name, bool(u.get("is_admin")) if u else False,
+                                 u.get("token_version", 0) if u else 0))
 
 
 def cmd_user(email: str):
