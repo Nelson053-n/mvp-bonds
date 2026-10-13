@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
 
@@ -35,7 +36,10 @@ def _send_sync(to: str, subject: str, body: str) -> None:
     msg["Date"] = formatdate(localtime=True)
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=_SMTP_TIMEOUT) as smtp:
         smtp.ehlo()
-        smtp.starttls()
+        # Без context smtplib берёт непроверяющий контекст (CERT_NONE): любой
+        # на пути до SMTP-сервера получил бы пароль ящика и коды сброса
+        # (аудит 12.10.2026, M1). Сертификат Beget *.beget.com проверку проходит.
+        smtp.starttls(context=ssl.create_default_context())
         if settings.smtp_user and settings.smtp_password:
             smtp.login(settings.smtp_user, settings.smtp_password)
         smtp.sendmail(settings.smtp_from, [to], msg.as_string())

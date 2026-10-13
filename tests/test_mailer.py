@@ -29,8 +29,8 @@ class _SlowSMTP:
     def ehlo(self):
         pass
 
-    def starttls(self):
-        pass
+    def starttls(self, context=None):
+        _SlowSMTP.tls_context = context
 
     def login(self, user, password):
         pass
@@ -110,3 +110,13 @@ async def test_reset_code_telegram_uses_shared_sender(monkeypatch) -> None:
     monkeypatch.setattr(notification_service, "send_telegram", fake_send)
     assert await auth_service._send_telegram_reset("T", "42", "123456", "bob") is True
     assert sent and sent[0][:2] == ("T", "42") and "123456" in sent[0][2]
+
+
+async def test_starttls_verifies_certificate(smtp) -> None:
+    """Аудит M1: без context smtplib не проверяет сертификат SMTP-сервера."""
+    import ssl
+    _SlowSMTP.tls_context = None
+    await mailer.send_mail("u@example.com", "S", "B", "test")
+    ctx = _SlowSMTP.tls_context
+    assert ctx is not None
+    assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname is True

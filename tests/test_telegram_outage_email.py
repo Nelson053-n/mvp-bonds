@@ -30,7 +30,7 @@ class _FakeSMTP:
     def ehlo(self):
         pass
 
-    def starttls(self):
+    def starttls(self, context=None):
         pass
 
     def login(self, user, password):
