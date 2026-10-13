@@ -198,3 +198,34 @@ async def test_pdf_endpoint_rejects_foreign_portfolio(client, auth_headers):
 async def test_pdf_endpoint_validates_lang(client, auth_headers):
     resp = await client.get("/portfolios/1/report.pdf?lang=xx", headers=auth_headers)
     assert resp.status_code == 422
+
+
+def test_markup_in_names_does_not_fetch_urls() -> None:
+    """Аудит M3: <img src> в имени портфеля/бумаги заставлял reportlab ходить по URL.
+
+    Поднимаем локальный HTTP-сервер и подставляем ссылку на него во все
+    пользовательские строки: ни одного запроса быть не должно, PDF — собран.
+    """
+    import http.server
+    import threading
+
+    hits: list = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    tag = f'<img src="http://127.0.0.1:{srv.server_address[1]}/probe" width="1" height="1"/>'
+    try:
+        data = _generate_pdf(f"P{tag}", [_row(name=f"N{tag}", ticker=f"T{tag}", company_rating=f"R{tag}")], "ru")
+    finally:
+        srv.shutdown()
+    assert data[:4] == b"%PDF"
+    assert hits == [], hits

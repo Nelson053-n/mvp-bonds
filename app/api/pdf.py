@@ -3,6 +3,7 @@ import io
 import os
 from datetime import date
 from typing import Literal
+from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -254,7 +255,7 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
     today_str = date.today().strftime("%d.%m.%Y") if lang == "ru" else date.today().isoformat()
 
     elements.append(Paragraph(t("title"), title_style))
-    elements.append(Paragraph(f"{t('portfolio')}: <b>{portfolio_name}</b>", sub_style))
+    elements.append(Paragraph(f"{t('portfolio')}: <b>{xml_escape(portfolio_name)}</b>", sub_style))
     elements.append(Paragraph(f"{t('generated')}: {today_str}", sub_style))
     elements.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=6))
 
@@ -382,11 +383,15 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
     table_data = [hdr_paragraphs]
     total_pnl = 0.0
 
+    # Paragraph разбирает разметку reportlab, включая <img src=...>, который
+    # открывает любой URL или файл: имя портфеля или бумаги с таким тегом
+    # заставляло сервер ходить по произвольному адресу (аудит 12.10.2026, M3).
+    # В ячейки идёт только текст — экранируем всегда.
     def _cell(text: str) -> Paragraph:
-        return Paragraph(str(text), cell_style)
+        return Paragraph(xml_escape(str(text)), cell_style)
 
     def _cell_r(text: str) -> Paragraph:
-        return Paragraph(str(text), cell_style_r)
+        return Paragraph(xml_escape(str(text)), cell_style_r)
 
     for i, row in enumerate(rows, 1):
         pnl_val = ((row.current_price or 0) - (row.purchase_price or 0)) * (row.quantity or 0)
@@ -405,7 +410,7 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
         pnl_hex = "#16a34a" if pnl_val >= 0 else "#dc2626"
 
         # Name column uses word-wrap Paragraph; P&L cells use colour markup
-        name_text = str(row.name or "")
+        name_text = xml_escape(str(row.name or ""))
         pnl_para = Paragraph(
             f'<font color="{pnl_hex}">{pnl_sign}{_fmt(pnl_val)}</font>',
             cell_style_r,
