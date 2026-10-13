@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_portfolio_or_403, user_is_pro
+from app.services.moex_service import valid_secid
 from app.config import settings as app_settings
 from app.exceptions import AppError, InstrumentNotFoundError
 from app.models import (
@@ -86,6 +87,9 @@ async def add_instruments_bulk(
 ) -> dict:
     """Add multiple instruments at once, with a single cache refresh."""
     await get_portfolio_or_403(portfolio_id, current_user)
+    # Лимит инструментов действовал только на одиночное добавление (аудит M6).
+    if storage_service.count_items(portfolio_id) + len(payloads) > app_settings.max_items_per_portfolio:
+        raise HTTPException(status_code=400, detail=f"Максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
     try:
         result = await portfolio_service.add_instruments_bulk(portfolio_id, payloads)
     except AppError as exc:
@@ -354,6 +358,10 @@ async def import_csv(
             errors.append(f"Строка {i}: quantity и purchase_price должны быть > 0")
             continue
 
+        if not valid_secid(ticker):
+            errors.append(f"Строка {i}: неверный тикер")
+            continue
+
         try:
             # Check if item with same ticker and type already exists
             existing = storage_service.get_item_by_ticker(
@@ -367,6 +375,10 @@ async def import_csv(
                     quantity,
                     purchase_price,
                 )
+            elif storage_service.count_items(portfolio_id) >= app_settings.max_items_per_portfolio:
+                # Лимит инструментов действовал только на одиночное добавление (аудит M6).
+                errors.append(f"Строка {i}: максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
+                continue
             else:
                 # Add new item
                 storage_service.add_item(

@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user, get_portfolio_or_403, user_is_pro
+from app.services.moex_service import valid_secid
 from app.config import settings as app_settings
 from app.services.cache_service import cache_service
 from app.services.cbr_service import cbr_service
@@ -118,18 +119,9 @@ async def create_portfolio(
 ) -> dict:
     """Create a new portfolio for current user."""
     user_id = current_user["sub"]
-    count = storage_service.count_portfolios(user_id)
-    # Free users are capped; Pro is unlimited (up to the legacy hard safety net).
-    if user_is_pro(current_user):
-        limit = app_settings.max_portfolios_per_user
-    else:
-        limit = app_settings.free_max_portfolios
-    if count >= limit:
-        if user_is_pro(current_user):
-            detail = f"Максимум {limit} портфелей на аккаунт"
-        else:
-            detail = f"На бесплатном тарифе — до {limit} портфелей. Оформите Pro для большего."
-        raise HTTPException(status_code=400, detail=detail)
+    refusal = _portfolio_limit_refusal(current_user)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
     portfolio_id = storage_service.create_portfolio(user_id, payload.name)
     portfolio = storage_service.get_portfolio(portfolio_id)
 
@@ -171,6 +163,21 @@ async def export_all_portfolios(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=all_portfolios.csv"},
     )
+
+
+def _portfolio_limit_refusal(current_user: dict) -> str | None:
+    """Текст отказа, если новый портфель превысит лимит тарифа; иначе None.
+
+    Общий для создания и импорта: import-all создавал портфели в обход лимита
+    free-тарифа (аудит 12.10.2026, M6).
+    """
+    pro = user_is_pro(current_user)
+    limit = app_settings.max_portfolios_per_user if pro else app_settings.free_max_portfolios
+    if storage_service.count_portfolios(current_user["sub"]) < limit:
+        return None
+    if pro:
+        return f"Максимум {limit} портфелей на аккаунт"
+    return f"На бесплатном тарифе — до {limit} портфелей. Оформите Pro для большего."
 
 
 @router.post("/import-all")
@@ -234,7 +241,18 @@ async def import_all_portfolios(
             errors.append(f"Строка {i}: quantity и purchase_price должны быть > 0")
             continue
 
+        if not valid_secid(ticker):
+            errors.append(f"Строка {i}: неверный тикер")
+            continue
+
         if portfolio_name not in portfolio_cache:
+            if len(portfolio_name) > 100:
+                errors.append(f"Строка {i}: название портфеля длиннее 100 символов")
+                continue
+            refusal = _portfolio_limit_refusal(current_user)
+            if refusal:
+                errors.append(f"Строка {i}: {refusal}")
+                continue
             pid = storage_service.create_portfolio(user_id, portfolio_name)
             portfolio_cache[portfolio_name] = pid
 
@@ -244,6 +262,9 @@ async def import_all_portfolios(
             existing_item = storage_service.get_item_by_ticker(pid, ticker, instrument_type)
             if existing_item:
                 storage_service.update_item(existing_item["id"], pid, quantity, purchase_price)
+            elif storage_service.count_items(pid) >= app_settings.max_items_per_portfolio:
+                errors.append(f"Строка {i}: максимум {app_settings.max_items_per_portfolio} инструментов в портфеле")
+                continue
             else:
                 storage_service.add_item(
                     ticker=ticker,
