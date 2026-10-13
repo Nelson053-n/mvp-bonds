@@ -204,7 +204,11 @@ class AuthService:
             logger.warning("Reset requested for user %s (id=%d): no delivery channel", username, user["id"])
             return "sent"
 
+        # Код — первичный ключ таблицы, а вставка INSERT OR REPLACE: совпадение
+        # с живым кодом другого пользователя молча затёрло бы его код.
         code = str(secrets.randbelow(900000) + 100000)  # 6-digit
+        while storage_service.reset_code_exists(code):
+            code = str(secrets.randbelow(900000) + 100000)
         expires_at = int(time.time() + self.RESET_TTL)
         storage_service.insert_password_reset_code(code, user["id"], expires_at)
 
@@ -262,7 +266,8 @@ class AuthService:
             subject = "Bond AI — код восстановления пароля"
         return await mailer.send_mail(email, subject, body, "password_reset")
 
-    def confirm_password_reset(self, code: str, new_password: str, client_ip: str = "") -> bool:
+    def confirm_password_reset(self, username: str, code: str, new_password: str,
+                               client_ip: str = "") -> bool:
         """Apply reset code and set new password. Returns True on success.
 
         Defenses against code-space brute-force:
@@ -278,7 +283,10 @@ class AuthService:
         across workers and survives restarts.
         """
         now_ts = int(time.time())
-        user_id = storage_service.consume_password_reset_code(code, now_ts)
+        user = storage_service.get_user_by_username_for_reset(username)
+        if not user:
+            return False
+        user_id = storage_service.consume_password_reset_code(code, user["id"], now_ts)
         if user_id is None:
             return False
 
@@ -313,17 +321,20 @@ class AuthService:
             logger.warning("Reset-confirm rate limit exceeded for ip=%s", client_ip)
         return not allowed
 
-    def register_failed_reset_attempt(self) -> None:
-        """Burn one attempt against every still-live code.
+    def register_failed_reset_attempt(self, username: str) -> None:
+        """Burn one attempt against every still-live code of this user.
 
-        Called when confirm_password_reset() returns False. Because the attacker
-        doesn't get to pick which code their guess matches, charging every live
-        code per failure means any code under brute-force dies after
-        _RESET_CODE_MAX_ATTEMPTS tries from any source.
+        Called when confirm_password_reset() returns False. Код сверяется только
+        с кодами указанного пользователя, поэтому и попытки списываются только
+        у них: любой его код умирает после _RESET_CODE_MAX_ATTEMPTS неверных
+        попыток с любых адресов, а чужие сбросы не страдают.
         """
+        user = storage_service.get_user_by_username_for_reset(username)
+        if not user:
+            return
         now_ts = int(time.time())
         invalidated = storage_service.burn_password_reset_attempts(
-            self._RESET_CODE_MAX_ATTEMPTS, now_ts
+            user["id"], self._RESET_CODE_MAX_ATTEMPTS, now_ts
         )
         if invalidated:
             logger.warning(

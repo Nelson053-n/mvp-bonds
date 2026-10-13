@@ -757,34 +757,43 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             conn.commit()
 
-    def consume_password_reset_code(self, code: str, now_ts: int) -> int | None:
-        """Atomically consume a valid (non-expired) code. Returns user_id or None.
+    def reset_code_exists(self, code: str) -> bool:
+        """Занят ли код (у любого пользователя) — код в таблице первичный ключ."""
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT 1 FROM password_reset_codes WHERE code = ?", (code,)
+            ).fetchone() is not None
+
+    def consume_password_reset_code(self, code: str, user_id: int, now_ts: int) -> int | None:
+        """Atomically consume a valid (non-expired) code of THIS user. Returns user_id or None.
 
         Single-use: row is deleted on success so concurrent confirms can't reuse it.
+        Код сверяется только среди кодов указанного пользователя.
         """
         with self._connect() as conn:
             # Opportunistic GC of expired codes
             conn.execute("DELETE FROM password_reset_codes WHERE expires_at < ?", (now_ts,))
             row = conn.execute(
-                "DELETE FROM password_reset_codes WHERE code = ? AND expires_at >= ? "
+                "DELETE FROM password_reset_codes WHERE code = ? AND user_id = ? AND expires_at >= ? "
                 "RETURNING user_id",
-                (code, now_ts),
+                (code, user_id, now_ts),
             ).fetchone()
             conn.commit()
             return int(row[0]) if row else None
 
-    def burn_password_reset_attempts(self, max_attempts: int, now_ts: int) -> int:
-        """Increment attempts on every live code; delete any that hit max_attempts.
+    def burn_password_reset_attempts(self, user_id: int, max_attempts: int, now_ts: int) -> int:
+        """Increment attempts on the user's live codes; delete any that hit max_attempts.
 
         Returns number of codes invalidated by this call. Used after a failed
-        /reset-password to make brute-force ineffective: any in-flight code
-        dies after enough wrong tries from any source.
+        /reset-password: the user's in-flight codes die after enough wrong
+        tries from any source. Только коды этого пользователя — раньше любые
+        5 неудач гасили коды сброса ВСЕХ пользователей (аудит 12.10.2026).
         """
         with self._connect() as conn:
             conn.execute("DELETE FROM password_reset_codes WHERE expires_at < ?", (now_ts,))
             conn.execute(
-                "UPDATE password_reset_codes SET attempts = attempts + 1 WHERE expires_at >= ?",
-                (now_ts,),
+                "UPDATE password_reset_codes SET attempts = attempts + 1 WHERE user_id = ? AND expires_at >= ?",
+                (user_id, now_ts),
             )
             cur = conn.execute(
                 "DELETE FROM password_reset_codes WHERE attempts >= ?",

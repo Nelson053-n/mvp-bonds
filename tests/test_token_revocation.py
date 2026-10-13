@@ -56,7 +56,7 @@ async def test_relogin_after_password_change_works(client) -> None:
 async def test_password_reset_revokes_tokens(client) -> None:
     uid, tok = await _user(client, "rev_reset")
     storage_service.insert_password_reset_code("246810", uid, int(time.time()) + 900)
-    r = await client.post("/auth/reset-password", json={"code": "246810", "new_password": "pass_new3"})
+    r = await client.post("/auth/reset-password", json={"username": "rev_reset", "code": "246810", "new_password": "pass_new3"})
     assert r.status_code == 204
     assert (await client.get("/auth/me", headers=_h(tok))).status_code == 401
 

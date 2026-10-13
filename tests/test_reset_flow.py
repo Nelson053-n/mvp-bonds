@@ -107,22 +107,22 @@ class TestPasswordResetStorage:
     async def test_insert_and_consume_returns_user_id(self, client: AsyncClient) -> None:
         uid = await _register(client, _uniq("st"))
         storage_service.insert_password_reset_code("111111", uid, int(time.time()) + 900)
-        consumed = storage_service.consume_password_reset_code("111111", int(time.time()))
+        consumed = storage_service.consume_password_reset_code("111111", uid, int(time.time()))
         assert consumed == uid
 
     async def test_consume_is_single_use(self, client: AsyncClient) -> None:
         """Consuming the same code twice returns None on the second call (atomic DELETE…RETURNING)."""
         uid = await _register(client, _uniq("st"))
         storage_service.insert_password_reset_code("222222", uid, int(time.time()) + 900)
-        first = storage_service.consume_password_reset_code("222222", int(time.time()))
-        second = storage_service.consume_password_reset_code("222222", int(time.time()))
+        first = storage_service.consume_password_reset_code("222222", uid, int(time.time()))
+        second = storage_service.consume_password_reset_code("222222", uid, int(time.time()))
         assert first == uid
         assert second is None
 
     async def test_expired_code_is_not_consumed(self, client: AsyncClient) -> None:
         uid = await _register(client, _uniq("st"))
         storage_service.insert_password_reset_code("333333", uid, int(time.time()) - 1)
-        consumed = storage_service.consume_password_reset_code("333333", int(time.time()))
+        consumed = storage_service.consume_password_reset_code("333333", uid, int(time.time()))
         assert consumed is None
 
     async def test_burn_invalidates_after_max_attempts(self, client: AsyncClient) -> None:
@@ -135,13 +135,13 @@ class TestPasswordResetStorage:
         max_attempts = auth_service._RESET_CODE_MAX_ATTEMPTS
         # First (max-1) burns don't delete anything…
         for _ in range(max_attempts - 1):
-            assert storage_service.burn_password_reset_attempts(max_attempts, now) == 0
+            assert storage_service.burn_password_reset_attempts(uid, max_attempts, now) == 0
         # …the max-th burn invalidates both.
-        invalidated = storage_service.burn_password_reset_attempts(max_attempts, now)
+        invalidated = storage_service.burn_password_reset_attempts(uid, max_attempts, now)
         assert invalidated == 2
         # And neither code is consumable any more.
-        assert storage_service.consume_password_reset_code("aaaaaa", now) is None
-        assert storage_service.consume_password_reset_code("bbbbbb", now) is None
+        assert storage_service.consume_password_reset_code("aaaaaa", uid, now) is None
+        assert storage_service.consume_password_reset_code("bbbbbb", uid, now) is None
 
     async def test_burn_skips_expired_codes(self, client: AsyncClient) -> None:
         """Expired codes are GC'd by burn, not counted in the 'invalidated' tally."""
@@ -150,7 +150,7 @@ class TestPasswordResetStorage:
         storage_service.insert_password_reset_code("expir1", uid, now - 1)
         storage_service.insert_password_reset_code("live11", uid, now + 900)
         # Single burn — expired one is GC'd, live one gets attempts=1, nothing invalidated yet.
-        assert storage_service.burn_password_reset_attempts(5, now) == 0
+        assert storage_service.burn_password_reset_attempts(uid, 5, now) == 0
         with storage_service._connect() as conn:
             rows = conn.execute("SELECT code, attempts FROM password_reset_codes").fetchall()
         assert rows == [("live11", 1)]
@@ -175,7 +175,7 @@ class TestResetPasswordHappyPath:
 
         r = await client.post(
             "/auth/reset-password",
-            json={"code": "ZCODE1", "new_password": "new_pw_222"},
+            json={"username": username, "code": "ZCODE1", "new_password": "new_pw_222"},
         )
         assert r.status_code == 204
 
@@ -200,12 +200,12 @@ class TestResetPasswordHappyPath:
         storage_service.insert_password_reset_code("ONCE11", uid, int(time.time()) + 900)
 
         first = await client.post(
-            "/auth/reset-password", json={"code": "ONCE11", "new_password": "fresh_pw_111"}
+            "/auth/reset-password", json={"username": username, "code": "ONCE11", "new_password": "fresh_pw_111"}
         )
         assert first.status_code == 204
 
         second = await client.post(
-            "/auth/reset-password", json={"code": "ONCE11", "new_password": "fresh_pw_222"}
+            "/auth/reset-password", json={"username": username, "code": "ONCE11", "new_password": "fresh_pw_222"}
         )
         assert second.status_code == 400
 
@@ -216,7 +216,7 @@ class TestResetPasswordFailures:
     async def test_invalid_code_returns_400(self, client: AsyncClient) -> None:
         r = await client.post(
             "/auth/reset-password",
-            json={"code": "000000", "new_password": "anything9"},
+            json={"username": "ghost_user", "code": "000000", "new_password": "anything9"},
         )
         assert r.status_code == 400
 
@@ -226,13 +226,13 @@ class TestResetPasswordFailures:
         for i in range(10):
             r = await client.post(
                 "/auth/reset-password",
-                json={"code": "11111" + str(i % 10), "new_password": "x_pw_9999"},
+                json={"username": "ghost_user", "code": "11111" + str(i % 10), "new_password": "x_pw_9999"},
             )
             assert r.status_code == 400, f"iter {i}: got {r.status_code}"
         # 11th → 429.
         r = await client.post(
             "/auth/reset-password",
-            json={"code": "999999", "new_password": "x_pw_9999"},
+            json={"username": "ghost_user", "code": "999999", "new_password": "x_pw_9999"},
         )
         assert r.status_code == 429
 
@@ -245,7 +245,7 @@ class TestResetPasswordFailures:
         for i in range(9):
             r = await client.post(
                 "/auth/reset-password",
-                json={"code": "fail" + str(i).zfill(2), "new_password": "x_pw_9999"},
+                json={"username": "ghost_user", "code": "fail" + str(i).zfill(2), "new_password": "x_pw_9999"},
             )
             assert r.status_code == 400
 
@@ -256,17 +256,17 @@ class TestResetPasswordFailures:
             uid = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()[0]
         storage_service.insert_password_reset_code("WINOK1", uid, int(time.time()) + 900)
         ok = await client.post(
-            "/auth/reset-password", json={"code": "WINOK1", "new_password": "post_ok_pw1"}
+            "/auth/reset-password", json={"username": username, "code": "WINOK1", "new_password": "post_ok_pw1"}
         )
         assert ok.status_code == 204
 
         # We've used 9 IP slots so far. Success added 0. We still have 1 left before 429.
         one_more = await client.post(
-            "/auth/reset-password", json={"code": "888888", "new_password": "x_pw_9999"}
+            "/auth/reset-password", json={"username": "ghost_user", "code": "888888", "new_password": "x_pw_9999"}
         )
         assert one_more.status_code == 400  # the 10th, not yet 429
         blocked = await client.post(
-            "/auth/reset-password", json={"code": "888888", "new_password": "x_pw_9999"}
+            "/auth/reset-password", json={"username": "ghost_user", "code": "888888", "new_password": "x_pw_9999"}
         )
         assert blocked.status_code == 429  # 11th — blocked
 
@@ -285,14 +285,14 @@ class TestResetPasswordFailures:
         for i in range(auth_service._RESET_CODE_MAX_ATTEMPTS):
             r = await client.post(
                 "/auth/reset-password",
-                json={"code": "ATKR" + str(i).zfill(2), "new_password": "atk_pw_99"},
+                json={"username": username, "code": "ATKR" + str(i).zfill(2), "new_password": "atk_pw_99"},
             )
             assert r.status_code == 400
 
         # Even with the legitimate code, reset now fails — VICTIM has been invalidated.
         r = await client.post(
             "/auth/reset-password",
-            json={"code": "VICTIM", "new_password": "legit_pw_9"},
+            json={"username": username, "code": "VICTIM", "new_password": "legit_pw_9"},
         )
         assert r.status_code == 400
 
@@ -309,17 +309,18 @@ class TestBlockedIpCannotGuess:
     """
 
     async def test_correct_code_from_blocked_ip_is_rejected(self, client: AsyncClient) -> None:
-        uid = await _register(client, _uniq("victim"))
+        vname = _uniq("victim")
+        uid = await _register(client, vname)
         for _ in range(10):
-            r = await client.post("/auth/reset-password", json={"code": "000000", "new_password": "x" * 8})
+            r = await client.post("/auth/reset-password", json={"username": vname, "code": "000000", "new_password": "x" * 8})
             assert r.status_code == 400
         assert (await client.post("/auth/reset-password",
-                                  json={"code": "000000", "new_password": "x" * 8})).status_code == 429
+                                  json={"username": vname, "code": "000000", "new_password": "x" * 8})).status_code == 429
 
         # Новый живой код после блокировки (как после /forgot-password жертвы).
         storage_service.insert_password_reset_code("654321", uid, int(time.time()) + 900)
         for guess in ("111111", "222222", "654321"):
-            r = await client.post("/auth/reset-password", json={"code": guess, "new_password": "attacker_pw1"})
+            r = await client.post("/auth/reset-password", json={"username": vname, "code": guess, "new_password": "attacker_pw1"})
             assert r.status_code == 429, (guess, r.status_code)
 
         with storage_service._connect() as conn:
@@ -339,3 +340,59 @@ class TestNoCodeWithoutChannel:
         with storage_service._connect() as conn:
             n = conn.execute("SELECT COUNT(*) FROM password_reset_codes").fetchone()[0]
         assert n == 0
+
+
+# ──────────── коды привязаны к пользователю: чужие сбросы не страдают ────────────
+
+
+class TestCodesScopedToUser:
+    """Раньше код сверялся со всеми живыми кодами, и любые 5 неудач гасили
+    коды сброса ВСЕХ пользователей — сброс пароля можно было держать
+    недоступным для всех. Теперь в /reset-password обязателен логин."""
+
+    async def test_failures_for_one_user_do_not_burn_another(self, client: AsyncClient) -> None:
+        a, b = _uniq("ua"), _uniq("ub")
+        await _register(client, a)
+        uid_b = await _register(client, b, password="b_old_pw1")
+        storage_service.insert_password_reset_code("515151", uid_b, int(time.time()) + 900)
+        for i in range(6):
+            await client.post("/auth/reset-password",
+                              json={"username": a, "code": f"00000{i}", "new_password": "x_pw_9999"})
+        with storage_service._connect() as conn:
+            conn.execute("DELETE FROM rate_limits")  # чтобы IP-блок не мешал B
+            conn.commit()
+        r = await client.post("/auth/reset-password",
+                              json={"username": b, "code": "515151", "new_password": "b_new_pw1"})
+        assert r.status_code == 204
+
+    async def test_correct_code_with_wrong_username_fails(self, client: AsyncClient) -> None:
+        owner, other = _uniq("own"), _uniq("oth")
+        uid = await _register(client, owner)
+        await _register(client, other)
+        storage_service.insert_password_reset_code("626262", uid, int(time.time()) + 900)
+        r = await client.post("/auth/reset-password",
+                              json={"username": other, "code": "626262", "new_password": "hijack_pw1"})
+        assert r.status_code == 400
+        assert storage_service.consume_password_reset_code("626262", uid, int(time.time())) == uid
+
+    async def test_new_code_never_overwrites_another_users_code(self, client: AsyncClient, monkeypatch) -> None:
+        import app.services.auth_service as auth_mod
+        holder = await _register(client, _uniq("hold"))
+        storage_service.insert_password_reset_code("700000", holder, int(time.time()) + 900)
+        name = _uniq("req")
+        uid = await _register(client, name)
+        storage_service.update_user_tg_chat_id(uid, "1")
+        storage_service.set_setting("tg_bot_token", "T")
+        seq = iter([600000, 600000, 123456])  # 600000+100000 = 700000 — занят
+
+        monkeypatch.setattr(auth_mod.secrets, "randbelow", lambda n: next(seq))
+
+        async def fake_tg(*a, **k):
+            return True
+        monkeypatch.setattr(auth_service, "_send_telegram_reset", fake_tg)
+        try:
+            await client.post("/auth/forgot-password", json={"username": name})
+        finally:
+            storage_service.set_setting("tg_bot_token", "")
+        assert storage_service.consume_password_reset_code("700000", holder, int(time.time())) == holder
+        assert storage_service.consume_password_reset_code("223456", uid, int(time.time())) == uid

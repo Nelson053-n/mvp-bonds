@@ -5210,7 +5210,7 @@
               try {
                 const r = await fetch('/auth/reset-password', {
                   method: 'POST', headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({ code, new_password: pw })
+                  body: JSON.stringify({ username: document.getElementById('forgot-username').value.trim(), code, new_password: pw })
                 });
                 if (r.status === 204) {
                   msg.textContent = t('auth.passwordChanged');

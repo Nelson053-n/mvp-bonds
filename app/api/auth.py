@@ -271,6 +271,9 @@ class ForgotPasswordInput(BaseModel):
 
 
 class ResetPasswordInput(BaseModel):
+    # Логин вместе с кодом: код сверяется только с кодами этого пользователя.
+    # Без него любые 5 неверных кодов гасили сбросы всех пользователей.
+    username: str = Field(..., min_length=1, max_length=64)
     code: str = Field(..., min_length=6, max_length=6)
     new_password: str = Field(..., min_length=6)
 
@@ -304,13 +307,14 @@ async def reset_password(payload: ResetPasswordInput, request: Request) -> None:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Слишком много попыток. Попробуйте позже",
         )
-    ok = auth_service.confirm_password_reset(payload.code, payload.new_password, client_ip)
+    ok = auth_service.confirm_password_reset(
+        payload.username.strip(), payload.code, payload.new_password, client_ip)
     if ok:
         return None
-    # Неудача: занять слот IP-окна и списать попытку у КАЖДОГО живого кода —
-    # всегда, даже если IP только что упёрся в лимит.
+    # Неудача: занять слот IP-окна и списать попытку у живых кодов этого
+    # пользователя — всегда, даже если IP только что упёрся в лимит.
     auth_service.is_reset_confirm_rate_limited(client_ip)
-    auth_service.register_failed_reset_attempt()
+    auth_service.register_failed_reset_attempt(payload.username.strip())
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Неверный или просроченный код",
