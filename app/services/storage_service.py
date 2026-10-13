@@ -97,8 +97,12 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
                 ).decode()
 
                 # Create admin user
+                # is_admin=1 явно: миграция, которая проставляет его по имени
+                # «admin», на свежей БД отрабатывает ДО этой вставки — первый
+                # пользователь оставался в БД не-админом (вскрылось, когда права
+                # стали читаться из БД, а не из токена — аудит M5).
                 cursor = conn.execute(
-                    "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                    "INSERT INTO users (username, password_hash, created_at, is_admin) VALUES (?, ?, ?, 1)",
                     ("admin", password_hash, now),
                 )
                 admin_user_id = cursor.lastrowid
@@ -123,7 +127,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -165,6 +169,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (5, self._migration_v5),
             (6, self._migration_v6),
             (7, self._migration_v7),
+            (8, self._migration_v8),
         ]
 
         for version, migrate in migrations:
@@ -593,6 +598,18 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
             """
         )
+
+    def _migration_v8(self, conn: sqlite3.Connection) -> None:
+        """v8 — версия токенов пользователя: смена/сброс пароля отзывает выданные JWT.
+
+        Раньше токен жил свои 72 часа при любой смене пароля — после захвата
+        аккаунта сброс пароля жертвой атакующего не выкидывал (аудит
+        12.10.2026, M5). Идемпотентна.
+        """
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
     def _write_bootstrap_admin_password(self, password: str) -> None:
         """Write the bootstrap admin password to a 0600 file next to the DB.

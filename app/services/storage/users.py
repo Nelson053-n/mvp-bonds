@@ -42,7 +42,7 @@ class UsersMixin:
     def get_user_by_username(self, username: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin FROM users WHERE username = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, token_version FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
 
@@ -54,12 +54,13 @@ class UsersMixin:
             "password_hash": row[2],
             "created_at": row[3],
             "is_admin": bool(row[4]),
+            "token_version": int(row[5]),
         }
 
     def get_user_by_id(self, user_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, is_pro, pro_until, tg_chat_id_reset FROM users WHERE id = ?",
+                "SELECT id, username, password_hash, created_at, is_admin, email, tg_chat_id, is_pro, pro_until, tg_chat_id_reset, token_version FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
 
@@ -76,6 +77,7 @@ class UsersMixin:
             "is_pro": _pro_active(row[7], row[8]),
             "pro_until": row[8],
             "tg_chat_id_reset": bool(row[9]),
+            "token_version": int(row[10]),
         }
 
     def get_all_users(self) -> list[dict]:
@@ -165,9 +167,10 @@ class UsersMixin:
             return int(cursor.rowcount)
 
     def update_user_password(self, user_id: int, password_hash: str) -> int:
+        """Новый пароль + следующая версия токенов: все выданные JWT отзываются."""
         with self._connect() as conn:
             cursor = conn.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
+                "UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?",
                 (password_hash, user_id),
             )
             conn.commit()

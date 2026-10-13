@@ -118,7 +118,8 @@ class AuthService:
         logger.info("User logged in: %s (id=%d)", username, user["id"])
         storage_service.update_last_login(user["id"])
         is_admin = bool(user.get("is_admin", False))
-        token = self.create_token(user["id"], user["username"], is_admin)
+        token = self.create_token(user["id"], user["username"], is_admin,
+                                  int(user.get("token_version") or 0))
         return {
             "user_id": user["id"],
             "username": user["username"],
@@ -126,7 +127,8 @@ class AuthService:
             "access_token": token,
         }
 
-    def create_token(self, user_id: int, username: str, is_admin: bool = False) -> str:
+    def create_token(self, user_id: int, username: str, is_admin: bool = False,
+                     token_version: int = 0) -> str:
         """
         Create a JWT access token.
         """
@@ -137,6 +139,8 @@ class AuthService:
             "sub": str(user_id),  # Must be string per JWT spec
             "username": username,
             "is_admin": is_admin,
+            # Сверяется с users.token_version в get_current_user (аудит M5).
+            "tv": token_version,
             "exp": int(exp.timestamp()),
             "iat": int(now.timestamp()),
         }

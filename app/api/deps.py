@@ -27,11 +27,23 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный или истекший токен",
         )
-    return payload  # {"sub": user_id, "username": ...}
+    # Подпись и срок — ещё не всё: токен отзывается сменой пароля
+    # (users.token_version), а права берутся из БД, не из токена. Иначе
+    # разжалованный админ и захваченная сессия жили до истечения 72 ч
+    # (аудит 12.10.2026, M5). Старые токены без "tv" — версия 0.
+    from app.services.storage_service import storage_service
+    user = storage_service.get_user_by_id(payload.get("sub"))
+    if user is None or int(payload.get("tv", 0)) != user["token_version"]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный или истекший токен",
+        )
+    payload["is_admin"] = user["is_admin"]
+    return payload  # {"sub": user_id, "username": ..., "is_admin": из БД}
 
 
 def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
-    """Require authenticated admin user."""
+    """Require authenticated admin user (is_admin — из БД, см. get_current_user)."""
     if not current_user.get("is_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступ запрещён")
     return current_user

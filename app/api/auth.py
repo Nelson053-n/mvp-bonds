@@ -114,12 +114,16 @@ class ChangeEmailInput(BaseModel):
     email: str = Field(..., max_length=254, pattern=r"^$|^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$")
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password")
 async def change_password(
     payload: ChangePasswordInput,
     current_user: dict = Depends(get_current_user),
-) -> None:
-    """Change current user's password."""
+) -> dict:
+    """Change current user's password.
+
+    Смена пароля отзывает все выданные токены (token_version), поэтому
+    возвращаем новый — иначе пользователя выкинуло бы из его же сессии.
+    """
     ok = auth_service.change_password(
         current_user["sub"], payload.old_password, payload.new_password
     )
@@ -128,6 +132,9 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Неверный текущий пароль",
         )
+    user = storage_service.get_user_by_id(current_user["sub"])
+    return {"access_token": auth_service.create_token(
+        user["id"], user["username"], user["is_admin"], user["token_version"])}
 
 
 class ChangeUsernameInput(BaseModel):

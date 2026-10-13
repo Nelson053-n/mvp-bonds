@@ -103,15 +103,14 @@ class TestMigrationAppliedOnImport:
         # миграции и понижаем номер — как выглядит БД перед деплоем.
         con = sqlite3.connect(fresh_db)
         try:
-            # Откатываем артефакт ПОСЛЕДНЕЙ миграции (v7 — tg_link_nonces):
+            # Откатываем артефакт ПОСЛЕДНЕЙ миграции (v8 — users.token_version):
             # тест про отставание ровно на одну версию.
-            con.execute("DROP TABLE tg_link_nonces")
+            con.execute("ALTER TABLE users DROP COLUMN token_version")
             con.execute("UPDATE schema_version SET version = ?",
                         (StorageService.SCHEMA_VERSION - 1,))
             con.commit()
-            tables = {r[0] for r in con.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'")}
-            assert "tg_link_nonces" not in tables, "подготовка не сработала"
+            cols = {c[1] for c in con.execute("PRAGMA table_info(users)")}
+            assert "token_version" not in cols, "подготовка не сработала"
         finally:
             con.close()
 
@@ -120,14 +119,13 @@ class TestMigrationAppliedOnImport:
         # Отдельным соединением: незакоммиченный DDL к этому моменту откатится.
         con = sqlite3.connect(fresh_db)
         try:
-            tables = {r[0] for r in con.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'")}
+            cols = {c[1] for c in con.execute("PRAGMA table_info(users)")}
             version = con.execute(
                 "SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
         finally:
             con.close()
 
-        assert "tg_link_nonces" in tables, (
+        assert "token_version" in cols, (
             "импорт не применил миграцию — деплой выкатит код на старую схему"
         )
         assert version == StorageService.SCHEMA_VERSION

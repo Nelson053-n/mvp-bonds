@@ -7427,7 +7427,10 @@
         if (newPw.length < 6) { status.textContent = t('settings.account.pwMinLength'); status.className = 'status error'; return; }
         try {
           const r = await apiFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
-          if (r.status === 204) {
+          if (r.ok) {
+            // Смена пароля отзывает прежние токены — сохраняем выданный новый.
+            const d = await r.json().catch(() => ({}));
+            if (d.access_token) localStorage.setItem('mvp_auth_token', d.access_token);
             status.textContent = t('settings.account.pwChanged');
             status.className = 'status ok';
             document.getElementById('acc-old-pw').value = '';
