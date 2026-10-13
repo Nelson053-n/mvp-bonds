@@ -245,3 +245,16 @@ def test_grant_pro_empty_payment():
     from app.api.billing import _grant_pro_from_payment
     assert _grant_pro_from_payment({}) is False
     assert _grant_pro_from_payment(None) is False
+
+
+def test_duplicate_notification_does_not_extend_twice(settings_override):
+    """Аудит LOW: повтор уведомления о том же платеже продлевал Pro ещё раз."""
+    from app.api.billing import _grant_pro_from_payment
+    from app.services.storage_service import storage_service
+    uid = storage_service.create_user("dup_pay_user", "x")
+    payment = {"id": "11111111-2222-3333-4444-555555555555", "status": "succeeded",
+               "metadata": {"user_id": str(uid), "plan": "month"}}
+    assert _grant_pro_from_payment(payment) is True
+    first = storage_service.get_user_by_id(uid)["pro_until"]
+    assert _grant_pro_from_payment(payment) is True
+    assert storage_service.get_user_by_id(uid)["pro_until"] == first

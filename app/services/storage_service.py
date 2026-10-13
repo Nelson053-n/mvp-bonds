@@ -1200,18 +1200,23 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
     # ── Pro payments (YooKassa, for NPD bookkeeping) ─────────────────────────
 
     def record_pro_payment(self, payment_id: str, user_id: int, username: str,
-                           plan: str, amount: float, status: str) -> None:
-        """Upsert a Pro payment by its YooKassa id (idempotent on webhook retries)."""
+                           plan: str, amount: float, status: str) -> bool:
+        """Записать платёж по id ЮKassa; False — такой платёж уже записан.
+
+        Атомарная «заявка» на платёж: повторное уведомление о том же платеже
+        не должно продлевать Pro ещё раз (аудит 12.10.2026, LOW).
+        """
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """INSERT INTO pro_payments (payment_id, user_id, username, plan, amount, status, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(payment_id) DO UPDATE SET status=excluded.status""",
+                   ON CONFLICT(payment_id) DO NOTHING""",
                 (payment_id, user_id, username, plan, amount, status, now),
             )
             conn.commit()
+            return cursor.rowcount == 1
 
     def get_pro_payments(self, limit: int = 200) -> list[dict]:
         with self._connect() as conn:

@@ -80,7 +80,7 @@ async def billing_create(
 
 
 def _grant_pro_from_payment(payment: dict) -> bool:
-    """Grant Pro to the user named in a *verified* succeeded payment. Idempotent-ish."""
+    """Grant Pro to the user named in a *verified* succeeded payment. Idempotent by payment id."""
     if not payment or payment.get("status") != "succeeded":
         return False
     meta = payment.get("metadata") or {}
@@ -93,9 +93,21 @@ def _grant_pro_from_payment(payment: dict) -> bool:
     if not plan_info:
         return False
     amount, days = plan_info
+    user = storage_service.get_user_by_id(user_id)
+    # Сначала «застолбить» платёж: ЮKassa повторяет уведомления, и каждое
+    # повторное продлевало Pro ещё на срок тарифа (аудит 12.10.2026, LOW).
+    # Учёт для НПД (чеки в «Мой налог» вносятся руками) — та же запись.
+    payment_id = str(payment.get("id") or "")
+    if payment_id:
+        if not storage_service.record_pro_payment(
+            payment_id=payment_id, user_id=user_id,
+            username=(user or {}).get("username", ""),
+            plan=plan, amount=float(amount), status="succeeded",
+        ):
+            logger.info("AUDIT pro_payment_duplicate: payment_id=%s user_id=%d", payment_id, user_id)
+            return True
     # Extend from the later of now / current expiry so stacking a renewal adds time.
     from datetime import date, timedelta
-    user = storage_service.get_user_by_id(user_id)
     base = date.today()
     if user and user.get("pro_until"):
         try:
@@ -106,17 +118,6 @@ def _grant_pro_from_payment(payment: dict) -> bool:
             pass
     until = (base + timedelta(days=days)).isoformat()
     storage_service.set_user_pro(user_id, True, until)
-    # Record the payment for NPD bookkeeping (receipts entered into "Мой налог"
-    # by hand — YooKassa has no auto-integration for that).
-    try:
-        storage_service.record_pro_payment(
-            payment_id=str(payment.get("id") or ""),
-            user_id=user_id,
-            username=(user or {}).get("username", ""),
-            plan=plan, amount=float(amount), status="succeeded",
-        )
-    except Exception:
-        logger.exception("record_pro_payment failed")
     logger.info("AUDIT pro_granted_via_payment: user_id=%d plan=%s until=%s", user_id, plan, until)
     return True
 
