@@ -19,7 +19,7 @@ from html import escape as h
 import httpx
 
 from app.config import settings
-from app.services.moex_service import moex_service
+from app.services.moex_service import moex_service, valid_secid
 from app.services.storage_service import storage_service
 from app.services.telegram_net import telegram_transport
 
@@ -261,6 +261,12 @@ class TelegramBotService:
         await self._call(client, "sendMessage", **payload)
 
     async def _answer_card(self, client, chat_id, secid: str):
+        # callback_data присылает клиент Telegram — модифицированный может
+        # прислать что угодно (аудит M7): невалидный тикер — без похода в MOEX
+        # и без ERROR-трассировки в лог.
+        if not valid_secid(secid.upper().strip()):
+            await self._send(client, chat_id, "Бумага не найдена. Попробуйте другой тикер.")
+            return
         try:
             snap = await moex_service.get_bond_snapshot(secid)
         except Exception:  # noqa: BLE001 - any failure → friendly msg

@@ -13,6 +13,17 @@ from app.exceptions import PriceNotFoundError, DataFetchError, RatingNotFoundErr
 
 logger = logging.getLogger(__name__)
 
+# Тикер/SECID подставляется в путь URL MOEX и SmartLab. Проверка формата
+# стояла только в AddInstrumentInput и обходилась CSV-импортом, import-all,
+# watchlist и кнопкой бота (аудит 12.10.2026, M7): «A/../../x?y» давал GET
+# на произвольный путь с IP прода. Хотя бы одна буква/цифра — чтобы «..» не
+# стал шагом вверх в /securities/{secid}/bondization.json.
+_SECID_RE = re.compile(r"^(?=.*[A-Z0-9])[A-Z0-9._-]{1,32}$")
+
+
+def valid_secid(secid: str) -> bool:
+    return bool(_SECID_RE.match(secid))
+
 # Retries for transient MOEX failures. Kept short: the cache loop runs every
 # 300s and refreshes portfolios concurrently, so a long backoff would stack up.
 _RETRY_ATTEMPTS = 3
@@ -496,6 +507,8 @@ class MOEXService:
 
     async def get_stock_snapshot(self, ticker: str) -> StockSnapshot:
         secid = ticker.upper().strip()
+        if not valid_secid(secid):
+            raise PriceNotFoundError(secid, "акция")
         cached = self._stock_snapshot_cache.get(secid)
         if cached and (time.time() - cached[1]) < self.SNAPSHOT_TTL:
             return cached[0]
@@ -585,6 +598,8 @@ class MOEXService:
         Returns {"value": float, "period_days": int} or None if unavailable.
         Only called when MOEX reports COUPONVALUE=0 (floater / not yet announced).
         """
+        if not valid_secid(secid):
+            return None
         cached = self._last_coupon_cache.get(secid)
         if cached is not None:
             value, ts = cached
@@ -657,6 +672,8 @@ class MOEXService:
         но не обязателен: лучше отдать её без рейтинга, чем 504.
         """
         secid = ticker.upper().strip()
+        if not valid_secid(secid):
+            raise PriceNotFoundError(secid, "облигация")
         cached = self._bond_snapshot_cache.get(secid)
         if cached and (time.time() - cached[1]) < self.SNAPSHOT_TTL:
             return cached[0]
@@ -981,6 +998,8 @@ class MOEXService:
             return None
 
     async def _get_credit_rating(self, secid: str) -> str | None:
+        if not valid_secid(secid):
+            return None
         if secid in self._credit_rating_cache:
             return self._credit_rating_cache[secid]
 
@@ -1080,6 +1099,8 @@ class MOEXService:
         Uses description.json (ISQUALIFIEDINVESTORS) and boards (is_traded on primary board).
         Results are cached in-memory.
         """
+        if not valid_secid(secid):
+            return False, True
         if secid in self._is_qual_cache:
             return self._is_qual_cache[secid]
 
@@ -1133,6 +1154,8 @@ class MOEXService:
     async def _get_smartlab_credit_rating(
         self, secid: str
     ) -> str | None:
+        if not valid_secid(secid):
+            return None
         cache_key = f"smartlab:{secid}"
         if cache_key in self._credit_rating_cache:
             return self._credit_rating_cache[cache_key]
