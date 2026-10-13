@@ -4,6 +4,7 @@ Authentication service for user registration, login, and JWT token management.
 
 import logging
 import secrets
+from html import escape
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -223,14 +224,14 @@ class AuthService:
         if lang == "en":
             text = (
                 f"🔐 Bond AI — password recovery\n\n"
-                f"Account: {username}\n"
+                f"Account: {escape(username)}\n"
                 f"Verification code: <b>{code}</b>\n\n"
                 f"Valid for 15 minutes. If you did not request a reset — ignore this message."
             )
         else:
             text = (
                 f"🔐 Bond AI — восстановление пароля\n\n"
-                f"Аккаунт: {username}\n"
+                f"Аккаунт: {escape(username)}\n"
                 f"Код подтверждения: <b>{code}</b>\n\n"
                 f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
             )

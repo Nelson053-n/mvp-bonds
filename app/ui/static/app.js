@@ -7153,8 +7153,7 @@
           const d = await r.json();
           const emailInput = document.getElementById('acc-email');
           if (emailInput && d.email) emailInput.value = d.email;
-          const tgInput = document.getElementById('acc-tg-chat');
-          if (tgInput && d.tg_chat_id) tgInput.value = d.tg_chat_id;
+          renderTgState(d.tg_chat_id);
         } catch(e) {}
       }
 
@@ -7464,27 +7463,78 @@
         } catch(e) { status.textContent = t('settings.account.emailConnError'); status.className = 'status error'; }
       });
 
-      // Save Telegram Chat ID
+      // ── Telegram: привязка по одноразовой ссылке на бота ─────────
+      // chat_id больше не вводят руками: к своему аккаунту можно было
+      // привязать чужой чат (аудит 12.10.2026, M2). Бот сам записывает чат,
+      // в котором владелец нажал Start по ссылке с одноразовым кодом.
+      function renderTgState(chatId) {
+        const state = document.getElementById('acc-tg-state');
+        const unlink = document.getElementById('acc-tg-unlink');
+        if (!state) return;
+        state.textContent = chatId ? t('settings.account.tgConnected') : t('settings.account.tgNotConnected');
+        state.style.color = chatId ? 'var(--green-600)' : 'var(--slate-500)';
+        if (unlink) unlink.style.display = chatId ? '' : 'none';
+      }
+
+      let tgLinkPoll = null;
       document.getElementById('acc-tg-btn').addEventListener('click', async () => {
-        const tgId = document.getElementById('acc-tg-chat').value.trim();
         const st = document.getElementById('acc-tg-status');
-        if (!tgId) { st.textContent = t('settings.account.tgRequired'); st.className = 'status error'; return; }
-        // @username Bot API не принимает: sendMessage вернёт «chat not found».
-        if (!/^-?\d{1,32}$/.test(tgId)) {
-          st.textContent = t('settings.account.tgNotNumeric', 'Chat ID — это число, а не @username');
-          st.className = 'status error';
-          return;
-        }
+        // Окно открываем синхронно по клику: открытое после await блокирует Safari.
+        const win = window.open('', '_blank');
         try {
-          const r = await apiFetch('/auth/me/telegram', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tg_chat_id: tgId }) });
-          if (r.status === 204) { st.textContent = t('settings.account.tgSaved'); st.className = 'status ok'; }
-          else {
-            // 400 — бот не может написать в чат; в detail инструкция, что сделать.
-            const d = await r.json().catch(() => ({}));
+          const r = await apiFetch('/auth/me/telegram/link', { method: 'POST' });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok || !d.url) {
+            if (win) win.close();
             st.textContent = typeof d.detail === 'string' ? d.detail : t('settings.account.tgError');
             st.className = 'status error';
+            return;
           }
-        } catch(e) { st.textContent = t('settings.account.tgConnError'); st.className = 'status error'; }
+          if (win) {
+            win.location.href = d.url;
+            st.textContent = t('settings.account.tgWaiting');
+          } else {
+            st.textContent = t('settings.account.tgPopupBlocked') + ' ';
+            const a = document.createElement('a');
+            a.href = d.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = d.url;
+            st.appendChild(a);
+          }
+          st.className = 'status';
+          // Ждём, пока бот привяжет чат: ссылка живёт 15 минут, проверяем 5.
+          clearInterval(tgLinkPoll);
+          let tries = 0;
+          tgLinkPoll = setInterval(async () => {
+            tries += 1;
+            try {
+              const rr = await apiFetch('/auth/me/portfolios-stats');
+              const dd = rr.ok ? await rr.json() : {};
+              if (dd.tg_chat_id) {
+                clearInterval(tgLinkPoll);
+                renderTgState(dd.tg_chat_id);
+                st.textContent = t('settings.account.tgConnected');
+                st.className = 'status ok';
+                return;
+              }
+            } catch (e) {}
+            if (tries >= 100) {
+              clearInterval(tgLinkPoll);
+              st.textContent = t('settings.account.tgTimeout');
+              st.className = 'status error';
+            }
+          }, 3000);
+        } catch (e) {
+          if (win) win.close();
+          st.textContent = t('settings.account.tgConnError'); st.className = 'status error';
+        }
+      });
+
+      document.getElementById('acc-tg-unlink')?.addEventListener('click', async () => {
+        const st = document.getElementById('acc-tg-status');
+        try {
+          const r = await apiFetch('/auth/me/telegram', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ tg_chat_id: '' }) });
+          if (r.status === 204) { renderTgState(null); st.textContent = ''; st.className = 'status'; }
+          else { st.textContent = t('settings.account.tgError'); st.className = 'status error'; }
+        } catch (e) { st.textContent = t('settings.account.tgConnError'); st.className = 'status error'; }
       });
 
       // Load account on settings tab open
@@ -7516,8 +7566,8 @@
         showPanel('panel-settings');
         document.querySelector('.stab-btn[data-stab="stab-account"]')?.click();
         setTimeout(() => {
-          const inp = document.getElementById('acc-tg-chat');
-          if (inp) { inp.focus(); inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+          const btn = document.getElementById('acc-tg-btn');
+          if (btn) { btn.focus(); btn.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
         }, 150);
       });
 

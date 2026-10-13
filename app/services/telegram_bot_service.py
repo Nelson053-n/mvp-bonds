@@ -331,7 +331,9 @@ class TelegramBotService:
         if not chat_id or not text:
             return
 
-        if text.startswith("/start"):
+        if text.startswith("/start link_"):
+            await self._link_account(client, msg, text[len("/start link_"):].strip())
+        elif text.startswith("/start"):
             await self._send(client, chat_id, _START_TEXT)
         elif text.startswith("/help"):
             await self._send(client, chat_id, _HELP_TEXT)
@@ -341,6 +343,31 @@ class TelegramBotService:
             await self._send(client, chat_id, _HELP_TEXT)
         else:
             await self._handle_query(client, chat_id, text)
+
+    async def _link_account(self, client, msg: dict, nonce: str) -> None:
+        """Привязать этот чат к аккаунту по одноразовому коду из настроек bondai.
+
+        Код выдаёт /auth/me/telegram/link залогиненному пользователю; Start с ним
+        нажимает сам владелец чата — так доказывается, что чат его (аудит
+        12.10.2026, M2). Только личный чат: в группу коды и алерты не шлём.
+        """
+        chat = msg.get("chat", {})
+        chat_id = chat.get("id")
+        if chat.get("type") != "private":
+            await self._send(client, chat_id, "Подключение работает только в личном чате с ботом.")
+            return
+        user_id = storage_service.consume_tg_link_nonce(nonce, int(time.time())) if nonce else None
+        if user_id is None:
+            await self._send(client, chat_id,
+                             "Ссылка устарела или уже использована. Нажмите «Подключить Telegram» "
+                             "в настройках bondai.ru ещё раз.")
+            return
+        storage_service.update_user_tg_chat_id(user_id, str(chat_id))
+        user = storage_service.get_user_by_id(user_id) or {}
+        logger.info("AUDIT tg_link: user_id=%d chat_id=%s", user_id, chat_id)
+        await self._send(client, chat_id,
+                         f"✅ Telegram подключён к аккаунту <b>{h(user.get('username', ''))}</b> на bondai.ru.\n"
+                         "Сюда будут приходить коды восстановления пароля и уведомления.")
 
     async def _send_donate_menu(self, client, chat_id):
         """Offer preset Telegram Stars amounts to support the project."""

@@ -6,6 +6,7 @@ or coupon payments are upcoming.
 
 import asyncio
 import logging
+from html import escape
 from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
@@ -146,46 +147,6 @@ class NotificationService:
         )
         return False
 
-    async def check_chat_reachable(self, token: str, chat_id: str) -> bool | None:
-        """Тестовое сообщение при привязке chat_id: может ли бот туда писать.
-
-        True — дошло; False — Telegram ответил 403 или 400 «chat not found»
-        (не нажат /start у бота или ID с ошибкой); None — проверить не
-        удалось (сеть, 5xx), решать по такому ответу нельзя.
-
-        Без проверки недоставляемый ID сохранялся с 204, а первая же рассылка
-        снимала его через _disable_subscription — пользователь видел, что
-        «не сохранилось». Сам _post_telegram здесь не годится: он снимает
-        подписку и пишет AUDIT tg_unsubscribe, а ID ещё даже не записан.
-        """
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": "✅ Telegram подключён к bondai.ru — сюда будут приходить "
-                    "коды восстановления пароля и уведомления.",
-        }
-        try:
-            async with httpx.AsyncClient(
-                timeout=10, transport=telegram_transport(),
-            ) as client:
-                resp = await client.post(url, json=payload)
-        except Exception as exc:
-            logger.warning(
-                "Telegram check_chat: %s %s", type(exc).__name__, exc,
-            )
-            return None
-        if resp.status_code == 200:
-            return True
-        if resp.status_code == 403 or (
-            resp.status_code == 400 and "chat not found" in resp.text.lower()
-        ):
-            return False
-        logger.warning(
-            "Telegram check_chat returned %d: %s",
-            resp.status_code, resp.text[:200],
-        )
-        return None
-
     async def send_alert_email(self, subject: str, body: str) -> bool:
         """Письмо админу на MVP_ALERT_EMAIL — канал на случай, когда недоступен сам Telegram."""
         if not settings.alert_email:
@@ -275,7 +236,7 @@ class NotificationService:
                         messages.append((
                             key,
                             f"\U0001f4c9 <b>Price drop</b>\n"
-                            f"{new_row.name} ({new_row.ticker})\n"
+                            f"{escape(new_row.name)} ({escape(new_row.ticker)})\n"
                             f"Was: {old_row.current_price:.2f} \u2192 "
                             f"Now: {new_row.current_price:.2f} "
                             f"(-{drop_pct:.1f}%)"
@@ -284,7 +245,7 @@ class NotificationService:
                         messages.append((
                             key,
                             f"\U0001f4c9 <b>Просадка цены</b>\n"
-                            f"{new_row.name} ({new_row.ticker})\n"
+                            f"{escape(new_row.name)} ({escape(new_row.ticker)})\n"
                             f"Было: {old_row.current_price:.2f} \u2192 "
                             f"Стало: {new_row.current_price:.2f} "
                             f"(-{drop_pct:.1f}%)"
@@ -307,14 +268,14 @@ class NotificationService:
                 messages.append((
                     key,
                     f"\u26a0\ufe0f <b>Rating change</b>\n"
-                    f"{new_row.name} ({new_row.ticker})\n"
+                    f"{escape(new_row.name)} ({escape(new_row.ticker)})\n"
                     f"{_grade(old_row.company_rating)} \u2192 {confirmed}"
                 ))
             else:
                 messages.append((
                     key,
                     f"\u26a0\ufe0f <b>Изменение рейтинга</b>\n"
-                    f"{new_row.name} ({new_row.ticker})\n"
+                    f"{escape(new_row.name)} ({escape(new_row.ticker)})\n"
                     f"{_grade(old_row.company_rating)} \u2192 {confirmed}"
                 ))
 
@@ -486,7 +447,7 @@ class NotificationService:
                 direction = "выше" if alert["alert_type"] == "above" else "ниже"
                 text = (
                     f"\U0001f3af Ценовой алерт сработал!\n\n"
-                    f"Бумага: {alert['ticker']}\n"
+                    f"Бумага: {escape(alert['ticker'])}\n"
                     f"Текущая цена: {current_price:.2f}\n"
                     f"Целевая цена ({direction}): {target:.2f}"
                 )

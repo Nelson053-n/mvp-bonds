@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=117">
+    <link rel="stylesheet" href="/static/styles.css?v=118">
   </head>
   <body>
 
@@ -461,13 +461,16 @@
                 <button class="btn" id="acc-email-btn" data-i18n="settings.account.emailSave">Сохранить email</button>
                 <div id="acc-email-status" class="status"></div>
                 <div class="field" style="margin-top:6px;">
-                  <label for="acc-tg-chat" data-i18n="settings.account.tgLabel">Telegram Chat ID (для восстановления)</label>
-                  <input id="acc-tg-chat" type="text" class="input" placeholder="123456789 (только цифры)" data-i18n-placeholder="settings.account.tgPlaceholder" />
+                  <label data-i18n="settings.account.tgLabel">Telegram (для восстановления)</label>
+                  <div id="acc-tg-state" style="font-size:13px;font-weight:600;" data-i18n="settings.account.tgNotConnected">Не подключён</div>
                   <p style="font-size:11px;color:var(--slate-500);margin:4px 0 0;" data-i18n="settings.account.tgHint">
-                    Сначала откройте @bondinfoai_bot и нажмите «Start» — иначе бот не сможет вам написать. Свой ID покажет @userinfobot.
+                    Нажмите «Подключить Telegram» — откроется @bondinfoai_bot. Нажмите в нём «Start», и чат привяжется к аккаунту.
                   </p>
                 </div>
-                <button class="btn" id="acc-tg-btn" data-i18n="settings.account.tgSave">Сохранить Telegram Chat ID</button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn" id="acc-tg-btn" data-i18n="settings.account.tgConnect">Подключить Telegram</button>
+                  <button class="btn btn-secondary" id="acc-tg-unlink" style="display:none;" data-i18n="settings.account.tgUnlink">Отвязать</button>
+                </div>
                 <div id="acc-tg-status" class="status"></div>
               </div>
             </div>
@@ -1453,8 +1456,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=117"></script>
-    <script src="/static/app.js?v=117"></script>
+    <script src="/static/translations.js?v=118"></script>
+    <script src="/static/app.js?v=118"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

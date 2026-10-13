@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import asyncio
+import html
 import json
 import logging
 import os
@@ -324,11 +325,13 @@ async def _rating_refresh_loop():
                                 display_name = f"{snap.name} ({ticker})"
                             except Exception:
                                 display_name = ticker
+                            # parse_mode=HTML: имена портфелей задаёт пользователь.
+                            display_name = html.escape(display_name)
 
                             for (_, chat_id), holdings in by_user.items():
                                 label = "Портфель" if len(holdings) == 1 else "Портфели"
                                 holdings_line = ", ".join(
-                                    f"{name} — {int(qty) if qty == int(qty) else qty} шт."
+                                    f"{html.escape(name)} — {int(qty) if qty == int(qty) else qty} шт."
                                     for name, qty in holdings
                                 )
                                 msg = (

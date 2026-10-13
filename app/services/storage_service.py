@@ -123,7 +123,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 6
+    SCHEMA_VERSION = 7
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -164,6 +164,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (4, self._migration_v4),
             (5, self._migration_v5),
             (6, self._migration_v6),
+            (7, self._migration_v7),
         ]
 
         for version, migrate in migrations:
@@ -575,6 +576,23 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             )
         except sqlite3.OperationalError:
             pass
+
+    def _migration_v7(self, conn: sqlite3.Connection) -> None:
+        """v7 — одноразовые коды привязки Telegram через t.me/<бот>?start=link_<код>.
+
+        Раньше chat_id вводили руками, и к своему аккаунту можно было привязать
+        чужой чат — бот писал туда от имени bondai (аудит 12.10.2026, M2).
+        Код доказывает, что пользователь сам открыл бота в этом чате.
+        """
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tg_link_nonces (
+                nonce TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                expires_at INTEGER NOT NULL
+            )
+            """
+        )
 
     def _write_bootstrap_admin_password(self, password: str) -> None:
         """Write the bootstrap admin password to a 0600 file next to the DB.

@@ -87,13 +87,15 @@ class TestEndpointRejects:
         )
         assert r.status_code == 422
 
-    async def test_numeric_saved(self, client, auth_headers) -> None:
+    async def test_numeric_not_bindable_manually(self, client, auth_headers) -> None:
+        """Аудит M2: ручной chat_id больше не привязывается — только ссылкой на бота."""
         r = await client.post(
             "/auth/me/telegram",
             json={"tg_chat_id": "987654321"},
             headers=auth_headers,
         )
-        assert r.status_code == 204
+        assert r.status_code == 400
+        assert "Подключить Telegram" in r.json()["detail"]
 
 
 class TestResetFlag:

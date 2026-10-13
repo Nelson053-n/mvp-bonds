@@ -4,14 +4,16 @@ Authentication API routes: register, login, get current user.
 
 import logging
 import re
+import secrets
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import get_current_user
+from app.config import settings
 from app.exceptions import AuthError
 from app.services.auth_service import auth_service
-from app.services.notification_service import notification_service
 from app.services.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
@@ -21,8 +23,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _CHAT_ID_RE = re.compile(r"-?\d{1,32}")
 
 
+# Буквы (латиница, кириллица), цифры и _ . @ + -. Имя попадает в сообщения
+# бота и письма: без белого списка туда уходили теги и ссылки (аудит
+# 12.10.2026, M2). Проверено на проде: все кроме одного из 142 имён проходят.
+_USERNAME_PATTERN = r"^[A-Za-zА-Яа-яЁё0-9_.@+\-]+$"
+
+
 class RegisterInput(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32)
+    username: str = Field(..., min_length=3, max_length=32, pattern=_USERNAME_PATTERN)
     password: str = Field(..., min_length=6)
 
 
@@ -112,7 +120,7 @@ async def change_password(
 
 
 class ChangeUsernameInput(BaseModel):
-    new_username: str = Field(..., min_length=3, max_length=64)
+    new_username: str = Field(..., min_length=3, max_length=64, pattern=_USERNAME_PATTERN)
 
 
 @router.patch("/me/username", status_code=status.HTTP_204_NO_CONTENT)
@@ -185,22 +193,34 @@ async def update_telegram(
     payload: UpdateTelegramInput,
     current_user: dict = Depends(get_current_user),
 ) -> None:
-    """Save user's personal Telegram Chat ID for password recovery."""
-    chat_id = payload.tg_chat_id.strip() or None
-    token = storage_service.get_setting("tg_bot_token", "")
-    current = (storage_service.get_user_by_id(current_user["sub"]) or {}).get("tg_chat_id")
-    # Тот же ID уже проверен при сохранении — не слать тестовое сообщение на каждый клик.
-    if chat_id and token and chat_id != current:
-        reachable = await notification_service.check_chat_reachable(token, chat_id)
-        if reachable is False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Бот не может написать в этот чат. Откройте "
-                       "@bondinfoai_bot в Telegram, нажмите «Start» и сохраните "
-                       "Chat ID ещё раз. Если уже нажимали — сверьте ID "
-                       "у @userinfobot.",
-            )
-    storage_service.update_user_tg_chat_id(current_user["sub"], chat_id)
+    """Отвязать Telegram (пустой chat_id). Привязка — только через /me/telegram/link.
+
+    Ручной ввод chat_id позволял привязать к своему аккаунту чужой чат и
+    слать туда сообщения от имени бота (аудит 12.10.2026, M2).
+    """
+    if payload.tg_chat_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Подключайте Telegram кнопкой «Подключить Telegram» в настройках.",
+        )
+    storage_service.update_user_tg_chat_id(current_user["sub"], None)
+
+
+_TG_LINK_TTL = 900
+
+
+@router.post("/me/telegram/link")
+async def create_telegram_link(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ссылка на бота с одноразовым кодом: бот привяжет чат, где нажали Start."""
+    if not storage_service.check_rate_limit(f"tg_link:{current_user['sub']}", 900, 10):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много попыток. Попробуйте позже",
+        )
+    nonce = secrets.token_urlsafe(16)
+    storage_service.create_tg_link_nonce(
+        current_user["sub"], nonce, int(time.time()) + _TG_LINK_TTL)
+    return {"url": f"https://t.me/{settings.tg_bot_username}?start=link_{nonce}"}
 
 
 class ForgotPasswordInput(BaseModel):

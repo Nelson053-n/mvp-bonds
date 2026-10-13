@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # Public Telegram bond-search bot (optional). When set, a long-polling loop
     # starts in the leader worker and answers /start + free-text ticker queries.
     tg_bot_token: str = ""
+    # Имя бота для ссылки привязки t.me/<имя>?start=link_<код>.
+    tg_bot_username: str = "bondinfoai_bot"
     # Search-engine verification & indexing (all optional).
     # yandex_verification: the token from Я.Вебмастер ("Мета-тег"/файл verification)
     #   — served as /yandex_<token>.html and as a <meta> on public pages.

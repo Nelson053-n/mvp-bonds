@@ -216,6 +216,29 @@ class UsersMixin:
             conn.commit()
             return int(cursor.rowcount)
 
+    def create_tg_link_nonce(self, user_id: int, nonce: str, expires_at: int) -> None:
+        """Новый код привязки Telegram; прежние коды пользователя и просроченные — удаляем."""
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM tg_link_nonces WHERE user_id = ? OR expires_at < CAST(strftime('%s','now') AS INTEGER)",
+                (user_id,),
+            )
+            conn.execute(
+                "INSERT INTO tg_link_nonces (nonce, user_id, expires_at) VALUES (?, ?, ?)",
+                (nonce, user_id, expires_at),
+            )
+            conn.commit()
+
+    def consume_tg_link_nonce(self, nonce: str, now_ts: int) -> int | None:
+        """Погасить код привязки атомарно; user_id или None (нет/просрочен/уже использован)."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "DELETE FROM tg_link_nonces WHERE nonce = ? AND expires_at > ? RETURNING user_id",
+                (nonce, now_ts),
+            ).fetchone()
+            conn.commit()
+        return int(row[0]) if row else None
+
     def clear_tg_chat_id(self, tg_chat_id: str) -> int:
         """Снять подписку у всех, у кого этот chat_id: бот заблокирован.
 
