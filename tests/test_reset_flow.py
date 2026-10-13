@@ -295,3 +295,47 @@ class TestResetPasswordFailures:
             json={"code": "VICTIM", "new_password": "legit_pw_9"},
         )
         assert r.status_code == 400
+
+
+# ──────────────────── аудит 12.10.2026, H1: перебор с заблокированного IP ────────────────────
+
+
+class TestBlockedIpCannotGuess:
+    """Заблокированный IP не должен сверять коды вообще.
+
+    Раньше код сверялся ДО проверки IP-блока: после 10 неудач IP получал 429,
+    но его догадки по-прежнему проверялись, а попытки у кодов не списывались.
+    Новый код, выпущенный после блокировки, перебирался без ограничений.
+    """
+
+    async def test_correct_code_from_blocked_ip_is_rejected(self, client: AsyncClient) -> None:
+        uid = await _register(client, _uniq("victim"))
+        for _ in range(10):
+            r = await client.post("/auth/reset-password", json={"code": "000000", "new_password": "x" * 8})
+            assert r.status_code == 400
+        assert (await client.post("/auth/reset-password",
+                                  json={"code": "000000", "new_password": "x" * 8})).status_code == 429
+
+        # Новый живой код после блокировки (как после /forgot-password жертвы).
+        storage_service.insert_password_reset_code("654321", uid, int(time.time()) + 900)
+        for guess in ("111111", "222222", "654321"):
+            r = await client.post("/auth/reset-password", json={"code": guess, "new_password": "attacker_pw1"})
+            assert r.status_code == 429, (guess, r.status_code)
+
+        with storage_service._connect() as conn:
+            row = conn.execute(
+                "SELECT attempts FROM password_reset_codes WHERE code = ?", ("654321",)
+            ).fetchone()
+        assert row is not None and row[0] == 0  # код не тронут — заблокированный IP до него не дошёл
+
+
+class TestNoCodeWithoutChannel:
+    async def test_user_without_channels_gets_no_code(self, client: AsyncClient) -> None:
+        """Код, который некуда доставить, — только цель для перебора: не создаём."""
+        name = _uniq("nochan")
+        await _register(client, name)
+        r = await client.post("/auth/forgot-password", json={"username": name})
+        assert r.status_code == 200 and r.json() == {"method": "sent"}
+        with storage_service._connect() as conn:
+            n = conn.execute("SELECT COUNT(*) FROM password_reset_codes").fetchone()[0]
+        assert n == 0

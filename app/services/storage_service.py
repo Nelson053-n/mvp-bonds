@@ -698,6 +698,18 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             conn.commit()
             return True
 
+    def is_rate_limited(self, key: str, window_seconds: int, max_count: int) -> bool:
+        """Исчерпан ли лимит в текущем окне — без увеличения счётчика."""
+        import time
+        now = int(time.time())
+        window_start = now - (now % window_seconds)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT count FROM rate_limits WHERE key = ? AND window_start = ?",
+                (key, window_start)
+            ).fetchone()
+        return row is not None and row[0] >= max_count
+
     # ── Password reset codes ────────────────────────────────────────────────
 
     def insert_password_reset_code(self, code: str, user_id: int, expires_at: int) -> None:

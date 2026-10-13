@@ -61,6 +61,19 @@ server {
         proxy_send_timeout 90s;
     }
 
+    # Эндпоинты с паролями и кодами сброса — лимит auth_rl (conf.d). Только
+    # эти четыре пути: /auth/me* дёргается фронтом на каждой загрузке.
+    location ~ ^/auth/(login|register|forgot-password|reset-password)$ {
+        limit_req zone=auth_rl burst=10 nodelay;
+
+        proxy_pass http://127.0.0.1:8002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8002;
         proxy_http_version 1.1;

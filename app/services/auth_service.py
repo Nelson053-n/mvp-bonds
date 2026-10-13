@@ -191,19 +191,23 @@ class AuthService:
         if not user:
             return "sent"
 
+        tg_token = storage_service.get_setting("tg_bot_token", "")
+        can_tg = bool(user["tg_chat_id"] and tg_token)
+        can_email = bool(user["email"] and mailer.smtp_configured())
+        if not (can_tg or can_email):
+            # Код, который некуда доставить, — только цель для перебора.
+            logger.warning("Reset requested for user %s (id=%d): no delivery channel", username, user["id"])
+            return "sent"
+
         code = str(secrets.randbelow(900000) + 100000)  # 6-digit
         expires_at = int(time.time() + self.RESET_TTL)
         storage_service.insert_password_reset_code(code, user["id"], expires_at)
 
         sent_via = []
-        if user["tg_chat_id"]:
-            tg_token = storage_service.get_setting("tg_bot_token", "")
-            if tg_token:
-                ok = await self._send_telegram_reset(tg_token, user["tg_chat_id"], code, username, lang=lang)
-                if ok:
-                    sent_via.append("telegram")
-
-        if user["email"]:
+        if can_tg:
+            if await self._send_telegram_reset(tg_token, user["tg_chat_id"], code, username, lang=lang):
+                sent_via.append("telegram")
+        if can_email:
             if await self._send_email_reset(user["email"], code, username, lang=lang):
                 sent_via.append("email")
 
@@ -275,6 +279,16 @@ class AuthService:
         storage_service.update_user_password(user_id, new_hash)
         logger.info("Password reset for user_id=%d", user_id)
         return True
+
+    def is_reset_confirm_blocked(self, client_ip: str) -> bool:
+        """IP уже исчерпал окно неудачных попыток — без списания слота."""
+        if not client_ip:
+            return False
+        return storage_service.is_rate_limited(
+            f"reset_confirm:ip:{client_ip}",
+            self._RESET_CONFIRM_WINDOW,
+            self._RESET_CONFIRM_MAX,
+        )
 
     def is_reset_confirm_rate_limited(self, client_ip: str) -> bool:
         """Charge one failure window slot for client_ip; True if blocked.

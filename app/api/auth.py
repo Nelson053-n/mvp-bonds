@@ -234,17 +234,20 @@ async def forgot_password(payload: ForgotPasswordInput, request: Request) -> dic
 async def reset_password(payload: ResetPasswordInput, request: Request) -> None:
     """Apply reset code and set a new password."""
     client_ip = request.client.host if request.client else ""
-    ok = auth_service.confirm_password_reset(payload.code, payload.new_password, client_ip)
-    if ok:
-        return None
-    # On failure: charge IP window AND burn an attempt against every live code.
-    # Order matters — check IP limit first so an attacker who already burned
-    # the window can't keep spending live-code attempts for free.
-    if auth_service.is_reset_confirm_rate_limited(client_ip):
+    # Блокировку IP проверяем ДО сверки кода. Раньше код сверялся первым, а
+    # заблокированный IP получал 429 без списания попыток у кодов — то есть
+    # перебирал коды без ограничений (аудит 12.10.2026, H1).
+    if auth_service.is_reset_confirm_blocked(client_ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Слишком много попыток. Попробуйте позже",
         )
+    ok = auth_service.confirm_password_reset(payload.code, payload.new_password, client_ip)
+    if ok:
+        return None
+    # Неудача: занять слот IP-окна и списать попытку у КАЖДОГО живого кода —
+    # всегда, даже если IP только что упёрся в лимит.
+    auth_service.is_reset_confirm_rate_limited(client_ip)
     auth_service.register_failed_reset_attempt()
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
