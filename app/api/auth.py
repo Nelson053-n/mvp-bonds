@@ -55,8 +55,17 @@ class UserResponse(BaseModel):
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterInput) -> dict:
+async def register(payload: RegisterInput, request: Request) -> dict:
     """Register a new user."""
+    # Без лимита аноним создавал аккаунты (каждый — с триалом Pro) и перебирал
+    # занятые имена по ответу «уже существует» (аудит 12.10.2026, M9).
+    client_ip = request.client.host if request.client else ""
+    if client_ip and not storage_service.check_rate_limit(
+            f"register:ip:{client_ip}", 3600, settings.register_max_per_hour):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много регистраций. Попробуйте позже",
+        )
     try:
         result = auth_service.register(payload.username, payload.password)
         return result
@@ -100,7 +109,9 @@ class ChangePasswordInput(BaseModel):
 
 
 class ChangeEmailInput(BaseModel):
-    email: str = Field(..., max_length=254)
+    # Пусто — отвязка; иначе минимальная проверка формата: адрес уходит в
+    # SMTP-заголовок To и получает письмо от bondai (аудит M4).
+    email: str = Field(..., max_length=254, pattern=r"^$|^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$")
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -143,6 +154,13 @@ async def change_email(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Change current user's email. Returns smtp_available flag."""
+    # Каждая смена шлёт письмо на указанный адрес: без лимита — спам с нашего
+    # SMTP и исчерпание квоты, после которого не доходят коды сброса (аудит M4).
+    if not storage_service.check_rate_limit(f"change_email:{current_user['sub']}", 3600, 5):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много попыток. Попробуйте позже",
+        )
     result = await auth_service.change_email(current_user["sub"], payload.email)
     if not result["ok"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пользователь не найден")

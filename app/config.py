@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     tg_bot_token: str = ""
     # Имя бота для ссылки привязки t.me/<имя>?start=link_<код>.
     tg_bot_username: str = "bondinfoai_bot"
+    # Регистраций с одного IP в час (аудит 12.10.2026, M9).
+    register_max_per_hour: int = 10
     # Search-engine verification & indexing (all optional).
     # yandex_verification: the token from Я.Вебмастер ("Мета-тег"/файл verification)
     #   — served as /yandex_<token>.html and as a <meta> on public pages.

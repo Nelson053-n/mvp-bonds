@@ -331,10 +331,12 @@ class AuthService:
         if not user:
             return {"ok": False, "smtp_available": False}
         clean_email = email.strip() or None
+        changed = clean_email != (user.get("email") or None)
         storage_service.update_user_email(user_id, clean_email)
         logger.info("Email updated for user_id=%d", user_id)
         smtp_available = mailer.smtp_configured()
-        if smtp_available and clean_email:
+        # Письмо — только на новый адрес, не на каждое нажатие «Сохранить».
+        if smtp_available and clean_email and changed:
             await self._send_email_confirmation(clean_email, user.get("username", ""))
         return {"ok": True, "smtp_available": smtp_available}
 

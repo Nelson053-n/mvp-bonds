@@ -67,6 +67,10 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
     original_yk = (original_settings.yookassa_shop_id, original_settings.yookassa_secret_key)
     original_settings.yookassa_shop_id = ""
     original_settings.yookassa_secret_key = ""
+    # Тесты регистрируют десятки пользователей с одного адреса; лимит
+    # регистраций проверяется отдельным тестом с подменой значения.
+    original_register_max = original_settings.register_max_per_hour
+    original_settings.register_max_per_hour = 1_000_000
 
     # CRITICAL: redirect the global singleton to the test database.
     # All modules that imported `storage_service` hold a reference to this
@@ -78,6 +82,7 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
 
     # Restore production settings and DB path
     original_settings.yookassa_shop_id, original_settings.yookassa_secret_key = original_yk
+    original_settings.register_max_per_hour = original_register_max
     config.settings = original_settings
     _global_storage.db_path = original_db_path
 
