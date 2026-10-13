@@ -184,13 +184,10 @@
           if (sharePassword) {
             headers['X-Share-Password'] = sharePassword;
           }
-        } else {
-          const token = localStorage.getItem('mvp_auth_token');
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
         }
-        const fetchOpts = { ...opts, headers };
+        // Сессия — в HttpOnly-cookie, браузер шлёт её сам (same-origin); токен
+        // в JS больше не хранится (аудит 12.10.2026, M8).
+        const fetchOpts = { ...opts, headers, credentials: 'same-origin' };
         const response = await fetch(url, fetchOpts);
         if (response.status === 401 && !isReadOnly) {
           clearUserState();
@@ -4645,11 +4642,21 @@
       }
 
       async function initAuth() {
-        const token = localStorage.getItem('mvp_auth_token');
         const username = localStorage.getItem('mvp_username');
         const savedPortfolioId = localStorage.getItem('mvp_active_portfolio_id');
 
-        if (!token) {
+        // Токен от прежней версии (localStorage) — один раз обменять на
+        // HttpOnly-cookie и удалить, чтобы не разлогинивать пользователя.
+        const legacyToken = localStorage.getItem('mvp_auth_token');
+        if (legacyToken) {
+          try {
+            const r = await fetch('/auth/session', { method: 'POST', headers: { 'Authorization': `Bearer ${legacyToken}` } });
+            if (r.ok) localStorage.setItem('mvp_logged_in', '1');
+          } catch (e) {}
+          localStorage.removeItem('mvp_auth_token');
+        }
+
+        if (!localStorage.getItem('mvp_logged_in')) {
           showLoginScreen();
           return;
         }
@@ -4738,8 +4745,16 @@
       // Clear per-user state so switching accounts in the same browser doesn't
       // carry over the previous user's active portfolio / mode. Device-level
       // prefs (theme, lang, mobile mode, last username) are intentionally kept.
+      // Выход: cookie сессии HttpOnly — удалить её может только сервер.
+      async function doLogout() {
+        try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) {}
+        clearUserState();
+        location.reload();
+      }
+      window.doLogout = doLogout;
+
       function clearUserState() {
-        ['mvp_auth_token', 'mvp_username', 'mvp_active_portfolio',
+        ['mvp_auth_token', 'mvp_logged_in', 'mvp_username', 'mvp_active_portfolio',
          'mvp_active_portfolio_id', 'mvp_profit_mode2', 'mvp_onboarding_done',
          'mvp_start_onboarding'].forEach(k => localStorage.removeItem(k));
       }
@@ -4783,7 +4798,7 @@
               const data = await res.json();
               if (res.ok) {
                 clearUserState();  // drop any previous user's portfolio/mode
-                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_logged_in', '1');  // сам токен — в HttpOnly-cookie
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
                 loginBtn.innerHTML = '<span class="btn-check">✓</span>' + t('auth.signing');
@@ -4822,7 +4837,7 @@
               const data = await res.json();
               if (res.ok) {
                 clearUserState();  // a brand-new account must not inherit prior state
-                localStorage.setItem('mvp_auth_token', data.access_token);
+                localStorage.setItem('mvp_logged_in', '1');  // сам токен — в HttpOnly-cookie
                 localStorage.setItem('mvp_username', data.username);
                 localStorage.setItem('mvp_last_username', username);
                 localStorage.setItem('mvp_start_onboarding', '1');
@@ -5301,10 +5316,7 @@
             btn.setAttribute('data-i18n', 'nav.logout');
             btn.textContent = 'Выйти';
             btn.style.cssText = 'padding:4px 12px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;';
-            btn.onclick = () => {
-              clearUserState();
-              location.reload();
-            };
+            btn.onclick = () => doLogout();
             topbarRight.appendChild(btn);
           }
         }
@@ -7428,9 +7440,7 @@
         try {
           const r = await apiFetch('/auth/change-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ old_password: oldPw, new_password: newPw }) });
           if (r.ok) {
-            // Смена пароля отзывает прежние токены — сохраняем выданный новый.
-            const d = await r.json().catch(() => ({}));
-            if (d.access_token) localStorage.setItem('mvp_auth_token', d.access_token);
+            // Смена пароля отзывает прежние токены; новый сервер уже положил в cookie.
             status.textContent = t('settings.account.pwChanged');
             status.className = 'status ok';
             document.getElementById('acc-old-pw').value = '';

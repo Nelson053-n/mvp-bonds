@@ -7,10 +7,10 @@ import re
 import secrets
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 
-from app.api.deps import get_current_user
+from app.api.deps import SESSION_COOKIE, get_current_user
 from app.config import settings
 from app.exceptions import AuthError
 from app.services.auth_service import auth_service
@@ -54,8 +54,22 @@ class UserResponse(BaseModel):
     pro_until: str | None = None  # ISO date; None = lifetime (or not Pro)
 
 
+def _set_session_cookie(response: Response, request: Request, token: str) -> None:
+    """Сессия браузера — HttpOnly-cookie; JS её не видит (аудит 12.10.2026, M8)."""
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        max_age=settings.jwt_expiry_hours * 3600,
+        httponly=True,
+        samesite="lax",
+        # За nginx (--proxy-headers, X-Forwarded-Proto) схема — https; локально
+        # по http Secure-cookie браузер бы не сохранил.
+        secure=request.url.scheme == "https",
+        path="/",
+    )
+
+
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterInput, request: Request) -> dict:
+async def register(payload: RegisterInput, request: Request, response: Response) -> dict:
     """Register a new user."""
     # Без лимита аноним создавал аккаунты (каждый — с триалом Pro) и перебирал
     # занятые имена по ответу «уже существует» (аудит 12.10.2026, M9).
@@ -68,6 +82,7 @@ async def register(payload: RegisterInput, request: Request) -> dict:
         )
     try:
         result = auth_service.register(payload.username, payload.password)
+        _set_session_cookie(response, request, result["access_token"])
         return result
     except AuthError as e:
         raise HTTPException(
@@ -77,7 +92,7 @@ async def register(payload: RegisterInput, request: Request) -> dict:
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(payload: LoginInput, request: Request) -> dict:
+async def login(payload: LoginInput, request: Request, response: Response) -> dict:
     """Login with username and password."""
     client_ip = request.client.host if request.client else ""
     result = auth_service.login(payload.username, payload.password, client_ip)
@@ -86,7 +101,31 @@ async def login(payload: LoginInput, request: Request) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Неверные учетные данные",
         )
+    _set_session_cookie(response, request, result["access_token"])
     return result
+
+
+@router.post("/session", status_code=status.HTTP_204_NO_CONTENT)
+async def exchange_session(
+    request: Request,
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+) -> None:
+    """Перенести сессию из заголовка Bearer в cookie.
+
+    Для браузеров, где токен остался в localStorage от прежней версии: страница
+    один раз обменивает его на cookie и удаляет — без повторного входа.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нужен заголовок Authorization")
+    _set_session_cookie(response, request, auth_header[7:])
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response) -> None:
+    """Удалить cookie сессии (токен в localStorage больше не хранится)."""
+    response.delete_cookie(SESSION_COOKIE, path="/")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -117,6 +156,8 @@ class ChangeEmailInput(BaseModel):
 @router.post("/change-password")
 async def change_password(
     payload: ChangePasswordInput,
+    request: Request,
+    response: Response,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Change current user's password.
@@ -133,8 +174,10 @@ async def change_password(
             detail="Неверный текущий пароль",
         )
     user = storage_service.get_user_by_id(current_user["sub"])
-    return {"access_token": auth_service.create_token(
-        user["id"], user["username"], user["is_admin"], user["token_version"])}
+    token = auth_service.create_token(
+        user["id"], user["username"], user["is_admin"], user["token_version"])
+    _set_session_cookie(response, request, token)
+    return {"access_token": token}
 
 
 class ChangeUsernameInput(BaseModel):

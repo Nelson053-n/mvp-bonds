@@ -3,6 +3,7 @@ FastAPI dependencies for authentication and portfolio access.
 """
 
 import time
+from urllib.parse import urlparse
 
 import bcrypt
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -11,17 +12,56 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.services.auth_service import auth_service
 from app.services.storage_service import storage_service
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+# Сессия браузера — в HttpOnly-cookie, а не в localStorage: XSS больше не может
+# унести токен (аудит 12.10.2026, M8). Заголовок Authorization: Bearer остаётся
+# для скриптов (manage.py, deploy.sh) и API-клиентов.
+SESSION_COOKIE = "bondai_session"
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _token_from_request(request: Request, credentials) -> tuple[str | None, bool]:
+    """(токен, пришёл_из_cookie). Заголовок приоритетнее cookie."""
+    if credentials is not None:
+        return credentials.credentials, False
+    token = request.cookies.get(SESSION_COOKIE)
+    return (token, True) if token else (None, False)
+
+
+def _cookie_request_is_same_origin(request: Request) -> bool:
+    """CSRF-защита для изменяющих запросов, авторизованных cookie.
+
+    Первый слой — SameSite=Lax (браузер не шлёт cookie в межсайтовых POST).
+    Второй — Sec-Fetch-Site и Origin: межсайтовый запрос отклоняем, даже если
+    браузер cookie всё же отправил. Bearer-заголовок CSRF не подвержен —
+    чужая страница не может его подставить.
+    """
+    if request.method in _SAFE_METHODS:
+        return True
+    if request.headers.get("sec-fetch-site") in ("cross-site", "same-site"):
+        return False
+    origin = request.headers.get("origin")
+    if origin:
+        return urlparse(origin).netloc == request.headers.get("host", "")
+    return True
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
     """
-    Extract and verify JWT token from Authorization header.
+    Extract and verify JWT token from Authorization header or session cookie.
     Raises 401 if token is invalid or expired.
     """
-    payload = auth_service.verify_token(credentials.credentials)
+    token, via_cookie = _token_from_request(request, credentials)
+    if token is None:
+        # Как раньше у HTTPBearer: без учётных данных — 403.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
+    if via_cookie and not _cookie_request_is_same_origin(request):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Запрос с чужого сайта отклонён")
+    payload = auth_service.verify_token(token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -112,10 +152,12 @@ async def get_optional_user(request: Request) -> dict | None:
     Returns None if no token or invalid token (for public/share routes).
     """
     auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.cookies.get(SESSION_COOKIE)
+    if not token:
         return None
-
-    token = auth_header[7:]
     payload = auth_service.verify_token(token)
     if payload is None:
         return None

@@ -378,7 +378,7 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
   // Public catalog renders without auth context; if a token is in localStorage,
   // swap the login/register CTAs for a "Мои портфели" link back to the app.
   (function(){{try{{
-    if(!localStorage.getItem('mvp_auth_token'))return;
+    if(!localStorage.getItem('mvp_logged_in')&&!localStorage.getItem('mvp_auth_token'))return;
     var l=document.getElementById('nav-login'),r=document.getElementById('nav-register'),p=document.getElementById('nav-portfolio');
     if(l)l.style.display='none'; if(r)r.style.display='none'; if(p)p.style.display='inline-flex';
   }}catch(e){{}}}})();

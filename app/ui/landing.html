@@ -2218,8 +2218,8 @@
     // instead of "Попробовать бесплатно" / "Войти".
     (function reflectAuthState() {
       try {
-        const token = localStorage.getItem('mvp_auth_token');
-        if (!token) return;
+        // Флаг входа (сам токен — в HttpOnly-cookie); mvp_auth_token — от прежней версии.
+        if (!localStorage.getItem('mvp_logged_in') && !localStorage.getItem('mvp_auth_token')) return;
         const show = (id, disp) => { const e = document.getElementById(id); if (e) e.style.display = disp; };
         show('nav-login-btn', 'none');
         show('nav-trial-btn', 'none');
@@ -2508,8 +2508,7 @@
         const regData = await regRes.json();
         if (!regRes.ok) throw new Error(regData.detail || 'Ошибка регистрации');
 
-        const token = regData.access_token;
-        localStorage.setItem('mvp_auth_token', token);
+        localStorage.setItem('mvp_logged_in', '1');  // сессия — в HttpOnly-cookie из ответа
         localStorage.setItem('mvp_username', regData.username);
         localStorage.setItem('mvp_last_username', username);
         localStorage.setItem('mvp_onboarding_done', '1'); // skip wizard on dashboard — we already have results
@@ -2518,7 +2517,7 @@
 
         // Create portfolio
         const portRes = await fetch('/portfolios', {
-          method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+          method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
           body: JSON.stringify({ name: 'Мой портфель' })
         });
         const portData = await portRes.json();
@@ -2535,7 +2534,7 @@
             purchase_price: null,  // auto-fetch current market price so profit=0 at add time
           }));
           await fetch(`/portfolios/${portfolioId}/instruments/bulk`, {
-            method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+            method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
             body: JSON.stringify(payloads)
           });
         }
@@ -2700,7 +2699,7 @@
           return;
         }
         if (data.access_token) {
-          localStorage.setItem('mvp_auth_token', data.access_token);
+          localStorage.setItem('mvp_logged_in', '1');  // сам токен — в HttpOnly-cookie
           if (data.username) localStorage.setItem('mvp_username', data.username);
           try { if (typeof ym !== 'undefined') ym(window._ymId, 'reachGoal', _landingAuthTab === 'register' ? 'registration' : 'login'); } catch(_) {}
           window.location.href = '/app';
