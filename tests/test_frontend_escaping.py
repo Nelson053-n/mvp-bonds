@@ -40,3 +40,10 @@ def test_manual_rating_markup_rejected(v) -> None:
 ])
 def test_app_js_escapes(snippet) -> None:
     assert snippet in APP_JS
+
+
+def test_table_polling_stops_when_logged_out() -> None:
+    """После 401 (флаг снят) вкладка не должна опрашивать /table раз в 15 минут."""
+    i = APP_JS.index("syncTableFromServer().catch(() => {});\n            }, SYNC_INTERVAL_MS);")
+    interval_body = APP_JS[APP_JS.rindex("setInterval(", 0, i):i]
+    assert "localStorage.getItem('mvp_logged_in')" in interval_body

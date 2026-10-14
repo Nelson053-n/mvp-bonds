@@ -133,3 +133,16 @@ async def test_reset_code_message_escapes_username(monkeypatch) -> None:
 async def test_username_whitelist(client, name, ok) -> None:
     r = await client.post("/auth/register", json={"username": name, "password": "secret12"})
     assert (r.status_code == 201) is ok, (name, r.status_code, r.text[:120])
+
+
+async def test_failed_link_attempts_are_logged_without_nonce(caplog) -> None:
+    """Неудачи привязки видны в логе (13.10 нельзя было понять, что случилось), код — нет."""
+    import logging
+    bot, _ = _bot()
+    with caplog.at_level(logging.INFO, logger="app.services.telegram_bot_service"):
+        await bot._handle_update(None, _start("/start link_SECRETNONCE123", chat_id=901))
+        await bot._handle_update(None, _start("/start link_SECRETNONCE456", chat_id=902, chat_type="group"))
+    msgs = [r.getMessage() for r in caplog.records]
+    assert any("tg_link_failed: reason=expired_or_used chat_id=901" in m for m in msgs)
+    assert any("tg_link_failed: reason=not_private chat_id=902" in m for m in msgs)
+    assert not any("SECRETNONCE" in m for m in msgs)

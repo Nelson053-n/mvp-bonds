@@ -6190,6 +6190,10 @@
           initAuth().then(() => {
             loadNotifSettings();
             setInterval(() => {
+              // Сессия истекла (401 снял флаг) — не опрашивать: вкладка часами
+              // слала запросы раз в 15 минут и получала 401. После нового
+              // входа флаг ставится снова, и опрос продолжается сам.
+              if (!localStorage.getItem('mvp_logged_in')) return;
               if (!isAllMode && !portfolioId) return;
               if (window._wizardBusy) return;
               syncTableFromServer().catch(() => {});

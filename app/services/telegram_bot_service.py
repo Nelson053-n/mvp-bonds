@@ -360,10 +360,16 @@ class TelegramBotService:
         chat = msg.get("chat", {})
         chat_id = chat.get("id")
         if chat.get("type") != "private":
+            # Сам код в лог не пишем — это одноразовый секрет привязки.
+            logger.info("tg_link_failed: reason=not_private chat_id=%s type=%s", chat_id, chat.get("type"))
             await self._send(client, chat_id, "Подключение работает только в личном чате с ботом.")
             return
         user_id = storage_service.consume_tg_link_nonce(nonce, int(time.time())) if nonce else None
         if user_id is None:
+            # Неудачи тоже видны в логе: 13.10 привязка у пользователя не
+            # подтвердилась, и по логу нельзя было понять — не нажал Start или
+            # код устарел.
+            logger.info("tg_link_failed: reason=expired_or_used chat_id=%s", chat_id)
             await self._send(client, chat_id,
                              "Ссылка устарела или уже использована. Нажмите «Подключить Telegram» "
                              "в настройках bondai.ru ещё раз.")
