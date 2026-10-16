@@ -441,6 +441,14 @@ class MOEXService:
                     src.record_hit()
                     logger.info("FX rate %s/RUB = %.4f", currency, rate)
                     return rate
+            # Для драгметаллов (GLD, SLV — так их отдаёт Т-Банк в денежных
+            # позициях) индикативного курса нет, только торги валютной секции.
+            rate = await self._get_selt_rate(client, currency)
+            if rate is not None:
+                self._fx_rate_cache[currency] = (rate, now)
+                src.record_hit()
+                logger.info("FX rate %s/RUB = %.4f (selt)", currency, rate)
+                return rate
             src.record_miss()
             logger.warning("FX rate not found for %s/RUB", currency)
         except Exception as exc:
@@ -452,6 +460,23 @@ class MOEXService:
         if cached:
             logger.warning("Using stale FX rate for %s/RUB: %.4f", currency, cached[0])
             return cached[0]
+        return None
+
+    async def _get_selt_rate(self, client, currency: str) -> float | None:
+        """Цена {CCY}RUB_TOM на основном режиме CETS (₽ за единицу, у металлов — за грамм)."""
+        if not (currency.isascii() and currency.isalpha()):
+            return None
+        url = (
+            f"{settings.moex_base_url}/engines/currency/markets/selt/boards/CETS/"
+            f"securities/{currency}RUB_TOM.json"
+            f"?iss.meta=off&iss.only=marketdata&marketdata.columns=LAST,MARKETPRICE,WAPRICE"
+        )
+        resp = await client.get(url, timeout=10)
+        resp.raise_for_status()
+        row = self._get_first_row(resp.json().get("marketdata", {}))
+        for key in ("LAST", "MARKETPRICE", "WAPRICE"):
+            if row.get(key):
+                return float(row[key])
         return None
 
     async def get_index_value(self, index_id: str = "RGBI") -> float | None:

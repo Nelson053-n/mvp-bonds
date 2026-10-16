@@ -922,3 +922,56 @@ class TestCreditRatingDescriptionRetry:
         assert calls["n"] == 3
         # причина сбоя в логе не пустая — виден тип исключения
         assert any("PoolTimeout" in r.getMessage() for r in caplog.records)
+
+
+class TestFxRateMetals:
+    """Драгметаллы (GLD из денежных позиций Т-Банка): индикативного курса на
+    MOEX нет — до правки золото считалось как 0 ₽ и давало ~520 WARNING в сутки."""
+
+    def _patch(self, monkeypatch, responses):
+        import app.services.moex_service as m
+        urls = []
+
+        class _Resp:
+            def __init__(self, payload):
+                self._p = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        class _Client:
+            async def get(self, url, **kw):
+                urls.append(url)
+                return _Resp(responses[len(urls) - 1])
+
+        monkeypatch.setattr(m.MOEXService, "_get_http", lambda self: _Client())
+        return urls
+
+    async def test_gold_rate_from_selt(self, monkeypatch):
+        import app.services.moex_service as m
+        urls = self._patch(monkeypatch, [
+            {"securities.current": {"columns": ["rate"], "data": []}},
+            {"marketdata": {"columns": ["LAST", "MARKETPRICE", "WAPRICE"],
+                            "data": [[None, 11195.31, 11266.62]]}},
+        ])
+        assert await m.MOEXService()._get_fx_rate("GLD") == 11195.31
+        assert "GLDRUB_TOM" in urls[1]
+
+    async def test_indicative_rate_wins(self, monkeypatch):
+        import app.services.moex_service as m
+        urls = self._patch(monkeypatch, [
+            {"securities.current": {"columns": ["rate"], "data": [[81.5]]}},
+        ])
+        assert await m.MOEXService()._get_fx_rate("USD") == 81.5
+        assert len(urls) == 1
+
+    async def test_no_rate_anywhere(self, monkeypatch):
+        import app.services.moex_service as m
+        self._patch(monkeypatch, [
+            {"securities.current": {"columns": ["rate"], "data": []}},
+            {"marketdata": {"columns": ["LAST", "MARKETPRICE", "WAPRICE"], "data": []}},
+        ])
+        assert await m.MOEXService()._get_fx_rate("XXX") is None
