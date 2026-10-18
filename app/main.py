@@ -32,6 +32,7 @@ from app.api.admin import router as admin_router
 from app.api.tbank import router as tbank_router
 from app.api.waitlist import router as waitlist_router
 from app.api.billing import router as billing_router
+from app.api.support import router as support_router
 from app.api.watchlist import router as watchlist_router
 from app.api.deps import get_shared_portfolio
 from app.config import settings
@@ -681,6 +682,7 @@ app.include_router(tbank_router)
 app.include_router(waitlist_router)
 app.include_router(watchlist_router)
 app.include_router(billing_router)
+app.include_router(support_router)
 
 # Register all static file routes (favicon, icons, manifest, sw.js)
 _register_static_routes(app)

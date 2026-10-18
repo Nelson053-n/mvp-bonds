@@ -127,7 +127,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -170,6 +170,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (6, self._migration_v6),
             (7, self._migration_v7),
             (8, self._migration_v8),
+            (9, self._migration_v9),
         ]
 
         for version, migrate in migrations:
@@ -610,6 +611,22 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+
+    def _migration_v9(self, conn: sqlite3.Connection) -> None:
+        """v9 — обращения пользователей в техподдержку (раздел админки)."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS support_tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TEXT NOT NULL,
+                handled_at TEXT
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, created_at)"
+        )
 
     def _write_bootstrap_admin_password(self, password: str) -> None:
         """Write the bootstrap admin password to a 0600 file next to the DB.
@@ -1232,6 +1249,57 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         with self._connect() as conn:
             conn.execute("DELETE FROM pro_payments WHERE payment_id = ?", (payment_id,))
             conn.commit()
+
+    # ── Support tickets ─────────────────────────────────────────────────────
+
+    def create_support_ticket(self, user_id: int, message: str) -> int:
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO support_tickets (user_id, message, created_at) VALUES (?, ?, ?)",
+                (user_id, message, datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+            ticket_id = cur.lastrowid
+        logger.info("AUDIT support_ticket_created: id=%s user_id=%d", ticket_id, user_id)
+        return int(ticket_id)
+
+    def list_support_tickets(self, status: str | None = None, limit: int = 200) -> list[dict]:
+        where, args = ("WHERE t.status = ?", [status]) if status else ("", [])
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT t.id, t.user_id, u.username, u.email, u.tg_chat_id, t.message,
+                           t.status, t.created_at, t.handled_at
+                    FROM support_tickets t LEFT JOIN users u ON u.id = t.user_id
+                    {where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?""",
+                (*args, limit),
+            ).fetchall()
+        return [
+            {"id": r[0], "user_id": r[1], "username": r[2], "email": r[3],
+             "has_telegram": bool(r[4]), "message": r[5], "status": r[6],
+             "created_at": r[7], "handled_at": r[8]}
+            for r in rows
+        ]
+
+    def count_open_support_tickets(self) -> int:
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM support_tickets WHERE status = 'open'"
+            ).fetchone()[0]
+
+    def set_support_ticket_done(self, ticket_id: int, done: bool) -> bool:
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            cur = conn.execute(
+                "UPDATE support_tickets SET status = ?, handled_at = ? WHERE id = ?",
+                ("done" if done else "open",
+                 datetime.now(timezone.utc).isoformat() if done else None, ticket_id),
+            )
+            conn.commit()
+            changed = cur.rowcount > 0
+        if changed:
+            logger.info("AUDIT support_ticket_%s: id=%d", "done" if done else "reopened", ticket_id)
+        return changed
 
     def get_pro_payments(self, limit: int = 200) -> list[dict]:
         with self._connect() as conn:

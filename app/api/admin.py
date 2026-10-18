@@ -33,6 +33,32 @@ async def list_pro_payments(admin: dict = Depends(get_admin_user)) -> list:
     return storage_service.get_pro_payments()
 
 
+@router.get("/support")
+async def list_support_tickets(
+    status_filter: str | None = None, admin: dict = Depends(get_admin_user)
+) -> dict:
+    """Обращения в техподдержку (?status_filter=open — только необработанные)."""
+    if status_filter not in (None, "open", "done"):
+        raise HTTPException(status_code=400, detail="status_filter: open | done")
+    return {
+        "open_count": storage_service.count_open_support_tickets(),
+        "tickets": storage_service.list_support_tickets(status_filter),
+    }
+
+
+class SupportDonePayload(BaseModel):
+    done: bool
+
+
+@router.patch("/support/{ticket_id}")
+async def mark_support_ticket(
+    ticket_id: int, payload: SupportDonePayload, admin: dict = Depends(get_admin_user)
+) -> dict:
+    if not storage_service.set_support_ticket_done(ticket_id, payload.done):
+        raise HTTPException(status_code=404, detail="Обращение не найдено")
+    return {"ok": True}
+
+
 @router.get("/revenue")
 async def get_revenue(days: int = 30, admin: dict = Depends(get_admin_user)) -> dict:
     """Daily revenue (succeeded payments) for the last N days — admin chart (7/30/90)."""

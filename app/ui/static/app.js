@@ -4638,7 +4638,57 @@
             link.style.display = '';
             if (sep) sep.style.display = '';
           }
+          const banner = document.getElementById('support-banner');
+          if (banner && !_supportBannerDismissed()) {
+            document.getElementById('support-banner-donate').href = d.url || d.sbp_url;
+            banner.style.display = '';
+          }
         } catch(e) { /* donate is optional */ }
+      }
+
+      // Плашка «поддержать проект» скрывается на 30 дней (только в этом браузере).
+      const _SUPPORT_BANNER_KEY = 'mvp_support_banner_until';
+      function _supportBannerDismissed() {
+        try { return Number(localStorage.getItem(_SUPPORT_BANNER_KEY) || 0) > Date.now(); }
+        catch (e) { return false; }
+      }
+      function dismissSupportBanner() {
+        document.getElementById('support-banner').style.display = 'none';
+        try { localStorage.setItem(_SUPPORT_BANNER_KEY, String(Date.now() + 30 * 86400 * 1000)); } catch (e) { /* ok */ }
+      }
+
+      // ── Техподдержка (пользователь) ────────────────────────────────
+      function openSupportTab() {
+        showPanel('panel-settings');
+        document.querySelector('.stab-btn[data-stab="stab-support"]')?.click();
+        document.getElementById('support-message')?.focus();
+      }
+      async function sendSupportMessage() {
+        const box = document.getElementById('support-message');
+        const btn = document.getElementById('support-send-btn');
+        const status = document.getElementById('support-status');
+        const message = (box.value || '').trim();
+        if (message.length < 5) { status.textContent = 'Опишите вопрос подробнее'; return; }
+        btn.disabled = true;
+        status.textContent = 'Отправляем…';
+        try {
+          const r = await apiFetch('/support', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message }),
+          });
+          if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            status.textContent = typeof d.detail === 'string' ? d.detail : 'Не удалось отправить. Попробуйте позже.';
+            return;
+          }
+          box.value = '';
+          status.textContent = '';
+          toast('Сообщение отправлено. Спасибо!', 'success');
+        } catch (e) {
+          status.textContent = 'Не удалось отправить. Проверьте соединение.';
+        } finally {
+          btn.disabled = false;
+        }
       }
 
       async function initAuth() {
@@ -6212,6 +6262,7 @@
         money:      () => { adminLoadRevenue(30).catch(() => {}); adminLoadPayments().catch(() => {}); },
         portfolios: () => adminLoadPortfolios(),
         system:     () => { adminLoadSources().catch(() => {}); adminLoadBackups().catch(() => {}); adminLoadAuditLog().catch(() => {}); },
+        support:    () => adminLoadSupport().catch(() => {}),
         promo:      () => adminLoadPromo(),
       };
       const _admTabLoaded = {};
@@ -6236,9 +6287,10 @@
 
       async function adminInit() {
         await adminLoadStats();
+        adminLoadSupport().catch(() => {});  // значок «N новых» на вкладке виден сразу
         // Deep-link via hash (/admin#money) or legacy path (/admin/promo).
         // Hash is used so tab names don't collide with /admin/* API routes.
-        const hash = (location.hash.match(/^#(users|money|portfolios|system|promo)$/) || [])[1];
+        const hash = (location.hash.match(/^#(users|money|portfolios|system|support|promo)$/) || [])[1];
         const legacy = location.pathname === '/admin/promo' ? 'promo' : null;
         adminShowTab(hash || legacy || 'users');
       }
@@ -6532,6 +6584,58 @@
           });
         } catch(e) {
           body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Не удалось загрузить</td></tr>';
+        }
+      }
+      async function adminLoadSupport() {
+        const body = document.getElementById('adm-support-body');
+        if (!body) return;
+        const r = await apiFetch('/admin/support');
+        if (!r.ok) {
+          body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Не удалось загрузить</td></tr>';
+          return;
+        }
+        const d = await r.json();
+        const badge = document.getElementById('adm-support-badge');
+        if (badge) { badge.textContent = d.open_count; badge.style.display = d.open_count ? '' : 'none'; }
+        if (!d.tickets.length) {
+          body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:12px;">Обращений пока нет</td></tr>';
+          return;
+        }
+        body.innerHTML = '';
+        d.tickets.forEach(t => {
+          const tr = document.createElement('tr');
+          if (t.status === 'done') tr.style.opacity = '.55';
+          const tdDate = document.createElement('td');
+          tdDate.textContent = t.created_at
+            ? new Date(t.created_at).toLocaleString('ru-RU', { timeZone: 'Asia/Vladivostok', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+            : '';
+          const tdUser = document.createElement('td');
+          tdUser.textContent = (t.username || 'удалён') + ' #' + (t.user_id || '');
+          const tdContact = document.createElement('td');
+          tdContact.textContent = [t.email, t.has_telegram ? 'Telegram' : ''].filter(Boolean).join(' · ') || '—';
+          const tdMsg = document.createElement('td');
+          tdMsg.style.cssText = 'white-space:pre-wrap;word-break:break-word;';
+          tdMsg.textContent = t.message;
+          const tdDone = document.createElement('td'); tdDone.style.textAlign = 'center';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.checked = t.status === 'done'; cb.style.cursor = 'pointer';
+          cb.onchange = () => adminToggleSupportDone(t.id, cb.checked, cb);
+          tdDone.appendChild(cb);
+          tr.append(tdDate, tdUser, tdContact, tdMsg, tdDone);
+          body.appendChild(tr);
+        });
+      }
+      async function adminToggleSupportDone(id, done, cb) {
+        try {
+          const r = await apiFetch(`/admin/support/${encodeURIComponent(id)}`, {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ done }),
+          });
+          if (!r.ok) throw new Error();
+          adminLoadSupport().catch(() => {});
+        } catch(e) {
+          if (cb) cb.checked = !done;
+          toast('Ошибка сохранения', 'error');
         }
       }
       async function adminToggleReceipt(paymentId, done, cb) {
