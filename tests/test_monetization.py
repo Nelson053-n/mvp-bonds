@@ -8,12 +8,12 @@ from app.services.llm_service import LLMService
 
 # ── New-user Pro trial ───────────────────────────────────────────────────────
 
-def test_new_user_gets_30day_pro_trial():
+def test_new_user_gets_year_pro_trial():
     from datetime import date, timedelta
     uid = storage_service.create_user("trial_newbie", "$2b$dummyhash")
     u = storage_service.get_user_by_id(uid)
     assert u["is_pro"] is True
-    assert u["pro_until"] == (date.today() + timedelta(days=30)).isoformat()
+    assert u["pro_until"] == (date.today() + timedelta(days=365)).isoformat()
 
 
 # ── Pro grant / revoke (admin) ───────────────────────────────────────────────

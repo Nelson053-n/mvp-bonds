@@ -5,6 +5,9 @@ import sqlite3
 logger = logging.getLogger(__name__)
 
 
+NEW_USER_PRO_DAYS = 365
+
+
 def _pro_active(is_pro_flag, pro_until) -> bool:
     """Effective Pro status: flag set AND (no expiry OR expiry in the future)."""
     if not is_pro_flag:
@@ -23,8 +26,8 @@ class UsersMixin:
         from datetime import datetime, timezone, date, timedelta
 
         now = datetime.now(timezone.utc).isoformat()
-        # New users get a 30-day Pro trial.
-        trial_until = (date.today() + timedelta(days=30)).isoformat()
+        # New users get a Pro trial (год — решение 18.10.2026: платных оплат почти нет).
+        trial_until = (date.today() + timedelta(days=NEW_USER_PRO_DAYS)).isoformat()
         with self._connect() as conn:
             try:
                 cursor = conn.execute(
