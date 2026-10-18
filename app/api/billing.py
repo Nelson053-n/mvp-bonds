@@ -5,7 +5,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user
 from app.config import settings
@@ -77,6 +77,60 @@ async def billing_create(
     logger.info("AUDIT billing_create: user_id=%s plan=%s payment_id=%s",
                 current_user["sub"], payload.plan, result.get("id"))
     return {"confirmation_url": result["confirmation_url"], "payment_id": result["id"]}
+
+
+DONATION_MIN_RUB = 50
+DONATION_MAX_RUB = 50_000
+
+
+class DonateInput(BaseModel):
+    amount: int = Field(ge=DONATION_MIN_RUB, le=DONATION_MAX_RUB)
+
+
+@router.post("/donate")
+async def billing_donate(
+    payload: DonateInput,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Пожертвование проекту через ЮKassa: платёж на произвольную сумму, Pro не выдаётся."""
+    if not yookassa_service.enabled():
+        raise HTTPException(status_code=503, detail="Оплата временно недоступна")
+    if not storage_service.check_rate_limit(f"donate:{current_user['sub']}", 3600, 10):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте позже.")
+    result = await yookassa_service.create_donation(
+        current_user["sub"], payload.amount, idempotence_key=str(uuid.uuid4())
+    )
+    if not result or not result.get("confirmation_url"):
+        raise HTTPException(status_code=502, detail="Не удалось создать платёж")
+    logger.info("AUDIT donate_create: user_id=%s amount=%d payment_id=%s",
+                current_user["sub"], payload.amount, result.get("id"))
+    return {"confirmation_url": result["confirmation_url"], "payment_id": result["id"]}
+
+
+def _record_donation(payment: dict) -> bool:
+    """Записать успешное пожертвование (для учёта НПД и выручки). Pro НЕ выдаётся.
+
+    Сумма — из проверенного платежа ЮKassa, не из тела уведомления.
+    """
+    if not payment or payment.get("status") != "succeeded":
+        return False
+    meta = payment.get("metadata") or {}
+    try:
+        user_id = int(meta.get("user_id"))
+        amount = float((payment.get("amount") or {}).get("value"))
+    except (TypeError, ValueError):
+        return False
+    payment_id = str(payment.get("id") or "")
+    if not payment_id or amount <= 0:
+        return False
+    user = storage_service.get_user_by_id(user_id)
+    if storage_service.record_pro_payment(
+        payment_id=payment_id, user_id=user_id,
+        username=(user or {}).get("username", ""),
+        plan="donation", amount=amount, status="succeeded",
+    ):
+        logger.info("AUDIT donation_received: user_id=%d amount=%.0f payment_id=%s", user_id, amount, payment_id)
+    return True
 
 
 def _grant_pro_from_payment(payment: dict) -> bool:
@@ -162,5 +216,8 @@ async def billing_webhook(request: Request) -> dict:
         return {"ok": True}
     verified = await yookassa_service.get_payment(payment_id)
     if verified:
-        _grant_pro_from_payment(verified)
+        if (verified.get("metadata") or {}).get("kind") == "donation":
+            _record_donation(verified)
+        else:
+            _grant_pro_from_payment(verified)
     return {"ok": True}

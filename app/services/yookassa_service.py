@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 _API = "https://api.yookassa.ru/v3/payments"
 _RETURN_URL = "https://bondai.ru/app?pro=success"
+_DONATE_RETURN_URL = "https://bondai.ru/app?donate=thanks"
 
 # plan -> (amount_rub, pro_days)
 PLANS = {
@@ -38,22 +39,7 @@ def _auth_header() -> str:
     return "Basic " + base64.b64encode(raw).decode()
 
 
-async def create_payment(user_id: int, plan: str, idempotence_key: str) -> dict | None:
-    """Create a YooKassa payment. Returns {id, confirmation_url} or None on failure.
-
-    `metadata.user_id` + `metadata.plan` come back in the webhook so we know
-    whom to grant Pro to and for how long.
-    """
-    if not enabled() or plan not in PLANS:
-        return None
-    amount, _days = PLANS[plan]
-    body = {
-        "amount": {"value": f"{amount}.00", "currency": "RUB"},
-        "confirmation": {"type": "redirect", "return_url": _RETURN_URL},
-        "capture": True,
-        "description": f"Bond AI Pro — {'месяц' if plan == 'month' else 'год'}",
-        "metadata": {"user_id": str(user_id), "plan": plan},
-    }
+async def _create(body: dict, idempotence_key: str) -> dict | None:
     headers = {
         "Authorization": _auth_header(),
         "Idempotence-Key": idempotence_key,
@@ -74,6 +60,37 @@ async def create_payment(user_id: int, plan: str, idempotence_key: str) -> dict 
     except Exception as exc:  # noqa: BLE001 - never propagate to the request
         logger.warning("YooKassa create error: %s", exc)
         return None
+
+
+async def create_payment(user_id: int, plan: str, idempotence_key: str) -> dict | None:
+    """Create a YooKassa payment. Returns {id, confirmation_url} or None on failure.
+
+    `metadata.user_id` + `metadata.plan` come back in the webhook so we know
+    whom to grant Pro to and for how long.
+    """
+    if not enabled() or plan not in PLANS:
+        return None
+    amount, _days = PLANS[plan]
+    return await _create({
+        "amount": {"value": f"{amount}.00", "currency": "RUB"},
+        "confirmation": {"type": "redirect", "return_url": _RETURN_URL},
+        "capture": True,
+        "description": f"Bond AI Pro — {'месяц' if plan == 'month' else 'год'}",
+        "metadata": {"user_id": str(user_id), "plan": plan},
+    }, idempotence_key)
+
+
+async def create_donation(user_id: int, amount: int, idempotence_key: str) -> dict | None:
+    """Платёж-пожертвование: произвольная сумма, Pro не выдаётся (metadata.kind=donation)."""
+    if not enabled():
+        return None
+    return await _create({
+        "amount": {"value": f"{int(amount)}.00", "currency": "RUB"},
+        "confirmation": {"type": "redirect", "return_url": _DONATE_RETURN_URL},
+        "capture": True,
+        "description": "Bond AI — поддержка проекта",
+        "metadata": {"user_id": str(user_id), "kind": "donation"},
+    }, idempotence_key)
 
 
 async def get_payment(payment_id: str) -> dict | None:

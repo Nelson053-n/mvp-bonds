@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=126">
+    <link rel="stylesheet" href="/static/styles.css?v=127">
   </head>
   <body>
 
@@ -135,7 +135,14 @@
                 Проект развивается без рекламы. Будем рады, если вы его поддержите — это помогает делать сервис лучше.
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a id="support-banner-donate" class="btn btn-primary" href="#" target="_blank" rel="noopener" style="height:30px;font-size:12px;padding:0 12px;text-decoration:none;display:inline-flex;align-items:center;">☕ Поддержать проект</a>
+                <a id="support-banner-donate" class="btn btn-primary" href="#" target="_blank" rel="noopener" style="display:none;height:30px;font-size:12px;padding:0 12px;text-decoration:none;align-items:center;">☕ Поддержать проект</a>
+                <span id="support-banner-amounts" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-muted);">☕ Поддержать:</span>
+                  <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(100)">100 ₽</button>
+                  <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(300)">300 ₽</button>
+                  <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(500)">500 ₽</button>
+                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate()">Другая сумма</button>
+                </span>
                 <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px;" onclick="dismissSupportBanner()">Скрыть</button>
               </div>
             </div>
@@ -1518,8 +1525,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=126"></script>
-    <script src="/static/app.js?v=126"></script>
+    <script src="/static/translations.js?v=127"></script>
+    <script src="/static/app.js?v=127"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

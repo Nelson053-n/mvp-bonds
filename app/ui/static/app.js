@@ -4595,6 +4595,9 @@
           toast('Оплата прошла — Pro активирован 🎉', 'success');
           history.replaceState(null, '', '/app');
           setTimeout(() => location.reload(), 1500);
+        } else if (params.get('donate') === 'thanks') {
+          history.replaceState(null, '', '/app');
+          toast('Спасибо за поддержку! 💚', 'success');
         } else if (params.get('pro') === '1' && !window._isPro) {
           history.replaceState(null, '', '/app');
           openProModal();
@@ -4630,20 +4633,56 @@
           const r = await fetch('/donate-info');
           if (!r.ok) return;
           const d = await r.json();
-          if (!d.enabled) return;
+          if (!d.enabled && !d.yookassa) return;
           const link = document.getElementById('donate-link');
           const sep = document.getElementById('donate-sep');
           if (link) {
-            link.href = d.url || d.sbp_url;
+            if (d.yookassa) {
+              // оплата через ЮKassa: сумма на выбор, без ухода на сторонний сайт до оплаты
+              link.href = '#';
+              link.removeAttribute('target');
+              link.onclick = (e) => { e.preventDefault(); donate(); };
+            } else {
+              link.href = d.url || d.sbp_url;
+            }
             link.style.display = '';
             if (sep) sep.style.display = '';
           }
           const banner = document.getElementById('support-banner');
           if (banner && !_supportBannerDismissed()) {
-            document.getElementById('support-banner-donate').href = d.url || d.sbp_url;
+            if (d.yookassa) {
+              document.getElementById('support-banner-amounts').style.display = 'inline-flex';
+            } else {
+              const a = document.getElementById('support-banner-donate');
+              a.href = d.url || d.sbp_url;
+              a.style.display = 'inline-flex';
+            }
             banner.style.display = '';
           }
         } catch(e) { /* donate is optional */ }
+      }
+
+      // Пожертвование через ЮKassa: amount не задан — спросить сумму.
+      async function donate(amount) {
+        if (!amount) {
+          const v = await showPrompt('Поддержать проект', 'Сумма в рублях (от 50 до 50 000 ₽)', {
+            value: '300', placeholder: '300', okText: 'Перейти к оплате',
+          });
+          if (v == null) return;
+          amount = /^\d{2,5}$/.test(String(v).trim()) ? parseInt(v, 10) : 0;
+        }
+        if (!(amount >= 50 && amount <= 50000)) { toast('Сумма — от 50 до 50 000 ₽', 'warn'); return; }
+        try {
+          const r = await apiFetch('/billing/donate', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ amount }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok || !d.confirmation_url) throw new Error(d.detail || 'Ошибка');
+          location.href = d.confirmation_url;  // оплата на стороне ЮKassa
+        } catch (e) {
+          toast('Не удалось создать платёж. Попробуйте позже.', 'error');
+        }
       }
 
       // Плашка «поддержать проект» скрывается на 30 дней (только в этом браузере).
@@ -6569,7 +6608,7 @@
           rows.forEach(p => {
             const tr = document.createElement('tr');
             const date = (p.created_at || '').substring(0, 10);
-            const planTxt = p.plan === 'year' ? 'Год' : 'Месяц';
+            const planTxt = p.plan === 'donation' ? 'Донат' : (p.plan === 'year' ? 'Год' : 'Месяц');
             const tdDate = document.createElement('td'); tdDate.textContent = date;
             const tdUser = document.createElement('td'); tdUser.textContent = (p.username || '') + ' #' + (p.user_id || '');
             const tdPlan = document.createElement('td'); tdPlan.textContent = planTxt;

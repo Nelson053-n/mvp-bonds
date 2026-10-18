@@ -836,7 +836,10 @@ async def llms_txt():
 # the dashboard hides the "Поддержать проект" button. Public, no auth.
 @app.get("/donate-info")
 async def donate_info():
+    from app.services import yookassa_service
     return {
+        # yookassa: пожертвование суммой на выбор через ЮKassa (POST /billing/donate)
+        "yookassa": yookassa_service.enabled(),
         "enabled": bool(settings.donate_url or settings.donate_sbp_url),
         "url": settings.donate_url,
         "sbp_url": settings.donate_sbp_url,
