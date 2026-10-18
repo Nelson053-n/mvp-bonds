@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=127">
+    <link rel="stylesheet" href="/static/styles.css?v=128">
   </head>
   <body>
 
@@ -126,18 +126,18 @@
         </div>
 
         <!-- Плашка «поддержать проект»: показывается, когда настроена ссылка на донат -->
-        <div id="support-banner" style="display:none;background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
+        <div id="support-banner" style="display:none;background:var(--bg-card, rgba(148,163,184,.06));border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
           <div style="display:flex;align-items:flex-start;gap:12px;">
-            <span style="font-size:18px;line-height:1;">🎁</span>
+            <span style="color:var(--text-muted);line-height:1;"><svg class="ico" style="width:20px;height:20px;margin:0" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg></span>
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Pro-функции бесплатны для всех — целый год</div>
               <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;word-break:break-word;">
                 Проект развивается без рекламы. Будем рады, если вы его поддержите — это помогает делать сервис лучше.
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a id="support-banner-donate" class="btn btn-primary" href="#" target="_blank" rel="noopener" style="display:none;height:30px;font-size:12px;padding:0 12px;text-decoration:none;align-items:center;">☕ Поддержать проект</a>
+                <a id="support-banner-donate" class="btn btn-primary" href="#" target="_blank" rel="noopener" style="display:none;height:30px;font-size:12px;padding:0 12px;text-decoration:none;align-items:center;"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>Поддержать проект</a>
                 <span id="support-banner-amounts" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
-                  <span style="font-size:12px;color:var(--text-muted);">☕ Поддержать:</span>
+                  <span style="font-size:12px;color:var(--text-muted);"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>Поддержать:</span>
                   <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(100)">100 ₽</button>
                   <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(300)">300 ₽</button>
                   <button class="btn btn-primary" style="height:30px;font-size:12px;padding:0 12px;" onclick="donate(500)">500 ₽</button>
@@ -817,12 +817,12 @@
 
         <!-- Sub-section tabs -->
         <div class="adm-tabs" id="adm-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
-          <button class="adm-tab active" data-tab="users"      onclick="adminShowTab('users', this)">👥 Пользователи</button>
-          <button class="adm-tab"        data-tab="money"      onclick="adminShowTab('money', this)">💰 Монетизация</button>
-          <button class="adm-tab"        data-tab="portfolios" onclick="adminShowTab('portfolios', this)">📁 Портфели</button>
-          <button class="adm-tab"        data-tab="system"     onclick="adminShowTab('system', this)">⚙️ Система</button>
-          <button class="adm-tab"        data-tab="support"    onclick="adminShowTab('support', this)">🛟 Поддержка <span id="adm-support-badge" style="display:none;background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:4px;"></span></button>
-          <button class="adm-tab"        data-tab="promo"      onclick="adminShowTab('promo', this)">📣 Промо</button>
+          <button class="adm-tab active" data-tab="users"      onclick="adminShowTab('users', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Пользователи</button>
+          <button class="adm-tab"        data-tab="money"      onclick="adminShowTab('money', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> Монетизация</button>
+          <button class="adm-tab"        data-tab="portfolios" onclick="adminShowTab('portfolios', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> Портфели</button>
+          <button class="adm-tab"        data-tab="system"     onclick="adminShowTab('system', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg> Система</button>
+          <button class="adm-tab"        data-tab="support"    onclick="adminShowTab('support', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"/></svg> Поддержка <span id="adm-support-badge" style="display:none;background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:4px;"></span></button>
+          <button class="adm-tab"        data-tab="promo"      onclick="adminShowTab('promo', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> Промо</button>
         </div>
 
         <!-- Users table -->
@@ -975,7 +975,7 @@
         <!-- Выручка по дням (Pro-платежи) -->
         <div class="card adm-pane" data-adm-tab="money" style="margin-top:16px;" id="adm-revenue-card">
           <div class="card-header">
-            <h2 class="card-title">📈 Выручка по дням</h2>
+            <h2 class="card-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> Выручка по дням</h2>
             <div style="display:flex;gap:6px;" id="adm-rev-range">
               <button class="btn btn-secondary adm-rev-btn" data-days="7"  style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadRevenue(7, this)">7 дней</button>
               <button class="btn btn-primary adm-rev-btn"   data-days="30" style="height:28px;font-size:12px;padding:0 12px;" onclick="adminLoadRevenue(30, this)">30 дней</button>
@@ -997,7 +997,7 @@
         <!-- Платежи Pro (для учёта НПД в «Мой налог» вручную) -->
         <div class="card adm-pane" data-adm-tab="money" style="margin-top:16px;" id="adm-payments-card">
           <div class="card-header">
-            <h2 class="card-title">💳 Платежи Pro</h2>
+            <h2 class="card-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg> Платежи Pro</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadPayments()">↺</button>
           </div>
           <div style="padding:8px 16px 0;font-size:11px;color:var(--text-muted);line-height:1.5;">
@@ -1016,7 +1016,7 @@
         <!-- Обращения пользователей в техподдержку -->
         <div class="card adm-pane" data-adm-tab="support" style="margin-top:16px;" id="adm-support-card">
           <div class="card-header">
-            <h2 class="card-title">🛟 Обращения в поддержку</h2>
+            <h2 class="card-title"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"/></svg> Обращения в поддержку</h2>
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadSupport()">↺</button>
           </div>
           <div style="padding:8px 16px 0;font-size:11px;color:var(--text-muted);line-height:1.5;">
@@ -1096,7 +1096,7 @@
         <a href="#" onclick="openSupportTab(); return false;" style="color: var(--text-muted); text-decoration: none;">Поддержка</a>
       </span>
       <span style="font-size: 11px; color: var(--text-muted);">
-        <a id="donate-link" href="#" target="_blank" rel="noopener" style="display:none;color: var(--green-400); text-decoration: none;">☕ Поддержать проект</a>
+        <a id="donate-link" href="#" target="_blank" rel="noopener" style="display:none;color: var(--text-muted); text-decoration: none;"><svg class="ico" style="width:12px;height:12px;margin-right:4px" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>Поддержать проект</a>
         <span id="donate-sep" style="display:none;">&nbsp;·&nbsp;</span>
         <a href="https://tbank.ru/baf/47BkLWQ33GF" target="_blank" rel="noopener" style="color: var(--blue-400); text-decoration: none;" data-i18n="footer.broker">Откройте брокерский счёт и получите акции на 2000 рублей →</a>
       </span>
@@ -1525,8 +1525,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=127"></script>
-    <script src="/static/app.js?v=127"></script>
+    <script src="/static/translations.js?v=128"></script>
+    <script src="/static/app.js?v=128"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

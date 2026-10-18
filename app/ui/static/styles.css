@@ -1129,3 +1129,6 @@ td.no-market-data {
   color: var(--text-muted);
   cursor: help;
 }
+
+/* Монохромные иконки (currentColor): вкладки админки, плашки */
+.ico { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; margin-right:6px; flex:none; }

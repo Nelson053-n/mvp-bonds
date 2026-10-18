@@ -4597,7 +4597,7 @@
           setTimeout(() => location.reload(), 1500);
         } else if (params.get('donate') === 'thanks') {
           history.replaceState(null, '', '/app');
-          toast('Спасибо за поддержку! 💚', 'success');
+          toast('Спасибо за поддержку!', 'success');
         } else if (params.get('pro') === '1' && !window._isPro) {
           history.replaceState(null, '', '/app');
           openProModal();
