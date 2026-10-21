@@ -784,6 +784,22 @@ async def _serve(key: str, build) -> HTMLResponse:
     return HTMLResponse(html, headers=_PUBLIC_CACHE)
 
 
+async def warm(number: str) -> bool:
+    """Пересобрать страницу выпуска в обход TTL (вызывает ночной прогрев).
+    Без этого после загрузки новых итогов дня страница до часа показывала бы
+    вчерашние цифры."""
+    sel = await _selection()
+    sec = next((s for s in sel if s["number"] == number), None)
+    if not sec:
+        return False
+    built = await _build_page(sec, sel)
+    if built is None:
+        return False
+    html, ttl = built
+    _ofz_page_cache[number] = (html, time.time(), ttl)
+    return True
+
+
 # ── Роуты ────────────────────────────────────────────────────────────────────
 
 @router.api_route("/ofz", response_class=HTMLResponse, methods=["GET", "HEAD"])

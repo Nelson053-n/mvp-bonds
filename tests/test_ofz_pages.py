@@ -472,3 +472,19 @@ async def test_bond_card_links_to_review_only_for_selected_ofz(client, monkeypat
     assert "/ofz/" not in (await client.get(f"/bond/{cny}")).text
     assert "/ofz/" not in (await client.get("/bond/RU000A106K43")).text        # не ОФЗ
     assert "/ofz/" not in (await client.get("/bond/SU26231RMFS7")).text        # ОФЗ вне отбора (26231 — без торгов)
+
+
+async def test_warm_rebuilds_cached_page_bypassing_ttl(client, monkeypatch, env):
+    calls = []
+    orig = ofz_pages._load_db
+    monkeypatch.setattr(ofz_pages, "_load_db", lambda *a: (calls.append(1), orig(*a))[1])
+    await client.get("/ofz/26238")
+    assert len(calls) == 1
+    t1 = ofz_pages._ofz_page_cache["26238"][1]
+    await asyncio.sleep(0.01)
+    assert await ofz_pages.warm("26238") is True
+    assert len(calls) == 2                      # в обход свежего кэша
+    assert ofz_pages._ofz_page_cache["26238"][1] > t1   # копия действительно заменена
+    r = await client.get("/ofz/26238")
+    assert r.status_code == 200 and len(calls) == 2   # отдаётся прогретая копия
+    assert await ofz_pages.warm("00000") is False     # вне отбора
