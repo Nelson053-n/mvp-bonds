@@ -234,27 +234,52 @@ async def _price_alert_loop():
             logger.exception("price_alert_loop: price alert check failed")
 
 
+# Портфель, чей последний синк упал (например, 504 на стороне Т-Банка, таймаут 30 с),
+# пробуем не каждый цикл, а раз в _TBANK_FAILED_RETRY_EVERY циклов.
+_TBANK_FAILED_RETRY_EVERY = 3
+
+
+async def _tbank_sync_cycle(skipped: dict[int, int]) -> None:
+    """Один проход синка. skipped: portfolio_id -> сколько циклов подряд пропущен (в памяти)."""
+    from app.services.tbank_sync_service import _PENDING_REMOVAL_PREFIX, do_sync_one
+    from app.api.deps import user_can_autosync
+    syncs = storage_service.get_all_enabled_syncs()
+    active_ids = {cfg["portfolio_id"] for cfg in syncs}
+    for pid in [p for p in skipped if p not in active_ids]:
+        del skipped[pid]
+    for cfg in syncs:
+        pid = cfg["portfolio_id"]
+        try:
+            # Free trial expired (non-Pro past the window) → disable sync.
+            if not user_can_autosync(cfg["user_id"]):
+                storage_service.set_sync_enabled(pid, False)
+                logger.info("Auto-sync disabled (free trial ended): portfolio_id=%d user_id=%d",
+                            pid, cfg["user_id"])
+                continue
+            # PENDING_REMOVAL — не сбой синка (синк прошёл), такие не притормаживаем.
+            last_error = cfg.get("last_sync_error")
+            if last_error and not last_error.startswith(_PENDING_REMOVAL_PREFIX):
+                if skipped.get(pid, 0) < _TBANK_FAILED_RETRY_EVERY - 1:
+                    skipped[pid] = skipped.get(pid, 0) + 1
+                    logger.debug("tbank_sync_loop: portfolio_id=%d skipped after failed sync (%d)",
+                                 pid, skipped[pid])
+                    continue
+                skipped[pid] = 0
+            else:
+                skipped.pop(pid, None)
+            await do_sync_one(pid, cfg)
+        except Exception:
+            logger.exception("tbank_sync_loop: sync failed for portfolio_id=%s", pid)
+
+
 async def _tbank_sync_loop():
     """Sync all enabled T-Bank portfolios every 10 minutes."""
     SYNC_INTERVAL = 600
+    skipped: dict[int, int] = {}
     await asyncio.sleep(SYNC_INTERVAL)  # first run 10 min after startup
     while True:
         try:
-            from app.services.tbank_sync_service import do_sync_one
-            from app.api.deps import user_can_autosync
-            syncs = storage_service.get_all_enabled_syncs()
-            for cfg in syncs:
-                try:
-                    # Free trial expired (non-Pro past the window) → disable sync.
-                    if not user_can_autosync(cfg["user_id"]):
-                        storage_service.set_sync_enabled(cfg["portfolio_id"], False)
-                        logger.info("Auto-sync disabled (free trial ended): portfolio_id=%d user_id=%d",
-                                    cfg["portfolio_id"], cfg["user_id"])
-                        continue
-                    await do_sync_one(cfg["portfolio_id"], cfg)
-                except Exception:
-                    logger.exception("tbank_sync_loop: sync failed for portfolio_id=%s",
-                                     cfg.get("portfolio_id"))
+            await _tbank_sync_cycle(skipped)
         except Exception:
             logger.exception("tbank_sync_loop: unexpected error")
         await asyncio.sleep(SYNC_INTERVAL)
@@ -802,7 +827,7 @@ async def llms_txt():
         "# Bond AI\n"
         "\n"
         "> Bond AI (bondai.ru) — AI-сервис для управления портфелем облигаций для российских розничных инвесторов. "
-        "Отслеживает 1200+ облигаций MOEX в реальном времени с расчётом YTM, купонным календарём и AI-аналитикой "
+        "Отслеживает 1500+ облигаций MOEX в реальном времени с расчётом YTM, купонным календарём и AI-аналитикой "
         "на базе Anthropic Claude. Базовый тариф бесплатен навсегда.\n"
         "\n"
         "## Продукт\n"
@@ -817,7 +842,7 @@ async def llms_txt():
         "\n"
         "## Ключевые возможности\n"
         "\n"
-        "- Данные MOEX ISS API в реальном времени (обновление каждые 15 минут)\n"
+        "- Данные MOEX ISS API в реальном времени (обновление каждые 5 минут)\n"
         "- AI-подбор портфеля по риск-профилю (от консервативного до агрессивного) на базе Claude\n"
         "- Купонный календарь с Telegram-уведомлениями о выплатах\n"
         "- Импорт портфеля из Т-Банк (Т-Инвестиции) по API\n"
@@ -924,20 +949,34 @@ async def view_shared_portfolio(share_token: str) -> HTMLResponse:
     """View shared portfolio page (public endpoint, no auth required)."""
     portfolio = storage_service.get_portfolio_by_share_token(share_token)
     if not portfolio:
-        html = error_page_html(
+        err_html = error_page_html(
             "\U0001f517", "Ссылка истекла или неверна",
             "Портфель по этой ссылке больше не доступен.",
             title="Портфель не найден — Bond AI",
         )
-        return HTMLResponse(html, status_code=404, headers={"Cache-Control": "no-store"})
+        return HTMLResponse(err_html, status_code=404, headers={"Cache-Control": "no-store"})
 
-    html = dashboard_path.read_text(encoding="utf-8")
-    html = html.replace(
+    page = dashboard_path.read_text(encoding="utf-8")
+    # Превью (title/og) видит любой, у кого есть ссылка, без пароля — имя защищённого портфеля в него не кладём.
+    if portfolio.get("share_password_hash"):
+        name = "Портфель облигаций"
+    else:
+        name = portfolio.get("name") or "Портфель облигаций"
+    title = html.escape(f"{name} — Bond AI", quote=True)
+    desc = html.escape("Портфель облигаций в Bond AI: состав, доходность и купонный календарь.", quote=True)
+    og = (
+        f'<meta property="og:type" content="website">\n'
+        f'    <meta property="og:title" content="{title}">\n'
+        f'    <meta property="og:description" content="{desc}">\n'
+        f'    <meta property="og:image" content="https://bondai.ru/og-image.png">\n'
+    )
+    page = page.replace("<title>Bond AI</title>", f"<title>{title}</title>\n    {og}", 1)
+    html_out = page.replace(
         "<!-- __SHARE_INJECT__ -->",
         f"<script>window.shareToken={json.dumps(share_token)};window.isSharedView=true;</script>",
         1,
     )
-    return HTMLResponse(html, headers=_NO_CACHE_HEADERS)
+    return HTMLResponse(html_out, headers=_NO_CACHE_HEADERS)
 
 
 @app.get("/share/{share_token}/table")
