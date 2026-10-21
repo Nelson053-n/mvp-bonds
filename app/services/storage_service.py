@@ -5,13 +5,14 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.storage.items import ItemsMixin
+from app.services.storage.ofz import OfzMixin
 from app.services.storage.portfolios import PortfoliosMixin
 from app.services.storage.users import UsersMixin
 
 logger = logging.getLogger(__name__)
 
 
-class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
+class StorageService(ItemsMixin, OfzMixin, PortfoliosMixin, UsersMixin):
     def __init__(self) -> None:
         self.db_path = Path(settings.sqlite_db_path)
         self._ensure_db()
@@ -127,7 +128,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 9
+    SCHEMA_VERSION = 10
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -171,6 +172,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             (7, self._migration_v7),
             (8, self._migration_v8),
             (9, self._migration_v9),
+            (10, self._migration_v10),
         ]
 
         for version, migrate in migrations:
@@ -626,6 +628,40 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, created_at)"
+        )
+
+    def _migration_v10(self, conn: sqlite3.Connection) -> None:
+        """v10 — история торгов ОФЗ и кривая бескупонной доходности (страницы /ofz).
+
+        Ключ (secid, tradedate) / (tradedate, period): повторная загрузка того же
+        дня перезаписывает строку, а не плодит дубли. duration хранится в днях,
+        как её отдаёт MOEX."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS ofz_daily (
+                secid TEXT NOT NULL,
+                tradedate TEXT NOT NULL,
+                close REAL,
+                yieldclose REAL,
+                duration REAL,
+                numtrades INTEGER,
+                value REAL,
+                zspread REAL,
+                facevalue REAL,
+                iricpiclose REAL,
+                beiclose REAL,
+                PRIMARY KEY (secid, tradedate)
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ofz_daily_tradedate ON ofz_daily(tradedate)"
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS ofz_curve_daily (
+                tradedate TEXT NOT NULL,
+                period REAL NOT NULL,
+                value REAL,
+                PRIMARY KEY (tradedate, period)
+            )"""
         )
 
     def _write_bootstrap_admin_password(self, password: str) -> None:

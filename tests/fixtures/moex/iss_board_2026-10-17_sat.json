@@ -1,0 +1,13 @@
+{
+"history": {
+	"columns": ["SECID", "TRADEDATE", "CLOSE", "YIELDCLOSE", "DURATION", "NUMTRADES", "VALUE", "ZSPREAD", "FACEVALUE", "IRICPICLOSE", "BEICLOSE"], 
+	"data": [
+
+	]
+},
+"history.cursor": {
+	"columns": ["INDEX", "TOTAL", "PAGESIZE"], 
+	"data": [
+		[0, 0, 100]
+	]
+}}

@@ -1,0 +1,43 @@
+{
+"maxdates": {
+	"columns": ["tradedate", "maxdate", "months"], 
+	"data": [
+
+	]
+},
+"params": {
+	"columns": ["tradedate", "tradetime", "B1", "B2", "B3", "T1", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"], 
+	"data": [
+
+	]
+},
+"params.dates": {
+	"columns": ["from", "till"], 
+	"data": [
+		["2014-01-06", "2026-10-21"]
+	]
+},
+"securities": {
+	"columns": ["tradedate", "tradetime", "secid", "benchmark", "expdate", "updatetime", "bidprice", "bidyield", "askprice", "askyield", "trdprice", "trdyield", "clcprice", "crtprice", "clcyield", "correction", "crtyield", "crtduration", "bidduration", "askduration", "shortname"], 
+	"data": [
+
+	]
+},
+"securities.dates": {
+	"columns": ["from", "till"], 
+	"data": [
+		["2014-01-06", "2026-10-21"]
+	]
+},
+"yearyields": {
+	"columns": ["tradedate", "tradetime", "period", "value"], 
+	"data": [
+
+	]
+},
+"yearyields.dates": {
+	"columns": ["from", "till"], 
+	"data": [
+		["2014-01-06", "2026-10-21"]
+	]
+}}
