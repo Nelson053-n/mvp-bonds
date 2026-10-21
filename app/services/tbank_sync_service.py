@@ -7,8 +7,10 @@ the same pattern (do_sync_one + _XXXX_INTERVAL background loop).
 
 import logging
 from datetime import datetime, timezone
+from html import escape
 
 from app.services.crypto_utils import decrypt_and_maybe_migrate
+from app.services.notification_service import notification_service
 from app.services.storage_service import storage_service
 from app.services.tbank_service import TBankError, TBankService
 
@@ -28,6 +30,48 @@ def parse_pending_removal(last_sync_error: str | None) -> list[str]:
         return []
     payload = last_sync_error[len(_PENDING_REMOVAL_PREFIX):]
     return [t.strip() for t in payload.split(",") if t.strip()]
+
+
+def _is_auth_error(message: str) -> bool:
+    return "токен" in message.lower() or "401" in message
+
+
+def _prev_error_is_real(portfolio_id: int) -> bool:
+    """True, если синк УЖЕ был в ошибке. PENDING_REMOVAL — не сбой, а успешный синк."""
+    cfg = storage_service.get_sync_config(portfolio_id) or {}
+    prev = cfg.get("last_sync_error")
+    return bool(prev) and not prev.startswith(_PENDING_REMOVAL_PREFIX)
+
+
+async def _notify_sync_failed(portfolio_id: int, auth_error: bool) -> None:
+    """Одно Telegram-сообщение владельцу при переходе «ок → ошибка».
+
+    Вызывающий отвечает за проверку перехода. Любой сбой здесь только логируется:
+    уведомление не должно ломать сам синк. Ретраи и отписку по 403/400 делает
+    notification_service.send_telegram.
+    """
+    try:
+        token = storage_service.get_setting("tg_bot_token", "")
+        portfolio = storage_service.get_portfolio(portfolio_id)
+        owner = storage_service.get_user_by_id(portfolio["user_id"]) if portfolio else None
+        chat_id = (owner or {}).get("tg_chat_id")
+        if not token or not chat_id:
+            return
+        name = escape(str(portfolio.get("name") or ""))
+        if auth_error:
+            text = (
+                f"⚠️ Синхронизация портфеля «{name}» с Т-Банком не удалась: "
+                "токен недействителен. Автосинхронизация отключена — "
+                "обновите токен в настройках портфеля."
+            )
+        else:
+            text = (
+                f"⚠️ Синхронизация портфеля «{name}» с Т-Банком не удалась: "
+                "Т-Банк временно недоступен. Приложение повторит попытку само."
+            )
+        await notification_service.send_telegram(token, str(chat_id), text)
+    except Exception:
+        logger.exception("sync_portfolio %d: не удалось отправить уведомление об ошибке", portfolio_id)
 
 
 async def do_sync_one(portfolio_id: int, cfg: dict) -> dict:
@@ -70,17 +114,24 @@ async def do_sync_one(portfolio_id: int, cfg: dict) -> dict:
     except TBankError as exc:
         now_iso = datetime.now(timezone.utc).isoformat()
         error_msg = exc.message[:500]
+        was_failing = _prev_error_is_real(portfolio_id)
         storage_service.update_sync_status(portfolio_id, now_iso, error_msg)
         # Disable sync on auth failure to avoid repeated 401s
-        if "токен" in exc.message.lower() or "401" in exc.message:
+        auth_error = _is_auth_error(exc.message)
+        if auth_error:
             storage_service.set_sync_enabled(portfolio_id, False)
             logger.warning(
                 "sync_portfolio %d: auth error, sync disabled: %s", portfolio_id, exc.message
             )
+        if not was_failing:
+            await _notify_sync_failed(portfolio_id, auth_error)
         raise
     except Exception as exc:
         now_iso = datetime.now(timezone.utc).isoformat()
+        was_failing = _prev_error_is_real(portfolio_id)
         storage_service.update_sync_status(portfolio_id, now_iso, str(exc)[:500])
+        if not was_failing:
+            await _notify_sync_failed(portfolio_id, False)
         raise
     finally:
         storage_service.release_sync_lock(portfolio_id)
