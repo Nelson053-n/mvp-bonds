@@ -4,7 +4,9 @@ import html
 import json
 import logging
 import os
+import time
 from pathlib import Path
+from typing import Any
 
 # Файлы, которые создаёт сервис (база, бэкапы, lock), — только владельцу.
 # Сервер общий с другими проектами; с umask 022 новые бэкапы базы получали
@@ -120,6 +122,9 @@ def _register_static_routes(application: FastAPI) -> None:
 # snapshot), send a Telegram alert so the operator notices a silently broken
 # loop instead of discovering missing backups days later.
 _FAILURE_ALERT_THRESHOLD = 3
+
+# Кэш считается зависшим, если не обновлялся дольше N интервалов обновления.
+_CACHE_STALE_FACTOR = 3
 
 
 async def _alert_task_failure(task_name: str, streak: int, exc: Exception) -> None:
@@ -276,13 +281,54 @@ async def _tbank_sync_loop():
     """Sync all enabled T-Bank portfolios every 10 minutes."""
     SYNC_INTERVAL = 600
     skipped: dict[int, int] = {}
+    fail_streak = 0
     await asyncio.sleep(SYNC_INTERVAL)  # first run 10 min after startup
     while True:
         try:
             await _tbank_sync_cycle(skipped)
-        except Exception:
-            logger.exception("tbank_sync_loop: unexpected error")
+            fail_streak = 0
+        except Exception as exc:
+            # Сюда попадает только сбой ВСЕГО прохода (например, не прочиталась БД);
+            # падение отдельного портфеля ловится внутри _tbank_sync_cycle и не считается.
+            fail_streak += 1
+            logger.exception("tbank_sync_loop: unexpected error (streak=%d)", fail_streak)
+            if fail_streak >= _FAILURE_ALERT_THRESHOLD:
+                await _alert_task_failure("Синк Т-Банка", fail_streak, exc)
         await asyncio.sleep(SYNC_INTERVAL)
+
+
+def _cache_age_s() -> float | None:
+    """Возраст самого свежего обновления кэша котировок в этом воркере, секунды.
+
+    None — ни один портфель ещё не прогрет. Берём самый свежий: если даже он
+    устарел, фоновое обновление стоит.
+    """
+    from app.services.cache_service import cache_service
+    stamps = [c.last_refresh for c in cache_service._caches.values() if c.last_refresh > 0]
+    return max(0.0, time.time() - max(stamps)) if stamps else None
+
+
+async def _cache_watchdog_loop():
+    """Алерт, если фоновое обновление кэша перестало обновлять данные.
+
+    Сам цикл в cache_service ловит ошибки по каждому портфелю и не падает, поэтому
+    fail_streak там не сработал бы никогда; признак поломки — устаревший кэш.
+    """
+    from app.services.cache_service import cache_service
+    fail_streak = 0
+    while True:
+        await asyncio.sleep(cache_service.refresh_interval)
+        age = _cache_age_s()
+        if age is not None and age > cache_service.refresh_interval * _CACHE_STALE_FACTOR:
+            fail_streak += 1
+            logger.error("cache_watchdog: cache stale %.0fs (streak=%d)", age, fail_streak)
+            if fail_streak >= _FAILURE_ALERT_THRESHOLD:
+                await _alert_task_failure(
+                    "Обновление кэша котировок", fail_streak,
+                    RuntimeError(f"кэш не обновлялся {age:.0f} с"),
+                )
+        else:
+            fail_streak = 0
 
 
 async def _rating_refresh_loop():
@@ -577,6 +623,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_price_alert_loop())
         asyncio.create_task(_rating_refresh_loop())
         asyncio.create_task(_tbank_sync_loop())
+        asyncio.create_task(_cache_watchdog_loop())
         asyncio.create_task(_daily_backup_loop())
         asyncio.create_task(_benchmark_snapshot_loop())
         from app.services import telegram_net
@@ -1011,6 +1058,29 @@ async def api_info() -> dict[str, str]:
     }
 
 
+def _db_ping() -> None:
+    conn = storage_service._connect()
+    try:
+        conn.execute("SELECT 1").fetchone()
+    finally:
+        conn.close()
+
+
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, Any]:
+    """Всегда 200, пока жив процесс (на это опираются deploy.sh и nginx).
+
+    Состояние зависимостей — в полях тела, без сетевых вызовов наружу.
+    """
+    try:
+        await asyncio.wait_for(asyncio.to_thread(_db_ping), timeout=2.0)
+        db_ok = True
+    except Exception:
+        logger.warning("health: db ping failed", exc_info=True)
+        db_ok = False
+    age = _cache_age_s()
+    return {
+        "status": "ok",
+        "db_ok": db_ok,
+        "cache_age_s": None if age is None else round(age, 1),
+    }
