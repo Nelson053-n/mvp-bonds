@@ -329,7 +329,7 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>(function(){{try{{if(localStorage.getItem('bondai_theme')==='light')document.documentElement.setAttribute('data-theme','light');}}catch(e){{}}}})();</script>
+<script>(function(){{try{{if((localStorage.getItem('mvp_theme')||localStorage.getItem('bondai_theme'))==='light')document.documentElement.setAttribute('data-theme','light');}}catch(e){{}}}})();</script>
 <title>{e(title)}</title>
 <meta name="description" content="{e(description)}">
 <meta name="robots" content="index, follow">
@@ -395,7 +395,7 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
 b.addEventListener('click',function(){{var h=document.documentElement;
 var light=h.getAttribute('data-theme')==='light';
 if(light)h.removeAttribute('data-theme');else h.setAttribute('data-theme','light');
-try{{localStorage.setItem('bondai_theme',light?'dark':'light');}}catch(e){{}}
+try{{var v=light?'dark':'light';localStorage.setItem('bondai_theme',v);localStorage.setItem('mvp_theme',v);}}catch(e){{}}
 window.dispatchEvent(new Event('bondai-theme'));}});}})();</script>
 {_METRIKA}
 </body>

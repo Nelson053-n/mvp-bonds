@@ -11,10 +11,10 @@
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         if (isLight) {
           document.documentElement.removeAttribute('data-theme');
-          localStorage.setItem('mvp_theme', 'dark');
+          localStorage.setItem('mvp_theme', 'dark'); localStorage.setItem('bondai_theme', 'dark');
         } else {
           document.documentElement.setAttribute('data-theme', 'light');
-          localStorage.setItem('mvp_theme', 'light');
+          localStorage.setItem('mvp_theme', 'light'); localStorage.setItem('bondai_theme', 'light');
         }
         updateThemeBtn();
         // Redraw charts with new theme colors
