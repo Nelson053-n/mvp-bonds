@@ -315,8 +315,20 @@ table.params td:first-child{width:52%}}
 """
 
 
+_ADD_SECID_RE = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
+
+
+def _register_href(secid: str) -> str:
+    """Registration link; on a bond page it carries ?add=SECID so the app can
+    open the add-instrument dialog pre-filled. An invalid secid gives the plain link."""
+    if _ADD_SECID_RE.match(secid or ""):
+        return f"/app?auth=register&add={secid}"
+    return "/app?auth=register"
+
+
 def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: list[dict],
-                body: str, og_type: str = "website") -> str:
+                body: str, og_type: str = "website",
+                register_href: str = "/app?auth=register") -> str:
     # <-escape "<" so data can never break out of the <script> block (XSS via JSON-LD)
     jsonld = "\n".join(
         '<script type="application/ld+json">'
@@ -370,7 +382,7 @@ def _page_shell(title: str, description: str, canonical: str, jsonld_blocks: lis
       <svg class="ic-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
     <a id="nav-login" class="btn btn-ghost" href="/app?auth=login">Войти</a>
-    <a id="nav-register" class="btn btn-primary" href="/app?auth=register"><span class="cta-long">Попробовать бесплатно</span><span class="cta-short">Начать</span></a>
+    <a id="nav-register" class="btn btn-primary" href="{e(register_href)}"><span class="cta-long">Попробовать бесплатно</span><span class="cta-short">Начать</span></a>
     <a id="nav-portfolio" class="btn btn-primary" href="/app" style="display:none;"><span class="cta-long">Мои портфели &rarr;</span><span class="cta-short">Портфели</span></a>
   </nav>
 </header>
@@ -624,11 +636,12 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
   <h2>Следите за {e(s.name)} в своём портфеле</h2>
   <p>Bond AI бесплатно отслеживает цены, купоны и доходность ваших облигаций: купонный календарь,
   Telegram-уведомления о выплатах, импорт портфеля из Т-Банка.</p>
-  <a class="btn btn-primary" href="/app?auth=register">Создать портфель бесплатно</a>
+  <a class="btn btn-primary" href="{e(_register_href(secid))}">Создать портфель бесплатно</a>
 </div>
 {related_html}
 """
-    return _page_shell(title, meta_desc, url, jsonld, body, og_type="article")
+    return _page_shell(title, meta_desc, url, jsonld, body, og_type="article",
+                       register_href=_register_href(secid))
 
 
 async def _build_bond_page(secid: str) -> str | None:

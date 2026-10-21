@@ -84,6 +84,29 @@ async def test_bond_page_renders(client, monkeypatch):
     assert "mc.yandex.ru/metrika/tag.js" in html
 
 
+async def test_bond_page_register_links_carry_add(client, monkeypatch):
+    """CTA и кнопка в шапке на странице бумаги ведут на /app?auth=register&add=SECID."""
+    async def fake_snapshot(secid, **kwargs):
+        return _make_snapshot()
+
+    monkeypatch.setattr(moex_service, "get_bond_snapshot", fake_snapshot)
+    html = (await client.get("/bond/SU26238RMFS4")).text
+    assert html.count('href="/app?auth=register&amp;add=SU26238RMFS4"') == 2
+    assert 'href="/app?auth=register"' not in html
+
+
+async def test_catalog_register_links_have_no_add(client):
+    html = (await client.get("/bond")).text
+    assert "add=" not in html.split("</header>")[0].split('id="nav-register"')[1].split(">")[0]
+
+
+def test_register_href_validates_secid():
+    assert bond_pages._register_href("SU26238RMFS4") == "/app?auth=register&add=SU26238RMFS4"
+    assert bond_pages._register_href("RU000A10DTA2") == "/app?auth=register&add=RU000A10DTA2"
+    for bad in ["", "A" * 21, 'X"><script>', "a b", "A&B=1", "A/B", "A?x"]:
+        assert bond_pages._register_href(bad) == "/app?auth=register"
+
+
 async def test_bond_page_cached(client, monkeypatch):
     calls = {"n": 0}
 

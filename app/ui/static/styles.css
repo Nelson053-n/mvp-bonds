@@ -663,6 +663,47 @@ td:last-child { border-right: none; }
 
 tbody tr:hover td { background: var(--table-row-hover); }
 
+/* Search above the portfolio table */
+.table-search { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.table-search .input { height: 32px; max-width: 320px; }
+
+/* Sticky header + first column of the portfolio table. A scroll container
+   (overflow-x:auto) makes position:sticky resolve against the wrapper itself,
+   so the wrapper gets its own max-height: otherwise it never scrolls
+   vertically and the header would never stick. Sticky cells need an opaque
+   background (the theme tokens are translucent in dark), hence the stack
+   over --bg. */
+#portfolio-table-wrap {
+  --sticky-head-bg: linear-gradient(var(--table-header-bg), var(--table-header-bg)), linear-gradient(var(--bg-card), var(--bg-card)), var(--bg);
+  --sticky-head-hover-bg: linear-gradient(var(--bg-elevated), var(--bg-elevated)), linear-gradient(var(--bg-card), var(--bg-card)), var(--bg);
+  --sticky-cell-bg: linear-gradient(var(--bg-card), var(--bg-card)), var(--bg);
+  --sticky-cell-hover-bg: linear-gradient(var(--table-row-hover), var(--table-row-hover)), linear-gradient(var(--bg-card), var(--bg-card)), var(--bg);
+  overflow: auto;
+  max-height: 75vh;
+}
+#portfolio-table-wrap thead th {
+  position: sticky; top: 0; z-index: 3;
+  background: var(--sticky-head-bg);
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+#portfolio-table-wrap thead th:hover { background: var(--sticky-head-hover-bg); }
+#portfolio-table-wrap thead th.no-sort:hover { background: var(--sticky-head-bg); }
+@media (max-width: 1100px) {
+  #portfolio-table-wrap thead th:nth-child(2),
+  #portfolio-table-wrap td.col-name {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--sticky-cell-bg);
+    box-shadow: 1px 0 0 var(--border-strong);
+  }
+  #portfolio-table-wrap thead th:nth-child(2) {
+    z-index: 4;
+    background: var(--sticky-head-bg);
+    box-shadow: 1px 0 0 var(--border-strong), 0 1px 0 var(--border-strong);
+  }
+  #portfolio-table-wrap tbody tr:hover td.col-name { background: var(--sticky-cell-hover-bg); }
+  #portfolio-table-wrap td.col-name { max-width: 120px; }
+}
+
 td.col-name { text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 td.col-name a { color: var(--blue-400); text-decoration: none; font-weight: 500; }
 td.col-name a:hover { text-decoration: underline; }

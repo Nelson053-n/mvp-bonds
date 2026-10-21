@@ -3450,6 +3450,8 @@
           if (el) el.style.display = isEmpty ? 'none' : '';
         });
         if (thead) thead.style.display = isEmpty ? 'none' : '';
+        const searchBox = document.querySelector('.table-search');
+        if (searchBox) searchBox.style.display = isEmpty ? 'none' : '';
         // Убираем белый фон и бордер карточки таблицы когда показывается wizard
         if (tableCard) {
           tableCard.style.background = isEmpty ? 'transparent' : '';
@@ -3504,10 +3506,27 @@
 
         setEmptyState(false);
 
-        for (let idx = 0; idx < rows.length; idx++) {
-          const row = rows[idx];
+        // Поиск фильтрует только показ строк: итоги, виджеты и пустое состояние
+        // считаются по полному набору rows.
+        const searchQ = (document.getElementById('table-search')?.value || '').trim().toLowerCase();
+        const shownRows = searchQ
+          ? rows.filter(r => String(r.name || '').toLowerCase().includes(searchQ)
+                          || String(r.ticker || '').toLowerCase().includes(searchQ))
+          : rows;
+        if (searchQ && shownRows.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 20;
+          td.style.cssText = 'padding:18px;text-align:center;color:var(--text-muted);white-space:normal;';
+          td.textContent = t('tbl.searchEmpty', 'Ничего не найдено');
+          tr.appendChild(td);
+          tableBody.appendChild(tr);
+        }
+
+        for (let idx = 0; idx < shownRows.length; idx++) {
+          const row = shownRows[idx];
           const tr  = document.createElement('tr');
-          tr.style.animation = `rowFadeIn .18s ease-out ${Math.min(idx * 25, 400)}ms both`;
+          if (!searchQ) tr.style.animation = `rowFadeIn .18s ease-out ${Math.min(idx * 25, 400)}ms both`;
 
           addCell(tr, String(idx + 1));
 
@@ -3762,7 +3781,7 @@
         sumRow.className = 'summary-row';
 
         // col 1-6 (colspan=6): label
-        const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = t('table.total'); sumRow.appendChild(lbl);
+        const lbl = document.createElement('td'); lbl.colSpan = 6; lbl.textContent = searchQ ? t('table.totalAll', 'Итого по портфелю') : t('table.total'); sumRow.appendChild(lbl);
         // col 7: Стоимость
         addCell(sumRow, fmt(roundTo2(summary.totalAssets)) + ' ₽');
         // col 8: Прибыль — follows the active profit-column mode (full / day / total)
@@ -3844,6 +3863,8 @@
           renderTable();
         });
       });
+
+      document.getElementById('table-search')?.addEventListener('input', () => renderTable());
 
       // ── RESIZE: redraw all canvas-based analytics ─────────────────
       // Debounced redraw — multiple panes resize in quick succession,
@@ -4696,6 +4717,29 @@
         try { localStorage.setItem(_SUPPORT_BANNER_KEY, String(Date.now() + 30 * 86400 * 1000)); } catch (e) { /* ok */ }
       }
 
+      // Плашка «добавьте email»: /auth/me отдаёт только has_email. «Скрыть» —
+      // на 30 дней в этом браузере; после сохранения email плашка гаснет.
+      const _EMAIL_BANNER_KEY = 'mvp_email_banner_until';
+      function checkEmailBanner(me) {
+        const banner = document.getElementById('email-banner');
+        if (!banner || !me || me.has_email !== false) return;
+        let dismissed = false;
+        try { dismissed = Number(localStorage.getItem(_EMAIL_BANNER_KEY) || 0) > Date.now(); } catch (e) { /* ok */ }
+        if (!dismissed) banner.style.display = '';
+      }
+      function dismissEmailBanner() {
+        document.getElementById('email-banner').style.display = 'none';
+        try { localStorage.setItem(_EMAIL_BANNER_KEY, String(Date.now() + 30 * 86400 * 1000)); } catch (e) { /* ok */ }
+      }
+      function openEmailSettings() {
+        showPanel('panel-settings');
+        document.querySelector('.stab-btn[data-stab="stab-account"]')?.click();
+        setTimeout(() => {
+          const inp = document.getElementById('acc-email');
+          if (inp) { inp.scrollIntoView({ block: 'center', behavior: 'smooth' }); inp.focus(); }
+        }, 150);
+      }
+
       // ── Техподдержка (пользователь) ────────────────────────────────
       function openSupportTab() {
         showPanel('panel-settings');
@@ -4784,6 +4828,7 @@
             if (verBadge) verBadge.style.display = 'none';
           }
           applyProGates();
+          checkEmailBanner(meData);
           initBilling();
           loadDonateLink();
           showDashboard();
@@ -4826,9 +4871,45 @@
             updatePortfolioSelector();
             setTimeout(() => initOnboarding(), 400);
           }
+          schedulePendingAdd();
         } catch (err) {
           showLoginScreen();
         }
+      }
+
+      // ── Deep-link «добавить бумагу»: /app?add=SECID с публичной страницы бумаги ──
+      // После логина/регистрации страница перезагружается с тем же URL, поэтому
+      // параметр читается здесь, уже в авторизованной сессии. Тикер переживает
+      // перезагрузку после онбординг-визарда через sessionStorage. В портфель
+      // ничего не пишется: только открывается модалка с предзаполненным тикером.
+      const _PENDING_ADD_KEY = 'mvp_pending_add';
+      function schedulePendingAdd() {
+        try {
+          const url = new URL(location.href);
+          const raw = url.searchParams.get('add');
+          if (raw !== null) {
+            url.searchParams.delete('add');
+            history.replaceState(null, '', url.pathname + url.search + url.hash);
+            if (/^[A-Za-z0-9_-]{1,20}$/.test(raw)) sessionStorage.setItem(_PENDING_ADD_KEY, raw.toUpperCase());
+          }
+          if (!sessionStorage.getItem(_PENDING_ADD_KEY)) return;
+          // Визард (400/1500 мс после загрузки) закрывается в closeOnboarding(),
+          // которая откроет модалку сама; если он не показан — открываем здесь.
+          setTimeout(() => {
+            const ov = document.getElementById('onboarding-overlay');
+            if (!ov || ov.style.display !== 'flex') openPendingAdd();
+          }, 1800);
+        } catch (e) { console.warn('pending add:', e.message); }
+      }
+      function openPendingAdd() {
+        let ticker = null;
+        try {
+          ticker = sessionStorage.getItem(_PENDING_ADD_KEY);
+          sessionStorage.removeItem(_PENDING_ADD_KEY);
+        } catch (e) { /* sessionStorage недоступен */ }
+        if (!ticker) return;
+        openAddInstrumentModal();
+        document.getElementById('add-modal-ticker').value = ticker;
       }
 
       // Clear per-user state so switching accounts in the same browser doesn't
@@ -7610,6 +7691,8 @@
           const r = await apiFetch('/auth/change-email', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email }) });
           if (r.ok) {
             const d = await r.json();
+            const eb = document.getElementById('email-banner');
+            if (eb) eb.style.display = 'none';
             if (d.smtp_available) {
               status.textContent = t('settings.account.emailSavedSmtp');
             } else {
@@ -8534,10 +8617,12 @@
         if (overlay) { overlay.style.display = 'flex'; }
       }
 
-      function closeOnboarding() {
+      function closeOnboarding(keepPendingAdd) {
         localStorage.setItem('mvp_onboarding_done', '1');
         const overlay = document.getElementById('onboarding-overlay');
         if (overlay) overlay.style.display = 'none';
+        // «Смотреть портфель» сразу перезагружает страницу — тикер сохраняем для неё.
+        if (!keepPendingAdd) openPendingAdd();
       }
 
       function obGoStep1() {
@@ -8661,7 +8746,7 @@
                   <div style="font-size:56px;margin-bottom:16px;">🎉</div>
                   <div style="font-size:22px;font-weight:700;color:var(--slate-800);margin-bottom:8px;">Портфель собран!</div>
                   <div style="color:var(--slate-500);font-size:14px;margin-bottom:24px;">AI подобрал ${_obSuggested.length} облигаций под ваш профиль</div>
-                  <button onclick="closeOnboarding();location.reload();" style="background:var(--blue-600);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer;">
+                  <button onclick="closeOnboarding(true);location.reload();" style="background:var(--blue-600);color:#fff;border:none;border-radius:8px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer;">
                     Смотреть портфель →
                   </button>
                 </div>`;

@@ -52,6 +52,7 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     is_pro: bool = False
     pro_until: str | None = None  # ISO date; None = lifetime (or not Pro)
+    has_email: bool = False  # адрес не отдаём, только факт: фронт предлагает его добавить
 
 
 def _set_session_cookie(response: Response, request: Request, token: str) -> None:
@@ -139,6 +140,7 @@ async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
         "is_admin": current_user.get("is_admin", False),
         "is_pro": bool(user.get("is_pro")) if user else False,
         "pro_until": (user.get("pro_until") if user else None),
+        "has_email": bool(user.get("email")) if user else False,
     }
 
 

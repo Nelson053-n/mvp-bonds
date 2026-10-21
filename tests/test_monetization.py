@@ -66,6 +66,20 @@ async def test_me_includes_is_pro(client, auth_headers):
     assert r.json()["is_pro"] is True
 
 
+async def test_me_has_email_flag(client):
+    """/auth/me отдаёт только факт наличия email (адрес не раскрывается)."""
+    r = await client.post("/auth/register", json={"username": "emailflag_user", "password": "secret123"})
+    assert r.status_code == 201, r.text
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    me = (await client.get("/auth/me", headers=h)).json()
+    assert me["has_email"] is False
+    assert "email" not in me
+    assert (await client.post("/auth/change-email", json={"email": "flag@example.com"}, headers=h)).status_code == 200
+    me = (await client.get("/auth/me", headers=h)).json()
+    assert me["has_email"] is True
+    assert "flag@example.com" not in str(me)
+
+
 # ── Donate info ──────────────────────────────────────────────────────────────
 
 async def test_donate_info_disabled_by_default(client):
