@@ -5544,7 +5544,8 @@
         if (portfolios.length > 1 || isAllMode) {
           const allOpt = document.createElement('option');
           allOpt.value = '__all__';
-          allOpt.textContent = '📊 Все портфели';
+          allOpt.textContent = 'Σ  Все портфели';
+          allOpt.style.fontWeight = '600';
           allOpt.selected = isAllMode;
           selector.appendChild(allOpt);
         }
@@ -5580,14 +5581,15 @@
         // Rename/delete moved to the table header next to the «Портфель» title —
         // keep the topbar clean (the name still shows there).
         if (pfActionsEl) pfActionsEl.style.display = 'none';
-        // Size to longest name
+        // Size to the longest option — not only portfolio names: «Σ Все портфели»
+        // and «+ Добавить портфель» are longer than short names and got clipped.
         if (portfolios.length) {
-          const longest = portfolios.reduce((a, b) => a.name.length > b.name.length ? a : b).name;
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           const cs = window.getComputedStyle(selector);
           ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-          selector.style.width = Math.ceil(ctx.measureText(longest).width + 40) + 'px';
+          const widest = Math.max(...Array.from(selector.options, o => ctx.measureText(o.textContent).width));
+          selector.style.width = Math.ceil(widest + 40) + 'px';
         }
 
         // Also update mobile selector
@@ -5598,7 +5600,8 @@
           if (portfolios.length > 1 || isAllMode) {
             const allOpt = document.createElement('option');
             allOpt.value = '__all__';
-            allOpt.textContent = '📊 Все портфели';
+            allOpt.textContent = 'Σ  Все портфели';
+            allOpt.style.fontWeight = '600';
             allOpt.selected = isAllMode;
             mobileSel.appendChild(allOpt);
           }

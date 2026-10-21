@@ -87,8 +87,8 @@
   --text-primary:     #0f172a;
   --text-secondary:   #475569;
   --text-muted:       #94a3b8;
-  --topbar-bg:        rgba(15,23,42,.97);
-  --topbar-border:    rgba(255,255,255,.06);
+  --topbar-bg:        rgba(255,255,255,.85);
+  --topbar-border:    rgba(15,23,42,.08);
   --table-header-bg:  #f8fafc;
   --table-row-hover:  #f8fafc;
   --table-border:     #f1f5f9;
@@ -246,6 +246,22 @@ body {
 }
 .analytics-period-btn:hover, .analytics-period-btn.active {
   background: var(--blue-600); color: #fff; border-color: var(--blue-600);
+}
+
+/* Светлая тема: шапка светлая, как на публичных страницах (/bond). Тексты шапки
+   в тёмной теме жёстко белые/slate-400 — на белом фоне их надо перекрасить. */
+[data-theme="light"] .brand-name { color: var(--text-primary); }
+[data-theme="light"] .nav-btn { color: var(--text-secondary); }
+[data-theme="light"] .nav-btn:hover { color: var(--text-primary); }
+[data-theme="light"] .nav-btn.active { color: var(--text-primary); }
+[data-theme="light"] .mobile-nav .nav-btn,
+[data-theme="light"] .mobile-nav .nav-btn.active {
+  border-color: var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+[data-theme="light"] .mobile-nav .nav-btn.active {
+  border-color: var(--blue-500) !important;
+  border-bottom-color: var(--blue-500) !important;
 }
 
 /* ── LAYOUT ──────────────────────────────────────────────── */

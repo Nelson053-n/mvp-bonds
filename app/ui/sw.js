@@ -1,9 +1,9 @@
-const CACHE_NAME = 'bond-ai-v130';
+const CACHE_NAME = 'bond-ai-v131';
 const STATIC_ASSETS = [
   '/manifest.json',
-  '/static/translations.js?v=130',
-  '/static/styles.css?v=130',
-  '/static/app.js?v=130',
+  '/static/translations.js?v=131',
+  '/static/styles.css?v=131',
+  '/static/app.js?v=131',
 ];
 
 self.addEventListener('install', (event) => {
