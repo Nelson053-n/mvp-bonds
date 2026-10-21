@@ -422,7 +422,8 @@ def _bond_kind(secid: str, board: str | None) -> str:
     return "корпоративная облигация"
 
 
-def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -> str:
+def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict],
+                      ofz_num: str | None = None) -> str:
     secid = s.ticker
     url = f"{_BASE_URL}/bond/{secid}"
     kind = _bond_kind(secid, board)
@@ -621,11 +622,16 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
             ],
         })
 
+    ofz_link = (
+        f'<p><a href="/ofz/{e(ofz_num)}">Разбор выпуска →</a> — динамика доходности, спред к кривой и сценарии</p>'
+        if ofz_num else ""
+    )
     body = f"""
 <nav class="crumbs"><a href="/">Главная</a> / <a href="/bond">Облигации</a> / {e(secid)}</nav>
 <h1>{e(s.name)} ({e(secid)}): цена, доходность и купоны</h1>
 <p class="sub">{e(kind.capitalize())} · данные Московской биржи на {e(_fmt_date(today) or "")}</p>
 <div class="kpis">{"".join(kpis)}</div>
+{ofz_link}
 {notes}
 <h2>Обзор</h2>
 <p>{e(description)}</p>
@@ -642,6 +648,20 @@ def _render_bond_page(s: BondSnapshot, board: str | None, related: list[dict]) -
 """
     return _page_shell(title, meta_desc, url, jsonld, body, og_type="article",
                        register_href=_register_href(secid))
+
+
+async def _ofz_review_number(secid: str) -> str | None:
+    """Номер выпуска, если у ОФЗ есть страница разбора /ofz/{номер}, иначе None.
+
+    Ссылка ставится только на выпуски из отбора: остальным /ofz/{номер} отвечает 404.
+    Импорт ленивый: ofz_pages сам импортирует этот модуль.
+    """
+    from app.services.ofz_history_service import ofz_number
+    num = ofz_number(secid)
+    if not num:
+        return None
+    from app.api.ofz_pages import _selection
+    return num if any(s["number"] == num for s in await _selection()) else None
 
 
 async def _build_bond_page(secid: str) -> str | None:
@@ -664,7 +684,7 @@ async def _build_bond_page(secid: str) -> str | None:
     pool = [b for b in all_bonds if b["ticker"] != secid and (board is None or b["board"] == board)]
     related = sorted(pool, key=lambda b: abs((b.get("market_yield") or 0) - my_yield))[:8]
 
-    html = _render_bond_page(snapshot, board, related)
+    html = _render_bond_page(snapshot, board, related, await _ofz_review_number(secid))
     _cache_put(secid, html)
     return html
 
@@ -1383,7 +1403,8 @@ async def all_public_urls() -> list[str]:
         f"{_BASE_URL}/privacy", f"{_BASE_URL}/terms",
     ]
     bonds = await _catalog_bonds()
-    return static + [f"{_BASE_URL}/bond/{b['ticker']}" for b in bonds]
+    from app.api.ofz_pages import ofz_urls  # lazy: ofz_pages imports this module
+    return static + await ofz_urls() + [f"{_BASE_URL}/bond/{b['ticker']}" for b in bonds]
 
 
 @router.api_route("/sitemap-bonds.xml", methods=["GET", "HEAD"])

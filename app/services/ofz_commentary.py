@@ -465,7 +465,7 @@ def _r_liquidity(f):
         return [
             f"По медианному дневному обороту ({v}) выпуск занимает {r}-е место из {t} разбираемых выпусков ОФЗ.",
             f"Медианный дневной оборот — {v}; по этому показателю выпуск на {r}-м месте из {t}.",
-            f"Выпуск входит в число наиболее торгуемых ОФЗ: {r}-е место из {t} при медианном обороте {v} в день.",
+            f"Среди разбираемых выпусков ОФЗ он занимает {r}-е место из {t} при медианном обороте {v} в день.",
         ]
     if has_rank:
         r, t = _fmt(rank, 0), _fmt(total, 0)
@@ -499,6 +499,14 @@ _RULES = [
 ]
 
 
+def _tidy(text: str) -> str:
+    # Единицы «б.п.»/«п.п.» кончаются точкой, а шаблон добавляет свою — без
+    # склейки в тексте получалось «на 28 б.п..».
+    while ".." in text:
+        text = text.replace("..", ".")
+    return text
+
+
 def build_comment(facts: dict) -> list:
     if not isinstance(facts, dict) or not facts:
         return []
@@ -507,7 +515,7 @@ def build_comment(facts: dict) -> list:
     for name, rule in _RULES:
         variants = rule(facts)
         if variants:
-            out.append(variants[_pick(secid, name, len(variants))])
+            out.append(_tidy(variants[_pick(secid, name, len(variants))]))
     return out
 
 
@@ -517,7 +525,7 @@ def _all_variants(facts: dict) -> list:
         return []
     out = []
     for _name, rule in _RULES:
-        out.extend(rule(facts) or [])
+        out.extend(_tidy(v) for v in rule(facts) or [])
     return out
 
 
@@ -668,5 +676,5 @@ def build_faq(facts: dict) -> list:
     for builder in _FAQ_BUILDERS:
         qa = builder(facts, label)
         if qa:
-            out.append(qa)
+            out.append((qa[0], _tidy(qa[1])))
     return out[:_FAQ_MAX]

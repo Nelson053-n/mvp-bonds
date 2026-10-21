@@ -15,6 +15,7 @@ Commands:
     anomalies <pid>        Analytics anomalies for a portfolio (yield-to-offer, etc.)
     token <user_id>        Mint a JWT for a user (debugging APIs)
     user <email>           Look up user id + their portfolios
+    ofz-check <number>     OFZ page numbers (e.g. 26238): our YTM/duration/MD/spread vs MOEX fields and zcyc
 """
 import asyncio
 import sys
@@ -179,6 +180,62 @@ def cmd_user(email: str):
             _p(f"  portfolio {p['id']}: {p.get('name')}")
 
 
+async def cmd_ofz_check(number: str):
+    """Сверка расчётов страницы ОФЗ с полями MOEX (сеть — через ofz_history_service)."""
+    from datetime import date
+    from app.services import ofz_history_service as hist
+    from app.services import ofz_analytics as oa
+    from app.services.storage_service import storage_service
+
+    secid = hist.secid_by_number(number, await hist.fetch_tqob_securities())
+    if not secid:
+        _p(f"ОФЗ {number}: нет на доске TQOB")
+        return
+    rows = storage_service.get_ofz_history(secid, days=30)
+    if not rows:
+        _p(f"{secid}: в ofz_daily нет строк (бэкфил не выполнен?)")
+        return
+    day = rows[-1]
+    td = day["tradedate"]
+    _p(f"{secid} на {td}")
+    _p(f"  ofz_daily : close={day['close']} yieldclose={day['yieldclose']} "
+       f"DURATION={day['duration']} дн.")
+    live = [r for r in await hist.fetch_board_day(td) if r["secid"] == secid]
+    if live:
+        _p(f"  MOEX live : close={live[0]['close']} yieldclose={live[0]['yieldclose']} "
+           f"DURATION={live[0]['duration']} дн.")
+    else:
+        _p("  MOEX live : строки за эту дату нет")
+    y, dur = day["yieldclose"], day["duration"]
+    if not dur:
+        _p("  дюрации нет — расчёты ниже невозможны")
+        return
+    _p(f"  дюрация   : {dur / 365:.3f} лет (DURATION/365)")
+    if y:
+        _p(f"  MD (f=1)  : {oa.modified_duration(dur, y, 1):.3f} лет")
+    else:
+        _p("  MD        : нет YIELDCLOSE (флоатер?)")
+    nodes = storage_service.get_ofz_curve(td)
+    live_nodes = await hist.fetch_zcyc_day(td)
+    _p(f"  zcyc в БД : {nodes}")
+    _p(f"  zcyc live : {live_nodes}")
+    for name, n in (("БД", nodes), ("live", live_nodes)):
+        c = oa.interp_curve(n, dur / 365)
+        sp = oa.spread_bp(y, dur, n)
+        _p(f"  кривая({name}) на D: {'нет' if c is None else f'{c:.2f}%'}; "
+           f"спред: {'нет' if sp is None else f'{sp:+.0f} б.п.'}")
+    # Контроль: Маколей по потокам bondization при YIELDCLOSE (потоки до даты расчёта отброшены)
+    if y:
+        bz = await hist.fetch_bondization(secid)
+        d0 = date.fromisoformat(td)
+        cfs = [(((date.fromisoformat(c["date"]) - d0).days) / 365, c["value"])
+               for c in bz["coupons"] if c["value"] and c["date"] > td]
+        cfs += [(((date.fromisoformat(a["date"]) - d0).days) / 365, a["value"])
+                for a in bz["amortizations"] if a["value"] and a["date"] > td]
+        mac = oa.macaulay_from_cashflows(cfs, y, 1) if cfs else None
+        _p("  Маколей по потокам (контроль): " + ("нет потоков" if mac is None else f"{mac:.3f} лет"))
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -203,6 +260,8 @@ def main():
         cmd_token(int(rest[0]))
     elif cmd == "user":
         cmd_user(rest[0])
+    elif cmd == "ofz-check":
+        asyncio.run(cmd_ofz_check(rest[0]))
     else:
         _p(f"unknown command: {cmd}")
         _p(__doc__)

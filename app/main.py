@@ -30,6 +30,7 @@ from app.api.uchebnik_articles import router as uchebnik_articles_router
 from app.api.uchebnik_articles import _LINKS as _UCHEBNIK_LINKS
 from app.api.uchebnik_articles_more import SLUGS as _UCHEBNIK_MORE_SLUGS
 from app.api.uchebnik_articles_more import router as uchebnik_articles_more_router
+from app.api import ofz_pages as _ofz_pages
 from app.api.pdf import router as pdf_router
 from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
@@ -630,6 +631,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_cache_watchdog_loop())
         asyncio.create_task(_daily_backup_loop())
         asyncio.create_task(_benchmark_snapshot_loop())
+        from app.services.ofz_warm import ofz_warm_loop
+        asyncio.create_task(ofz_warm_loop())
         from app.services import telegram_net
         asyncio.create_task(telegram_net.watch_routes())
         # Public Telegram bond-search bot — only in the leader so a single
@@ -751,6 +754,7 @@ app.include_router(legal_pages_router)
 app.include_router(uchebnik_router)
 app.include_router(uchebnik_articles_router)
 app.include_router(uchebnik_articles_more_router)
+app.include_router(_ofz_pages.router)
 app.include_router(pdf_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
@@ -812,6 +816,7 @@ async def robots_txt():
         "\n"
         "Sitemap: https://bondai.ru/sitemap.xml\n"
         "Sitemap: https://bondai.ru/sitemap-bonds.xml\n"
+        + _ofz_pages.ROBOTS_SITEMAP_LINE
     )
     return Response(content, media_type="text/plain")
 
@@ -921,6 +926,7 @@ async def llms_txt():
             f"- [{_UCHEBNIK_LINKS[slug][0]}](https://bondai.ru/uchebnik/{slug}): {_UCHEBNIK_LINKS[slug][1]}\n"
             for slug in _UCHEBNIK_MORE_SLUGS
         ) +
+        "".join(_ofz_pages.LLMS_TXT_LINES) +
         "- [Каталог облигаций MOEX](https://bondai.ru/bond): Все торгуемые облигации Московской биржи (ОФЗ и корпоративные) — у каждой бумаги своя страница /bond/{тикер} с ценой, доходностью YTM, купонами, офертой и кредитным рейтингом\n"
         "- [Калькулятор НКД](https://bondai.ru/calc/nkd): Онлайн-расчёт накопленного купонного дохода облигации по ставке или размеру купона\n"
         "- [Калькулятор доходности YTM](https://bondai.ru/calc/ytm): Онлайн-расчёт эффективной, простой и текущей доходности облигации к погашению\n"

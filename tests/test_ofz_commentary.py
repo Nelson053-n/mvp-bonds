@@ -344,3 +344,19 @@ def test_faq_answers_contain_facts_values():
     assert "6,3" in dur and "14,4" in dur
     sens = next(a for q, a in faq.items() if "росте ставки" in q)
     assert "5,9" in sens and "613,50" in sens and "577,05" in sens
+
+
+def test_no_double_dot_after_units():
+    # «б.п.» + точка шаблона давали «..» в тексте страницы.
+    facts = dict(secid="SU26238RMFS4", number="26238", kind="fixed", close=51.5,
+                 min52=48.0, max52=58.0, spread_bp=-16, spread_median_bp=12,
+                 md=5.8, dp_up100_pct=-5.6, dp_down100_pct=6.2,
+                 conv_up_minus_down_pp=0.6, p0_rub=515, p_up100_rub=487,
+                 p_down100_rub=547, coupon_pct=7.1, ytm=16.2,
+                 liq_rank=40, liq_total=50, liq_value_mln=120.0,
+                 years_to_maturity=6.8)
+    texts = oc._all_variants(facts) + oc.build_comment(facts)
+    texts += [a for _q, a in oc.build_faq(facts)]
+    assert texts and not [t for t in texts if ".." in t]
+    # место 40 из 50 не называется «одним из наиболее торгуемых»
+    assert not [t for t in texts if "наиболее торгуем" in t]

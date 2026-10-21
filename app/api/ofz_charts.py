@@ -25,7 +25,9 @@ _MONTHS = ["янв", "фев", "мар", "апр", "май", "июн", "июл",
 _SVG_OPEN = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" '
              'style="width:100%;height:auto" role="img" aria-label="{t}">')
 # Размер и цвет подписей заданы один раз на <g>: повтор style у каждого <text> стоил ~35% веса графика.
-_G_OPEN = '<g style="font-size:11px;font-family:inherit" fill="var(--muted)">'
+# Класс ofz-ax нужен странице: на узком экране viewBox 640 сжимается ~1:1,8 и
+# 11px превращаются в ~6px — страница поднимает размер медиа-запросом.
+_G_OPEN = '<g class="ofz-ax" style="font-size:11px;font-family:inherit" fill="var(--muted)">'
 
 
 def _esc(s) -> str:
