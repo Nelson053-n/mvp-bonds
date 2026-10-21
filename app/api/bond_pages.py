@@ -1371,6 +1371,8 @@ async def all_public_urls() -> list[str]:
     static = [
         f"{_BASE_URL}/", f"{_BASE_URL}/uchebnik", f"{_BASE_URL}/bond",
         f"{_BASE_URL}/calc", f"{_BASE_URL}/calc/nkd", f"{_BASE_URL}/calc/ytm",
+        f"{_BASE_URL}/uchebnik/doxodnost-ofz", f"{_BASE_URL}/uchebnik/nkd",
+        f"{_BASE_URL}/uchebnik/oferta",
         f"{_BASE_URL}/privacy", f"{_BASE_URL}/terms",
     ]
     bonds = await _catalog_bonds()

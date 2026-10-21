@@ -466,6 +466,15 @@ _BODY = _CONTENT_CSS + """
     </div>
   </section>
 
+  <section class="edu-section" id="chitajte-takzhe">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="/uchebnik/doxodnost-ofz">Как посчитать доходность ОФЗ: купонная, текущая и к погашению (YTM)</a></li>
+      <li><a href="/uchebnik/nkd">НКД по облигациям: что это и почему сумма сделки отличается от котировки</a></li>
+      <li><a href="/uchebnik/oferta">Оферта по облигации: put и call, доходность к оферте</a></li>
+    </ul>
+  </section>
+
   <div class="edu-cta">
     <h2>Соберите портфель облигаций с Bond AI</h2>
     <p>AI подберёт облигации под ваш риск-профиль, рассчитает YTM и купонный календарь по данным MOEX. Базовый тариф — бесплатно навсегда.</p>
