@@ -468,10 +468,27 @@ _BODY = _CONTENT_CSS + """
 
   <section class="edu-section" id="chitajte-takzhe">
     <h2>Читайте также</h2>
+    <h3>Доходность и цена</h3>
     <ul>
       <li><a href="/uchebnik/doxodnost-ofz">Как посчитать доходность ОФЗ: купонная, текущая и к погашению (YTM)</a></li>
+      <li><a href="/uchebnik/tekushaya-i-k-pogasheniyu">Текущая доходность и доходность к погашению: сравнение двух облигаций</a></li>
+      <li><a href="/uchebnik/reinvestirovanie-kuponov">Реинвестирование купонов: простая и эффективная доходность</a></li>
       <li><a href="/uchebnik/nkd">НКД по облигациям: что это и почему сумма сделки отличается от котировки</a></li>
+      <li><a href="/uchebnik/dyuraciya">Дюрация облигации: Маколея и модифицированная</a></li>
+    </ul>
+    <h3>Виды облигаций и риски</h3>
+    <ul>
+      <li><a href="/uchebnik/rejtingi-vdo">Рейтинги облигаций и ВДО: шкалы, уровни и риск</a></li>
+      <li><a href="/uchebnik/flouteri">Облигации с плавающим купоном (флоатеры)</a></li>
+      <li><a href="/uchebnik/amortizaciya">Амортизация и досрочное погашение облигаций</a></li>
       <li><a href="/uchebnik/oferta">Оферта по облигации: put и call, доходность к оферте</a></li>
+      <li><a href="/uchebnik/valyutnye-obligacii">Валютные, замещающие и юаневые облигации</a></li>
+    </ul>
+    <h3>Практика</h3>
+    <ul>
+      <li><a href="/uchebnik/kak-chitat-kartochku">Как читать карточку облигации на бирже</a></li>
+      <li><a href="/uchebnik/lestnica">Лестница облигаций: как собрать и зачем</a></li>
+      <li><a href="/uchebnik/obligacii-ili-vklad">Облигации или вклад: механика, ликвидность и риски</a></li>
     </ul>
   </section>
 

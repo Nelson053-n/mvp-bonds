@@ -1362,6 +1362,12 @@ async def bonds_catalog() -> HTMLResponse:
 
 # ── Sitemap ──────────────────────────────────────────────────────────────────
 
+def _uchebnik_more_urls() -> list[str]:
+    # Imported lazily: uchebnik_articles_more imports this module for the page shell.
+    from app.api.uchebnik_articles_more import article_urls
+    return article_urls()
+
+
 async def all_public_urls() -> list[str]:
     """Every public, indexable URL — static pages + one per tradable bond.
 
@@ -1373,6 +1379,7 @@ async def all_public_urls() -> list[str]:
         f"{_BASE_URL}/calc", f"{_BASE_URL}/calc/nkd", f"{_BASE_URL}/calc/ytm",
         f"{_BASE_URL}/uchebnik/doxodnost-ofz", f"{_BASE_URL}/uchebnik/nkd",
         f"{_BASE_URL}/uchebnik/oferta",
+        *_uchebnik_more_urls(),
         f"{_BASE_URL}/privacy", f"{_BASE_URL}/terms",
     ]
     bonds = await _catalog_bonds()

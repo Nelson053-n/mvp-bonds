@@ -27,6 +27,9 @@ from app.api.calculators import router as calculators_router
 from app.api.legal_pages import router as legal_pages_router
 from app.api.uchebnik_page import router as uchebnik_router
 from app.api.uchebnik_articles import router as uchebnik_articles_router
+from app.api.uchebnik_articles import _LINKS as _UCHEBNIK_LINKS
+from app.api.uchebnik_articles_more import SLUGS as _UCHEBNIK_MORE_SLUGS
+from app.api.uchebnik_articles_more import router as uchebnik_articles_more_router
 from app.api.pdf import router as pdf_router
 from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
@@ -747,6 +750,7 @@ app.include_router(calculators_router)
 app.include_router(legal_pages_router)
 app.include_router(uchebnik_router)
 app.include_router(uchebnik_articles_router)
+app.include_router(uchebnik_articles_more_router)
 app.include_router(pdf_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
@@ -859,6 +863,15 @@ async def sitemap_xml():
         "    <changefreq>monthly</changefreq>\n"
         "    <priority>0.7</priority>\n"
         "  </url>\n"
+        + "".join(
+            "  <url>\n"
+            f"    <loc>https://bondai.ru/uchebnik/{slug}</loc>\n"
+            "    <lastmod>2026-10-21</lastmod>\n"
+            "    <changefreq>monthly</changefreq>\n"
+            "    <priority>0.7</priority>\n"
+            "  </url>\n"
+            for slug in _UCHEBNIK_MORE_SLUGS
+        ) +
         "  <url>\n"
         "    <loc>https://bondai.ru/bond</loc>\n"
         "    <lastmod>2026-06-14</lastmod>\n"
@@ -904,6 +917,10 @@ async def llms_txt():
         "- [Как посчитать доходность ОФЗ](https://bondai.ru/uchebnik/doxodnost-ofz): Купонная, текущая и эффективная доходность к погашению (YTM): формулы и пример с числами\n"
         "- [НКД по облигациям](https://bondai.ru/uchebnik/nkd): Что такое накопленный купонный доход, как он считается и почему сумма сделки отличается от котировки\n"
         "- [Оферта по облигации](https://bondai.ru/uchebnik/oferta): Put и call оферты, доходность к оферте и что учесть держателю\n"
+        + "".join(
+            f"- [{_UCHEBNIK_LINKS[slug][0]}](https://bondai.ru/uchebnik/{slug}): {_UCHEBNIK_LINKS[slug][1]}\n"
+            for slug in _UCHEBNIK_MORE_SLUGS
+        ) +
         "- [Каталог облигаций MOEX](https://bondai.ru/bond): Все торгуемые облигации Московской биржи (ОФЗ и корпоративные) — у каждой бумаги своя страница /bond/{тикер} с ценой, доходностью YTM, купонами, офертой и кредитным рейтингом\n"
         "- [Калькулятор НКД](https://bondai.ru/calc/nkd): Онлайн-расчёт накопленного купонного дохода облигации по ставке или размеру купона\n"
         "- [Калькулятор доходности YTM](https://bondai.ru/calc/ytm): Онлайн-расчёт эффективной, простой и текущей доходности облигации к погашению\n"
