@@ -936,9 +936,18 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
 
 
     def get_stats(self) -> dict:
-        from datetime import datetime, timezone
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        from datetime import datetime, timedelta, timezone
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.strftime("%Y-%m-%d")
+        days = [(now_utc - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(13, -1, -1)]
         with self._connect() as conn:
+            # created_at хранится как ISO-строка UTC, первые 10 символов = дата.
+            reg_rows = conn.execute(
+                "SELECT substr(created_at, 1, 10) AS d, COUNT(*) FROM users "
+                "WHERE created_at >= ? GROUP BY d",
+                (days[0],),
+            ).fetchall()
+            reg_by_day = {r[0]: int(r[1]) for r in reg_rows}
             users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             portfolios = conn.execute("SELECT COUNT(*) FROM portfolios").fetchone()[0]
             shared = conn.execute(
@@ -964,6 +973,7 @@ class StorageService(ItemsMixin, PortfoliosMixin, UsersMixin):
             "autosync_count": int(autosync_count),
             "tg_notif_count": int(tg_notif_count),
             "backup_count": backup_count,
+            "registrations_14d": [{"date": d, "count": reg_by_day.get(d, 0)} for d in days],
         }
 
     def get_all_portfolios_raw(self) -> list[dict]:
