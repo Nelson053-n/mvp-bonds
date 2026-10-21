@@ -1009,7 +1009,9 @@
       background: rgba(37,99,235,.1);
       box-shadow: 0 0 0 1px rgba(37,99,235,.3);
     }
-    .risk-icon { font-size: 22px; flex-shrink: 0; }
+    .risk-icon { display: inline-flex; flex-shrink: 0; color: var(--blue-400, #60a5fa); }
+    .risk-icon .icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .risk-card.selected .risk-icon { color: #fff; }
     .risk-name { font-size: 14px; font-weight: 700; color: #fff; }
     .risk-hint { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
 
@@ -1262,7 +1264,7 @@
     "softwareVersion": "3.0",
     "featureList": [
       "AI-подбор портфеля облигаций на базе Claude AI",
-      "Данные Московской биржи (MOEX) в реальном времени каждые 15 минут",
+      "Данные Московской биржи (MOEX) в реальном времени каждые 5 минут",
       "Купонный календарь и планирование денежного потока",
       "Telegram-уведомления о купонных выплатах и ценовых алертах",
       "Кредитные рейтинги из SmartLab и MOEX с алертом на двойное понижение",
@@ -1321,7 +1323,7 @@
         "name": "Откуда берутся данные о ценах облигаций?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 15 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX."
+          "text": "Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 5 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX."
         }
       },
       {
@@ -1425,7 +1427,7 @@
       <div class="trust-row">
         <div class="trust-badge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg> Бесплатно навсегда</div>
         <div class="trust-badge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7"/><path d="m12 2 8 5H4z"/></svg> Без брокера</div>
-        <div class="trust-badge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg> Обновление каждые 15 мин</div>
+        <div class="trust-badge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg> Обновление каждые 5 мин</div>
         <div class="trust-badge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg> Уведомления в Telegram</div>
       </div>
 
@@ -1443,7 +1445,7 @@
   <div class="stats-strip">
     <div class="stats-grid reveal">
       <div class="stat-cell">
-        <div class="stat-num"><span class="accent">2 500</span>+</div>
+        <div class="stat-num"><span class="accent">1 500</span>+</div>
         <div class="stat-label">облигаций с MOEX</div>
       </div>
       <div class="stat-cell">
@@ -1479,7 +1481,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
           </div>
           <h3>Аналитика в реальном времени</h3>
-          <p>Цены, купонная доходность и YTM с MOEX обновляются каждые 15 минут. P&amp;L по каждой позиции и по портфелю целиком.</p>
+          <p>Цены, купонная доходность и YTM с MOEX обновляются каждые 5 минут. P&amp;L по каждой позиции и по портфелю целиком.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon-wrap fi-purple">
@@ -1571,7 +1573,7 @@
           </div>
           <span class="ai-step-arrow">&rarr;</span>
           <h4>Данные MOEX</h4>
-          <p>Загружаем цены, купоны, доходность к погашению и кредитные рейтинги 2 500+ облигаций каждые 15 минут.</p>
+          <p>Загружаем цены, купоны, доходность к погашению и кредитные рейтинги 1 500+ облигаций каждые 5 минут.</p>
         </div>
 
         <div class="ai-step">
@@ -1730,7 +1732,7 @@
           <div class="comp-cell comp-feature">Цены в реальном времени</div>
           <div class="comp-cell"><span class="comp-no">Ручной ввод</span></div>
           <div class="comp-cell"><span class="comp-partial">Частично</span></div>
-          <div class="comp-cell comp-hl"><span class="comp-yes">MOEX каждые 15 мин</span></div>
+          <div class="comp-cell comp-hl"><span class="comp-yes">MOEX каждые 5 мин</span></div>
 
           <div class="comp-cell comp-feature">AI-подбор портфеля</div>
           <div class="comp-cell"><span class="comp-no">Нет</span></div>
@@ -1806,7 +1808,7 @@
           <div class="trust-stat-icon" style="background:rgba(37,99,235,.12);box-shadow:0 0 20px rgba(37,99,235,.1);">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           </div>
-          <div class="trust-stat-num"><span class="trust-counter" data-target="2500">0</span>+</div>
+          <div class="trust-stat-num"><span class="trust-counter" data-target="1500">0</span>+</div>
           <div class="trust-stat-label">облигаций в базе</div>
           <div class="trust-stat-sub">ОФЗ и корпоративные бумаги с MOEX</div>
         </div>
@@ -1836,7 +1838,7 @@
         </div>
       </div>
       <p class="trust-privacy-note" style="margin-top:24px;text-align:center;font-size:13px;color:var(--text-muted,#94a3b8);line-height:1.6;max-width:720px;margin-left:auto;margin-right:auto;">
-        🔒 Персональные данные обрабатываются по <strong>ФЗ-152</strong>. Bond AI <strong>не хранит банковские данные</strong> и не имеет доступа к деньгам: API-токен Т-Банка хранится в зашифрованном виде и используется только для чтения состава портфеля. Пароли защищены bcrypt, авторизация — по JWT. Подробнее — в <a href="/privacy" style="color:var(--blue-400,#60a5fa);">политике конфиденциальности</a>.
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Персональные данные обрабатываются по <strong>ФЗ-152</strong>. Bond AI <strong>не хранит банковские данные</strong> и не имеет доступа к деньгам: API-токен Т-Банка хранится в зашифрованном виде и используется только для чтения состава портфеля. Пароли защищены bcrypt, авторизация — по JWT. Подробнее — в <a href="/privacy" style="color:var(--blue-400,#60a5fa);">политике конфиденциальности</a>.
       </p>
     </div>
   </section>
@@ -1859,7 +1861,7 @@
           <div class="plan-divider"></div>
           <ul class="plan-features">
             <li><span class="pf-check">✓</span> До 2 портфелей</li>
-            <li><span class="pf-check">✓</span> Цены MOEX каждые 15 минут</li>
+            <li><span class="pf-check">✓</span> Цены MOEX каждые 5 минут</li>
             <li><span class="pf-check">✓</span> AI-подбор портфеля</li>
             <li><span class="pf-check">✓</span> Купонный календарь</li>
             <li><span class="pf-check">✓</span> Telegram-уведомления</li>
@@ -1885,7 +1887,6 @@
             <li><span class="pf-check">✓</span> Налоговый помощник + выгрузка для декларации</li>
             <li><span class="pf-check">✓</span> Стресс-тесты, YTM-кривая, «что продать первым»</li>
             <li><span class="pf-check">✓</span> Неограниченные портфели</li>
-            <li><span class="pf-check">✓</span> Данные MOEX каждые 5 минут</li>
             <li><span class="pf-check">✓</span> Автосинхронизация с Т-Банком</li>
             <li><span class="pf-check">✓</span> Алерты по ценам, рейтингам и офертам</li>
           </ul>
@@ -1942,7 +1943,7 @@
             <span class="faq-q-text">Откуда берутся данные о ценах?</span>
             <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
-          <div class="faq-a"><div class="faq-a-inner">Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 15 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX.</div></div>
+          <div class="faq-a"><div class="faq-a-inner">Все рыночные данные загружаются с Московской биржи через открытый ISS API. Цены обновляются каждые 5 минут в торговое время. Кредитные рейтинги берутся из SmartLab и MOEX.</div></div>
         </div>
 
         <div class="faq-item">
@@ -2002,7 +2003,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </div>
           <h3>Каталог облигаций</h3>
-          <p>2 500+ выпусков MOEX: цена, доходность, купоны, оферта и рейтинг — отдельная страница по каждой бумаге.</p>
+          <p>1 500+ выпусков MOEX: цена, доходность, купоны, оферта и рейтинг — отдельная страница по каждой бумаге.</p>
           <div class="tool-arrow">Открыть каталог →</div>
         </a>
         <a class="feature-card tool-card" href="/calc/nkd">
@@ -2070,28 +2071,28 @@
           <div class="wiz-desc">AI подберёт облигации под ваш инвестиционный стиль — прямо сейчас, без регистрации.</div>
           <div class="risk-grid" id="wiz-risk-grid">
             <div class="risk-card" data-risk="ultra_low" data-yield="9">
-              <span class="risk-icon">🛡️</span>
+              <span class="risk-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6z"/></svg></span>
               <div>
                 <div class="risk-name">Консервативный</div>
                 <div class="risk-hint">ОФЗ и гособлигации · доходность 8–11%</div>
               </div>
             </div>
             <div class="risk-card" data-risk="low" data-yield="12">
-              <span class="risk-icon">⚖️</span>
+              <span class="risk-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 21h14M5 7h14"/><path d="m5 7-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z"/></svg></span>
               <div>
                 <div class="risk-name">Умеренный</div>
                 <div class="risk-hint">Корпоративные 1-го эшелона · 11–15%</div>
               </div>
             </div>
             <div class="risk-card" data-risk="moderate" data-yield="16">
-              <span class="risk-icon">📈</span>
+              <span class="risk-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>
               <div>
                 <div class="risk-name">Сбалансированный</div>
                 <div class="risk-hint">Широкий рынок корп. облигаций · 15–20%</div>
               </div>
             </div>
             <div class="risk-card" data-risk="high" data-yield="21">
-              <span class="risk-icon">🚀</span>
+              <span class="risk-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9s-2.1-.8-2.9-.1z"/><path d="m12 15-3-3a22 22 0 0 1 2-4 12.9 12.9 0 0 1 11-5c0 2.7-.8 7.5-5 11a22 22 0 0 1-4 2z"/><path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5"/></svg></span>
               <div>
                 <div class="risk-name">Агрессивный</div>
                 <div class="risk-hint">ВДО и высокодоходные бумаги · 20%+</div>
@@ -2144,7 +2145,7 @@
             <div class="wiz-summary-row" id="wiz-summary"></div>
             <div class="wiz-bonds-list" id="wiz-bonds"></div>
             <div class="wiz-register-box">
-              <div class="wiz-register-title">💾 Сохраните портфель бесплатно</div>
+              <div class="wiz-register-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px;vertical-align:-3px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg> Сохраните портфель бесплатно</div>
               <div class="wiz-register-sub">Создайте аккаунт за 30 секунд — и мы автоматически добавим эти облигации в ваш портфель. Отслеживайте цены, купоны и доходность в реальном времени.</div>
               <div class="wiz-reg-fields">
                 <input class="wiz-reg-input" id="wiz-reg-user" type="text" placeholder="Придумайте логин" autocomplete="username" />
@@ -2165,7 +2166,7 @@
           </div>
           <!-- Error state -->
           <div id="wiz-error" style="display:none;text-align:center;padding:32px 0;">
-            <div style="font-size:32px;margin-bottom:16px;">⚠️</div>
+            <div style="margin-bottom:16px;color:var(--slate-400);"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" style="width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
             <div style="font-size:15px;color:var(--slate-400);margin-bottom:8px;">Не удалось загрузить данные</div>
             <div style="font-size:13px;color:var(--slate-600);margin-bottom:24px;">Проверьте соединение и попробуйте ещё раз</div>
             <button class="wiz-btn-next" onclick="wizGoStep3()" style="max-width:200px;margin:0 auto;display:block;">Попробовать снова</button>

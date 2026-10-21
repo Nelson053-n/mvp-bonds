@@ -35,7 +35,7 @@ sqlite3 data/portfolio.db "SELECT * FROM users;"
 3. `app/services/portfolio_service.py` — central orchestrator that coordinates all other services
 4. `app/services/moex_service.py` — fetches live market data from MOEX ISS API + credit ratings (SmartLab → MOEX fallback)
 5. `app/services/storage_service.py` — SQLite persistence (auto-creates schema + admin user on first run)
-6. `app/services/cache_service.py` — in-memory cache with background refresh (configurable interval, default 900s)
+6. `app/services/cache_service.py` — in-memory cache with background refresh (configurable interval, default 300s)
 7. `app/services/llm_service.py` — generates AI comments; two modes: `stub` (hardcoded) or `openai`
 8. `app/services/notification_service.py` — Telegram alerts (coupon reminders, double-downgrade detection)
 9. `app/ui/dashboard.html` — HTML shell of the frontend SPA (~1450 lines); JS/CSS live in `app/ui/static/` (`app.js`, `translations.js`, `styles.css`). Service worker `app/ui/sw.js` caches static assets — after ANY change to static files bump `CACHE_NAME` in `sw.js`, otherwise clients keep the old version
