@@ -204,6 +204,8 @@ async def test_catalog_page(client):
     assert "ОФЗ 26238" in html
     assert "ТестКорп БО-1" in html
     assert "/bond/RU000A106K43" in html
+    # вход в раздел разборов: без ссылки хаб /ofz достижим только по крошкам
+    assert 'href="/ofz"' in html
     # smart-lab-style controls: type chips, search, sortable headers
     assert 'data-board="TQOB"' in html
     assert 'id="cat-search"' in html

@@ -416,3 +416,8 @@ def test_numbers_card():
     _cell("kak-chitat-kartochku", "14,84 ₽", "999,84 ₽")
     _answer("kak-chitat-kartochku", "14,84 ₽", "999,84 ₽", "98,5%", "985 ₽")
     _has("kak-chitat-kartochku", "12,18%", "9 998,40", "1 200")
+
+
+async def test_uchebnik_links_to_ofz_hub(client):
+    resp = await client.get("/uchebnik")
+    assert resp.status_code == 200 and 'href="/ofz"' in resp.text

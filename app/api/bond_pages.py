@@ -1269,7 +1269,7 @@ async def bonds_catalog() -> HTMLResponse:
 <script>document.body.classList.add('catalog');</script>
 <nav class="crumbs"><a href="/">Главная</a> / Облигации</nav>
 <h1>Облигации Московской биржи: цены, доходность и карта доходности</h1>
-<p class="sub">{len(bonds)} торгуемых выпусков · ОФЗ, корпоративные и валютные облигации · данные MOEX на {e(today_str or "")}</p>
+<p class="sub">{len(bonds)} торгуемых выпусков · ОФЗ, корпоративные и валютные облигации · данные MOEX на {e(today_str or "")} · <a href="/ofz">Разборы ОФЗ с графиками и сценариями</a></p>
 <section class="ymap-box">
   <div class="ymap-head">
     <h2>Карта доходности облигаций</h2>

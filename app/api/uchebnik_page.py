@@ -486,6 +486,7 @@ _BODY = _CONTENT_CSS + """
     </ul>
     <h3>Практика</h3>
     <ul>
+      <li><a href="/ofz">Разборы ОФЗ: доходность, дюрация и спред к кривой по каждому выпуску</a></li>
       <li><a href="/uchebnik/kak-chitat-kartochku">Как читать карточку облигации на бирже</a></li>
       <li><a href="/uchebnik/lestnica">Лестница облигаций: как собрать и зачем</a></li>
       <li><a href="/uchebnik/obligacii-ili-vklad">Облигации или вклад: механика, ликвидность и риски</a></li>
