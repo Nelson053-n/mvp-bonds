@@ -469,14 +469,20 @@ class MOEXService:
         url = (
             f"{settings.moex_base_url}/engines/currency/markets/selt/boards/CETS/"
             f"securities/{currency}RUB_TOM.json"
-            f"?iss.meta=off&iss.only=marketdata&marketdata.columns=LAST,MARKETPRICE,WAPRICE"
+            f"?iss.meta=off&iss.only=marketdata,securities"
+            f"&marketdata.columns=LAST,MARKETPRICE,WAPRICE&securities.columns=PREVPRICE"
         )
         resp = await client.get(url, timeout=10)
         resp.raise_for_status()
-        row = self._get_first_row(resp.json().get("marketdata", {}))
+        payload = resp.json()
+        row = self._get_first_row(payload.get("marketdata", {}))
         for key in ("LAST", "MARKETPRICE", "WAPRICE"):
             if row.get(key):
                 return float(row[key])
+        # До открытия торгов marketdata пуст — берём цену предыдущей сессии.
+        prev = self._get_first_row(payload.get("securities", {})).get("PREVPRICE")
+        if prev:
+            return float(prev)
         return None
 
     async def get_index_value(self, index_id: str = "RGBI") -> float | None:
@@ -729,7 +735,10 @@ class MOEXService:
             if not data.get("securities", {}).get("data"):
                 logger.debug("Нет цены облигации %s: не торгуется на MOEX", secid)
             else:
-                logger.error("Не удалось получить цену облигации %s", secid)
+                logger.error(
+                    "Не удалось получить цену облигации %s: %s",
+                    secid, self._price_diag(data),
+                )
             raise PriceNotFoundError(secid, "облигация")
 
         # Previous trading session close % of face, for the "day P&L" mode.
@@ -985,6 +994,28 @@ class MOEXService:
                 return row
         max_index = min(len(columns), len(best))
         return {columns[idx]: best[idx] for idx in range(max_index)}
+
+    @staticmethod
+    def _price_diag(data: dict[str, Any]) -> str:
+        """Одна строка для лога: по доскам BOARDID LAST/PREVPRICE/PREVLEGALCLOSEPRICE и SYSTIME."""
+        def rows(name: str) -> list[dict[str, Any]]:
+            ds = data.get(name) or {}
+            cols = ds.get("columns") or []
+            return [dict(zip(cols, v)) for v in (ds.get("data") or [])]
+
+        boards: dict[Any, dict[str, Any]] = {}
+        systime = None
+        for r in rows("securities"):
+            boards.setdefault(r.get("BOARDID"), {}).update(r)
+        for r in rows("marketdata"):
+            boards.setdefault(r.get("BOARDID"), {}).update(r)
+            systime = systime or r.get("SYSTIME")
+        parts = [
+            f"{b}(LAST={r.get('LAST')},PREV={r.get('PREVPRICE')},"
+            f"PREVLEGAL={r.get('PREVLEGALCLOSEPRICE')})"
+            for b, r in boards.items()
+        ]
+        return f"доски: {' '.join(parts) or '-'}; SYSTIME={systime}"
 
     # Price fields a securities row may carry, in fallback order.
     _SEC_PRICE_FIELDS = (

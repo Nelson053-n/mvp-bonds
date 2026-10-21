@@ -533,6 +533,27 @@ class TestUntradedBondLogging:
 
         assert [r for r in caplog.records if r.levelname == "ERROR"]
 
+    async def test_no_price_error_lists_boards(self, monkeypatch, caplog):
+        data = {
+            "securities": {
+                "columns": ["SECID", "BOARDID", "SHORTNAME", "PREVPRICE"],
+                "data": [["SU26248RMFS", "SPOB", "ОФЗ", None],
+                         ["SU26248RMFS", "TQOB", "ОФЗ", None]],
+            },
+            "marketdata": {
+                "columns": ["SECID", "BOARDID", "LAST", "SYSTIME"],
+                "data": [["SU26248RMFS", "SPOB", None, "2026-10-21 10:00:00"]],
+            },
+        }
+        svc = self._make_service(monkeypatch, data)
+        with caplog.at_level("DEBUG", logger="app.services.moex_service"):
+            with pytest.raises(PriceNotFoundError):
+                await svc.get_bond_snapshot("SU26248RMFS")
+        errs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert len(errs) == 1 and "\n" not in errs[0]
+        assert "SPOB" in errs[0] and "TQOB" in errs[0]
+        assert "2026-10-21 10:00:00" in errs[0]
+
     async def test_moex_outage_still_logs_error(self, monkeypatch, caplog):
         """A 5xx / network failure must never be silenced: _fetch raises before
         the quiet branch is reached, so the outage stays visible as ERROR."""
@@ -959,6 +980,16 @@ class TestFxRateMetals:
         ])
         assert await m.MOEXService()._get_fx_rate("GLD") == 11195.31
         assert "GLDRUB_TOM" in urls[1]
+
+    async def test_gold_rate_prevprice_before_open(self, monkeypatch):
+        import app.services.moex_service as m
+        urls = self._patch(monkeypatch, [
+            {"securities.current": {"columns": ["rate"], "data": []}},
+            {"marketdata": {"columns": ["LAST", "MARKETPRICE", "WAPRICE"], "data": []},
+             "securities": {"columns": ["PREVPRICE"], "data": [[10951.5]]}},
+        ])
+        assert await m.MOEXService()._get_fx_rate("GLD") == 10951.5
+        assert "securities.columns=PREVPRICE" in urls[1]
 
     async def test_indicative_rate_wins(self, monkeypatch):
         import app.services.moex_service as m
