@@ -1978,7 +1978,23 @@
         const allVals = [...values, ...costs, ...rgbiOnly, ...securitiesOnly];
         const maxV = Math.max(...allVals);
         const minV = Math.min(...allVals) * 0.98;
-        const pad = { t: 16, r: 16, b: 32, l: 56 };
+        // Легенда — отдельная полоса НАД графиком, строки с переносом. Раньше она рисовалась
+        // внутри области графика (pad.t = 16) и ложилась поверх линий.
+        const legendItems = [hasSecurities ? 'Стоимость портфеля (с кэшем)' : 'Стоимость портфеля'];
+        if (hasSecurities) legendItems.push('Только бумаги');
+        if (_rgbiNorm) legendItems.push('Индекс ОФЗ (норм.)');
+        ctx.font = 'bold 9px Inter, sans-serif';
+        const legendMaxX = W - 16;
+        let legendX = 56 + 4, legendRow = 0;
+        const legendLayout = legendItems.map(text => {
+          const w = ctx.measureText('— ' + text).width;
+          if (legendX > 56 + 4 && legendX + w > legendMaxX) { legendX = 56 + 4; legendRow++; }
+          const item = { text, x: legendX, row: legendRow };
+          legendX += w + 14;
+          return item;
+        });
+        const legendH = (legendRow + 1) * 13;
+        const pad = { t: Math.max(16, legendH + 12), r: 16, b: 32, l: 56 };
         const chartW = W - pad.l - pad.r;
         const chartH = H - pad.t - pad.b;
         const xScale = (i) => pad.l + (i / Math.max(snapshots.length - 1, 1)) * chartW;
@@ -2091,18 +2107,17 @@
             ctx.restore();
           }
 
-          // Unified legend — stacked rows, no overlap. Only lines actually drawn.
+          // Legend — полоса над графиком (раскладка legendLayout посчитана до pad).
           {
             const greenClr = st.getPropertyValue('--green-600').trim() || '#16a34a';
-            const legend = [];
-            legend.push([hasSecurities ? 'Стоимость портфеля (с кэшем)' : 'Стоимость портфеля', lineClr]);
-            if (hasSecurities) legend.push(['Только бумаги', greenClr]);
-            if (_rgbiNorm) legend.push(['Индекс ОФЗ (норм.)', '#f59e0b']);
+            const legendClrs = [lineClr];
+            if (hasSecurities) legendClrs.push(greenClr);
+            if (_rgbiNorm) legendClrs.push('#f59e0b');
             ctx.font = 'bold 9px Inter, sans-serif';
             ctx.textAlign = 'left';
-            legend.forEach((item, i) => {
-              ctx.fillStyle = item[1];
-              ctx.fillText('— ' + item[0], pad.l + 4, pad.t + 10 + i * 12);
+            legendLayout.forEach((item, i) => {
+              ctx.fillStyle = legendClrs[i];
+              ctx.fillText('— ' + item.text, item.x, 10 + item.row * 13);
             });
           }
 

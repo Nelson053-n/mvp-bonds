@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=131">
+    <link rel="stylesheet" href="/static/styles.css?v=132">
   </head>
   <body>
 
@@ -209,9 +209,11 @@
               <span>Свести одинаковые бумаги</span>
             </label>
           </div>
-          <div class="table-search" style="display:none;">
-            <input type="search" id="table-search" class="input" autocomplete="off" data-i18n-placeholder="tbl.search" placeholder="Поиск по названию или тикеру" aria-label="Поиск по названию или тикеру">
-          </div>
+          <!-- Отдельная <form>: иначе Chrome считает это поле «логином» ближайших формless-паролей
+               (токены, смена пароля) и подставляет сохранённые учётки. -->
+          <form class="table-search" role="search" autocomplete="off" onsubmit="return false" style="display:none;">
+            <input type="search" id="table-search" name="table-filter" class="input" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" data-i18n-placeholder="tbl.search" placeholder="Поиск по названию или тикеру" aria-label="Поиск по названию или тикеру">
+          </form>
           <div class="table-wrap" id="portfolio-table-wrap">
             <table>
               <thead>
@@ -1543,8 +1545,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=131"></script>
-    <script src="/static/app.js?v=131"></script>
+    <script src="/static/translations.js?v=132"></script>
+    <script src="/static/app.js?v=132"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;
