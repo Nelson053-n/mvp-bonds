@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=135">
+    <link rel="stylesheet" href="/static/styles.css?v=136">
   </head>
   <body>
 
@@ -182,11 +182,14 @@
         </div>
 
         <!-- Multi-broker hint (shown when user has >1 portfolio and is not in all-mode) -->
-        <a id="multibroker-hint" href="/all" style="display:none;align-items:center;gap:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;text-decoration:none;color:var(--text-primary);">
-          <span style="font-size:16px;line-height:1;">🔗</span>
-          <span style="flex:1;min-width:0;font-size:12.5px;color:var(--text-secondary);" data-i18n="multibroker.hint">Ведёте несколько брокеров? На странице «Все портфели» одинаковые бумаги сводятся в одну строку.</span>
-          <span style="font-size:12px;font-weight:600;color:var(--blue-600);white-space:nowrap;" data-i18n="multibroker.cta">Открыть сводку →</span>
-        </a>
+        <div id="multibroker-hint" style="display:none;align-items:center;gap:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;">
+          <a href="/all" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text-primary);">
+            <span style="font-size:16px;line-height:1;">🔗</span>
+            <span style="flex:1;min-width:0;font-size:12.5px;color:var(--text-secondary);" data-i18n="multibroker.hint">Ведёте несколько брокеров? На странице «Все портфели» одинаковые бумаги сводятся в одну строку.</span>
+            <span style="font-size:12px;font-weight:600;color:var(--blue-600);white-space:nowrap;" data-i18n="multibroker.cta">Открыть сводку →</span>
+          </a>
+          <button type="button" id="multibroker-hint-close" aria-label="Закрыть" title="Закрыть" style="flex:none;background:none;border:0;padding:2px 6px;font-size:18px;line-height:1;cursor:pointer;color:var(--text-muted);">×</button>
+        </div>
 
         <div id="portfolio-table-card" class="card" style="padding: 0;">
           <div class="card-header" style="border-bottom:1px solid var(--border);">
@@ -1603,8 +1606,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=135"></script>
-    <script src="/static/app.js?v=135"></script>
+    <script src="/static/translations.js?v=136"></script>
+    <script src="/static/app.js?v=136"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

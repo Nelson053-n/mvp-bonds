@@ -4722,6 +4722,17 @@
       }
 
       // Плашка «поддержать проект» скрывается на 30 дней (только в этом браузере).
+      // Закрытую подсказку про мульти-брокер не показываем 30 дней, затем напоминаем.
+      const _MB_HINT_KEY = 'mvp_multibroker_hint_until';
+      function _mbHintDismissed() {
+        try { return Number(localStorage.getItem(_MB_HINT_KEY) || 0) > Date.now(); }
+        catch (e) { return false; }
+      }
+      document.getElementById('multibroker-hint-close')?.addEventListener('click', () => {
+        document.getElementById('multibroker-hint').style.display = 'none';
+        try { localStorage.setItem(_MB_HINT_KEY, String(Date.now() + 30 * 86400 * 1000)); } catch (e) { /* ok */ }
+      });
+
       const _SUPPORT_BANNER_KEY = 'mvp_support_banner_until';
       function _supportBannerDismissed() {
         try { return Number(localStorage.getItem(_SUPPORT_BANNER_KEY) || 0) > Date.now(); }
@@ -5651,7 +5662,7 @@
         // Multi-broker hint: show when juggling >1 portfolio outside all-mode
         const mbHint = document.getElementById('multibroker-hint');
         if (mbHint) {
-          mbHint.style.display = (!isReadOnly && !isAllMode && portfolios.length > 1) ? 'flex' : 'none';
+          mbHint.style.display = (!isReadOnly && !isAllMode && portfolios.length > 1 && !_mbHintDismissed()) ? 'flex' : 'none';
         }
         // Refresh-ratings button: per-portfolio only (hidden in all-mode / share)
         const rrBtn = document.getElementById('btn-refresh-ratings');
