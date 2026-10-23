@@ -129,7 +129,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 11
+    SCHEMA_VERSION = 12
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -175,6 +175,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
             (9, self._migration_v9),
             (10, self._migration_v10),
             (11, self._migration_v11),
+            (12, self._migration_v12),
         ]
 
         for version, migrate in migrations:
@@ -631,6 +632,13 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, created_at)"
         )
+
+    def _migration_v12(self, conn: sqlite3.Connection) -> None:
+        """v12 — отметка «отвечено» у входящих писем (ставится при отправке ответа из админки)."""
+        try:
+            conn.execute("ALTER TABLE mail_messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
     def _migration_v11(self, conn: sqlite3.Connection) -> None:
         """v11 — почта поддержки: входящие (IMAP) и исходящие ответы (встроенный клиент в админке).

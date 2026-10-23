@@ -6829,18 +6829,34 @@
           tr.append(
             _mailEl('td', _mailDate(m.date), 'white-space:nowrap;'),
             _mailEl('td', dir === 'in' ? m.from_addr : m.to_addr, 'max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
-            _mailEl('td', (m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : ''), 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
+            _mailEl('td', (m.answered ? '↩ ' : '') + (m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : ''), 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
           );
           tr.onclick = () => adminMailOpen(m.id, dir, tr);
           body.appendChild(tr);
         });
+      }
+      function adminMailBack(dir) {
+        document.getElementById(`adm-mail-${dir}-detail`).replaceChildren();
+        document.getElementById(`adm-mail-${dir}-list`).style.display = '';
+      }
+      async function adminMailDelete(id, dir) {
+        if (!confirm('Удалить письмо из админки? На почтовом сервере оно останется.')) return;
+        const r = await apiFetch(`/admin/mail/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!r.ok) { toast('Не удалось удалить письмо', 'error'); return; }
+        toast('Письмо удалено', 'success');
+        adminMailBack(dir);
+        adminMailLoad(dir).catch(() => {});
       }
       async function adminMailOpen(id, dir, row) {
         const box = document.getElementById(`adm-mail-${dir}-detail`);
         const r = await apiFetch(`/admin/mail/${encodeURIComponent(id)}`);
         if (!r.ok) { toast('Не удалось открыть письмо', 'error'); return; }
         const m = await r.json();
+        document.getElementById(`adm-mail-${dir}-list`).style.display = 'none';
+        const back = _mailEl('button', '← Все письма', 'margin-top:12px;'); back.className = 'btn btn-secondary';
+        back.onclick = () => adminMailBack(dir);
         box.replaceChildren(
+          back,
           _mailEl('h3', m.subject || '(без темы)', 'margin:16px 0 4px;font-size:15px;'),
           _mailEl('div', `От: ${m.from_addr}\nКому: ${m.to_addr}${m.cc ? '\nКопия: ' + m.cc : ''}\n${_mailDate(m.date)}`, 'font-size:12px;color:var(--text-muted);white-space:pre-wrap;margin-bottom:12px;'),
           _mailEl('div', m.body, 'white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55;padding:12px;border:1px solid var(--border);border-radius:var(--radius);'),
@@ -6849,12 +6865,16 @@
           const reply = _mailEl('button', 'Ответить', 'margin-top:12px;'); reply.className = 'btn btn-primary';
           reply.onclick = () => adminMailCompose(dir, m);
           box.appendChild(reply);
+          if (m.answered) box.appendChild(_mailEl('span', '↩ Вы уже ответили на это письмо', 'margin-left:12px;font-size:12px;color:var(--green-600);'));
           if (!m.is_read) {
             apiFetch(`/admin/mail/${encodeURIComponent(id)}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ read: true }) })
               .then(rr => rr.ok ? rr.json() : null).then(d => { if (d) _mailSetBadge(d.unread); });
             if (row) row.style.fontWeight = '';
           }
         }
+        const del = _mailEl('button', 'Удалить', 'margin-top:12px;margin-left:8px;'); del.className = 'btn btn-secondary';
+        del.onclick = () => adminMailDelete(id, dir);
+        box.appendChild(del);
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       function adminMailCompose(dir, orig) {
@@ -6879,12 +6899,15 @@
             const d = await r.json().catch(() => ({}));
             if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'Ошибка отправки');
             toast('Письмо отправлено', 'success');
-            box.replaceChildren();
+            adminMailBack(dir);
             adminMailLoad('out').catch(() => {});
+            adminMailLoad('in').catch(() => {});
           } catch (e) { status.textContent = e.message; send.disabled = false; }
         };
         const row = _mailEl('div', undefined, 'display:flex;gap:10px;align-items:center;');
-        row.append(send, status);
+        const cancel = _mailEl('button', 'Отмена'); cancel.className = 'btn btn-secondary';
+        cancel.onclick = () => adminMailBack(dir);
+        row.append(send, cancel, status);
         const form = _mailEl('div', undefined, 'display:flex;flex-direction:column;gap:8px;margin-top:16px;');
         form.append(to, cc, subj, text, row);
         box.appendChild(form);

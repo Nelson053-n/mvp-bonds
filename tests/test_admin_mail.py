@@ -133,6 +133,7 @@ async def test_reply_sets_threading_and_lands_in_outbox(client, auth_headers, sm
     assert frm == "support@bondai.ru"  # в конверте адрес без имени
     out = storage_service.list_mail("out")
     assert len(out) == 1 and out[0]["to_addr"] == "ivan@example.com"
+    assert storage_service.get_mail(orig)["answered"] == 1  # входящее помечено отвеченным
 
 
 @pytest.mark.parametrize("payload", [
@@ -200,3 +201,48 @@ def test_system_mailer_from_has_display_name(monkeypatch) -> None:
     mailer._send_sync("u@example.com", "Тема", "Тело")
     frm, rcpt, text = FakeSmtp.sent[0]
     assert "From: BondAI <alert@bondai.ru>" in text and frm == "alert@bondai.ru"
+
+
+async def test_plain_send_does_not_mark_anything_answered(client, auth_headers, smtp) -> None:
+    other = storage_service.add_mail("in", "<o>", "a@b.cc", "s@b.cc", "t", "b", "2026-10-22T10:00:00+00:00")
+    await client.post("/admin/mail/send", headers=auth_headers, json={"to": "a@b.cc", "subject": "s", "body": "b"})
+    assert storage_service.get_mail(other)["answered"] == 0
+
+
+async def test_failed_send_does_not_mark_answered(client, auth_headers, monkeypatch) -> None:
+    orig = storage_service.add_mail("in", "<f>", "a@b.cc", "s@b.cc", "t", "b", "2026-10-22T10:00:00+00:00")
+    def boom(*a, **k): raise OSError("down")
+    monkeypatch.setattr(mail_client.smtplib, "SMTP", boom)
+    r = await client.post("/admin/mail/send", headers=auth_headers,
+                          json={"to": "a@b.cc", "subject": "s", "body": "b", "reply_to_id": orig})
+    assert r.status_code == 502 and storage_service.get_mail(orig)["answered"] == 0
+
+
+async def test_delete_mail_removes_it_and_updates_counter(client, auth_headers) -> None:
+    mid = storage_service.add_mail("in", "<d>", "a@b.cc", "s@b.cc", "t", "b", "2026-10-22T10:00:00+00:00")
+    r = await client.delete(f"/admin/mail/{mid}", headers=auth_headers)
+    assert r.status_code == 200 and r.json()["unread"] == 0
+    assert storage_service.get_mail(mid) is None
+    assert (await client.delete(f"/admin/mail/{mid}", headers=auth_headers)).status_code == 404
+
+
+async def test_deleted_mail_is_not_reimported_by_sync(imap) -> None:
+    imap.mails = {5: _raw(mid="<m5@x>")}
+    await mail_client.sync_inbox()
+    storage_service.delete_mail(storage_service.list_mail("in")[0]["id"])
+    assert await mail_client.sync_inbox() == 0 and storage_service.list_mail("in") == []
+
+
+async def test_delete_requires_admin(client) -> None:
+    from app.services.auth_service import AuthService
+    uid = storage_service.create_user("mail_del_user", "x")
+    token = AuthService().create_token(user_id=uid, username="mail_del_user", is_admin=False)
+    r = await client.delete("/admin/mail/1", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+
+def test_ui_has_back_delete_and_answered_marker() -> None:
+    js = (ROOT / "app/ui/static/app.js").read_text(encoding="utf-8")
+    html = (ROOT / "app/ui/dashboard.html").read_text(encoding="utf-8")
+    assert "'← Все письма'" in js and "method: 'DELETE'" in js and "m.answered" in js
+    assert 'id="adm-mail-in-list"' in html and 'id="adm-mail-out-list"' in html

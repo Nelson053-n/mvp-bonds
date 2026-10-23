@@ -1,8 +1,8 @@
 """Mail mixin: письма ящика поддержки (входящие по IMAP и отправленные из админки)."""
 
-_COLS = "id, direction, msg_id, from_addr, to_addr, cc, subject, body, in_reply_to, date, is_read"
-_LIST_COLS = "id, direction, from_addr, to_addr, subject, substr(body, 1, 160), date, is_read"
-_LIST_KEYS = ("id", "direction", "from_addr", "to_addr", "subject", "snippet", "date", "is_read")
+_COLS = "id, direction, msg_id, from_addr, to_addr, cc, subject, body, in_reply_to, date, is_read, answered"
+_LIST_COLS = "id, direction, from_addr, to_addr, subject, substr(body, 1, 160), date, is_read, answered"
+_LIST_KEYS = ("id", "direction", "from_addr", "to_addr", "subject", "snippet", "date", "is_read", "answered")
 
 
 class MailMixin:
@@ -45,3 +45,14 @@ class MailMixin:
             return conn.execute(
                 "SELECT COUNT(*) FROM mail_messages WHERE direction = 'in' AND is_read = 0"
             ).fetchone()[0]
+
+    def set_mail_answered(self, mail_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute("UPDATE mail_messages SET answered = 1 WHERE id = ?", (mail_id,))
+            conn.commit()
+
+    def delete_mail(self, mail_id: int) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM mail_messages WHERE id = ?", (mail_id,))
+            conn.commit()
+            return cur.rowcount > 0

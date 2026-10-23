@@ -85,6 +85,8 @@ async def send(payload: SendPayload, admin: dict = Depends(get_admin_user)) -> d
     except Exception as exc:
         logger.warning("support mail send failed: %s %s", type(exc).__name__, exc)
         raise HTTPException(status_code=502, detail="Письмо не отправлено: ошибка почтового сервера")
+    if payload.reply_to_id is not None:
+        storage_service.set_mail_answered(payload.reply_to_id)
     return {"ok": True, "id": mail_id}
 
 
@@ -100,4 +102,14 @@ async def get_mail(mail_id: int, admin: dict = Depends(get_admin_user)) -> dict:
 async def mark_read(mail_id: int, payload: ReadPayload, admin: dict = Depends(get_admin_user)) -> dict:
     if not storage_service.set_mail_read(mail_id, payload.read):
         raise HTTPException(status_code=404, detail="Письмо не найдено")
+    return {"ok": True, "unread": storage_service.count_unread_mail()}
+
+
+@router.delete("/{mail_id}")
+async def delete_mail(mail_id: int, admin: dict = Depends(get_admin_user)) -> dict:
+    """Удаляет письмо из админки. На почтовом сервере письмо остаётся; назад оно не вернётся —
+    синхронизация берёт только письма новее уже полученных."""
+    if not storage_service.delete_mail(mail_id):
+        raise HTTPException(status_code=404, detail="Письмо не найдено")
+    logger.info("AUDIT support_mail_deleted: id=%d", mail_id)
     return {"ok": True, "unread": storage_service.count_unread_mail()}
