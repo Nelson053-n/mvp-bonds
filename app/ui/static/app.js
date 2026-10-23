@@ -7359,6 +7359,8 @@
         _currentUserIsAdmin = isAdmin;
         const btn = document.getElementById('nav-admin');
         if (btn && isAdmin) btn.style.display = '';
+        const adminNotif = document.getElementById('notif-admin-card');
+        if (adminNotif) adminNotif.style.display = isAdmin ? '' : 'none';
         // Deep-link: /admin/promo (legacy path) or /admin#<tab> opens the admin
         // panel on that sub-section. adminInit() picks the tab from hash/path.
         if (isAdmin && window.location.pathname === '/admin/promo') {
@@ -7735,7 +7737,17 @@
         state.textContent = chatId ? t('settings.account.tgConnected') : t('settings.account.tgNotConnected');
         state.style.color = chatId ? 'var(--green-600)' : 'var(--slate-500)';
         if (unlink) unlink.style.display = chatId ? '' : 'none';
+        const nState = document.getElementById('notif-tg-state');
+        if (nState) {
+          nState.textContent = state.textContent;
+          nState.style.color = state.style.color;
+        }
       }
+
+      // Кнопка на вкладке «Уведомления» запускает ту же привязку, что и в «Аккаунте».
+      document.getElementById('notif-tg-btn')?.addEventListener('click', () => {
+        document.getElementById('acc-tg-btn').click();
+      });
 
       let tgLinkPoll = null;
       document.getElementById('acc-tg-btn').addEventListener('click', async () => {

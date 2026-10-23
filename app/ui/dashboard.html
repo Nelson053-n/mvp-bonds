@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=132">
+    <link rel="stylesheet" href="/static/styles.css?v=133">
   </head>
   <body>
 
@@ -576,7 +576,38 @@
         <!-- ── TAB: Notifications ── -->
         <div id="stab-notifications" class="stab-content" style="display:none;">
           <div class="panel-cols panel-cols-auto">
-            <div class="card">
+            <div class="card" id="notif-user-card">
+              <div class="card-header">
+                <h2 class="card-title" data-i18n="settings.notif.howTitle">Как подключить уведомления в Telegram</h2>
+              </div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.7;">
+                  <li data-i18n="settings.notif.step1">Нажмите «Подключить Telegram» ниже — откроется бот @bondinfoai_bot.</li>
+                  <li data-i18n="settings.notif.step2">В боте нажмите «Запустить» (Start). Бот ответит, что аккаунт привязан.</li>
+                  <li data-i18n="settings.notif.step3">Вернитесь сюда: статус ниже сменится на «Подключён».</li>
+                  <li data-i18n="settings.notif.step4">Включите «Уведомления о купонах» и выберите, за сколько дней предупреждать.</li>
+                </ol>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                  <span style="font-size:13px;font-weight:600;" id="notif-tg-state" data-i18n="settings.account.tgNotConnected">Не подключён</span>
+                  <button class="btn" id="notif-tg-btn" data-i18n="settings.account.tgConnect">Подключить Telegram</button>
+                </div>
+                <p style="font-size:11px;color:var(--slate-500);margin:0;" data-i18n="settings.notif.stepNote">Если бот не открылся — разрешите всплывающие окна для сайта или откройте @bondinfoai_bot в Telegram вручную и перейдите по ссылке снова. Ссылка действует 15 минут. Отвязать Telegram можно во вкладке «Аккаунт».</p>
+                <div class="field">
+                  <label data-i18n="settings.coupon_notif_title">Уведомления о купонах</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
+                    <input type="checkbox" id="coupon-notif-enabled">
+                    <span style="font-size:13px;" data-i18n="settings.coupon_notif_enable">Включить уведомления о купонах</span>
+                  </label>
+                  <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:var(--text-muted);" data-i18n="settings.coupon_notif_days">За дней:</span>
+                    <input type="number" id="coupon-notif-days" min="1" max="30" value="3" class="input" style="width:60px;" />
+                    <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
+                  </div>
+                  <div id="coupon-notif-status" class="status"></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" id="notif-admin-card" style="display:none;">
               <div class="card-header">
                 <h2 class="card-title" data-i18n="settings.notif.botTitle">Настройки бота</h2>
               </div>
@@ -592,19 +623,6 @@
                 <div class="field">
                   <label for="tg-threshold" data-i18n="settings.notif.threshold">Порог просадки (%)</label>
                   <input id="tg-threshold" type="number" class="input" step="0.5" min="0.5" value="5" />
-                </div>
-                <div class="field">
-                  <label data-i18n="settings.coupon_notif_title">Уведомления о купонах</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
-                    <input type="checkbox" id="coupon-notif-enabled">
-                    <span style="font-size:13px;" data-i18n="settings.coupon_notif_enable">Включить уведомления о купонах</span>
-                  </label>
-                  <div id="coupon-notif-days-row" style="display:none;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
-                    <span style="font-size:12px;color:var(--text-muted);" data-i18n="settings.coupon_notif_days">За дней:</span>
-                    <input type="number" id="coupon-notif-days" min="1" max="30" value="3" class="input" style="width:60px;" />
-                    <button id="btn-save-coupon-notif" class="btn btn-sm" data-i18n="settings.save">Сохранить</button>
-                  </div>
-                  <div id="coupon-notif-status" class="status"></div>
                 </div>
                 <div class="field">
                   <label for="tg-lang" data-i18n="settings.notif.lang">Язык уведомлений</label>
@@ -1545,8 +1563,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=132"></script>
-    <script src="/static/app.js?v=132"></script>
+    <script src="/static/translations.js?v=133"></script>
+    <script src="/static/app.js?v=133"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;
