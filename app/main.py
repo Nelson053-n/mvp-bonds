@@ -36,6 +36,7 @@ from app.api.portfolio import router as portfolio_router
 from app.api.portfolios import router as portfolios_router
 from app.api.settings import router as settings_router
 from app.api.admin import router as admin_router
+from app.api.admin_mail import router as admin_mail_router
 from app.api.tbank import router as tbank_router
 from app.api.waitlist import router as waitlist_router
 from app.api.billing import router as billing_router
@@ -633,6 +634,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_benchmark_snapshot_loop())
         from app.services.ofz_warm import ofz_warm_loop
         asyncio.create_task(ofz_warm_loop())
+        from app.services.mail_client import mail_sync_loop
+        asyncio.create_task(mail_sync_loop())
         from app.services import telegram_net
         asyncio.create_task(telegram_net.watch_routes())
         # Public Telegram bond-search bot — only in the leader so a single
@@ -759,6 +762,7 @@ app.include_router(pdf_router)
 app.include_router(portfolios_router)
 app.include_router(portfolio_router)
 app.include_router(settings_router)
+app.include_router(admin_mail_router)
 app.include_router(admin_router)
 app.include_router(tbank_router)
 app.include_router(waitlist_router)

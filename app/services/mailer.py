@@ -13,13 +13,14 @@ import logging
 import smtplib
 import ssl
 from email.mime.text import MIMEText
-from email.utils import formatdate, make_msgid
+from email.utils import formataddr, formatdate, make_msgid
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 _SMTP_TIMEOUT = 15
+SENDER_NAME = "BondAI"
 
 
 def smtp_configured() -> bool:
@@ -29,7 +30,7 @@ def smtp_configured() -> bool:
 def _send_sync(to: str, subject: str, body: str) -> None:
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
+    msg["From"] = formataddr((SENDER_NAME, settings.smtp_from))
     msg["To"] = to
     # Gmail отклоняет письма без Message-ID: 550 5.7.1 RFC 5322.
     msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2] or None)

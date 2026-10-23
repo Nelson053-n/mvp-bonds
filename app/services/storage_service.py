@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.storage.items import ItemsMixin
+from app.services.storage.mail import MailMixin
 from app.services.storage.ofz import OfzMixin
 from app.services.storage.portfolios import PortfoliosMixin
 from app.services.storage.users import UsersMixin
@@ -12,7 +13,7 @@ from app.services.storage.users import UsersMixin
 logger = logging.getLogger(__name__)
 
 
-class StorageService(ItemsMixin, OfzMixin, PortfoliosMixin, UsersMixin):
+class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixin):
     def __init__(self) -> None:
         self.db_path = Path(settings.sqlite_db_path)
         self._ensure_db()
@@ -128,7 +129,7 @@ class StorageService(ItemsMixin, OfzMixin, PortfoliosMixin, UsersMixin):
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 10
+    SCHEMA_VERSION = 11
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -173,6 +174,7 @@ class StorageService(ItemsMixin, OfzMixin, PortfoliosMixin, UsersMixin):
             (8, self._migration_v8),
             (9, self._migration_v9),
             (10, self._migration_v10),
+            (11, self._migration_v11),
         ]
 
         for version, migrate in migrations:
@@ -628,6 +630,33 @@ class StorageService(ItemsMixin, OfzMixin, PortfoliosMixin, UsersMixin):
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, created_at)"
+        )
+
+    def _migration_v11(self, conn: sqlite3.Connection) -> None:
+        """v11 — почта поддержки: входящие (IMAP) и исходящие ответы (встроенный клиент в админке).
+
+        Уникальность (direction, msg_id): повторная синхронизация того же письма
+        не плодит дубли. msg_id — заголовок Message-ID."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS mail_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                direction TEXT NOT NULL,
+                msg_id TEXT,
+                from_addr TEXT NOT NULL DEFAULT '',
+                to_addr TEXT NOT NULL DEFAULT '',
+                cc TEXT NOT NULL DEFAULT '',
+                subject TEXT NOT NULL DEFAULT '',
+                body TEXT NOT NULL DEFAULT '',
+                in_reply_to TEXT,
+                date TEXT NOT NULL,
+                is_read INTEGER NOT NULL DEFAULT 0
+            )"""
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_mail_dir_msgid ON mail_messages(direction, msg_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mail_dir_date ON mail_messages(direction, date DESC)"
         )
 
     def _migration_v10(self, conn: sqlite3.Connection) -> None:

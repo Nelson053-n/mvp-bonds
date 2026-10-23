@@ -6401,6 +6401,8 @@
         portfolios: () => adminLoadPortfolios(),
         system:     () => { adminLoadSources().catch(() => {}); adminLoadBackups().catch(() => {}); adminLoadAuditLog().catch(() => {}); },
         support:    () => adminLoadSupport().catch(() => {}),
+        'mail-in':  () => adminMailLoad('in').catch(() => {}),
+        'mail-out': () => adminMailLoad('out').catch(() => {}),
         promo:      () => adminLoadPromo(),
       };
       const _admTabLoaded = {};
@@ -6426,9 +6428,10 @@
       async function adminInit() {
         await adminLoadStats();
         adminLoadSupport().catch(() => {});  // значок «N новых» на вкладке виден сразу
+        adminMailBadge().catch(() => {});
         // Deep-link via hash (/admin#money) or legacy path (/admin/promo).
         // Hash is used so tab names don't collide with /admin/* API routes.
-        const hash = (location.hash.match(/^#(users|money|portfolios|system|support|promo)$/) || [])[1];
+        const hash = (location.hash.match(/^#(users|money|portfolios|system|support|mail-in|mail-out|promo)$/) || [])[1];
         const legacy = location.pathname === '/admin/promo' ? 'promo' : null;
         adminShowTab(hash || legacy || 'users');
       }
@@ -6775,6 +6778,117 @@
           if (cb) cb.checked = !done;
           toast('Ошибка сохранения', 'error');
         }
+      }
+      // ── Почта поддержки (встроенный клиент) ──────────────────────────────
+      // Текст письма всегда идёт через textContent: тело приходит из внешнего мира.
+      function _mailEl(tag, text, css) {
+        const e = document.createElement(tag);
+        if (text !== undefined) e.textContent = text;
+        if (css) e.style.cssText = css;
+        return e;
+      }
+      function _mailDate(iso) {
+        return iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: 'Asia/Vladivostok', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+      }
+      function _mailSetBadge(n) {
+        const b = document.getElementById('adm-mail-badge');
+        if (b) { b.textContent = n; b.style.display = n ? '' : 'none'; }
+      }
+      async function adminMailBadge() {
+        const r = await apiFetch('/admin/mail/status');
+        if (r.ok) _mailSetBadge((await r.json()).unread);
+      }
+      async function adminMailLoad(dir, sync) {
+        const body = document.getElementById(`adm-mail-${dir}-body`);
+        const note = document.getElementById(`adm-mail-${dir}-note`);
+        if (!body) return;
+        note.style.display = 'none';
+        if (sync && dir === 'in') {
+          const sr = await apiFetch('/admin/mail/sync', { method: 'POST' });
+          if (!sr.ok) {
+            const d = await sr.json().catch(() => ({}));
+            note.textContent = typeof d.detail === 'string' ? d.detail : 'Не удалось проверить почту';
+            note.style.display = '';
+          }
+        }
+        const r = await apiFetch(`/admin/mail?direction=${dir}&limit=100`);
+        if (!r.ok) { body.replaceChildren(_mailEl('tr')); return; }
+        const d = await r.json();
+        _mailSetBadge(d.unread);
+        body.replaceChildren();
+        if (!d.items.length) {
+          const tr = _mailEl('tr'); const td = _mailEl('td', dir === 'in' ? 'Входящих пока нет' : 'Отправленных писем пока нет', 'text-align:center;color:var(--text-muted);padding:12px;');
+          td.colSpan = 3; tr.appendChild(td); body.appendChild(tr);
+          return;
+        }
+        d.items.forEach(m => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          const unread = dir === 'in' && !m.is_read;
+          if (unread) tr.style.fontWeight = '600';
+          tr.append(
+            _mailEl('td', _mailDate(m.date), 'white-space:nowrap;'),
+            _mailEl('td', dir === 'in' ? m.from_addr : m.to_addr, 'max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
+            _mailEl('td', (m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : ''), 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
+          );
+          tr.onclick = () => adminMailOpen(m.id, dir, tr);
+          body.appendChild(tr);
+        });
+      }
+      async function adminMailOpen(id, dir, row) {
+        const box = document.getElementById(`adm-mail-${dir}-detail`);
+        const r = await apiFetch(`/admin/mail/${encodeURIComponent(id)}`);
+        if (!r.ok) { toast('Не удалось открыть письмо', 'error'); return; }
+        const m = await r.json();
+        box.replaceChildren(
+          _mailEl('h3', m.subject || '(без темы)', 'margin:16px 0 4px;font-size:15px;'),
+          _mailEl('div', `От: ${m.from_addr}\nКому: ${m.to_addr}${m.cc ? '\nКопия: ' + m.cc : ''}\n${_mailDate(m.date)}`, 'font-size:12px;color:var(--text-muted);white-space:pre-wrap;margin-bottom:12px;'),
+          _mailEl('div', m.body, 'white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55;padding:12px;border:1px solid var(--border);border-radius:var(--radius);'),
+        );
+        if (dir === 'in') {
+          const reply = _mailEl('button', 'Ответить', 'margin-top:12px;'); reply.className = 'btn btn-primary';
+          reply.onclick = () => adminMailCompose(dir, m);
+          box.appendChild(reply);
+          if (!m.is_read) {
+            apiFetch(`/admin/mail/${encodeURIComponent(id)}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ read: true }) })
+              .then(rr => rr.ok ? rr.json() : null).then(d => { if (d) _mailSetBadge(d.unread); });
+            if (row) row.style.fontWeight = '';
+          }
+        }
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      function adminMailCompose(dir, orig) {
+        const box = document.getElementById(`adm-mail-${dir}-detail`);
+        if (!orig) box.replaceChildren();
+        const inp = (v, ph) => { const i = document.createElement('input'); i.className = 'input'; i.value = v || ''; i.placeholder = ph; return i; };
+        // Адрес без имени: «Имя <a@b.c>» валидатор на сервере отклонит
+        const fromAddr = orig ? ((orig.from_addr.match(/<([^>]+)>/) || [])[1] || orig.from_addr) : '';
+        const to = inp(fromAddr, 'Кому');
+        const cc = inp('', 'Копия (необязательно)');
+        const subj = inp(orig ? (/^re:/i.test(orig.subject) ? orig.subject : 'Re: ' + orig.subject) : '', 'Тема');
+        const text = document.createElement('textarea');
+        text.rows = 9; text.className = 'input'; text.style.cssText = 'width:100%;resize:vertical;font:inherit;font-size:13px;padding:10px;';
+        if (orig) text.value = '\n\n— ' + _mailDate(orig.date) + ', ' + orig.from_addr + ':\n' + orig.body.split('\n').map(l => '> ' + l).join('\n');
+        const status = _mailEl('span', '', 'font-size:12px;color:var(--text-muted);');
+        const send = _mailEl('button', 'Отправить'); send.className = 'btn btn-primary';
+        send.onclick = async () => {
+          send.disabled = true; status.textContent = 'Отправка…';
+          try {
+            const r = await apiFetch('/admin/mail/send', { method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ to: to.value, cc: cc.value, subject: subj.value, body: text.value, reply_to_id: orig ? orig.id : null }) });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'Ошибка отправки');
+            toast('Письмо отправлено', 'success');
+            box.replaceChildren();
+            adminMailLoad('out').catch(() => {});
+          } catch (e) { status.textContent = e.message; send.disabled = false; }
+        };
+        const row = _mailEl('div', undefined, 'display:flex;gap:10px;align-items:center;');
+        row.append(send, status);
+        const form = _mailEl('div', undefined, 'display:flex;flex-direction:column;gap:8px;margin-top:16px;');
+        form.append(to, cc, subj, text, row);
+        box.appendChild(form);
+        text.focus(); text.setSelectionRange(0, 0);
       }
       async function adminToggleReceipt(paymentId, done, cb) {
         try {

@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # Почтовый ящик поддержки (встроенный клиент в админке): IMAP для входящих,
+    # SMTP (smtp_host/smtp_port выше) для ответов. Отдельная учётка от smtp_user —
+    # там ящик для системных писем (сброс пароля, алерты).
+    mail_imap_host: str = "imap.beget.com"
+    mail_imap_port: int = 993
+    mail_user: str = ""
+    mail_password: str = ""
+    mail_from: str = ""
     # Куда слать письмо, когда Telegram недоступен по всем маршрутам —
     # алерт через сам Telegram в этот момент не доставить.
     alert_email: str = ""

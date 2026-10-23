@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=133">
+    <link rel="stylesheet" href="/static/styles.css?v=134">
   </head>
   <body>
 
@@ -860,6 +860,8 @@
           <button class="adm-tab"        data-tab="portfolios" onclick="adminShowTab('portfolios', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> Портфели</button>
           <button class="adm-tab"        data-tab="system"     onclick="adminShowTab('system', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg> Система</button>
           <button class="adm-tab"        data-tab="support"    onclick="adminShowTab('support', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24"/></svg> Поддержка <span id="adm-support-badge" style="display:none;background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:4px;"></span></button>
+          <button class="adm-tab"        data-tab="mail-in"    onclick="adminShowTab('mail-in', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> Входящие <span id="adm-mail-badge" style="display:none;background:#ef4444;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:4px;"></span></button>
+          <button class="adm-tab"        data-tab="mail-out"   onclick="adminShowTab('mail-out', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Исходящие</button>
           <button class="adm-tab"        data-tab="promo"      onclick="adminShowTab('promo', this)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> Промо</button>
         </div>
 
@@ -1049,6 +1051,44 @@
               <tbody id="adm-payments-body"></tbody>
             </table>
           </div>
+        </div>
+
+        <!-- Почта поддержки: Входящие -->
+        <div class="card adm-pane" data-adm-tab="mail-in" style="margin-top:16px;" id="adm-mail-in-card">
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+            <h2 class="card-title">Почта поддержки · Входящие</h2>
+            <div style="display:flex;gap:6px;margin-left:auto;">
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminMailCompose('in')">Написать</button>
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminMailLoad('in', true)" title="Проверить почту">↺</button>
+            </div>
+          </div>
+          <div id="adm-mail-in-note" style="display:none;padding:8px 16px 0;font-size:12px;color:var(--text-muted);line-height:1.5;"></div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;font-size:12px;">
+              <thead><tr><th>Дата</th><th>От кого</th><th>Тема</th></tr></thead>
+              <tbody id="adm-mail-in-body"></tbody>
+            </table>
+          </div>
+          <div id="adm-mail-in-detail" style="padding:0 16px 16px;"></div>
+        </div>
+
+        <!-- Почта поддержки: Исходящие -->
+        <div class="card adm-pane" data-adm-tab="mail-out" style="margin-top:16px;" id="adm-mail-out-card">
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+            <h2 class="card-title">Почта поддержки · Исходящие</h2>
+            <div style="display:flex;gap:6px;margin-left:auto;">
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminMailCompose('out')">Написать</button>
+              <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminMailLoad('out', true)" title="Проверить почту">↺</button>
+            </div>
+          </div>
+          <div id="adm-mail-out-note" style="display:none;padding:8px 16px 0;font-size:12px;color:var(--text-muted);line-height:1.5;"></div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;font-size:12px;">
+              <thead><tr><th>Дата</th><th>Кому</th><th>Тема</th></tr></thead>
+              <tbody id="adm-mail-out-body"></tbody>
+            </table>
+          </div>
+          <div id="adm-mail-out-detail" style="padding:0 16px 16px;"></div>
         </div>
 
         <!-- Обращения пользователей в техподдержку -->
@@ -1563,8 +1603,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=133"></script>
-    <script src="/static/app.js?v=133"></script>
+    <script src="/static/translations.js?v=134"></script>
+    <script src="/static/app.js?v=134"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

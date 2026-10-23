@@ -103,14 +103,14 @@ class TestMigrationAppliedOnImport:
         # миграции и понижаем номер — как выглядит БД перед деплоем.
         con = sqlite3.connect(fresh_db)
         try:
-            # Откатываем артефакт ПОСЛЕДНЕЙ миграции (v10 — таблица ofz_daily):
+            # Откатываем артефакт ПОСЛЕДНЕЙ миграции (v11 — таблица mail_messages):
             # тест про отставание ровно на одну версию.
-            con.execute("DROP TABLE ofz_daily")
+            con.execute("DROP TABLE mail_messages")
             con.execute("UPDATE schema_version SET version = ?",
                         (StorageService.SCHEMA_VERSION - 1,))
             con.commit()
             tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            assert "ofz_daily" not in tables, "подготовка не сработала"
+            assert "mail_messages" not in tables, "подготовка не сработала"
         finally:
             con.close()
 
@@ -125,7 +125,7 @@ class TestMigrationAppliedOnImport:
         finally:
             con.close()
 
-        assert "ofz_daily" in tables, (
+        assert "mail_messages" in tables, (
             "импорт не применил миграцию — деплой выкатит код на старую схему"
         )
         assert version == StorageService.SCHEMA_VERSION
