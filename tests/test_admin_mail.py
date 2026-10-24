@@ -245,4 +245,7 @@ def test_ui_has_back_delete_and_answered_marker() -> None:
     js = (ROOT / "app/ui/static/app.js").read_text(encoding="utf-8")
     html = (ROOT / "app/ui/dashboard.html").read_text(encoding="utf-8")
     assert "'← Все письма'" in js and "method: 'DELETE'" in js and "m.answered" in js
+    # кнопка удаления видна прямо в списке и не открывает письмо (stopPropagation)
+    assert re.search(r"delBtn\.onclick = \(ev\) => \{ ev\.stopPropagation\(\); adminMailDelete\(m\.id, dir\)", js)
+    assert "↩ Отвечено" in js and "Нажмите на письмо, чтобы открыть" in html
     assert 'id="adm-mail-in-list"' in html and 'id="adm-mail-out-list"' in html

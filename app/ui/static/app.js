@@ -6829,7 +6829,7 @@
         body.replaceChildren();
         if (!d.items.length) {
           const tr = _mailEl('tr'); const td = _mailEl('td', dir === 'in' ? 'Входящих пока нет' : 'Отправленных писем пока нет', 'text-align:center;color:var(--text-muted);padding:12px;');
-          td.colSpan = 3; tr.appendChild(td); body.appendChild(tr);
+          td.colSpan = 4; tr.appendChild(td); body.appendChild(tr);
           return;
         }
         d.items.forEach(m => {
@@ -6837,10 +6837,18 @@
           tr.style.cursor = 'pointer';
           const unread = dir === 'in' && !m.is_read;
           if (unread) tr.style.fontWeight = '600';
+          const tdSubj = _mailEl('td', undefined, 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;');
+          if (m.answered) tdSubj.appendChild(_mailEl('span', '↩ Отвечено', 'color:var(--green-600);font-weight:600;margin-right:8px;'));
+          tdSubj.appendChild(document.createTextNode((m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : '')));
+          const tdAct = _mailEl('td', undefined, 'white-space:nowrap;text-align:right;');
+          const delBtn = _mailEl('button', 'Удалить', 'height:24px;font-size:11px;padding:0 8px;'); delBtn.className = 'btn btn-secondary';
+          delBtn.onclick = (ev) => { ev.stopPropagation(); adminMailDelete(m.id, dir); };
+          tdAct.appendChild(delBtn);
           tr.append(
             _mailEl('td', _mailDate(m.date), 'white-space:nowrap;'),
             _mailEl('td', dir === 'in' ? m.from_addr : m.to_addr, 'max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
-            _mailEl('td', (m.answered ? '↩ ' : '') + (m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : ''), 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'),
+            tdSubj,
+            tdAct,
           );
           tr.onclick = () => adminMailOpen(m.id, dir, tr);
           body.appendChild(tr);
