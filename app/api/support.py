@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user
+from app.services.mailer import send_mail
 from app.services.notification_service import notification_service
 from app.services.storage_service import storage_service
 
@@ -43,6 +44,31 @@ async def notify_admin_new_ticket(ticket_id: int, user: dict, message: str) -> b
     return await notification_service.send_telegram(token, chat_id, text)
 
 
+async def notify_user_support_reply(user_id: int, ticket_id: int, text: str) -> list[str]:
+    """Дубль ответа вне приложения: Telegram (общий бот) и email. Возвращает каналы, куда ушло.
+    Сам ответ уже сохранён в БД и виден в приложении, поэтому сбой канала не критичен."""
+    user = storage_service.get_user_by_id(user_id)
+    if user is None:
+        return []
+    sent: list[str] = []
+    token = storage_service.get_all_settings().get("tg_bot_token", "")
+    if user.get("tg_chat_id") and token:
+        try:
+            msg = f"💬 <b>Ответ поддержки BondAI</b> (обращение #{ticket_id})\n\n{html.escape(text)}"
+            if await notification_service.send_telegram(token, str(user["tg_chat_id"]), msg):
+                sent.append("telegram")
+        except Exception:
+            logger.exception("support reply %d: Telegram не ушёл", ticket_id)
+    if user.get("email"):
+        try:
+            if await send_mail(user["email"], f"Ответ поддержки BondAI на обращение #{ticket_id}", text,
+                               f"support_reply_{ticket_id}"):
+                sent.append("email")
+        except Exception:
+            logger.exception("support reply %d: письмо не ушло", ticket_id)
+    return sent
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_ticket(payload: SupportRequest, current_user: dict = Depends(get_current_user)) -> dict:
     user = storage_service.get_user_by_id(current_user["sub"])
@@ -59,3 +85,25 @@ async def create_ticket(payload: SupportRequest, current_user: dict = Depends(ge
     except Exception:
         logger.exception("support ticket %d: уведомление админу не ушло", ticket_id)
     return {"ok": True, "id": ticket_id}
+
+
+@router.get("/mine")
+async def my_tickets(current_user: dict = Depends(get_current_user)) -> dict:
+    """Обращения пользователя с ответами поддержки."""
+    uid = int(current_user["sub"])
+    return {
+        "unread": storage_service.count_unread_support_replies(uid),
+        "tickets": storage_service.list_user_support_tickets(uid),
+    }
+
+
+@router.get("/unread")
+async def unread_replies(current_user: dict = Depends(get_current_user)) -> dict:
+    """Лёгкий опрос для плашки «поддержка ответила»."""
+    return {"unread": storage_service.count_unread_support_replies(int(current_user["sub"]))}
+
+
+@router.post("/mine/read")
+async def mark_replies_read(current_user: dict = Depends(get_current_user)) -> dict:
+    storage_service.mark_support_replies_read(int(current_user["sub"]))
+    return {"ok": True}

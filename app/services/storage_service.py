@@ -129,7 +129,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 12
+    SCHEMA_VERSION = 13
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -176,6 +176,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
             (10, self._migration_v10),
             (11, self._migration_v11),
             (12, self._migration_v12),
+            (13, self._migration_v13),
         ]
 
         for version, migrate in migrations:
@@ -639,6 +640,22 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
             conn.execute("ALTER TABLE mail_messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+
+    def _migration_v13(self, conn: sqlite3.Connection) -> None:
+        """v13 — ответы поддержки на обращения: пользователь видит их в приложении
+        (read_at пуст, пока он не открыл вкладку «Поддержка»)."""
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS support_replies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                read_at TEXT
+            )"""
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_support_replies_ticket ON support_replies(ticket_id, read_at)"
+        )
 
     def _migration_v11(self, conn: sqlite3.Connection) -> None:
         """v11 — почта поддержки: входящие (IMAP) и исходящие ответы (встроенный клиент в админке).
@@ -1357,10 +1374,11 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
                     {where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?""",
                 (*args, limit),
             ).fetchall()
+        replies = self.list_support_replies([r[0] for r in rows])
         return [
             {"id": r[0], "user_id": r[1], "username": r[2], "email": r[3],
              "has_telegram": bool(r[4]), "message": r[5], "status": r[6],
-             "created_at": r[7], "handled_at": r[8]}
+             "created_at": r[7], "handled_at": r[8], "replies": replies.get(r[0], [])}
             for r in rows
         ]
 
@@ -1383,6 +1401,75 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
         if changed:
             logger.info("AUDIT support_ticket_%s: id=%d", "done" if done else "reopened", ticket_id)
         return changed
+
+    def get_support_ticket_user_id(self, ticket_id: int) -> int | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT user_id FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
+        return row[0] if row else None
+
+    def add_support_reply(self, ticket_id: int, body: str) -> bool:
+        """Ответ админа на обращение; False — обращения нет."""
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            if conn.execute("SELECT 1 FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone() is None:
+                return False
+            conn.execute(
+                "INSERT INTO support_replies (ticket_id, body, created_at) VALUES (?, ?, ?)",
+                (ticket_id, body, datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+        logger.info("AUDIT support_reply_added: ticket_id=%d", ticket_id)
+        return True
+
+    def list_support_replies(self, ticket_ids: list[int]) -> dict[int, list[dict]]:
+        if not ticket_ids:
+            return {}
+        marks = ",".join("?" * len(ticket_ids))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT ticket_id, body, created_at, read_at FROM support_replies
+                    WHERE ticket_id IN ({marks}) ORDER BY created_at, id""",
+                ticket_ids,
+            ).fetchall()
+        out: dict[int, list[dict]] = {}
+        for r in rows:
+            out.setdefault(r[0], []).append(
+                {"body": r[1], "created_at": r[2], "is_read": r[3] is not None}
+            )
+        return out
+
+    def list_user_support_tickets(self, user_id: int, limit: int = 50) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT id, message, status, created_at FROM support_tickets
+                   WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?""",
+                (user_id, limit),
+            ).fetchall()
+        tickets = [{"id": r[0], "message": r[1], "status": r[2], "created_at": r[3]} for r in rows]
+        replies = self.list_support_replies([t["id"] for t in tickets])
+        for t in tickets:
+            t["replies"] = replies.get(t["id"], [])
+        return tickets
+
+    def count_unread_support_replies(self, user_id: int) -> int:
+        with self._connect() as conn:
+            return conn.execute(
+                """SELECT COUNT(*) FROM support_replies r
+                   JOIN support_tickets t ON t.id = r.ticket_id
+                   WHERE t.user_id = ? AND r.read_at IS NULL""",
+                (user_id,),
+            ).fetchone()[0]
+
+    def mark_support_replies_read(self, user_id: int) -> None:
+        from datetime import datetime, timezone
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE support_replies SET read_at = ?
+                   WHERE read_at IS NULL AND ticket_id IN
+                         (SELECT id FROM support_tickets WHERE user_id = ?)""",
+                (datetime.now(timezone.utc).isoformat(), user_id),
+            )
+            conn.commit()
 
     def get_pro_payments(self, limit: int = 200) -> list[dict]:
         with self._connect() as conn:

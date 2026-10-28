@@ -4772,6 +4772,62 @@
         document.querySelector('.stab-btn[data-stab="stab-support"]')?.click();
         document.getElementById('support-message')?.focus();
       }
+      function _supEl(tag, text, css) {
+        const e = document.createElement(tag);
+        if (text !== undefined) e.textContent = text;
+        if (css) e.style.cssText = css;
+        return e;
+      }
+      function _supDate(iso) {
+        return iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: 'Asia/Vladivostok', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+      }
+      // Ответы поддержки: текст только через textContent (его пишет человек).
+      async function loadMySupport() {
+        const card = document.getElementById('support-mine-card');
+        const list = document.getElementById('support-mine-list');
+        if (!card || !list) return;
+        try {
+          const r = await apiFetch('/support/mine');
+          if (!r.ok) return;
+          const d = await r.json();
+          list.innerHTML = '';
+          card.style.display = d.tickets.length ? '' : 'none';
+          d.tickets.forEach(t => {
+            const box = _supEl('div', undefined, 'border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;');
+            box.appendChild(_supEl('div', 'Вы · ' + _supDate(t.created_at), 'font-size:11px;color:var(--text-muted);margin-bottom:4px;'));
+            box.appendChild(_supEl('div', t.message, 'font-size:13px;white-space:pre-wrap;word-break:break-word;'));
+            t.replies.forEach(rp => {
+              const rb = _supEl('div', undefined, 'margin-top:10px;padding:8px 10px;border-radius:var(--radius-sm);background:rgba(37,99,235,.08);' + (rp.is_read ? '' : 'border:1px solid rgba(37,99,235,.45);'));
+              rb.appendChild(_supEl('div', 'Поддержка · ' + _supDate(rp.created_at) + (rp.is_read ? '' : ' · новый'), 'font-size:11px;color:var(--text-muted);margin-bottom:4px;'));
+              rb.appendChild(_supEl('div', rp.body, 'font-size:13px;white-space:pre-wrap;word-break:break-word;'));
+              box.appendChild(rb);
+            });
+            if (!t.replies.length) box.appendChild(_supEl('div', 'Ответа пока нет — мы посмотрим и ответим здесь.', 'margin-top:8px;font-size:12px;color:var(--text-muted);'));
+            list.appendChild(box);
+          });
+          if (d.unread) {
+            // пометка «прочитано» после показа, чтобы «новый» успел отрисоваться
+            await apiFetch('/support/mine/read', { method: 'POST' });
+          }
+          const banner = document.getElementById('support-reply-banner');
+          if (banner) banner.style.display = 'none';
+        } catch (e) { /* ok */ }
+      }
+      async function checkSupportReplies() {
+        const banner = document.getElementById('support-reply-banner');
+        if (!banner) return;
+        try {
+          const r = await apiFetch('/support/unread');
+          if (!r.ok) return;
+          const d = await r.json();
+          const onTab = document.getElementById('stab-support')?.style.display === 'block'
+            && document.getElementById('panel-settings')?.style.display !== 'none';
+          banner.style.display = d.unread && !onTab ? '' : 'none';
+          const c = document.getElementById('support-reply-banner-count');
+          if (c) c.textContent = d.unread > 1 ? 'Новых ответов: ' + d.unread : '';
+        } catch (e) { /* ok */ }
+      }
+      window.addEventListener('focus', () => { if (localStorage.getItem('mvp_logged_in')) checkSupportReplies(); });
       async function sendSupportMessage() {
         const box = document.getElementById('support-message');
         const btn = document.getElementById('support-send-btn');
@@ -4793,6 +4849,7 @@
           box.value = '';
           status.textContent = '';
           toast('Сообщение отправлено. Спасибо!', 'success');
+          loadMySupport();
         } catch (e) {
           status.textContent = 'Не удалось отправить. Проверьте соединение.';
         } finally {
@@ -4857,6 +4914,7 @@
           checkEmailBanner(meData);
           initBilling();
           loadDonateLink();
+          checkSupportReplies();
           showDashboard();
           await loadPortfolios();
           if (window.checkTgResetBanner) window.checkTgResetBanner();
@@ -6768,6 +6826,17 @@
           const tdMsg = document.createElement('td');
           tdMsg.style.cssText = 'white-space:pre-wrap;word-break:break-word;';
           tdMsg.textContent = t.message;
+          (t.replies || []).forEach(rp => {
+            const rb = _supEl('div', undefined, 'margin-top:8px;padding:6px 8px;border-radius:6px;background:rgba(37,99,235,.08);');
+            rb.appendChild(_supEl('div', 'Ответ · ' + _supDate(rp.created_at) + (rp.is_read ? ' · прочитан' : ' · не прочитан'), 'font-size:11px;color:var(--text-muted);'));
+            rb.appendChild(_supEl('div', rp.body));
+            tdMsg.appendChild(rb);
+          });
+          const replyBtn = _supEl('button', t.replies && t.replies.length ? 'Ответить ещё' : 'Ответить');
+          replyBtn.className = 'btn btn-secondary';
+          replyBtn.style.cssText = 'height:26px;font-size:12px;padding:0 10px;margin-top:8px;display:block;';
+          replyBtn.onclick = () => adminSupportReplyForm(t.id, tdMsg, replyBtn);
+          tdMsg.appendChild(replyBtn);
           const tdDone = document.createElement('td'); tdDone.style.textAlign = 'center';
           const cb = document.createElement('input');
           cb.type = 'checkbox'; cb.checked = t.status === 'done'; cb.style.cursor = 'pointer';
@@ -6776,6 +6845,39 @@
           tr.append(tdDate, tdUser, tdContact, tdMsg, tdDone);
           body.appendChild(tr);
         });
+      }
+      function adminSupportReplyForm(id, cell, btn) {
+        btn.style.display = 'none';
+        const form = _supEl('div', undefined, 'margin-top:8px;display:flex;flex-direction:column;gap:6px;');
+        const ta = _supEl('textarea');
+        ta.maxLength = 2000; ta.rows = 4; ta.placeholder = 'Ответ пользователю';
+        ta.style.cssText = 'width:100%;font:inherit;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card, transparent);color:var(--text-primary);';
+        const row = _supEl('div', undefined, 'display:flex;gap:8px;align-items:center;');
+        const send = _supEl('button', 'Отправить'); send.className = 'btn btn-primary'; send.style.cssText = 'height:28px;font-size:12px;padding:0 12px;';
+        const cancel = _supEl('button', 'Отмена'); cancel.className = 'btn btn-secondary'; cancel.style.cssText = 'height:28px;font-size:12px;padding:0 12px;';
+        cancel.onclick = () => { form.remove(); btn.style.display = ''; };
+        send.onclick = async () => {
+          const text = ta.value.trim();
+          if (!text) return;
+          send.disabled = true;
+          try {
+            const r = await apiFetch(`/admin/support/${encodeURIComponent(id)}/reply`, {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ text }),
+            });
+            if (!r.ok) throw new Error();
+            const d = await r.json();
+            toast('Ответ сохранён' + (d.delivered && d.delivered.length ? ', продублирован: ' + d.delivered.join(', ') : ' (виден пользователю в приложении)'), 'success');
+            adminLoadSupport().catch(() => {});
+          } catch (e) {
+            send.disabled = false;
+            toast('Не удалось отправить ответ', 'error');
+          }
+        };
+        row.append(send, cancel);
+        form.append(ta, row);
+        cell.appendChild(form);
+        ta.focus();
       }
       async function adminToggleSupportDone(id, done, cb) {
         try {
@@ -7555,6 +7657,7 @@
           if (target) target.style.display = 'block';
           if (btn.dataset.stab === 'stab-portfolios') settingsLoadPortfolios();
           if (btn.dataset.stab === 'stab-account') settingsLoadAccount();
+          if (btn.dataset.stab === 'stab-support') loadMySupport();
         });
       });
 

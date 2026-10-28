@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_admin_user
+from app.api.support import notify_user_support_reply
 from app.services.storage_service import storage_service
 from app.services.moex_service import moex_service
 from app.promo_materials import all_materials
@@ -57,6 +58,27 @@ async def mark_support_ticket(
     if not storage_service.set_support_ticket_done(ticket_id, payload.done):
         raise HTTPException(status_code=404, detail="Обращение не найдено")
     return {"ok": True}
+
+
+class SupportReplyPayload(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/support/{ticket_id}/reply")
+async def reply_support_ticket(
+    ticket_id: int, payload: SupportReplyPayload, admin: dict = Depends(get_admin_user)
+) -> dict:
+    """Ответ пользователю: сохраняется в приложении (видит всегда), дублируется на email/в Telegram,
+    если они есть. Обращение помечается обработанным."""
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Пустой ответ")
+    user_id = storage_service.get_support_ticket_user_id(ticket_id)
+    if user_id is None or not storage_service.add_support_reply(ticket_id, text):
+        raise HTTPException(status_code=404, detail="Обращение не найдено")
+    storage_service.set_support_ticket_done(ticket_id, True)
+    delivered = await notify_user_support_reply(user_id, ticket_id, text)
+    return {"ok": True, "delivered": delivered}
 
 
 @router.get("/revenue")

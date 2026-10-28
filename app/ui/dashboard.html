@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=137">
+    <link rel="stylesheet" href="/static/styles.css?v=138">
   </head>
   <body>
 
@@ -122,6 +122,18 @@
                 <button id="sold-banner-keep-btn" class="btn btn-secondary" style="font-size:12px;height:28px;padding:0 12px;">Оставить</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Ответ поддержки на обращение пользователя -->
+        <div id="support-reply-banner" style="display:none;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:18px;line-height:1;">💬</span>
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary);">Поддержка ответила на ваше обращение</div>
+              <div id="support-reply-banner-count" style="font-size:12px;color:var(--text-muted);"></div>
+            </div>
+            <button class="btn btn-primary" style="font-size:12px;height:28px;padding:0 12px;" onclick="openSupportTab()">Прочитать ответ</button>
           </div>
         </div>
 
@@ -564,7 +576,7 @@
               <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
                 <div style="font-size:12px;color:var(--text-muted);line-height:1.5;">
                   Что-то не работает или не хватает функции — опишите, мы получим сообщение сразу.
-                  Ответим на email или в Telegram, если они указаны в настройках аккаунта.
+                  Ответ появится здесь, на этой вкладке, и на странице портфеля. Если в настройках аккаунта указан email или привязан Telegram — продублируем и туда.
                 </div>
                 <textarea id="support-message" maxlength="2000" rows="6" placeholder="Опишите проблему или вопрос" style="width:100%;resize:vertical;font:inherit;font-size:13px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card, transparent);color:var(--text-primary);"></textarea>
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -572,6 +584,12 @@
                   <span id="support-status" style="font-size:12px;color:var(--text-muted);" role="status"></span>
                 </div>
               </div>
+            </div>
+            <div class="card" id="support-mine-card" style="display:none;">
+              <div class="card-header">
+                <h2 class="card-title">Ваши обращения</h2>
+              </div>
+              <div class="card-body" id="support-mine-list" style="display:flex;flex-direction:column;gap:12px;"></div>
             </div>
           </div>
         </div>
@@ -1103,7 +1121,7 @@
             <button class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 10px;" onclick="adminLoadSupport()">↺</button>
           </div>
           <div style="padding:8px 16px 0;font-size:11px;color:var(--text-muted);line-height:1.5;">
-            Новое обращение приходит в Telegram админа. Свяжитесь с пользователем по email/Telegram и отметьте «Обработано».
+            Новое обращение приходит в Telegram админа. Нажмите «Ответить»: ответ увидит сам пользователь в приложении (плашка на странице портфеля), а при наличии email/Telegram он уйдёт и туда. После ответа обращение отмечается обработанным.
           </div>
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;font-size:12px;">
@@ -1608,8 +1626,8 @@
 </div>
 
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=137"></script>
-    <script src="/static/app.js?v=137"></script>
+    <script src="/static/translations.js?v=138"></script>
+    <script src="/static/app.js?v=138"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;
