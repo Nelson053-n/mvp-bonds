@@ -5319,11 +5319,11 @@
                   <h1 class="l-h1" data-i18n-html="login.hero">Умный подбор<br><span class="grad">облигаций</span><br>с помощью ИИ</h1>
                   <p class="l-sub" data-i18n="login.sub">Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.</p>
                   <ul class="l-feats">
-                    <li><span class="l-feat-icon">🤖</span><span data-i18n="login.feat1">ИИ-подбор облигаций по доходности и уровню риска</span></li>
+                    <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg></span><span data-i18n="login.feat1">ИИ-подбор облигаций по доходности и уровню риска</span></li>
                     <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg></span><span data-i18n="login.feat2">Актуальные цены и доходность по данным MOEX</span></li>
-                    <li><span class="l-feat-icon">💰</span><span data-i18n="login.feat3">Расчёт купонного дохода с учётом праздников и оферт</span></li>
-                    <li><span class="l-feat-icon">🏅</span><span data-i18n="login.feat4">Кредитные рейтинги эмитентов облигаций</span></li>
-                    <li><span class="l-feat-icon">🔗</span><span data-i18n="login.feat5">Публичные ссылки для совместного просмотра портфеля</span></li>
+                    <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span><span data-i18n="login.feat3">Расчёт купонного дохода с учётом праздников и оферт</span></li>
+                    <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span><span data-i18n="login.feat4">Кредитные рейтинги эмитентов облигаций</span></li>
+                    <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span data-i18n="login.feat5">Публичные ссылки для совместного просмотра портфеля</span></li>
                   </ul>
                 </div>
                 <div class="l-right">
@@ -9299,14 +9299,18 @@
       });
 
       // ── GUIDE MODAL ────────────────────────────────────────────────
+      const _GI = {"bot": "<path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2M20 14h2M15 13v2M9 13v2\"/>", "chart": "<path d=\"M3 3v18h18\"/><path d=\"M8 17v-6M13 17V7M18 17v-3\"/>", "cash": "<rect width=\"20\" height=\"12\" x=\"2\" y=\"6\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/>", "award": "<circle cx=\"12\" cy=\"8\" r=\"6\"/><path d=\"M15.477 12.89 17 22l-5-3-5 3 1.523-9.11\"/>", "link": "<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>", "bulb": "<path d=\"M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5\"/><path d=\"M9 18h6M10 22h4\"/>", "refresh": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>", "scale": "<path d=\"m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z\"/><path d=\"m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z\"/><path d=\"M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2\"/>", "bank": "<path d=\"M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7\"/><path d=\"M12 2 20 7H4z\"/>", "file": "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z\"/><path d=\"M14 2v6h6M16 13H8M16 17H8\"/>", "up": "<path d=\"m22 7-8.5 8.5-5-5L2 17\"/><path d=\"M16 7h6v6\"/>", "down": "<path d=\"m22 17-8.5-8.5-5 5L2 7\"/><path d=\"M16 17h6v-6\"/>", "building": "<rect width=\"16\" height=\"20\" x=\"4\" y=\"2\" rx=\"2\"/><path d=\"M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01\"/>", "zap": "<path d=\"M13 2 3 14h9l-1 8 10-12h-9z\"/>", "list": "<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01\"/>", "cal": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M16 2v4M8 2v4M3 10h18\"/>", "alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4M12 17h.01\"/>", "octagon": "<path d=\"M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z\"/><path d=\"M12 8v4M12 16h.01\"/>", "drop": "<path d=\"M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z\"/>", "shield": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z\"/>", "type": "<path d=\"M4 7V4h16v3M9 20h6M12 4v16\"/>", "book": "<path d=\"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z\"/><path d=\"M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z\"/>", "tag": "<path d=\"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z\"/><circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>"};
+      function gico(n) {
+        return '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true">' + _GI[n] + '</svg>';
+      }
       const GUIDE_CONTENT = {
         basics: `
           <div class="guide-section">
-            <h3>💡 Что такое облигация?</h3>
+            <h3>${gico('bulb')}Что такое облигация?</h3>
             <p>Облигация — это долговая ценная бумага. Покупая облигацию, вы <strong>даёте деньги в долг</strong> эмитенту (государству, региону или компании). Взамен эмитент обязуется регулярно выплачивать вам проценты (купоны) и вернуть номинал в дату погашения.</p>
           </div>
           <div class="guide-section">
-            <h3>🔄 Как это работает?</h3>
+            <h3>${gico('refresh')}Как это работает?</h3>
             <div class="guide-card">
               <h4>1. Вы покупаете облигацию</h4>
               <p>На бирже по рыночной цене. Цена выражается в % от номинала — например, 97,5% при номинале 1000 ₽ означает цену 975 ₽.</p>
@@ -9321,43 +9325,43 @@
             </div>
           </div>
           <div class="guide-section">
-            <h3>⚖️ Облигации vs Акции vs Вклад</h3>
+            <h3>${gico('scale')}Облигации vs Акции vs Вклад</h3>
             <div class="guide-card">
-              <h4>🏦 Банковский вклад</h4>
+              <h4>${gico('bank')}Банковский вклад</h4>
               <p>Фиксированный доход, страховка АСВ до 1,4 млн ₽. Простой, но низкая доходность, нельзя продать досрочно без потери процентов.</p>
             </div>
             <div class="guide-card">
-              <h4>📄 Облигации</h4>
+              <h4>${gico('file')}Облигации</h4>
               <p>Фиксированный купонный доход, можно продать в любой момент. Доходность выше вклада, риски умеренные. Нет страховки АСВ.</p>
             </div>
             <div class="guide-card">
-              <h4>📈 Акции</h4>
+              <h4>${gico('up')}Акции</h4>
               <p>Потенциально высокий доход, но цена может упасть в разы. Подходят для долгосрочных инвесторов с аппетитом к риску.</p>
             </div>
           </div>`,
 
         types: `
           <div class="guide-section">
-            <h3>🏛️ По эмитенту</h3>
+            <h3>${gico('bank')}По эмитенту</h3>
             <div class="guide-card">
               <h4>🇷🇺 ОФЗ — Облигации Федерального Займа <span class="guide-badge guide-badge-green">Минимальный риск</span></h4>
               <p>Выпускаются Минфином России. Самый надёжный рублёвый инструмент. Купонный доход освобождён от НДФЛ. Ликвидный рынок.</p>
             </div>
             <div class="guide-card">
-              <h4>🏙️ Муниципальные (субфедеральные) <span class="guide-badge guide-badge-green">Низкий риск</span></h4>
+              <h4>${gico('building')}Муниципальные (субфедеральные) <span class="guide-badge guide-badge-green">Низкий риск</span></h4>
               <p>Выпускают регионы и муниципалитеты. Чуть выше доходность, чем у ОФЗ. Риск дефолта минимален при поддержке федерального бюджета.</p>
             </div>
             <div class="guide-card">
-              <h4>🏢 Корпоративные <span class="guide-badge guide-badge-yellow">Средний риск</span></h4>
+              <h4>${gico('building')}Корпоративные <span class="guide-badge guide-badge-yellow">Средний риск</span></h4>
               <p>Выпускают компании. Доходность выше ОФЗ за счёт кредитного риска. Надёжность зависит от рейтинга: ААА–ВВВ — инвестиционный уровень, BB и ниже — высокодоходные (ВДО).</p>
             </div>
             <div class="guide-card">
-              <h4>⚡ ВДО — Высокодоходные облигации <span class="guide-badge guide-badge-red">Высокий риск</span></h4>
+              <h4>${gico('zap')}ВДО — Высокодоходные облигации <span class="guide-badge guide-badge-red">Высокий риск</span></h4>
               <p>Облигации небольших компаний с рейтингом BB и ниже или без рейтинга. Купон 18–25%+, но риск дефолта значительно выше. Требуют диверсификации и анализа.</p>
             </div>
           </div>
           <div class="guide-section">
-            <h3>📋 По типу купона</h3>
+            <h3>${gico('list')}По типу купона</h3>
             <div class="guide-card">
               <h4>Фиксированный купон</h4>
               <p>Ставка неизменна весь срок. Удобно планировать доход. Но при росте ставок ЦБ цена облигации падает.</p>
@@ -9372,7 +9376,7 @@
             </div>
           </div>
           <div class="guide-section">
-            <h3>📅 По сроку</h3>
+            <h3>${gico('cal')}По сроку</h3>
             <ul>
               <li><strong>Краткосрочные</strong> — до 1–2 лет. Меньше процентный риск.</li>
               <li><strong>Среднесрочные</strong> — 2–5 лет. Баланс доходности и риска.</li>
@@ -9382,7 +9386,7 @@
 
         metrics: `
           <div class="guide-section">
-            <h3><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg>Ключевые показатели таблицы</h3>
+            <h3>${gico('chart')}Ключевые показатели таблицы</h3>
             <dl>
               <div class="guide-term-row">
                 <dt>Чистая цена</dt>
@@ -9425,34 +9429,34 @@
 
         risks: `
           <div class="guide-section">
-            <h3>⚠️ Основные риски</h3>
+            <h3>${gico('alert')}Основные риски</h3>
             <div class="guide-card" style="border-color:rgba(248,113,113,.25);">
-              <h4>💥 Кредитный риск (риск дефолта) <span class="guide-badge guide-badge-red">Высокий</span></h4>
+              <h4>${gico('octagon')}Кредитный риск (риск дефолта) <span class="guide-badge guide-badge-red">Высокий</span></h4>
               <p>Эмитент может не выплатить купон или не погасить номинал. Характерен для корпоративных облигаций с низким рейтингом (ВДО). Снижается диверсификацией и выбором надёжных эмитентов.</p>
             </div>
             <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
-              <h4>📉 Процентный риск <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <h4>${gico('down')}Процентный риск <span class="guide-badge guide-badge-yellow">Средний</span></h4>
               <p>При росте ключевой ставки ЦБ цены облигаций падают (и наоборот). Чем длиннее срок — тем сильнее реакция. Решение: держать до погашения или выбирать флоатеры.</p>
             </div>
             <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
-              <h4>💧 Риск ликвидности <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <h4>${gico('drop')}Риск ликвидности <span class="guide-badge guide-badge-yellow">Средний</span></h4>
               <p>Некоторые выпуски торгуются редко — трудно продать быстро по справедливой цене. Особенно актуально для ВДО и небольших выпусков. Проверяйте объём торгов перед покупкой.</p>
             </div>
             <div class="guide-card" style="border-color:rgba(245,158,11,.2);">
-              <h4>📋 Риск оферты <span class="guide-badge guide-badge-yellow">Средний</span></h4>
+              <h4>${gico('list')}Риск оферты <span class="guide-badge guide-badge-yellow">Средний</span></h4>
               <p>После оферты эмитент может сильно снизить купон. Если не предъявить к выкупу и «прозевать» оферту — рискуете получить невыгодный купон. Следите за датами оферт в таблице.</p>
             </div>
             <div class="guide-card">
-              <h4><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg>Инфляционный риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
+              <h4>${gico('chart')}Инфляционный риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
               <p>Реальная доходность может оказаться ниже инфляции. Частично решается выбором ОФЗ-ИН (линкеров) или флоатеров с привязкой к ставке ЦБ.</p>
             </div>
             <div class="guide-card">
-              <h4>🏛️ Налоговый риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
+              <h4>${gico('bank')}Налоговый риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
               <p>Купонный доход и прибыль от продажи облагаются НДФЛ 13–15%. Исключение: ОФЗ — купон не облагается НДФЛ. Используйте ИИС для налоговых льгот.</p>
             </div>
           </div>
           <div class="guide-section">
-            <h3>🛡️ Как снизить риски?</h3>
+            <h3>${gico('shield')}Как снизить риски?</h3>
             <ul>
               <li><strong>Диверсификация</strong> — не более 5–7% в одного эмитента, не более 15–20% в одну отрасль</li>
               <li><strong>Рейтинг</strong> — для консервативного портфеля выбирайте BBB и выше (АКРА/Эксперт РА)</li>
@@ -9464,7 +9468,7 @@
 
         glossary: `
           <div class="guide-section">
-            <h3>🔤 Глоссарий</h3>
+            <h3>${gico('type')}Глоссарий</h3>
             <dl>
               <div class="guide-term-row"><dt>Номинал</dt><dd>Базовая стоимость облигации, которую эмитент возвращает при погашении. Обычно 1000 ₽.</dd></div>
               <div class="guide-term-row"><dt>Купон</dt><dd>Периодическая выплата процентов держателю облигации.</dd></div>
