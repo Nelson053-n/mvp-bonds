@@ -5320,7 +5320,7 @@
                   <p class="l-sub" data-i18n="login.sub">Отслеживайте акции и облигации в одном месте. ИИ подберёт облигации под ваш риск-профиль и желаемую доходность.</p>
                   <ul class="l-feats">
                     <li><span class="l-feat-icon">🤖</span><span data-i18n="login.feat1">ИИ-подбор облигаций по доходности и уровню риска</span></li>
-                    <li><span class="l-feat-icon">📊</span><span data-i18n="login.feat2">Актуальные цены и доходность по данным MOEX</span></li>
+                    <li><span class="l-feat-icon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg></span><span data-i18n="login.feat2">Актуальные цены и доходность по данным MOEX</span></li>
                     <li><span class="l-feat-icon">💰</span><span data-i18n="login.feat3">Расчёт купонного дохода с учётом праздников и оферт</span></li>
                     <li><span class="l-feat-icon">🏅</span><span data-i18n="login.feat4">Кредитные рейтинги эмитентов облигаций</span></li>
                     <li><span class="l-feat-icon">🔗</span><span data-i18n="login.feat5">Публичные ссылки для совместного просмотра портфеля</span></li>
@@ -9382,7 +9382,7 @@
 
         metrics: `
           <div class="guide-section">
-            <h3>📊 Ключевые показатели таблицы</h3>
+            <h3><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg>Ключевые показатели таблицы</h3>
             <dl>
               <div class="guide-term-row">
                 <dt>Чистая цена</dt>
@@ -9443,7 +9443,7 @@
               <p>После оферты эмитент может сильно снизить купон. Если не предъявить к выкупу и «прозевать» оферту — рискуете получить невыгодный купон. Следите за датами оферт в таблице.</p>
             </div>
             <div class="guide-card">
-              <h4>📊 Инфляционный риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
+              <h4><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg>Инфляционный риск <span class="guide-badge guide-badge-blue">Низкий</span></h4>
               <p>Реальная доходность может оказаться ниже инфляции. Частично решается выбором ОФЗ-ИН (линкеров) или флоатеров с привязкой к ставке ЦБ.</p>
             </div>
             <div class="guide-card">

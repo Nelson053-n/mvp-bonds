@@ -395,7 +395,7 @@ _BODY = _CONTENT_CSS + """
       <p>После оферты эмитент может сильно снизить купон. Если не предъявить к выкупу и «прозевать» оферту — рискуете получить невыгодный купон. Следите за датами оферт.</p>
     </div>
     <div class="edu-card">
-      <h4>📊 Инфляционный риск <span class="badge badge-blue">Низкий</span></h4>
+      <h4><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex:none" aria-hidden="true"><path d="M3 3v18h18"/><path d="M8 17v-6M13 17V7M18 17v-3"/></svg>Инфляционный риск <span class="badge badge-blue">Низкий</span></h4>
       <p>Реальная доходность может оказаться ниже инфляции. Частично решается выбором ОФЗ-ИН (линкеров) или флоатеров с привязкой к ставке ЦБ.</p>
     </div>
     <div class="edu-card">
