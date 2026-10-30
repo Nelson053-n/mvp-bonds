@@ -1189,3 +1189,10 @@ td.no-market-data {
 
 /* Монохромные иконки (currentColor): вкладки админки, плашки */
 .ico { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; margin-right:6px; flex:none; }
+
+/* Support messages and replies read as prose inside their cells. */
+#adm-support-card th:nth-child(4),
+#adm-support-body td:nth-child(4),
+#support-mine-list {
+  text-align: left;
+}
