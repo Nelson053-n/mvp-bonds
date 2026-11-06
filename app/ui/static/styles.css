@@ -1190,6 +1190,13 @@ td.no-market-data {
 /* Монохромные иконки (currentColor): вкладки админки, плашки */
 .ico { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; margin-right:6px; flex:none; }
 
+/* Support messages and replies read as prose inside their cells. */
+#adm-support-card th:nth-child(4),
+#adm-support-body td:nth-child(4),
+#support-mine-list {
+  text-align: left;
+}
+
 /* Manual cash-flow journal */
 .manual-accounting-dialog { width: min(1100px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--modal-bg); color: var(--text-primary); overflow: auto; }
 .manual-accounting-dialog::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
