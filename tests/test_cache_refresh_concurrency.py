@@ -31,6 +31,8 @@ class TestBackgroundRefreshConcurrency:
                 state["done"] += 1
 
         monkeypatch.setattr(svc, "refresh", fake_refresh)
+        # Портфели здесь вымышленные, в БД их нет — чистку удалённых отключаем.
+        monkeypatch.setattr(svc, "_prune_deleted", lambda ids: ids)
         # 40 портфелей, как на проде их 136
         for pid in range(40):
             svc.get_cache(pid)

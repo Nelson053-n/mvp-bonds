@@ -305,6 +305,8 @@ async def delete_portfolio(portfolio_id: int, request: Request, admin: dict = De
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
     storage_service.delete_portfolio(portfolio_id)
+    from app.services.cache_service import cache_service
+    cache_service.forget(portfolio_id)
     logger.info("Admin %s deleted portfolio %d", admin["username"], portfolio_id)
     storage_service.write_audit_log(
         admin_user_id=admin["sub"],

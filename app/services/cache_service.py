@@ -186,6 +186,33 @@ class CacheService:
                 result.append(new_row)
         return result
 
+    def forget(self, portfolio_id: int) -> None:
+        """Drop the cache of a deleted portfolio so the background loop stops refreshing it."""
+        self._caches.pop(portfolio_id, None)
+
+    def _prune_deleted(self, portfolio_ids: list[int]) -> list[int]:
+        """Drop caches of portfolios that no longer exist in the DB.
+
+        Entries are created on any access and the startup warm-up registers
+        every portfolio, but nothing removed them: deleted portfolios (user
+        delete, admin delete, cascade from a deleted user, manual DB cleanup)
+        were refreshed every cycle forever, and once they had rows each cycle
+        also failed to save a snapshot with a FOREIGN KEY error.
+        """
+        from app.services.storage_service import storage_service
+
+        try:
+            existing = {p["id"] for p in storage_service.get_all_portfolios_raw()}
+        except Exception:
+            logger.exception("Cache prune: could not list portfolios")
+            return portfolio_ids
+        stale = [pid for pid in portfolio_ids if pid not in existing]
+        for pid in stale:
+            self._caches.pop(pid, None)
+        if stale:
+            logger.info("Cache prune: dropped %d deleted portfolio(s)", len(stale))
+        return [pid for pid in portfolio_ids if pid in existing]
+
     def invalidate(self, portfolio_id: int) -> None:
         """Mark cache stale for a portfolio so the next periodic tick refreshes early."""
         cache = self.get_cache(portfolio_id)
@@ -208,6 +235,8 @@ class CacheService:
         while True:
             try:
                 portfolio_ids = list(self._caches.keys())
+                if portfolio_ids:
+                    portfolio_ids = self._prune_deleted(portfolio_ids)
                 if portfolio_ids:
                     # Портфели обновляются пачками, а не все разом. Внутри
                     # каждого свой Semaphore(8) на бумаги, поэтому gather по

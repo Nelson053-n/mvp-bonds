@@ -808,6 +808,7 @@ async def delete_portfolio(
     """Delete a portfolio."""
     portfolio = await get_portfolio_or_403(portfolio_id, current_user)
     storage_service.delete_portfolio(portfolio_id)
+    cache_service.forget(portfolio_id)
 
 
 @router.post("/{portfolio_id}/refresh-ratings")
