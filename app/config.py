@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     # → Интеграция → Ключи API. Add to .env later, no redeploy needed.
     yookassa_shop_id: str = ""
     yookassa_secret_key: str = ""
+    # Voluntary support remains available when paid Pro purchases are disabled.
+    pro_purchase_enabled: bool = True
     # Webhook IP-allowlist: only official YooKassa subnets may hit /billing/webhook.
     # Set MVP_YOOKASSA_WEBHOOK_IP_CHECK=false to disable (local dev / behind proxy).
     yookassa_webhook_ip_check: bool = True

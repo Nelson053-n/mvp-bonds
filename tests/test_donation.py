@@ -1,5 +1,8 @@
 """Пожертвования через ЮKassa: платёж на выбранную сумму, Pro не выдаётся."""
 import pytest
+import httpx
+from fastapi import FastAPI
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api import billing
 from app.services import yookassa_service as yk
@@ -34,6 +37,16 @@ async def test_donate_returns_confirmation_url(client, auth_headers, created) ->
     r = await client.post("/billing/donate", headers=auth_headers, json={"amount": 300})
     assert r.status_code == 200
     assert r.json()["confirmation_url"] == "https://yookassa.example/pay"
+    assert created == [(1, 300)]
+
+
+async def test_donations_remain_available_with_paid_pro_disabled(client, auth_headers, created, monkeypatch) -> None:
+    monkeypatch.setattr(billing.settings, "pro_purchase_enabled", False)
+    config = (await client.get("/billing/config")).json()
+    assert config["enabled"] is False
+    assert config["donations_enabled"] is True
+    assert (await client.post("/billing/create", headers=auth_headers, json={"plan": "year"})).status_code == 503
+    assert (await client.post("/billing/donate", headers=auth_headers, json={"amount": 300})).status_code == 200
     assert created == [(1, 300)]
 
 
@@ -108,3 +121,19 @@ async def test_webhook_routes_donation_not_to_pro(client, monkeypatch) -> None:
     r = await client.post("/billing/webhook", json={"object": {"id": PID}})
     assert r.status_code == 200
     assert recorded and not granted
+
+
+@pytest.mark.parametrize("peer,forwarded,expected", [
+    ("172.20.0.1", "185.71.76.1", 200),
+    ("172.20.0.1", "198.51.100.20", 403),
+    ("198.51.100.20", "185.71.76.1", 403),
+])
+async def test_webhook_trusts_only_exact_local_proxy(monkeypatch, peer, forwarded, expected) -> None:
+    monkeypatch.setattr(billing.settings, "yookassa_webhook_ip_check", True)
+    inner = FastAPI()
+    inner.include_router(billing.router)
+    app = ProxyHeadersMiddleware(inner, trusted_hosts=["172.20.0.1"])
+    transport = httpx.ASGITransport(app=app, client=(peer, 12345))
+    async with httpx.AsyncClient(transport=transport, base_url="https://bondai.test") as c:
+        response = await c.post("/billing/webhook", headers={"X-Forwarded-For": forwarded}, json={})
+    assert response.status_code == expected

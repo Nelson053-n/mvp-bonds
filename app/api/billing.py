@@ -49,7 +49,8 @@ def _ip_allowed(client_ip: str) -> bool:
 async def billing_config() -> dict:
     """Public: prices + whether billing is enabled (UI hides buttons if not)."""
     return {
-        "enabled": yookassa_service.enabled(),
+        "enabled": yookassa_service.enabled() and settings.pro_purchase_enabled,
+        "donations_enabled": yookassa_service.enabled(),
         "price_month": settings.pro_price_month,
         "price_year": settings.pro_price_year,
     }
@@ -65,7 +66,7 @@ async def billing_create(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Create a YooKassa payment and return the confirmation URL to redirect to."""
-    if not yookassa_service.enabled():
+    if not yookassa_service.enabled() or not settings.pro_purchase_enabled:
         raise HTTPException(status_code=503, detail="Оплата временно недоступна")
     if payload.plan not in yookassa_service.PLANS:
         raise HTTPException(status_code=400, detail="Неизвестный тариф")
