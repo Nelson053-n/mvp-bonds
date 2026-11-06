@@ -6,9 +6,21 @@ The global storage_service singleton is redirected to a temporary DB
 for the entire test session so that no test can ever touch production data.
 """
 
+import os
 from pathlib import Path
 import tempfile
 from typing import AsyncGenerator, Generator
+
+# Must run BEFORE anything imports `app`: the module-level `settings` object
+# and the `storage_service` singleton are built at import time, and
+# `StorageService.__init__` creates/migrates the DB right away. Without this
+# the import alone touched the developer's data/portfolio.db, and every bare
+# `StorageService()` in tests (they read the import-time `settings` object,
+# not `config.settings`) wrote straight into it — 1485 "snap-guard-test"
+# portfolios ended up there and then on prod when it was restored from that
+# file on 2026-11-04.
+_SESSION_DB_DIR = tempfile.mkdtemp(prefix="bondai-tests-")
+os.environ["MVP_SQLITE_DB_PATH"] = str(Path(_SESSION_DB_DIR) / "import_time.db")
 
 import pytest
 import pytest_asyncio
@@ -71,6 +83,10 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
     # регистраций проверяется отдельным тестом с подменой значения.
     original_register_max = original_settings.register_max_per_hour
     original_settings.register_max_per_hour = 1_000_000
+    # `StorageService()` reads the import-time settings object, so point it at
+    # the test DB too — otherwise new instances open the default path.
+    original_sqlite_path = original_settings.sqlite_db_path
+    original_settings.sqlite_db_path = test_db_path
 
     # CRITICAL: redirect the global singleton to the test database.
     # All modules that imported `storage_service` hold a reference to this
@@ -83,6 +99,7 @@ def settings_override(test_db_path: str) -> Generator[Settings, None, None]:
     # Restore production settings and DB path
     original_settings.yookassa_shop_id, original_settings.yookassa_secret_key = original_yk
     original_settings.register_max_per_hour = original_register_max
+    original_settings.sqlite_db_path = original_sqlite_path
     config.settings = original_settings
     _global_storage.db_path = original_db_path
 
