@@ -113,6 +113,8 @@ class InstrumentMetrics(BaseModel):
     nominal: float | None = None
     aci: float | None = None
     realized_coupons: float | None = None  # Σ coupons paid since purchase (RUB)
+    realized_principal: float | None = None
+    accounting_managed: bool = False
     full_profit: float | None = None  # revaluation + aci×qty + realized_coupons (RUB)
     market_yield: float | None = None
     dividend_yield: float | None = None

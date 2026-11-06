@@ -21,6 +21,7 @@ class ItemsMixin:
         custom_coupon_freq: int | None = None,
         custom_maturity: str | None = None,
     ) -> int:
+        self.assert_legacy_position_write(portfolio_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 """
@@ -121,6 +122,7 @@ class ItemsMixin:
     def delete_item(self, item_id: int, portfolio_id: int) -> int:
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
+        self.assert_legacy_position_write(portfolio_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 "UPDATE portfolio_items SET deleted_at = ? WHERE id = ? AND portfolio_id = ? AND deleted_at IS NULL",
@@ -149,6 +151,7 @@ class ItemsMixin:
         custom_coupon_freq: int | None = None,
         custom_maturity: str | None = None,
     ) -> int:
+        self.assert_legacy_position_write(portfolio_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 """
@@ -367,6 +370,7 @@ class ItemsMixin:
 
     def restore_item(self, item_id: int, portfolio_id: int) -> int:
         """Restore a soft-deleted item."""
+        self.assert_legacy_position_write(portfolio_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 "UPDATE portfolio_items SET deleted_at = NULL WHERE id = ? AND portfolio_id = ? AND deleted_at IS NOT NULL",

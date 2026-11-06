@@ -364,7 +364,22 @@ async def get_all_table(
     total_value = sum(float(d.get("current_value") or 0) for d in items) or 1.0
     for d in items:
         d["weight"] = round(float(d.get("current_value") or 0) / total_value * 100, 2)
-    return {"items": items}
+    manual_result = 0.0
+    has_manual = False
+    for p in _portfolios:
+        selected = [r for r in rows if origin.get(id(r), (None,))[0] == p['id']]
+        if storage_service.accounting_enabled(p['id']):
+            from app.services.accounting_service import summarize
+            has_manual = True
+            result = summarize(storage_service.get_account_operations(p['id']), selected)['result']
+            if result is None:
+                manual_result = None
+                break
+            manual_result += result
+        else:
+            manual_result += sum((r.full_profit if r.full_profit is not None else r.profit) for r in selected)
+    return {"items": items, 'accounting_result': manual_result if has_manual else None,
+            'has_manual_accounting': has_manual}
 
 
 @router.get("/all/totals")
@@ -386,6 +401,7 @@ async def get_all_totals(current_user: dict = Depends(get_current_user)) -> dict
             logger.exception("get_all_totals: failed for portfolio_id=%s", p.get("id"))
             rows = []
         p_value = sum(float(getattr(r, "current_value", 0) or 0) for r in rows)
+        p_value += await portfolio_service.get_cash_rub(p["id"])
         totals.append({
             "id": p["id"],
             "name": p["name"],
@@ -575,15 +591,25 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
     # None and simply contribute nothing.
     realized_coupons = 0.0
     for r in rows:
+        if getattr(r, 'accounting_managed', False):
+            continue
         val = getattr(r, "realized_coupons", None)
         if val:
             realized_coupons += float(val)
+    for pid in portfolio_ids:
+        if storage_service.accounting_enabled(pid):
+            from app.services.accounting_service import replay
+            positions = replay(storage_service.get_account_operations(pid))['positions']
+            realized_coupons += sum(p['coupons_minor'] for p in positions.values()) / 100
 
     # 4) Free cash (RUB equivalent) via FX conversion, fetched concurrently.
     async def _compute_free_cash() -> float:
         all_cash: list[tuple[str, float]] = []
         for pid in portfolio_ids:
             try:
+                if storage_service.accounting_enabled(pid):
+                    all_cash.append(('RUB', await portfolio_service.get_cash_rub(pid)))
+                    continue
                 cfg = storage_service.get_sync_config(pid)
                 if not cfg or not cfg.get("cash_balance"):
                     continue
@@ -709,6 +735,8 @@ async def portfolio_tax_report(
 ) -> dict:
     """Pro-only: НДФЛ estimate for the portfolio."""
     await _require_pro(portfolio_id, current_user)
+    if storage_service.accounting_enabled(portfolio_id):
+        raise HTTPException(409, 'Налоговый расчёт по журналу операций пока недоступен. Экспортируйте операции для сверки с брокером.')
     from app.services.tax_service import build_tax_report
     rows = await portfolio_service.get_table(portfolio_id)
     return build_tax_report(rows)
@@ -721,6 +749,8 @@ async def portfolio_tax_report_csv(
 ) -> StreamingResponse:
     """Pro-only: НДФЛ estimate as a CSV (opens in Excel)."""
     await _require_pro(portfolio_id, current_user)
+    if storage_service.accounting_enabled(portfolio_id):
+        raise HTTPException(409, 'Налоговый расчёт по журналу операций пока недоступен. Экспортируйте операции для сверки с брокером.')
     from app.services.tax_service import build_tax_report
     rows = await portfolio_service.get_table(portfolio_id)
     report = build_tax_report(rows)

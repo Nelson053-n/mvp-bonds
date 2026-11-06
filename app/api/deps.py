@@ -17,7 +17,8 @@ security = HTTPBearer(auto_error=False)
 # Сессия браузера — в HttpOnly-cookie, а не в localStorage: XSS больше не может
 # унести токен (аудит 12.10.2026, M8). Заголовок Authorization: Bearer остаётся
 # для скриптов (manage.py, deploy.sh) и API-клиентов.
-SESSION_COOKIE = "bondai_session"
+from app.config import settings as _settings
+SESSION_COOKIE = _settings.session_cookie_name
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 

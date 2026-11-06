@@ -177,6 +177,8 @@ class PortfoliosMixin:
 
     def move_instrument(self, item_id: int, from_portfolio_id: int, to_portfolio_id: int) -> bool:
         """Move an instrument from one portfolio to another. Returns True if moved."""
+        self.assert_legacy_position_write(from_portfolio_id)
+        self.assert_legacy_position_write(to_portfolio_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 "UPDATE portfolio_items SET portfolio_id = ? WHERE id = ? AND portfolio_id = ?",
@@ -281,6 +283,8 @@ class PortfoliosMixin:
 
     def merge_portfolios(self, source_id: int, target_id: int) -> int:
         """Move all items from source portfolio into target. Returns count moved."""
+        self.assert_legacy_position_write(source_id)
+        self.assert_legacy_position_write(target_id)
         with self._connect() as conn:
             cursor = conn.execute(
                 "UPDATE portfolio_items SET portfolio_id = ? WHERE portfolio_id = ?",

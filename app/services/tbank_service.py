@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# С 07.08.2026 invest-public-api.tinkoff.ru отдаёт сертификат, выпущенный
+# С 07.08.2026 invest-public-api.tbank.ru отдаёт сертификат, выпущенный
 # «Russian Trusted Root CA» (Минцифры). Этого корня нет ни в certifi, ни в
 # системном хранилище Ubuntu, поэтому проверка падала с
 # CERTIFICATE_VERIFY_FAILED и синк не работал вовсе.
@@ -47,7 +47,7 @@ def _ssl_context() -> ssl.SSLContext:
     return ctx
 
 
-_BASE = "https://invest-public-api.tinkoff.ru/rest"
+_BASE = "https://invest-public-api.tbank.ru/rest"
 _ACCOUNTS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts"
 _PORTFOLIO_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio"
 _OPERATIONS_URL = f"{_BASE}/tinkoff.public.invest.api.contract.v1.OperationsService/GetOperations"

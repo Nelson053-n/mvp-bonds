@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     jwt_secret: str  # Required, no default — fail fast if not set
     jwt_algorithm: str = "HS256"
     jwt_expiry_hours: int = 72
+    session_cookie_name: str = "bondai_session"
+    manual_accounting_enabled: bool = False
     # Dedicated key for encrypting stored broker tokens (T-Bank API tokens in
     # portfolio_sync.tbank_token_enc). Kept SEPARATE from jwt_secret so that
     # rotating MVP_JWT_SECRET (a standard security practice) does NOT break

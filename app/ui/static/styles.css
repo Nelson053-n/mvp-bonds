@@ -1189,3 +1189,28 @@ td.no-market-data {
 
 /* Монохромные иконки (currentColor): вкладки админки, плашки */
 .ico { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; margin-right:6px; flex:none; }
+
+/* Manual cash-flow journal */
+.manual-accounting-dialog { width: min(1100px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--modal-bg); color: var(--text-primary); overflow: auto; }
+.manual-accounting-dialog::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
+.ma-dialog-close { border: 0; background: none; color: var(--text-muted); font-size: 26px; line-height: 1; cursor: pointer; padding: 4px 8px; }
+.ma-dialog-close:hover { color: var(--text-primary); }
+
+#manual-accounting-card label { display: flex; flex-direction: column; gap: 6px; min-width: 140px; flex: 1 1 160px; font-size: 12px; }
+#manual-accounting-card .input { width: 100%; min-width: 0; }
+#ma-initialize { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+#ma-initialize > p { flex-basis: 100%; line-height: 1.6; }
+#ma-initialize > select { flex: 1 1 220px; width: auto; }
+#ma-initialize > button { flex: 0 1 auto; }
+#ma-message { min-height: 18px; }
+@media (max-width: 640px) {
+  #manual-accounting-card label { flex-basis: 100%; }
+  #ma-submit { width: 100%; }
+}
+
+/* Support messages and replies read as prose inside their cells. */
+#adm-support-card th:nth-child(4),
+#adm-support-body td:nth-child(4),
+#support-mine-list {
+  text-align: left;
+}

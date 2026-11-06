@@ -5,7 +5,7 @@ from datetime import date
 from typing import Literal
 from xml.sax.saxutils import escape as xml_escape
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user, get_portfolio_or_403
@@ -123,7 +123,14 @@ async def export_portfolio_pdf(
     portfolio = await get_portfolio_or_403(portfolio_id, current_user)
     rows = await portfolio_service.get_table(portfolio_id)
 
-    pdf_bytes = _generate_pdf(portfolio["name"], rows, lang)
+    from app.services.storage_service import storage_service
+    accounting = None
+    if storage_service.accounting_enabled(portfolio_id):
+        from app.services.accounting_service import summarize
+        accounting = summarize(storage_service.get_account_operations(portfolio_id), rows)
+        if accounting['result'] is None:
+            raise HTTPException(409, 'Для отчёта дождитесь актуальных котировок')
+    pdf_bytes = _generate_pdf(portfolio["name"], rows, lang, accounting)
 
     today = date.today().isoformat()
     filename = f"portfolio_{portfolio_id}_{today}.pdf"
@@ -136,8 +143,8 @@ async def export_portfolio_pdf(
 
 # ── PDF generation ────────────────────────────────────────────────────────────
 
-def _generate_pdf(portfolio_name: str, rows, lang: str = "ru") -> bytes:
-    return _generate_pdf_reportlab(portfolio_name, rows, lang)
+def _generate_pdf(portfolio_name: str, rows, lang: str = "ru", accounting=None) -> bytes:
+    return _generate_pdf_reportlab(portfolio_name, rows, lang, accounting)
 
 
 def _find_cyrillic_font() -> tuple[str, str | None]:
@@ -169,7 +176,7 @@ def _find_cyrillic_font_bold() -> tuple[str, str | None]:
     return "Helvetica-Bold", None
 
 
-def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
+def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str, accounting=None) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.lib.pagesizes import A4, landscape
@@ -264,6 +271,9 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
     total_value  = sum(r.current_value or 0 for r in rows)
     total_cost   = sum((r.purchase_price or 0) * (r.quantity or 0) for r in rows)
     total_profit = total_value - total_cost
+    if accounting:
+        total_profit = accounting['result']
+        total_cost = accounting['opening_value'] + accounting['deposits']
     pnl_pct = (total_profit / total_cost * 100) if total_cost else 0
 
     def _coupon_freq(period: int | None) -> int:
@@ -296,8 +306,8 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
 
     summary_rows = [
         [t("metric"),         t("value")],
-        [t("total_value"),    f"{_fmt(total_value)} {rub}"],
-        [t("total_cost"),     f"{_fmt(total_cost)} {rub}"],
+        [t("total_value"),    f"{_fmt(accounting['assets'] if accounting else total_value)} {rub}"],
+        [(('Начальная база и пополнения' if lang == 'ru' else 'Opening basis and deposits') if accounting else t("total_cost")), f"{_fmt(total_cost)} {rub}"],
         [t("pnl"),            f"{pnl_sign}{_fmt(total_profit)} {rub}"],
         [t("pnl_pct"),        f"{pnl_sign_pct}{pnl_pct:.2f}%"],
         [t("annual_coupon"),  f"{_fmt(annual_coupon)} {rub}"],
@@ -306,6 +316,11 @@ def _generate_pdf_reportlab(portfolio_name: str, rows, lang: str) -> bytes:
         [t("bonds_count"),    str(len(bonds))],
     ]
 
+    if accounting:
+        summary_rows.append(['Свободные деньги' if lang == 'ru' else 'Available cash', f"{_fmt(accounting['cash'])} {rub}"])
+        summary_rows.append(['Полученные купоны' if lang == 'ru' else 'Coupons received', f"{_fmt(accounting['coupons'])} {rub}"])
+        summary_rows.append(['Возврат номинала' if lang == 'ru' else 'Principal received', f"{_fmt(accounting['principal'])} {rub}"])
+        summary_rows.append(['Выведено' if lang == 'ru' else 'Withdrawn', f"{_fmt(accounting['withdrawals'])} {rub}"])
     pnl_color = C_GREEN if total_profit >= 0 else C_RED
     summ_table = Table(summary_rows, colWidths=[6.5 * cm, 5.5 * cm])
     summ_style = [

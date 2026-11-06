@@ -395,8 +395,21 @@ class PortfolioService:
         """Return cached table (instant). Falls back to fresh fetch."""
         from app.services.cache_service import cache_service
 
+        if storage_service.accounting_enabled(portfolio_id) and cache_service.is_warm(portfolio_id):
+            # Other workers have independent caches. Compare authoritative holdings
+            # before reusing one after a journal write in a different worker.
+            items = storage_service.get_items(portfolio_id)
+            cached = cache_service.rows(portfolio_id)
+            expected = {i['id']: (i['quantity'], i.get('custom_price')) for i in items}
+            observed = {r.id: (r.quantity, r.current_price if r.source == 'custom' else None) for r in cached}
+            if expected != observed:
+                cache_service.invalidate(portfolio_id)
         if cache_service.is_warm(portfolio_id):
-            return cache_service.rows(portfolio_id)
+            rows = cache_service.rows(portfolio_id)
+            if storage_service.accounting_enabled(portfolio_id):
+                from app.services.accounting_service import apply_to_rows
+                return apply_to_rows(storage_service.get_account_operations(portfolio_id), rows)
+            return rows
         return await cache_service.refresh(portfolio_id)
 
     async def get_cash_rub(self, portfolio_id: int) -> float:
@@ -406,6 +419,9 @@ class PortfolioService:
         a bond into cash must not drop the total value.
         """
         import json as _json
+        if storage_service.accounting_enabled(portfolio_id):
+            from app.services.accounting_service import replay
+            return replay(storage_service.get_account_operations(portfolio_id))['cash_minor'] / 100
         cfg = storage_service.get_sync_config(portfolio_id)
         if not cfg or not cfg.get("cash_balance"):
             return 0.0
@@ -775,6 +791,9 @@ class PortfolioService:
                     row.id, portfolio_id, rating_to_store, row.coupon_rate
                 )
 
+        if storage_service.accounting_enabled(portfolio_id):
+            from app.services.accounting_service import apply_to_rows
+            apply_to_rows(storage_service.get_account_operations(portfolio_id), finalized)
         return finalized
 
 

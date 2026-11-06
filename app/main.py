@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.auth import router as auth_router
+from app.api.accounting import router as accounting_router
 from app.api.bond_pages import error_page_html, router as bond_pages_router
 from app.api.bonds import router as bonds_router
 from app.api.calculators import router as calculators_router
@@ -49,6 +50,7 @@ from app.services.storage_service import storage_service
 from app.services.portfolio_service import portfolio_service
 from app.services.rating_utils import rating_worsened
 from app.logging_config import setup_logging
+from app.exceptions import ValidationError as PortfolioValidationError
 
 
 setup_logging()
@@ -737,6 +739,11 @@ async def generic_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+@app.exception_handler(PortfolioValidationError)
+async def portfolio_validation_handler(request: Request, exc: PortfolioValidationError):
+    return JSONResponse(status_code=409, content={'detail': exc.detail})
+
+
 # ── Middleware ───────────────────────────────────────────────────────────────
 
 @app.middleware("http")
@@ -750,6 +757,7 @@ async def add_security_headers(request: Request, call_next) -> Response:
 # ── Routers ─────────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
+app.include_router(accounting_router)
 app.include_router(bond_pages_router)
 app.include_router(bonds_router)
 app.include_router(calculators_router)

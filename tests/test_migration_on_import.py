@@ -99,18 +99,19 @@ class TestMigrationAppliedOnImport:
         """
         _run("import app.main", fresh_db)
 
-        # Откатываем схему на версию назад: убираем колонку последней
+        # Откатываем схему на версию назад: убираем таблицы последней
         # миграции и понижаем номер — как выглядит БД перед деплоем.
         con = sqlite3.connect(fresh_db)
         try:
-            # Откатываем артефакт ПОСЛЕДНЕЙ миграции (v13 — таблица support_replies):
+            # Откатываем артефакты последней миграции v14 — ручной журнал:
             # тест про отставание ровно на одну версию.
-            con.execute("DROP TABLE support_replies")
+            con.execute("DROP TABLE manual_operations")
+            con.execute("DROP TABLE manual_accounts")
             con.execute("UPDATE schema_version SET version = ?",
                         (StorageService.SCHEMA_VERSION - 1,))
             con.commit()
             tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            assert "support_replies" not in tables, "подготовка не сработала"
+            assert "manual_accounts" not in tables, "подготовка не сработала"
         finally:
             con.close()
 
@@ -125,7 +126,7 @@ class TestMigrationAppliedOnImport:
         finally:
             con.close()
 
-        assert "support_replies" in tables, (
+        assert "manual_accounts" in tables and "manual_operations" in tables, (
             "импорт не применил миграцию — деплой выкатит код на старую схему"
         )
         assert version == StorageService.SCHEMA_VERSION

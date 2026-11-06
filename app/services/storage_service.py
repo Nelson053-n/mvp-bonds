@@ -9,11 +9,12 @@ from app.services.storage.mail import MailMixin
 from app.services.storage.ofz import OfzMixin
 from app.services.storage.portfolios import PortfoliosMixin
 from app.services.storage.users import UsersMixin
+from app.services.storage.accounting import AccountingMixin
 
 logger = logging.getLogger(__name__)
 
 
-class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixin):
+class StorageService(AccountingMixin, ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixin):
     def __init__(self) -> None:
         self.db_path = Path(settings.sqlite_db_path)
         self._ensure_db()
@@ -129,7 +130,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 13
+    SCHEMA_VERSION = 14
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -177,6 +178,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
             (11, self._migration_v11),
             (12, self._migration_v12),
             (13, self._migration_v13),
+            (14, self._migration_v14),
         ]
 
         for version, migrate in migrations:
@@ -187,6 +189,29 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
             conn.commit()
             current = version
             logger.info("AUDIT migration applied: v%d", version)
+
+    def _migration_v14(self, conn: sqlite3.Connection) -> None:
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS manual_accounts (
+                portfolio_id INTEGER PRIMARY KEY REFERENCES portfolios(id) ON DELETE CASCADE,
+                started_on TEXT NOT NULL,
+                basis TEXT NOT NULL CHECK(basis IN ('current','purchase'))
+            );
+            CREATE TABLE IF NOT EXISTS manual_operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL REFERENCES manual_accounts(portfolio_id) ON DELETE CASCADE,
+                item_id INTEGER REFERENCES portfolio_items(id),
+                kind TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                amount_minor INTEGER NOT NULL CHECK(amount_minor >= 0),
+                quantity TEXT NOT NULL DEFAULT '0',
+                source TEXT NOT NULL,
+                external_key TEXT,
+                UNIQUE(portfolio_id, external_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_manual_operations_date
+            ON manual_operations(portfolio_id, event_date, id);
+        ''')
 
     def _migration_v1(self, conn: sqlite3.Connection) -> None:
         """v1 — add-column migrations on the original three tables
@@ -1558,6 +1583,7 @@ class StorageService(ItemsMixin, MailMixin, OfzMixin, PortfoliosMixin, UsersMixi
         tbank_account_id: str,
         bonds_only: bool,
     ) -> None:
+        self.assert_legacy_position_write(portfolio_id)
         with self._connect() as conn:
             conn.execute(
                 """

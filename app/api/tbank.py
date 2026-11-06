@@ -217,6 +217,9 @@ async def tbank_sync_enable(
     user_id = current_user["sub"]
     _get_portfolio_or_403(payload.portfolio_id, user_id)
 
+    if storage_service.accounting_enabled(payload.portfolio_id):
+        raise HTTPException(409, 'Портфель ведётся вручную через журнал. Создайте отдельный портфель для брокера.')
+
     if not user_can_autosync(user_id):
         raise HTTPException(
             status_code=403,

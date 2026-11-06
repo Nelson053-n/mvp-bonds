@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/styles.css?v=141">
+    <link rel="stylesheet" href="/static/styles.css?v=145">
   </head>
   <body>
 
@@ -215,6 +215,7 @@
               <span id="autosync-cash" style="display:none;font-size:11px;font-weight:500;color:var(--text-muted);flex-basis:100%;margin-top:2px;"></span>
             </h2>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="ma-launcher" style="display:none"><button id="ma-open" type="button" class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px" onclick="openManualAccounting()">Деньги и операции</button></span>
               <button id="btn-profit-mode" class="btn btn-secondary" style="display:none;height:28px;font-size:12px;padding:0 12px;" onclick="cycleProfitMode()" title="Переключить режим: Полная / От покупки / За день">Прибыль:&nbsp;<span id="btn-profit-mode-label">Полная</span>&nbsp;⇄</button>
               <button id="btn-refresh-ratings" class="btn btn-secondary" style="height:28px;font-size:12px;padding:0 12px;" onclick="refreshRatings()" title="Подтянуть актуальные кредитные рейтинги по биржевым бумагам" data-i18n="ratings.refresh">↻ Рейтинги</button>
               <button class="btn btn-add-instrument" style="height:28px;font-size:12px;padding:0 12px;" onclick="openAddInstrumentModal()">+ Добавить бумагу</button>
@@ -1625,9 +1626,44 @@
   </div>
 </div>
 
+    <dialog id="ma-dialog" class="manual-accounting-dialog" aria-labelledby="ma-dialog-title">
+        <div id="manual-accounting-card" class="card" style="margin:0;">
+          <div class="card-header"><h2 id="ma-dialog-title" class="card-title">Деньги и операции</h2><div style="display:flex;align-items:center;gap:16px"><span style="font-size:12px;color:var(--text-muted)">Ручной учёт · RUB</span><button type="button" class="ma-dialog-close" onclick="closeManualAccounting()" aria-label="Закрыть окно">×</button></div></div>
+          <div class="card-body">
+            <p id="ma-status" style="line-height:1.5"></p>
+            <div id="ma-initialize">
+              <p>Начните с текущей оценки, чтобы учитывать новые выплаты. Для восстановления простой истории одной покупки можно выбрать цены приобретения; нужны даты покупки всех позиций. Прошлые выплаты подтверждаются отдельно. НКД покупки и комиссии в старых данных отсутствуют — результат восстановления приблизительный.</p>
+              <label>Начальные свободные деньги, ₽ <input id="ma-opening-cash" class="input" type="number" min="0" step="0.01" value="0"></label>
+              <select id="ma-basis" class="input"><option value="current">Начать с текущей оценки</option><option value="purchase">Восстановить от цен покупки</option></select>
+              <button class="btn btn-primary" onclick="manualInitialize()">Включить учёт для портфеля</button>
+            </div>
+            <div id="ma-active" style="display:none;">
+              <p id="ma-totals" style="font-weight:600;line-height:1.7"></p>
+              <p style="color:var(--text-muted);font-size:12px">Стоимость = бумаги + деньги. Результат учитывает выплаты и выводы. Выплата амортизации не является самостоятельной прибылью. Состав портфеля меняется через операции ниже.</p>
+              <form id="ma-operation-form" onsubmit="manualSubmit(event)" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                <label>Операция<select id="ma-kind" class="input" onchange="manualFormKind()"><option value="deposit">Пополнение</option><option value="withdraw">Вывод</option><option value="buy">Покупка</option><option value="sell">Продажа</option><option value="coupon">Купон</option><option value="amortization">Амортизация</option><option value="redemption">Полное погашение</option><option value="fee">Комиссия</option><option value="valuation">Оценка внебиржевой бумаги</option></select></label>
+                <label>Дата<input id="ma-date" class="input" type="date" required></label>
+                <label>Бумага<select id="ma-item" class="input"></select></label>
+                <label id="ma-ticker-label" style="display:none">Новый тикер<input id="ma-ticker" class="input" maxlength="32" placeholder="RU000…"></label>
+                <label id="ma-quantity-label" style="display:none">Количество<input id="ma-quantity" class="input" type="number" min="0" step="0.000001" value="1"></label>
+                <label><span id="ma-amount-label">Общая сумма, ₽</span><input id="ma-amount" class="input" type="number" min="0" step="0.01" required></label>
+                <button id="ma-submit" class="btn btn-primary">Записать</button>
+              </form>
+              <p style="font-size:12px;color:var(--text-muted)">Для покупки и продажи введите общую сумму сделки с НКД; комиссию запишите отдельно. Для купона и амортизации — общую фактически полученную сумму. Рыночная оценка MOEX обновляется независимо от операций.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-secondary" onclick="manualLoadPayments()">Выплаты по графику MOEX</button><button class="btn btn-secondary" onclick="manualUndo()">Отменить последнюю операцию</button><button class="btn btn-secondary" onclick="manualExport()">Экспорт операций CSV</button></div>
+              <div id="ma-payments"></div>
+              <div class="table-wrap" style="max-height:280px;overflow:auto"><table><thead><tr><th>Дата</th><th>Операция</th><th>Бумага</th><th>Сумма, ₽</th><th>Количество</th><th>Источник</th></tr></thead><tbody id="ma-history"></tbody></table></div>
+            </div>
+            <p id="ma-message" role="status" style="color:var(--red-600)"></p>
+          </div>
+        </div>
+
+    </dialog>
+
     <!-- __SHARE_INJECT__ -->
-    <script src="/static/translations.js?v=141"></script>
-    <script src="/static/app.js?v=141"></script>
+    <script src="/static/translations.js?v=145"></script>
+    <script src="/static/app.js?v=145"></script>
+    <script src="/static/accounting.js?v=145"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
       window._ymId = 107693104;

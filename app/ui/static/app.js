@@ -296,7 +296,7 @@
       }
       // True if the portfolio has full-profit data (T-Bank synced: НКД + coupons).
       function portfolioSupportsFull() {
-        try { return (tableRows || []).some(r => r.full_profit !== null && r.full_profit !== undefined); }
+        try { return !!window._manualAccountState?.enabled || !!window._allHasManualAccounting || (tableRows || []).some(r => r.full_profit !== null && r.full_profit !== undefined); }
         catch(e) { return false; }
       }
       function _tProfit(key, fallback) {
@@ -368,6 +368,7 @@
         return order[(idx + 1) % order.length];
       }
       function profitValueFor(row) {
+        if (row.accounting_managed && row.no_market_data && window._profitMode === 'full') return null;
         if (window._profitMode === 'day') return row.day_profit;
         if (window._profitMode === 'full') return (row.full_profit ?? row.profit);
         return row.profit;
@@ -487,7 +488,8 @@
         const scs = document.getElementById('stat-coupon-sub');
 
         const cashRub = Number(window.cashTotalRub || 0);
-        const isEmpty = tableRows.length === 0 && cashRub === 0;
+        const manualState = !isAllMode ? window._manualAccountState : null;
+        const isEmpty = tableRows.length === 0 && cashRub === 0 && !manualState?.enabled;
 
         const n = tableRows.length;
         const posSuffix = n === 1 ? t('stat.sub.pos1') : n < 5 ? t('stat.sub.pos2') : t('stat.sub.pos5');
@@ -503,13 +505,14 @@
 
         // Headline follows the selected profit mode (the ⇄ toggle on the table),
         // so the big number matches the column. 'full' only if data supports it.
-        const useFull = window._profitMode === 'full' && summary.hasFullData;
+        const useFull = window._profitMode === 'full' && (summary.hasFullData || manualState?.enabled || window._allHasManualAccounting);
         const headlineProfit = useFull
-          ? summary.totalFullProfit
+          ? (manualState?.enabled ? (manualState.totals.result ?? 0) : (isAllMode && window._allHasManualAccounting ? (window._allAccountingResult ?? 0) : summary.totalFullProfit))
           : (window._profitMode === 'day' ? summary.dayProfit : summary.totalProfit);
         sp.className = 'stat-value ' + (isEmpty ? '' : headlineProfit > 0 ? 'positive' : headlineProfit < 0 ? 'negative' : '');
         animateCounter(sp, isEmpty ? 0 : roundTo2(headlineProfit),
           v => (v >= 0 ? '+' : '') + fmt(roundTo2(v)) + ' ₽');
+        if (useFull && ((manualState?.enabled && manualState.totals.result == null) || (isAllMode && window._allHasManualAccounting && window._allAccountingResult == null))) sp.textContent = '—';
         if (isEmpty) {
           sps.textContent = t('stat.sub.addItems');
         } else {
@@ -742,6 +745,11 @@
           if (Number(window.cashTotalRub || 0) !== 0) { window.cashTotalRub = 0; renderTable(); }
         };
         if (!pid) return hide();
+        if (typeof loadManualAccounting === 'function' && await loadManualAccounting(pid)) {
+          badge.textContent = 'Ручной учёт операций'; badge.style.display = '';
+          if (cashRow) { cashRow.textContent = 'Свободно: ' + fmt(Number(window.cashTotalRub || 0)) + ' ₽'; cashRow.style.display = ''; }
+          return;
+        }
         try {
           const r = await apiFetch('/tbank/sync/status?portfolio_id=' + pid);
           if (!r.ok) return hide();
@@ -2728,7 +2736,7 @@
           td.title = `Куплено ${day}.${m}.${y}`;
         }
         const needsDate = field === 'purchase_price' && bondNeedsPurchaseDate(row);
-        if (isReadOnly) {
+        if (isReadOnly || row.accounting_managed) {
           td.textContent = fmt(row[field]);
           return td;
         }
@@ -3505,7 +3513,7 @@
         tableBody.innerHTML = '';
 
         // Show portfolio wizard if empty
-        if (rows.length === 0 && !isReadOnly) {
+        if (rows.length === 0 && !isReadOnly && !window._manualAccountState?.enabled && !window._allHasManualAccounting) {
           setEmptyState(true);
           const tr = document.createElement('tr');
           const td = document.createElement('td');
@@ -3662,6 +3670,7 @@
             const _q = Number(row.quantity || 0);
             const body = Number(row.profit || 0);                 // переоценка тела
             const aciT = Number(row.aci || 0) * _q;               // накопленный НКД
+            const principal = Number(row.realized_principal || 0);
             const coup = Number(row.realized_coupons || 0);       // полученные купоны
             const fmtSigned = (v) => (v >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(v))) + ' ₽';
             if (window._profitMode === 'full' && row.full_profit != null) {
@@ -3672,6 +3681,9 @@
                 'Купоны получены:  ' + fmtSigned(coup) + '\n' +
                 '─────────────\n' +
                 'Итого:  ' + fmtSigned(Number(row.full_profit));
+              if (row.accounting_managed) profitTd.title =
+                'Результат по журналу: текущая стоимость + продажи + купоны + возврат номинала − начальная база − покупки − комиссии.\n' +
+                'Полученные купоны: ' + fmtSigned(coup) + '\nВозврат номинала: ' + fmtSigned(principal) + '\nИтого: ' + fmtSigned(Number(row.full_profit));
             } else if (window._profitMode === 'day') {
               profitTd.title = 'Изменение цены тела за последнюю торговую сессию × количество';
             } else {
@@ -3769,6 +3781,12 @@
             });
             actionTd.appendChild(delBtn);
 
+            if (row.accounting_managed) {
+              actionTd.replaceChildren();
+              const journalBtn = document.createElement('button'); journalBtn.className = 'btn-sm'; journalBtn.textContent = 'Операции';
+              journalBtn.onclick = () => openManualAccounting('coupon', row.id);
+              actionTd.append(journalBtn);
+            }
             tr.appendChild(actionTd);
           }
           tableBody.appendChild(tr);
@@ -4027,10 +4045,13 @@
         }
         if (!resp.ok) throw new Error('Не удалось загрузить таблицу портфеля.');
         const payload = await resp.json();
+        if (isAllMode) { window._allHasManualAccounting = !!payload.has_manual_accounting; window._allAccountingResult = payload.accounting_result; }
+        else if (window._manualAccountPortfolioId !== portfolioId) { window._manualAccountState = null; window._manualAccountPortfolioId = portfolioId; }
         // Keep custom (off-exchange) items: they carry is_traded=false by design,
         // but must still appear — only hide genuinely delisted exchange instruments.
         tableRows = (payload.items || []).filter(r => r.is_traded !== false || r.source === 'custom');
         if (!isReadOnly) { try { persistTableCache(); } catch(e) {} }
+        if (typeof loadManualAccounting === 'function') await loadManualAccounting(portfolioId);
         renderTable();
         scheduleAnalytics();
         // Update total portfolios value after sync
@@ -8576,6 +8597,7 @@
       }
 
       function openAddInstrumentModal() {
+        if (window._manualAccountState?.enabled) { openManualAccounting('buy', null); return; }
         // No early-return on missing portfolioId: the modal opens anyway and
         // submitAddInstrumentModal() creates a default portfolio on first add.
         const modal = document.getElementById('add-instrument-modal');
@@ -9223,7 +9245,7 @@
       // When a new SW takes control (after a deploy), reload once so the page
       // picks up the fresh HTML/JS instead of serving stale cached assets —
       // this is what previously required a manual "Clear site data".
-      if ('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator && !window.BONDAI_PREVIEW) {
         let _swReloading = false;
         // Reload once when a new SW takes control (after a deploy) so the page
         // picks up fresh HTML/JS instead of stale cached assets. Skip the very
