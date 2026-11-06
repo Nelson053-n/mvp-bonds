@@ -245,3 +245,83 @@ async def test_restore_from_purchase_cost_requires_dates(client, auth_headers, m
     await post(client, auth_headers, pid, 'amortization', 500, iid)
     state = (await client.get(f'/portfolios/{pid}/accounting', headers=auth_headers)).json()
     assert state['totals']['result'] == 0 and state['totals']['assets'] == 1000
+
+
+# ── 07.11.2026: проверка тестового кабинета ─────────────────────────────────
+
+def test_amortized_row_shows_cost_basis_not_false_loss():
+    """После амортизации 50% цена бумаги упала вместе с номиналом — это не убыток."""
+    operations = [op('opening', 1000, '1'), op('amortization', 500)]
+    r = apply_to_rows(operations, [row(500)])[0]
+    assert (r.purchase_price, r.profit, r.full_profit) == (500, 0, 0)
+
+
+def test_average_cost_on_partial_sale():
+    operations = [op('opening', 1000, '2'), op('sell', 700, '1')]
+    pos = replay(operations)['positions'][1]
+    assert (pos['cost_minor'], pos['realized_minor']) == (50000, 20000)
+    r = row(600)
+    r.quantity = 1
+    r = apply_to_rows(operations, [r])[0]
+    assert (r.purchase_price, r.profit, r.full_profit) == (500, 100, 300)
+    assert summarize(operations, [r])['result'] == 300
+
+
+def test_bought_below_par_amortization_beyond_cost_is_result():
+    operations = [op('opening', 400, '1'), op('amortization', 500)]
+    pos = replay(operations)['positions'][1]
+    assert (pos['cost_minor'], pos['realized_minor']) == (0, 10000)
+
+
+async def test_custom_amortization_lowers_price_and_face_and_undo_restores(client, auth_headers, manual_portfolio):
+    pid, iid = manual_portfolio
+    await initialize(client, auth_headers, pid)
+    r = await post(client, auth_headers, pid, 'amortization', '500', iid)
+    assert r.status_code == 200, r.text
+    item = next(i for i in storage_service.get_items(pid) if i['id'] == iid)
+    assert (item['custom_price'], item['custom_nominal']) == (500, 500)
+    state = (await client.get(f'/portfolios/{pid}/accounting', headers=auth_headers)).json()['totals']
+    assert (state['securities_value'], state['cash'], state['assets'], state['result']) == (500, 500, 1000, 0)
+
+    r = await client.delete(f'/portfolios/{pid}/accounting/operations/{r.json()["operation_id"]}', headers=auth_headers)
+    assert r.status_code == 200, r.text
+    item = next(i for i in storage_service.get_items(pid) if i['id'] == iid)
+    assert (item['custom_price'], item['custom_nominal']) == (1000, 1000)
+
+
+async def test_user_local_tomorrow_is_accepted(client, auth_headers, manual_portfolio):
+    """Во Владивостоке после полуночи у пользователя уже «завтра» по UTC сервера."""
+    from datetime import datetime, timedelta, timezone
+    from app.services.accounting_service import latest_event_date
+    pid, iid = manual_portfolio
+    await initialize(client, auth_headers, pid)
+    latest = latest_event_date()
+    assert latest >= datetime.now(timezone.utc).date()
+    r = await post(client, auth_headers, pid, 'coupon', '10', iid, event_date=latest.isoformat())
+    assert r.status_code == 200, r.text
+    r = await post(client, auth_headers, pid, 'coupon', '10', iid, event_date=(latest + timedelta(days=1)).isoformat())
+    assert r.status_code == 400
+
+
+def test_snapshot_cost_is_net_contributions():
+    from app.services.accounting_service import net_contributions
+    operations = [op('opening', 1000, '1'), op('amortization', 500), op('deposit', 200, iid=None),
+                  op('withdraw', 300, iid=None)]
+    assert net_contributions(operations) == 900
+
+
+async def test_amortization_does_not_show_as_growth_on_chart(client, auth_headers, manual_portfolio):
+    pid, iid = manual_portfolio
+    await initialize(client, auth_headers, pid)
+    assert (await post(client, auth_headers, pid, 'amortization', '500', iid)).status_code == 200
+    snaps = storage_service.get_portfolio_snapshots(pid)
+    assert snaps and all(s['total_cost'] == 1000 for s in snaps)
+    assert snaps[-1]['total_value'] == 1000
+
+
+async def test_fully_redeemed_journal_keeps_value_history(client, auth_headers, manual_portfolio):
+    pid, iid = manual_portfolio
+    await initialize(client, auth_headers, pid)
+    assert (await post(client, auth_headers, pid, 'redemption', '1000', iid, quantity='1')).status_code == 200
+    snaps = storage_service.get_portfolio_snapshots(pid)
+    assert snaps[-1]['total_value'] == 1000 and snaps[-1]['total_cost'] == 1000

@@ -115,6 +115,10 @@ class CacheService:
                         from app.services.portfolio_service import portfolio_service
                         securities_value = sum(r.current_value or 0 for r in merged)
                         total_cost = sum((r.purchase_price or 0) * (r.quantity or 0) for r in merged)
+                        if storage_service.accounting_enabled(portfolio_id):
+                            from app.services.accounting_service import net_contributions
+                            total_cost = net_contributions(
+                                storage_service.get_account_operations(portfolio_id))
                         cash_rub = await portfolio_service.get_cash_rub(portfolio_id)
                         # Portfolio value = securities + cash
                         storage_service.save_portfolio_snapshot(

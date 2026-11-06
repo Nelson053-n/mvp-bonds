@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.api.deps import get_current_user, get_portfolio_or_403
 from app.config import settings
-from app.services.accounting_service import minor, summarize
+from app.services.accounting_service import latest_event_date, minor, net_contributions, summarize
 from app.services.cache_service import cache_service
 from app.services.payment_schedule_service import load_payments, proposals
 from app.services.portfolio_service import portfolio_service
@@ -31,8 +31,10 @@ async def refresh_account_snapshot(portfolio_id: int):
         return
     securities = sum(r.current_value for r in rows)
     cash = await portfolio_service.get_cash_rub(portfolio_id)
-    storage_service.save_portfolio_snapshot(portfolio_id, securities + cash,
-                                           sum(r.purchase_price * r.quantity for r in rows), securities)
+    storage_service.save_portfolio_snapshot(
+        portfolio_id, securities + cash,
+        net_contributions(storage_service.get_account_operations(portfolio_id)), securities,
+        no_open_positions=not rows)
 
 
 async def access(portfolio_id: int, user: dict = Depends(get_current_user)):
@@ -97,7 +99,7 @@ async def initialize(portfolio_id: int, payload: Initialize, user=Depends(access
         raise HTTPException(400, 'Первая версия учёта поддерживает только ручные рублёвые облигации')
     if any(r.no_market_data or r.current_value <= 0 for r in rows):
         raise HTTPException(400, 'Сначала загрузите актуальные цены всех позиций')
-    if payload.basis == 'purchase' and any(not r.purchase_date or r.purchase_date > date.today().isoformat() for r in rows):
+    if payload.basis == 'purchase' and any(not r.purchase_date or r.purchase_date > latest_event_date().isoformat() for r in rows):
         raise HTTPException(400, 'Для восстановления укажите дату покупки каждой позиции')
     try:
         storage_service.initialize_account(portfolio_id, minor(payload.cash), payload.basis, rows)

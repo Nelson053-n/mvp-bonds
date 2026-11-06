@@ -516,10 +516,19 @@
         if (isEmpty) {
           sps.textContent = t('stat.sub.addItems');
         } else {
-          const pctOfPortfolio = summary.totalInvested > 0
-            ? ((headlineProfit / summary.totalInvested) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
+          // Journal result is measured against what was put in (opening base +
+          // deposits), not against the cost of bonds still held — after a full
+          // redemption there are none, after amortization only part remains.
+          const journal = useFull && manualState?.enabled ? manualState.totals : null;
+          const profitBase = journal
+            ? Number(journal.opening_value || 0) + Number(journal.deposits || 0)
+            : summary.totalInvested;
+          const pctOfPortfolio = profitBase > 0
+            ? ((headlineProfit / profitBase) * 100).toFixed(2) + t('stat.sub.ofPortfolio')
             : '\u00a0';
-          const realizedCoupons = useFull
+          const realizedCoupons = journal
+            ? Number(journal.coupons || 0)
+            : useFull
             ? Number(summary.totalRealizedCoupons || 0)
             : Number((window._analyticsExtra && window._analyticsExtra.realized_coupons) || 0);
           const aciTotal = tableRows.reduce((s, r) => s + (Number(r.aci || 0) * Number(r.quantity || 0)), 0);
@@ -3818,7 +3827,12 @@
         // col 7: Стоимость
         addCell(sumRow, fmt(roundTo2(summary.totalAssets)) + ' ₽');
         // col 8: Прибыль — follows the active profit-column mode (full / day / total)
-        const sumProfit = window._profitMode === 'full' ? summary.totalFullProfit
+        // Closed positions (sold / redeemed) leave the table but stay in the journal,
+        // so in "full" mode the total must come from the journal, not from the rows.
+        const journalTotals = (!isAllMode && window._profitMode === 'full' && window._manualAccountState?.enabled)
+          ? window._manualAccountState.totals : null;
+        const sumProfit = journalTotals && journalTotals.result != null ? journalTotals.result
+                        : window._profitMode === 'full' ? summary.totalFullProfit
                         : window._profitMode === 'day'  ? summary.dayProfit
                         : summary.totalProfit;
         const p2 = document.createElement('td');

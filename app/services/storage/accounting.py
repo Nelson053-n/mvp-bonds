@@ -2,7 +2,7 @@
 import logging
 from datetime import date, datetime, timezone
 
-from app.services.accounting_service import replay, minor
+from app.services.accounting_service import amortization_per_bond, latest_event_date, replay, minor
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class AccountingMixin:
             account = conn.execute('SELECT started_on FROM manual_accounts WHERE portfolio_id=?', (portfolio_id,)).fetchone()
             if not account:
                 raise ValueError('Сначала включите учёт операций')
-            if not account[0] <= data['event_date'] <= date.today().isoformat():
+            if not account[0] <= data['event_date'] <= latest_event_date().isoformat():
                 raise ValueError('Дата должна быть между началом учёта и сегодняшним днём')
             existing = conn.execute('SELECT id FROM manual_operations WHERE portfolio_id=? AND external_key=?',
                                     (portfolio_id, data['external_key'])).fetchone()
@@ -88,13 +88,34 @@ class AccountingMixin:
             cur = conn.execute('INSERT INTO manual_operations (portfolio_id,item_id,kind,event_date,amount_minor,quantity,source,external_key) '
                                'VALUES (?,?,?,?,?,?,?,?)', (portfolio_id, iid, data['kind'], data['event_date'], data['amount_minor'],
                                 data.get('quantity', '0'), data.get('source', 'manual'), data['external_key']))
+            op_id = cur.lastrowid
             operations = self._account_operations(conn, portfolio_id)
             state = replay(operations)
             self._apply_account_positions(conn, portfolio_id, state)
+            if data['kind'] == 'amortization':
+                self._shift_custom_face(conn, portfolio_id, operations, op_id, -1)
             conn.commit()
-            op_id = cur.lastrowid
         logger.info('AUDIT manual_operation_added portfolio_id=%d operation_id=%d kind=%s', portfolio_id, op_id, data['kind'])
         return op_id
+
+    @staticmethod
+    def _shift_custom_face(conn, portfolio_id, operations, op_id, sign):
+        """Amortization of an off-exchange bond: its price and face value per bond fall
+        by the returned amount (undo restores them). Exchange bonds get both from MOEX.
+        Without this the returned money was counted twice — as cash and inside the
+        unchanged manual price."""
+        op = next(o for o in operations if o['id'] == op_id)
+        if not op['item_id']:
+            return
+        item = conn.execute('SELECT source FROM portfolio_items WHERE id=? AND portfolio_id=?',
+                            (op['item_id'], portfolio_id)).fetchone()
+        if not item or item[0] != 'custom':
+            return
+        delta = float(amortization_per_bond(operations, op)) * sign
+        conn.execute('UPDATE portfolio_items SET '
+                     'custom_price = MAX(0, ROUND(COALESCE(custom_price, purchase_price) + ?, 4)), '
+                     'custom_nominal = MAX(0, ROUND(COALESCE(custom_nominal, 1000) + ?, 4)) '
+                     'WHERE id=? AND portfolio_id=?', (delta, delta, op['item_id'], portfolio_id))
 
     @staticmethod
     def _apply_account_positions(conn, portfolio_id, state):
@@ -110,6 +131,9 @@ class AccountingMixin:
             last = conn.execute("SELECT id FROM manual_operations WHERE portfolio_id=? AND source!='opening' ORDER BY id DESC LIMIT 1", (portfolio_id,)).fetchone()
             if not last or last[0] != operation_id:
                 raise ValueError('Можно отменить только последнюю добавленную операцию')
+            operations = self._account_operations(conn, portfolio_id)
+            if next(o for o in operations if o['id'] == operation_id)['kind'] == 'amortization':
+                self._shift_custom_face(conn, portfolio_id, operations, operation_id, +1)
             conn.execute('DELETE FROM manual_operations WHERE id=? AND portfolio_id=?', (operation_id, portfolio_id))
             state = replay(self._account_operations(conn, portfolio_id))
             conn.execute('UPDATE portfolio_items SET quantity=0,deleted_at=? WHERE portfolio_id=? AND id NOT IN '

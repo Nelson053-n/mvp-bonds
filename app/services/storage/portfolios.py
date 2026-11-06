@@ -322,7 +322,8 @@ class PortfoliosMixin:
         ]
 
     def save_portfolio_snapshot(self, portfolio_id: int, total_value: float, total_cost: float,
-                                securities_value: float | None = None) -> None:
+                                securities_value: float | None = None,
+                                no_open_positions: bool = False) -> None:
         """Save daily snapshot. Upsert by date.
 
         total_value = securities + cash (so selling into cash doesn't drop it).
@@ -337,7 +338,9 @@ class PortfoliosMixin:
         # Check securities (not total_value, which now includes cash) so the guard
         # still fires when only cash remains would be a legitimate state.
         sec_check = securities_value if securities_value is not None else total_value
-        if (not sec_check) and total_cost > 0:
+        # A journal portfolio whose bonds were all sold / redeemed legitimately holds
+        # only cash — that is not an outage.
+        if (not sec_check) and total_cost > 0 and not no_open_positions:
             logger.warning(
                 "Skipping snapshot for portfolio %s: securities_value=0 with total_cost=%.2f "
                 "(prices likely unavailable)", portfolio_id, total_cost
