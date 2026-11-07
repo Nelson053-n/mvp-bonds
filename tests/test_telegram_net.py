@@ -108,25 +108,50 @@ async def test_real_httpx_request_goes_through_failover() -> None:
         await server.wait_closed()
 
 
+class TestRouteHealth:
+    """Состояние считается по рабочему маршруту, а не по каждому адресу."""
+
+    def test_proxy_up_is_ok_whatever_direct_does(self) -> None:
+        from app.services.telegram_net import route_health
+        assert route_health({"socks5://p": True, "1.1.1.1": False}) == "ok"
+        assert route_health({"socks5://p": True, "1.1.1.1": True}) == "ok"
+
+    def test_proxy_down_with_direct_is_degraded(self) -> None:
+        from app.services.telegram_net import route_health
+        assert route_health({"socks5://p": False, "1.1.1.1": True}) == "degraded"
+
+    def test_nothing_works_is_down(self) -> None:
+        from app.services.telegram_net import route_health
+        assert route_health({"socks5://p": False, "1.1.1.1": False}) == "down"
+
+    def test_without_proxy_any_direct_is_ok(self) -> None:
+        from app.services.telegram_net import route_health
+        assert route_health({"1.1.1.1": False, "2.2.2.2": True}) == "ok"
+        assert route_health({"1.1.1.1": False, "2.2.2.2": False}) == "down"
+
+
 class TestDescribeChange:
     def test_first_probe_all_up_is_silent(self) -> None:
-        assert describe_change(None, {"a": True, "b": True}) is None
+        assert describe_change(None, "ok", {"a": True, "b": True}) is None
 
-    def test_route_down_warns_with_working_route(self) -> None:
-        level, text = describe_change({"a": True, "b": True}, {"a": False, "b": True})
-        assert level == logging.WARNING
-        assert "a" in text and "через b" in text
+    def test_flapping_direct_ips_are_silent(self) -> None:
+        """Прод: прямые адреса Bot API мигают по нескольку раз в час."""
+        routes = {"socks5://p": True, "1.1.1.1": False, "2.2.2.2": True}
+        assert describe_change("ok", "ok", routes) is None
+        assert describe_change("ok", "ok", {**routes, "1.1.1.1": True}) is None
 
-    def test_same_state_is_silent(self) -> None:
-        state = {"a": False, "b": True}
-        assert describe_change(state, dict(state)) is None
+    def test_primary_down_warns_once(self) -> None:
+        routes = {"socks5://p": False, "1.1.1.1": True}
+        level, text = describe_change("ok", "degraded", routes)
+        assert level == logging.WARNING and "запасные" in text
+        assert describe_change("degraded", "degraded", routes) is None
 
     def test_all_down_is_error(self) -> None:
-        level, _ = describe_change({"a": False, "b": True}, {"a": False, "b": False})
+        level, _ = describe_change("degraded", "down", {"socks5://p": False, "1.1.1.1": False})
         assert level == logging.ERROR
 
     def test_recovery_is_info(self) -> None:
-        level, _ = describe_change({"a": False, "b": True}, {"a": True, "b": True})
+        level, _ = describe_change("down", "ok", {"socks5://p": True, "1.1.1.1": False})
         assert level == logging.INFO
 
 
@@ -221,8 +246,17 @@ async def test_socks_refusal_is_connect_error() -> None:
         await socks.wait_closed()
 
 
-async def test_proxy_last_then_first_after_use(monkeypatch) -> None:
+async def test_proxy_first_by_default(monkeypatch) -> None:
+    """Обычный маршрут — туннель: прямые адреса с RU-хостинга ненадёжны."""
     monkeypatch.setattr(telegram_net.settings, "tg_socks_proxy", "127.0.0.1:1082")
+    monkeypatch.setattr(telegram_net.settings, "tg_proxy_first", True)
+    assert (await telegram_net.routes.candidates())[0] == "socks5://127.0.0.1:1082"
+
+
+async def test_proxy_last_then_first_after_use(monkeypatch) -> None:
+    """Режим MVP_TG_PROXY_FIRST=false: прокси — запасной путь, пока не понадобился."""
+    monkeypatch.setattr(telegram_net.settings, "tg_socks_proxy", "127.0.0.1:1082")
+    monkeypatch.setattr(telegram_net.settings, "tg_proxy_first", False)
     cands = await telegram_net.routes.candidates()
     assert cands[-1] == "socks5://127.0.0.1:1082"
     _FailoverBackend._remember("socks5://127.0.0.1:1082")

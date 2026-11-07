@@ -37,10 +37,6 @@ _CONNECT_TIMEOUT = 5.0
 _DNS_TIMEOUT = 3.0
 _PROXY_PREFIX = "socks5://"
 PROXY_FIRST_SECONDS = 300
-# Туннель wg-google общий с nanabanana: пока прямые адреса живы, прокси
-# проверяем раз в PROXY_PROBE_EVERY циклов (30 мин), а не каждые 5 мин —
-# 48 соединений в сутки вместо 288.
-PROXY_PROBE_EVERY = 6
 
 
 _dns_failing = False
@@ -73,11 +69,12 @@ async def _resolve() -> list[str]:
 
 
 class _Routes:
-    """Последний рабочий прямой адрес процесса — его пробуем первым.
+    """Порядок маршрутов до api.telegram.org.
 
-    Прокси (MVP_TG_SOCKS_PROXY) — последний маршрут. Если сработал только он,
-    PROXY_FIRST_SECONDS пробуем его первым: иначе каждое подключение при полном
-    сбое прямых адресов теряло бы по 5с на каждом из них.
+    Задан SOCKS-прокси и MVP_TG_PROXY_FIRST (по умолчанию) — он первый всегда:
+    прямые адреса с RU-хостинга доступны через раз, и переключение между ними
+    только добавляло задержку и алерты. Прямые остаются запасным путём на случай,
+    когда туннель лёг.
     """
 
     def __init__(self) -> None:
@@ -90,7 +87,7 @@ class _Routes:
         ordered += KNOWN_IPS
         direct = list(dict.fromkeys(ordered))
         proxy = [_PROXY_PREFIX + settings.tg_socks_proxy] if settings.tg_socks_proxy else []
-        if proxy and time.monotonic() < self.proxy_until:
+        if proxy and (settings.tg_proxy_first or time.monotonic() < self.proxy_until):
             return proxy + direct
         return direct + proxy
 
@@ -177,7 +174,8 @@ class _FailoverBackend(httpcore.AsyncNetworkBackend):
     @staticmethod
     def _remember(route: str) -> None:
         if route.startswith(_PROXY_PREFIX):
-            if time.monotonic() >= routes.proxy_until:
+            # При proxy_first это штатный маршрут, а не авария — не пугаем лог.
+            if not settings.tg_proxy_first and time.monotonic() >= routes.proxy_until:
                 logger.warning("telegram: прямые адреса недоступны, работаем через %s", route)
             routes.proxy_until = time.monotonic() + PROXY_FIRST_SECONDS
             return
@@ -241,26 +239,51 @@ def confirm(confirmed: dict[str, bool], prev_raw: dict[str, bool] | None,
     }
 
 
-def describe_change(prev: dict[str, bool] | None,
-                    cur: dict[str, bool]) -> tuple[int, str] | None:
-    """Что сообщить о смене доступности маршрутов; None — сообщать нечего.
+def _proxy_routes(routes: dict[str, bool]) -> list[str]:
+    return [r for r in routes if r.startswith(_PROXY_PREFIX)]
 
-    Сообщаем только о переходах, иначе при долгом сбое алерт уходил бы
-    каждые 5 минут. Первый замер со всеми рабочими маршрутами — тишина.
+
+def route_health(routes: dict[str, bool]) -> str:
+    """Состояние связи с Telegram с точки зрения рабочего маршрута.
+
+    ok       — основной маршрут (туннель, если он настроен) работает: мигание
+               прямых адресов поводом для алерта не считается, это запасной путь;
+    degraded — основной маршрут лёг, работаем через запасные;
+    down     — не работает ничего.
     """
-    down = sorted(ip for ip, ok in cur.items() if not ok)
-    prev_down = sorted(ip for ip, ok in (prev or {}).items() if not ok)
-    if down == prev_down:
+    if not routes:
+        return "down"
+    proxy = _proxy_routes(routes)
+    if proxy:
+        if routes[proxy[0]]:
+            return "ok"
+        return "degraded" if any(routes.values()) else "down"
+    return "ok" if any(routes.values()) else "down"
+
+
+def describe_change(prev_health: str | None, cur_health: str,
+                    routes: dict[str, bool] | None = None) -> tuple[int, str] | None:
+    """Что сообщить о смене состояния связи; None — молчим.
+
+    Алерт — только о смене состояния рабочего маршрута. В проде прямые адреса
+    Bot API мигают по нескольку раз в час, и раньше каждый такой переход давал
+    два сообщения в сутки с лишним.
+    """
+    routes = routes or {}
+    if cur_health == (prev_health or ""):
         return None
-    up = sorted(ip for ip, ok in cur.items() if ok)
-    if not up:
-        return logging.ERROR, "Telegram недоступен: не отвечает ни один маршрут (" + ", ".join(down) + ")"
-    if down:
+    if cur_health == "ok":
+        if prev_health is None:
+            return None  # первый замер и всё в порядке — повода писать нет
+        return logging.INFO, "Telegram: связь восстановлена (" + ", ".join(
+            r for r, ok in routes.items() if ok) + ")"
+    if cur_health == "degraded":
+        primary = (_proxy_routes(routes) or ["основной"])[0]
         return logging.WARNING, (
-            "Telegram: недоступны " + ", ".join(down)
-            + "; работаем через " + ", ".join(up)
-        )
-    return logging.INFO, "Telegram: все маршруты снова доступны (" + ", ".join(up) + ")"
+            "Telegram: основной маршрут недоступен (" + primary + "), работаем через запасные ("
+            + (", ".join(r for r, ok in routes.items() if ok) or "нет доступных") + ")")
+    return logging.ERROR, ("Telegram недоступен: не отвечает ни один маршрут ("
+                           + ", ".join(r for r, ok in routes.items() if not ok) + ")")
 
 
 async def watch_routes() -> None:
@@ -276,35 +299,28 @@ async def watch_routes() -> None:
     from app.services.storage_service import storage_service
 
     try:
-        confirmed = json.loads(storage_service.get_setting("tg_routes_state", "{}"))
+        saved = json.loads(storage_service.get_setting("tg_routes_state", "{}"))
     except Exception:
         logger.exception("telegram_routes: битый tg_routes_state, начинаем с нуля")
-        confirmed = {}
+        saved = {}
+    if isinstance(saved, dict) and "routes" in saved:
+        confirmed = dict(saved.get("routes") or {})
+        health = saved.get("health")
+    else:
+        # Старый формат — карта маршрутов без состояния связи.
+        confirmed, health = (saved if isinstance(saved, dict) else {}), None
     prev_raw: dict[str, bool] | None = None
-    direct_down = False
-    tick = 0
     while True:
         try:
-            probe_proxy = (tick % PROXY_PROBE_EVERY == 0 or direct_down or any(
-                not ok for r, ok in confirmed.items() if not r.startswith(_PROXY_PREFIX)))
-            tick += 1
-            cur = await probe_routes(include_proxy=probe_proxy)
-            direct_down = any(not ok for r, ok in cur.items() if not r.startswith(_PROXY_PREFIX))
-            if direct_down and not probe_proxy:
-                # Прямой адрес упал только что — проверить запасной путь сразу,
-                # а не через цикл.
-                cur = await probe_routes(include_proxy=True)
+            cur = await probe_routes(include_proxy=True)
             new = confirm(confirmed, prev_raw, cur)
-            # Непроверенный в этот раз прокси сохраняет подтверждённое состояние,
-            # а prev_raw — его последний НАСТОЯЩИЙ замер: подставить старое
-            # значение как новый замер значило бы подтвердить его вслепую.
-            new.update({r: ok for r, ok in confirmed.items()
-                        if r.startswith(_PROXY_PREFIX) and r not in cur})
             prev_raw = {**(prev_raw or {}), **cur}
-            change = describe_change(confirmed, new)
-            if new != confirmed:
-                storage_service.set_setting("tg_routes_state", json.dumps(new))
-                confirmed = new
+            new_health = route_health(new)
+            change = describe_change(health, new_health, new)
+            if new != confirmed or new_health != health:
+                storage_service.set_setting(
+                    "tg_routes_state", json.dumps({"health": new_health, "routes": new}))
+                confirmed, health = new, new_health
             if change:
                 level, text = change
                 logger.log(level, "telegram_routes: %s", text)

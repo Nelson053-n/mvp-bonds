@@ -67,9 +67,12 @@ async def test_not_configured_skips(smtp, monkeypatch) -> None:
     assert smtp == []
 
 
-DOWN = {"149.154.166.110": False, "149.154.167.220": True}
-UP = {"149.154.166.110": True, "149.154.167.220": True}
-ALL_DOWN = {"149.154.166.110": False, "149.154.167.220": False}
+PROXY = "socks5://127.0.0.1:1080"
+# Как на проде: туннель живой, прямые адреса Bot API мигают.
+UP = {PROXY: True, "149.154.166.110": False, "149.154.167.220": True}
+FLAP = {PROXY: True, "149.154.166.110": True, "149.154.167.220": False}
+DEGRADED = {PROXY: False, "149.154.166.110": True, "149.154.167.220": True}
+ALL_DOWN = {PROXY: False, "149.154.166.110": False, "149.154.167.220": False}
 
 
 async def _run(monkeypatch, probes: list[dict], store: dict | None = None):
@@ -120,55 +123,50 @@ async def test_all_routes_down_sends_email_not_telegram(monkeypatch) -> None:
     assert tgs == []
 
 
-async def test_partial_outage_goes_to_telegram(monkeypatch) -> None:
-    emails, tgs, _ = await _run(monkeypatch, [DOWN, DOWN])
+async def test_fallback_route_goes_to_telegram_once(monkeypatch) -> None:
+    """Туннель лёг, прямой адрес работает — одно предупреждение, не поток."""
+    emails, tgs, _ = await _run(monkeypatch, [DEGRADED, DEGRADED, DEGRADED])
     assert emails == []
-    assert len(tgs) == 1
+    assert len(tgs) == 1 and "запасные" in tgs[0]
+
+
+async def test_flapping_direct_addresses_are_silent(monkeypatch) -> None:
+    """Спам 07.11: прямые адреса мигали, туннель при этом работал."""
+    emails, tgs, _ = await _run(monkeypatch, [UP, FLAP, UP, FLAP, FLAP, UP, UP])
+    assert emails == [] and tgs == []
 
 
 async def test_single_blip_is_silent(monkeypatch) -> None:
-    """Мигание на один замер — как у 149.154.166.110 на проде — не алертим."""
-    emails, tgs, _ = await _run(monkeypatch, [UP, DOWN, UP, ALL_DOWN, UP])
+    emails, tgs, _ = await _run(monkeypatch, [UP, DEGRADED, UP, ALL_DOWN, UP])
     assert emails == [] and tgs == []
 
 
 async def test_down_then_recovery_two_alerts(monkeypatch) -> None:
-    _, tgs, _ = await _run(monkeypatch, [DOWN, DOWN, DOWN, UP, UP])
+    _, tgs, _ = await _run(monkeypatch, [DEGRADED, DEGRADED, DEGRADED, UP, UP])
     assert len(tgs) == 2
-    assert "недоступны" in tgs[0] and "снова доступны" in tgs[1]
+    assert "запасные" in tgs[0] and "восстановлена" in tgs[1]
 
 
 async def test_restart_does_not_repeat_alert(monkeypatch) -> None:
     """После деплоя тот же сбой не объявляется заново."""
-    _, tgs1, store = await _run(monkeypatch, [DOWN, DOWN])
+    _, tgs1, store = await _run(monkeypatch, [DEGRADED, DEGRADED])
     assert len(tgs1) == 1
-    _, tgs2, _ = await _run(monkeypatch, [DOWN, DOWN, DOWN], store=store)
+    _, tgs2, _ = await _run(monkeypatch, [DEGRADED, DEGRADED, DEGRADED], store=store)
     assert tgs2 == []
 
 
-P = "socks5://127.0.0.1:1082"
-UP_P = {**UP, P: True}
-DOWN_P = {**DOWN, P: True}
-PROXY_DEAD = {**UP, P: False}
+P = PROXY
+DEAD_PROXY = {**UP, P: False}
 
 
-async def test_proxy_probed_rarely_while_direct_up(monkeypatch) -> None:
-    """Туннель общий с nanabanana: при живых прямых адресах — раз в 6 циклов."""
-    await _run(monkeypatch, [UP_P] * 12)
-    assert sum(p for _, p in _run.proxy_calls) == 2
+async def test_proxy_is_probed_every_cycle(monkeypatch) -> None:
+    """Туннель — основной маршрут, проверяем каждый цикл, а не раз в 30 минут."""
+    await _run(monkeypatch, [UP] * 4)
+    assert len(_run.proxy_calls) == 4 and all(p for _, p in _run.proxy_calls)
 
 
-async def test_proxy_probed_every_cycle_when_direct_down(monkeypatch) -> None:
-    # Цикл 1: прямой адрес упал → прокси проверяется в ТОМ ЖЕ цикле, не через 5 мин.
-    await _run(monkeypatch, [UP_P, DOWN_P, DOWN_P] + [DOWN_P] * 5)
-    assert (1, True) in _run.proxy_calls
-    assert all(p for cycle, p in _run.proxy_calls if cycle >= 2)
-
-
-async def test_dead_proxy_confirmed_by_two_real_probes(monkeypatch) -> None:
-    """Пропущенные циклы не подтверждают и не сбрасывают состояние прокси."""
-    _, tgs, store = await _run(monkeypatch, [PROXY_DEAD] * 8)
-    # Настоящие замеры прокси — циклы 0 и 6: оба «мёртв» → один алерт.
-    # Цикл 7 прокси не проверяет — это НЕ повод объявить «снова доступны».
+async def test_dead_proxy_gives_one_warning_and_is_remembered(monkeypatch) -> None:
+    _, tgs, store = await _run(monkeypatch, [DEAD_PROXY] * 4)
     assert len(tgs) == 1 and P in tgs[0]
-    assert json.loads(store["tg_routes_state"])[P] is False
+    saved = json.loads(store["tg_routes_state"])
+    assert saved["health"] == "degraded" and saved["routes"][P] is False
