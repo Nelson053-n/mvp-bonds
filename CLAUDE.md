@@ -146,7 +146,19 @@ Public (no auth): `GET /share/{token}`, `GET /share/{token}/table`, `GET /share/
 
 **Публикация отчётов без логина:** HTML-отчёт кладётся на прод в `app/ui/static/` как `report-<случайный-токен>.html` → доступен по `https://bondai.ru/static/report-<token>.html`. Файлы НЕ в git, поэтому автодеплой их не затирает. Удаление: `ssh root@212.8.228.248 rm /opt/mvp-bonds/app/ui/static/report-*.html`.
 
-**Доставка отчётов — Telegram, НЕ почта** (решение пользователя, 2026-07-10): ссылку на отчёт слать через TG-бота проекта **@bondinfoai_bot**; токен и chat_id — в SQLite `app_settings` (`tg_bot_token`/`tg_chat_id`, задаются в UI панели), НЕ в env. Готовая команда — skill `portfolio-report`. На проде нет `sqlite3` CLI — БД читать через `.venv/bin/python3`. Отчёты почтой не слать. SMTP при этом настроен (2026-10-11) — только для алерта «Telegram недоступен по всем маршрутам» на `MVP_ALERT_EMAIL` и для кодов сброса пароля: ящик Beget `alert@bondai.ru`, `smtp.beget.com:2525` STARTTLS (порт 25 с сервера по-прежнему отбивается). Ключи `MVP_SMTP_*` — только в `.env` на проде.
+**Доставка отчётов — Telegram, НЕ почта** (решение пользователя, 2026-07-10): ссылку на отчёт слать через TG-бота проекта **@bondinfoai_bot**; токен и chat_id — в SQLite `app_settings` (`tg_bot_token`/`tg_chat_id`, задаются в UI панели), НЕ в env. Готовая команда — skill `portfolio-report`. На проде нет `sqlite3` CLI — БД читать через `.venv/bin/python3`. Отчёты почтой не слать. SMTP работает через ящики Beget `alert@bondai.ru` (алерты) и `support@bondai.ru` (ответы поддержки и коды сброса пароля), `smtp.beget.com:2525` STARTTLS — порт 25 хостинг по-прежнему отбивает. Ключи `MVP_SMTP_*` — только в `.env` на проде.
+
+**Почта (с 12.11.2026) — два ящика Beget, оба читаются в админке:**
+
+| Ящик | Переменные | Что через него |
+|---|---|---|
+| `alert@bondai.ru` | `MVP_SMTP_HOST/PORT/USER/PASSWORD/FROM`, `MVP_ALERT_EMAIL` | системные письма: «Telegram недоступен», аварийные алерты |
+| `support@bondai.ru` | `MVP_MAIL_USER/PASSWORD/FROM`, `MVP_MAIL_IMAP_HOST/PORT` | ответы поддержки, коды сброса пароля, подтверждение email |
+
+- SMTP: `smtp.beget.com:2525` STARTTLS — хостинг vdsina режет 25/465/587, открыт только 2525. IMAP: `imap.beget.com:993`.
+- Beget требует, чтобы `From` совпадал с аутентифицированным ящиком, поэтому у отправки два набора учёток: `mailer.send_mail(..., sender="support")` для писем от поддержки, по умолчанию — `alert`. Если ящик поддержки не настроен, письма уходят с alert (коды сброса не теряются).
+- Админка → «Входящие»/«Исходящие»: чтение обоих ящиков (`mail_messages.mailbox`), ответ уходит с того ящика, куда пришло письмо (`POST /admin/mail/send`, `reply_to_id`). Фоновый синк — `mail_sync_loop`, курсоры IMAP хранятся отдельно по ящикам.
+- Учётные данные — только в `/root/bondai-ru2-migration/container.env`, в git их нет.
 
 ## Design system (UI)
 

@@ -99,16 +99,15 @@ class TestMigrationAppliedOnImport:
         """
         _run("import app.main", fresh_db)
 
-        # Откатываем схему на версию назад: убираем таблицы последней
-        # миграции и понижаем номер — как выглядит БД перед деплоем.
+        # Откатываем схему назад: убираем таблицы v14 и ставим версию перед
+        # ней — как выглядит БД перед деплоем. Тест не привязан к номеру
+        # текущей миграции: когда v15 добавляет только колонки, откат ровно на
+        # одну версию не оставил бы артефактов для проверки.
         con = sqlite3.connect(fresh_db)
         try:
-            # Откатываем артефакты последней миграции v14 — ручной журнал:
-            # тест про отставание ровно на одну версию.
             con.execute("DROP TABLE manual_operations")
             con.execute("DROP TABLE manual_accounts")
-            con.execute("UPDATE schema_version SET version = ?",
-                        (StorageService.SCHEMA_VERSION - 1,))
+            con.execute("UPDATE schema_version SET version = 13")
             con.commit()
             tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             assert "manual_accounts" not in tables, "подготовка не сработала"
@@ -233,3 +232,49 @@ class TestEveryMigrationRegistered:
         for n in range(1, StorageService.SCHEMA_VERSION + 1):
             assert hasattr(StorageService, f"_migration_v{n}"), \
                 f"нет метода _migration_v{n}"
+
+
+class TestMigrationV15RepairsResetCodes:
+    """Прод-дефект 12.11.2026: в restored-базе у password_reset_codes не было
+    колонки attempts, хотя она есть в CREATE TABLE — /auth/forgot-password
+    падал с OperationalError, сброс пароля не работал. v15 добавляет её."""
+
+    def _make_stale(self, db_path: str) -> None:
+        _run("import app.main", db_path)
+        con = sqlite3.connect(db_path)
+        try:
+            con.execute("ALTER TABLE password_reset_codes RENAME TO prc_old")
+            con.execute("""CREATE TABLE password_reset_codes (
+                code TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+                created_at INTEGER NOT NULL)""")
+            con.execute("DROP TABLE prc_old")
+            con.execute("UPDATE schema_version SET version = 14")
+            con.commit()
+        finally:
+            con.close()
+
+    def test_attempts_column_added(self, tmp_path: Path) -> None:
+        db = str(tmp_path / "stale.db")
+        self._make_stale(db)
+        _run("import app.main", db)
+
+        con = sqlite3.connect(db)
+        try:
+            cols = {r[1] for r in con.execute("PRAGMA table_info(password_reset_codes)")}
+            version = con.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
+        finally:
+            con.close()
+        assert "attempts" in cols, "миграция v15 не добавила attempts — сброс пароля снова упадёт"
+        assert version == StorageService.SCHEMA_VERSION
+
+    def test_mailbox_column_on_messages(self, tmp_path: Path) -> None:
+        db = str(tmp_path / "stale2.db")
+        self._make_stale(db)
+        _run("import app.main", db)
+
+        con = sqlite3.connect(db)
+        try:
+            cols = {r[1] for r in con.execute("PRAGMA table_info(mail_messages)")}
+        finally:
+            con.close()
+        assert "mailbox" in cols

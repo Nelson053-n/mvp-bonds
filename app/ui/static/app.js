@@ -6975,6 +6975,7 @@
           const unread = dir === 'in' && !m.is_read;
           if (unread) tr.style.fontWeight = '600';
           const tdSubj = _mailEl('td', undefined, 'max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;');
+          if (m.mailbox === 'alert') tdSubj.appendChild(_mailEl('span', 'alert@', 'color:var(--text-muted);font-size:10px;border:1px solid var(--border);border-radius:6px;padding:1px 5px;margin-right:8px;'));
           if (m.answered) tdSubj.appendChild(_mailEl('span', '↩ Отвечено', 'color:var(--green-600);font-weight:600;margin-right:8px;'));
           tdSubj.appendChild(document.createTextNode((m.subject || '(без темы)') + (m.snippet ? ' — ' + m.snippet.replace(/\s+/g, ' ') : '')));
           const tdAct = _mailEl('td', undefined, 'white-space:nowrap;text-align:right;');
@@ -7014,7 +7015,7 @@
         box.replaceChildren(
           back,
           _mailEl('h3', m.subject || '(без темы)', 'margin:16px 0 4px;font-size:15px;'),
-          _mailEl('div', `От: ${m.from_addr}\nКому: ${m.to_addr}${m.cc ? '\nКопия: ' + m.cc : ''}\n${_mailDate(m.date)}`, 'font-size:12px;color:var(--text-muted);white-space:pre-wrap;margin-bottom:12px;'),
+          _mailEl('div', `От: ${m.from_addr}\nКому: ${m.to_addr}${m.cc ? '\nКопия: ' + m.cc : ''}\nЯщик: ${m.mailbox === 'alert' ? 'alert@bondai.ru' : 'support@bondai.ru'}\n${_mailDate(m.date)}`, 'font-size:12px;color:var(--text-muted);white-space:pre-wrap;margin-bottom:12px;'),
           _mailEl('div', m.body, 'white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.55;padding:12px;border:1px solid var(--border);border-radius:var(--radius);'),
         );
         if (dir === 'in') {

@@ -26,6 +26,7 @@ def _addresses(raw: str, field: str) -> str:
 
 
 class SendPayload(BaseModel):
+    mailbox: str = Field(default="support", pattern="^(support|alert)$")
     to: str = Field(max_length=500)
     cc: str = Field(default="", max_length=500)
     subject: str = Field(min_length=1, max_length=300)
@@ -39,16 +40,20 @@ class ReadPayload(BaseModel):
 
 @router.get("/status")
 async def mail_status(admin: dict = Depends(get_admin_user)) -> dict:
-    return {"configured": mail_client.mail_configured(), "address": mail_client.settings.mail_from,
+    boxes = [{"key": a.key, "address": a.address} for a in mail_client.accounts()]
+    return {"configured": mail_client.mail_configured(),
+            "address": boxes[0]["address"] if boxes else "",
+            "accounts": boxes,
             "unread": storage_service.count_unread_mail()}
 
 
 @router.get("")
 async def list_mail(direction: str = Query("in", pattern="^(in|out)$"),
                     limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+                    mailbox: str | None = Query(None, pattern="^(support|alert)$"),
                     admin: dict = Depends(get_admin_user)) -> dict:
-    return {"unread": storage_service.count_unread_mail(),
-            "items": storage_service.list_mail(direction, limit, offset)}
+    return {"unread": storage_service.count_unread_mail(mailbox),
+            "items": storage_service.list_mail(direction, limit, offset, mailbox)}
 
 
 @router.post("/sync")
@@ -74,14 +79,17 @@ async def send(payload: SendPayload, admin: dict = Depends(get_admin_user)) -> d
         raise HTTPException(status_code=400, detail="Тема не может содержать переводы строки")
     if not storage_service.check_rate_limit(f"admin_mail:{admin['sub']}", 3600, _SEND_LIMIT_PER_HOUR):
         raise HTTPException(status_code=429, detail="Слишком много писем за час")
-    in_reply_to = None
+    in_reply_to, mailbox = None, payload.mailbox
     if payload.reply_to_id is not None:
         orig = storage_service.get_mail(payload.reply_to_id)
         if orig is None:
             raise HTTPException(status_code=404, detail="Исходное письмо не найдено")
         in_reply_to = orig["msg_id"]
+        # Отвечаем с того ящика, куда письмо пришло: иначе адрес отправителя
+        # не совпадёт с аутентифицированным, и Beget отклонит отправку.
+        mailbox = orig.get("mailbox") or mailbox
     try:
-        mail_id = await mail_client.send_mail(to, subject, payload.body, cc, in_reply_to)
+        mail_id = await mail_client.send_mail(to, subject, payload.body, cc, in_reply_to, mailbox)
     except Exception as exc:
         logger.warning("support mail send failed: %s %s", type(exc).__name__, exc)
         raise HTTPException(status_code=502, detail="Письмо не отправлено: ошибка почтового сервера")

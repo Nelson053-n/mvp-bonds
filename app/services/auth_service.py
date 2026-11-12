@@ -264,7 +264,7 @@ class AuthService:
                 f"Действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте."
             )
             subject = "Bond AI — код восстановления пароля"
-        return await mailer.send_mail(email, subject, body, "password_reset")
+        return await mailer.send_mail(email, subject, body, "password_reset", sender="support")
 
     def confirm_password_reset(self, username: str, code: str, new_password: str,
                                client_ip: str = "") -> bool:
@@ -368,6 +368,7 @@ class AuthService:
             f"Теперь вы сможете использовать его для восстановления пароля.\n"
             f"Если вы не привязывали этот email — проигнорируйте письмо.",
             "email_confirmation",
+            sender="support",
         )
 
     def verify_token(self, token: str) -> dict | None:

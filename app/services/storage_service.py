@@ -130,7 +130,7 @@ class StorageService(AccountingMixin, ItemsMixin, MailMixin, OfzMixin, Portfolio
 
     # Latest schema version. Bump and append a (N, self._migration_vN) pair to
     # the `migrations` list in _run_migrations when adding new schema changes.
-    SCHEMA_VERSION = 14
+    SCHEMA_VERSION = 15
 
     def _get_schema_version(self, conn: sqlite3.Connection) -> int:
         """Read the current schema version, creating the tracking table if absent.
@@ -179,6 +179,7 @@ class StorageService(AccountingMixin, ItemsMixin, MailMixin, OfzMixin, Portfolio
             (12, self._migration_v12),
             (13, self._migration_v13),
             (14, self._migration_v14),
+            (15, self._migration_v15),
         ]
 
         for version, migrate in migrations:
@@ -189,6 +190,24 @@ class StorageService(AccountingMixin, ItemsMixin, MailMixin, OfzMixin, Portfolio
             conn.commit()
             current = version
             logger.info("AUDIT migration applied: v%d", version)
+
+    def _migration_v15(self, conn: sqlite3.Connection) -> None:
+        """v15 — attempts у кодов сброса и ящик-источник у писем.
+
+        `password_reset_codes.attempts` есть в CREATE TABLE, но отдельной
+        миграции для старых баз не было: на проде (база восстановлена из
+        старой копии) /auth/forgot-password падал с «table
+        password_reset_codes has no column named attempts» — сброс пароля не
+        работал вовсе. Вторая колонка нужна, чтобы в админке было видно, на
+        какой из двух ящиков пришло письмо.
+        """
+        for table, column, ddl in (
+            ("password_reset_codes", "attempts", "INTEGER NOT NULL DEFAULT 0"),
+            ("mail_messages", "mailbox", "TEXT NOT NULL DEFAULT 'support'"),
+        ):
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def _migration_v14(self, conn: sqlite3.Connection) -> None:
         conn.executescript('''

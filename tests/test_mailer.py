@@ -120,3 +120,33 @@ async def test_starttls_verifies_certificate(smtp) -> None:
     ctx = _SlowSMTP.tls_context
     assert ctx is not None
     assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname is True
+
+
+async def test_support_sender_used_when_configured(smtp, monkeypatch) -> None:
+    """Коды сброса пароля и подтверждения email — с support@, а не с alert@."""
+    monkeypatch.setattr(settings, "mail_user", "support@bondai.ru")
+    monkeypatch.setattr(settings, "mail_password", "pw2")
+    monkeypatch.setattr(settings, "mail_from", "support@bondai.ru")
+    assert await auth_service._send_email_reset("u@example.com", "123456", "bob") is True
+    frm, _, msg = smtp[-1]
+    assert frm == "support@bondai.ru"
+    assert "From: BondAI <support@bondai.ru>" in msg
+
+
+async def test_reset_falls_back_to_alert_without_support(smtp, monkeypatch) -> None:
+    """Ящик поддержки не настроен — код всё равно уходит (с alert@)."""
+    monkeypatch.setattr(settings, "mail_user", "")
+    monkeypatch.setattr(settings, "mail_password", "")
+    monkeypatch.setattr(settings, "mail_from", "")
+    assert await auth_service._send_email_reset("u@example.com", "123456", "bob") is True
+    assert smtp[-1][0] == "alert@bondai.ru"
+
+
+async def test_system_alerts_stay_on_alert_mailbox(smtp, monkeypatch) -> None:
+    from app.services.notification_service import notification_service
+    monkeypatch.setattr(settings, "mail_user", "support@bondai.ru")
+    monkeypatch.setattr(settings, "mail_password", "pw2")
+    monkeypatch.setattr(settings, "mail_from", "support@bondai.ru")
+    monkeypatch.setattr(settings, "alert_email", "alert@bondai.ru")
+    assert await notification_service.send_alert_email("Тема", "Текст") is True
+    assert smtp[-1][0] == "alert@bondai.ru"
