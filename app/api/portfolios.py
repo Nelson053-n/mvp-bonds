@@ -34,6 +34,19 @@ _MONTHS_RU = ["", "января", "февраля", "марта", "апреля"
               "июля", "августа", "сентября", "октября", "ноября", "декабря"]
 
 
+def _instrument_label(ticker: str, name: str | None) -> str:
+    """«Название (ТИКЕР)» для уведомлений; без названия — только тикер.
+
+    В списке аномалий был один тикер, и по нему нельзя было понять, о какой
+    бумаге речь: пользователь сверял его с таблицей вручную.
+    """
+    clean_name = (name or "").strip()
+    clean_ticker = (ticker or "").strip()
+    if clean_name and clean_ticker:
+        return f"{clean_name} ({clean_ticker})"
+    return clean_name or clean_ticker
+
+
 def _yield_to_offer_anomaly(r, today) -> dict | None:
     """If a bond shows an absurdly high yield caused by a near offer/buyback,
     return an anomaly explaining it is yield-to-offer (with the date)."""
@@ -518,6 +531,7 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
         cutoff = (datetime.utcnow() - timedelta(days=14)).isoformat()
         with storage_service._connect() as conn:
             tickers = list({r.ticker for r in rows if r.type == "bond"})
+            names = {r.ticker: getattr(r, "name", "") for r in rows if r.type == "bond"}
             if tickers:
                 placeholders = ",".join("?" * len(tickers))
                 cursor = conn.execute(
@@ -534,7 +548,10 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
                         anomalies.append({
                             "type": "rating_downgrade",
                             "ticker": tkr,
-                            "text": f"{tkr}: рейтинг снижен {hist[0][0]} → {hist[-1][0]}",
+                            "text": (
+                                f"{_instrument_label(tkr, names.get(tkr))}: рейтинг снижен "
+                                f"{hist[0][0]} → {hist[-1][0]}"
+                            ),
                             "severity": "high",
                         })
     except Exception:
@@ -556,7 +573,10 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
                 anomalies.append({
                     "type": "price_drop",
                     "ticker": r.ticker,
-                    "text": f"{r.ticker}: цена {diff_pct:+.1f}% к предыдущему дню",
+                    "text": (
+                        f"{_instrument_label(r.ticker, getattr(r, 'name', ''))}: "
+                        f"цена {diff_pct:+.1f}% к предыдущему дню"
+                    ),
                     "severity": "medium",
                 })
                 seen_drop.add(r.ticker)
@@ -575,7 +595,10 @@ async def _build_analytics_extra(rows: list, portfolio_ids: list[int]) -> dict:
                 anomalies.append({
                     "type": "imminent_event",
                     "ticker": r.ticker,
-                    "text": f"{r.ticker}: {label} через {(d - today).days} дн.",
+                    "text": (
+                        f"{_instrument_label(r.ticker, getattr(r, 'name', ''))}: "
+                        f"{label} через {(d - today).days} дн."
+                    ),
                     "severity": "medium",
                 })
                 seen_event.add((r.ticker, fld))
