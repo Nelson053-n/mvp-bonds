@@ -193,6 +193,10 @@ class LLMService:
             return None
         event_date, label = min(upcoming)
         days = (event_date - today).days
+        if days >= 365:
+            years = days / 365.25
+            years_text = f"{years:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+            return f"{label} через {years_text} лет ({event_date:%d-%m-%Y})"
         return f"{label} через {days} дн. ({event_date:%d-%m-%Y})"
 
     async def _openai_validate(
