@@ -328,7 +328,10 @@ class TestLLMServiceOpenAIFallback:
         ):
             comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        # The stub no longer uses canned "in profit / in loss" phrasing: it builds
+        # a factual comment from the metrics, so assert the fallback is that one.
+        assert "Доля в портфеле" in comment
+        assert "Дивидендная доходность 6%" in comment
 
     async def test_analyze_portfolio_unavailable_on_failure(
         self, service: LLMService
