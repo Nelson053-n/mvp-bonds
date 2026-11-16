@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import date
 from typing import Any
 
 import httpx
@@ -136,35 +137,54 @@ class LLMService:
         )
 
     def _stub_comment(self, payload: InstrumentMetrics) -> str:
-        if payload.type == "bond":
-            high_yield = (
-                payload.market_yield is not None
-                and payload.market_yield >= 12
-            )
-            below_nominal = payload.current_price < 100
-            if high_yield and below_nominal:
-                return (
-                    "Доходность выше средней,"
-                    " бумага торгуется ниже номинала."
-                )
-            if payload.profit >= 0:
-                return (
-                    "Позиция в плюсе,"
-                    " параметры доходности выглядят стабильными."
-                )
-            return (
-                "Позиция в минусе,"
-                " цена чувствительна к рыночной доходности."
-            )
+        """Build a factual, deterministic comment without network access."""
+        facts: list[str] = []
 
-        dividend_note = (
-            "умеренная дивидендная доходность"
-            if (payload.dividend_yield or 0) >= 5
-            else "низкая дивидендная доходность"
+        if payload.no_market_data:
+            facts.append("Рыночные данные недоступны")
+        if payload.market_yield is not None:
+            facts.append(f"доходность к погашению {self._fmt_metric(payload.market_yield)}%")
+        if payload.coupon_rate is not None:
+            coupon = f"купон {self._fmt_metric(payload.coupon_rate)}%"
+            if payload.coupon_period:
+                frequency = max(1, round(365 / payload.coupon_period))
+                coupon += f", {frequency} раз в год"
+            facts.append(coupon)
+        if payload.dividend_yield is not None:
+            facts.append(f"дивидендная доходность {self._fmt_metric(payload.dividend_yield)}%")
+        if payload.company_rating:
+            source = f" ({payload.rating_source})" if payload.rating_source else ""
+            facts.append(f"рейтинг {payload.company_rating}{source}")
+        facts.append(f"доля в портфеле {self._fmt_metric(payload.weight)}%")
+        if payload.day_profit is not None:
+            facts.append(f"изменение за день {self._fmt_metric(payload.day_profit)} ₽")
+        facts.append(f"результат от покупки {self._fmt_metric(payload.profit)} ₽")
+
+        nearest = self._nearest_event(payload)
+        if nearest:
+            facts.append(nearest)
+        return ". ".join(fact[0].upper() + fact[1:] for fact in facts) + "."
+
+    @staticmethod
+    def _fmt_metric(value: float) -> str:
+        """Match the table's ru-RU display: up to two decimal places."""
+        text = f"{value:,.2f}".rstrip("0").rstrip(".")
+        return text.replace(",", "\N{NO-BREAK SPACE}").replace(".", ",")
+
+    @staticmethod
+    def _nearest_event(payload: InstrumentMetrics) -> str | None:
+        today = date.today()
+        events = (
+            ("погашение", payload.maturity_date),
+            ("оферта", payload.offer_date),
+            ("buyback", payload.buyback_date),
         )
-        if payload.profit >= 0:
-            return f"Позиция в плюсе, {dividend_note}."
-        return f"Позиция в просадке, {dividend_note}."
+        upcoming = [(event_date, label) for label, event_date in events if event_date and event_date >= today]
+        if not upcoming:
+            return None
+        event_date, label = min(upcoming)
+        days = (event_date - today).days
+        return f"{label} через {days} дн. ({event_date:%d-%m-%Y})"
 
     async def _openai_validate(
         self, payload: AddInstrumentInput

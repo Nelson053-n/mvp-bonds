@@ -138,8 +138,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Доходность выше средней" in comment
-        assert "ниже номинала" in comment
+        assert "Доходность к погашению 13,5%" in comment
+        assert "Доля в портфеле 100%" in comment
 
     async def test_comment_bond_profit_positive(
         self, service: LLMService
@@ -161,7 +161,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        assert "Доходность к погашению 10%" in comment
+        assert "Результат от покупки 130 ₽" in comment
 
     async def test_comment_bond_profit_negative(
         self, service: LLMService
@@ -183,7 +184,7 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в минусе" in comment or "Позиция в просадке" in comment
+        assert "Результат от покупки -70 ₽" in comment
 
     async def test_comment_stock_positive(self, service: LLMService) -> None:
         """Test stock comment for positive profit."""
@@ -203,7 +204,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        assert "Дивидендная доходность 6%" in comment
+        assert "Результат от покупки 5\N{NO-BREAK SPACE}000 ₽" in comment
 
     async def test_comment_stock_negative(self, service: LLMService) -> None:
         """Test stock comment for negative profit."""
@@ -223,7 +225,35 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в просадке" in comment or "Позиция в минусе" in comment
+        assert "Результат от покупки -5\N{NO-BREAK SPACE}000 ₽" in comment
+
+    async def test_comments_vary_by_available_metrics_and_omit_missing(self, service: LLMService) -> None:
+        base = dict(type="bond", name="Bond", ticker="BOND", current_price=100,
+                    purchase_price=100, quantity=1, current_value=100, weight=12.34, ai_comment="")
+        rated = InstrumentMetrics(**base, id=1, profit=2.5, market_yield=14.25,
+                                  company_rating="AA-", rating_source="smartlab")
+        no_market = InstrumentMetrics(**base, id=2, profit=-1, no_market_data=True)
+
+        rated_comment = await service.generate_comment(rated)
+        no_market_comment = await service.generate_comment(no_market)
+
+        assert rated_comment != no_market_comment
+        assert "14,25%" in rated_comment and "AA- (smartlab)" in rated_comment
+        assert "Рыночные данные недоступны" in no_market_comment
+        assert "Доходность к погашению" not in no_market_comment
+
+    async def test_stub_comment_is_local_and_deterministic(self, service: LLMService) -> None:
+        metrics = InstrumentMetrics(
+            id=1, type="bond", name="Bond", ticker="BOND", current_price=100,
+            purchase_price=99, quantity=1, current_value=100, profit=1,
+            weight=7.5, coupon_rate=12.1, coupon_period=91, ai_comment="",
+        )
+        with patch.object(service, "_openai_comment", AsyncMock()) as remote:
+            first = await service.generate_comment(metrics)
+            second = await service.generate_comment(metrics)
+        assert first == second
+        assert "Купон 12,1%, 4 раз в год" in first
+        remote.assert_not_awaited()
 
 
 def _http_error() -> httpx.HTTPStatusError:

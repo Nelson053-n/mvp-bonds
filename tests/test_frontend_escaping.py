@@ -47,3 +47,17 @@ def test_table_polling_stops_when_logged_out() -> None:
     i = APP_JS.index("syncTableFromServer().catch(() => {});\n            }, SYNC_INTERVAL_MS);")
     interval_body = APP_JS[APP_JS.rindex("setInterval(", 0, i):i]
     assert "localStorage.getItem('mvp_logged_in')" in interval_body
+
+
+def test_ai_comment_uses_safe_dom_and_independent_position_state() -> None:
+    block = APP_JS[APP_JS.index("function createInstrumentComment"):APP_JS.index("// ── TOAST", APP_JS.index("function createInstrumentComment"))]
+    assert "value.textContent" in block
+    assert "expandedInstrumentComments.has(key)" in block
+    assert "aria-expanded" in block and "aria-controls" in block
+    assert "innerHTML" not in block
+
+
+def test_ai_comment_preview_has_absolute_140_character_limit() -> None:
+    assert "INSTRUMENT_COMMENT_PREVIEW_LIMIT = 140" in APP_JS
+    assert "Array.from(fullText.trim())" in APP_JS
+    assert "createInstrumentComment(row.id, row.ai_comment)" in APP_JS

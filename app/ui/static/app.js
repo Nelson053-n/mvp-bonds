@@ -123,6 +123,77 @@
           .replace(/'/g, '&#39;');
       }
 
+      const expandedInstrumentComments = new Set();
+      const INSTRUMENT_COMMENT_PREVIEW_LIMIT = 140;
+      (function addInstrumentCommentStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+          .instrument-comment{display:flex;align-items:flex-start;gap:6px;margin-top:6px;max-width:min(52ch,100%);min-width:0;overflow-wrap:anywhere;font-size:12px;line-height:18px;font-weight:400;color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:normal}
+          .instrument-comment__marker{display:inline-flex;align-items:center;height:18px;padding:0 6px;box-sizing:border-box;flex:0 0 auto;border:1px solid var(--info-border);border-radius:var(--radius-sm);background:var(--info-bg);color:var(--info-color);font-size:10px;line-height:16px;font-weight:700;letter-spacing:.04em}
+          .instrument-comment__body{flex:1;min-width:0}
+          .instrument-comment__text{white-space:normal}
+          .instrument-comment__toggle{display:block;min-height:22px;padding:2px 0;border:0;background:transparent;color:var(--blue-400);font:600 12px/18px inherit;cursor:pointer;transition:color .15s ease-out,opacity .15s ease-out,text-decoration-color .15s ease-out}
+          [data-theme="light"] .instrument-comment__toggle{color:var(--blue-600)}
+          .instrument-comment__toggle:hover{text-decoration:underline;color:var(--blue-500)}
+          .instrument-comment__toggle:active{opacity:.78}
+          .instrument-comment__toggle:focus-visible{outline:2px solid var(--blue-500);outline-offset:2px;border-radius:4px}
+          @media(max-width:767px){.instrument-comment__toggle{min-width:44px;min-height:44px;text-align:left}}
+        `;
+        document.head.appendChild(style);
+      })();
+
+      function instrumentCommentPreview(fullText) {
+        const chars = Array.from(fullText.trim());
+        if (chars.length <= INSTRUMENT_COMMENT_PREVIEW_LIMIT) return chars.join('');
+        const candidate = chars.slice(0, INSTRUMENT_COMMENT_PREVIEW_LIMIT - 1).join('');
+        const boundary = candidate.lastIndexOf(' ');
+        const trimmed = boundary >= 90 ? candidate.slice(0, boundary) : candidate;
+        return trimmed.trimEnd() + '…';
+      }
+
+      function createInstrumentComment(positionId, fullText) {
+        const text = String(fullText || '').trim();
+        if (!text) return null;
+        const key = String(positionId);
+        const preview = instrumentCommentPreview(text);
+        const expandable = preview !== text;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'instrument-comment';
+        const marker = document.createElement('span');
+        marker.className = 'instrument-comment__marker';
+        marker.textContent = 'AI';
+        marker.setAttribute('aria-hidden', 'true');
+        const body = document.createElement('span');
+        body.className = 'instrument-comment__body';
+        const value = document.createElement('span');
+        value.className = 'instrument-comment__text';
+        value.id = `instrument-comment-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+        const paint = () => { value.textContent = expandedInstrumentComments.has(key) ? text : preview; };
+        paint();
+        body.appendChild(value);
+        if (expandable) {
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'instrument-comment__toggle';
+          toggle.setAttribute('aria-controls', value.id);
+          const syncToggle = () => {
+            const expanded = expandedInstrumentComments.has(key);
+            toggle.textContent = expanded ? 'Скрыть' : 'Подробнее';
+            toggle.setAttribute('aria-expanded', String(expanded));
+          };
+          syncToggle();
+          toggle.addEventListener('click', () => {
+            if (expandedInstrumentComments.has(key)) expandedInstrumentComments.delete(key);
+            else expandedInstrumentComments.add(key);
+            paint();
+            syncToggle();
+          });
+          body.appendChild(toggle);
+        }
+        wrapper.append(marker, body);
+        return wrapper;
+      }
+
       // ── TOAST NOTIFICATIONS ──────────────────────────────────────
       (function() {
         const TOAST_STYLES = `
@@ -3519,6 +3590,10 @@
         if (typeof setProfitMode === 'function') setProfitMode(window._profitModeDesired);
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
+        const currentPositionIds = new Set(rows.map(row => String(row.id)));
+        for (const id of expandedInstrumentComments) {
+          if (!currentPositionIds.has(id)) expandedInstrumentComments.delete(id);
+        }
         tableBody.innerHTML = '';
 
         // Show portfolio wizard if empty
@@ -3627,6 +3702,8 @@
             qualBadge.style.cssText = 'display:inline-block;margin-top:3px;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(234,179,8,.15);color:#ca8a04;border:1px solid rgba(234,179,8,.3);letter-spacing:.3px;';
             nameTd.appendChild(qualBadge);
           }
+          const instrumentComment = createInstrumentComment(row.id, row.ai_comment);
+          if (instrumentComment) nameTd.appendChild(instrumentComment);
           // The same hint also rides in the name cell, which is the only column
           // visible on a phone without scrolling the table sideways — the buy-price
           // column sits well past the right edge at 360-390px. CSS shows exactly
@@ -9612,4 +9689,3 @@
           }
         }, true);
       })();
-
