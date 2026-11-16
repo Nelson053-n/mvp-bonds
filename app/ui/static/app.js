@@ -123,75 +123,128 @@
           .replace(/'/g, '&#39;');
       }
 
-      const expandedInstrumentComments = new Set();
-      const INSTRUMENT_COMMENT_PREVIEW_LIMIT = 140;
-      (function addInstrumentCommentStyles() {
-        const style = document.createElement('style');
-        style.textContent = `
-          .instrument-comment{display:flex;align-items:flex-start;gap:6px;margin-top:6px;max-width:min(52ch,100%);min-width:0;overflow-wrap:anywhere;font-size:12px;line-height:18px;font-weight:400;color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:normal}
-          .instrument-comment__marker{display:inline-flex;align-items:center;height:18px;padding:0 6px;box-sizing:border-box;flex:0 0 auto;border:1px solid var(--info-border);border-radius:var(--radius-sm);background:var(--info-bg);color:var(--info-color);font-size:10px;line-height:16px;font-weight:700;letter-spacing:.04em}
-          .instrument-comment__body{flex:1;min-width:0}
-          .instrument-comment__text{white-space:normal}
-          .instrument-comment__toggle{display:block;min-height:22px;padding:2px 0;border:0;background:transparent;color:var(--blue-400);font:600 12px/18px inherit;cursor:pointer;transition:color .15s ease-out,opacity .15s ease-out,text-decoration-color .15s ease-out}
-          [data-theme="light"] .instrument-comment__toggle{color:var(--blue-600)}
-          .instrument-comment__toggle:hover{text-decoration:underline;color:var(--blue-500)}
-          .instrument-comment__toggle:active{opacity:.78}
-          .instrument-comment__toggle:focus-visible{outline:2px solid var(--blue-500);outline-offset:2px;border-radius:4px}
-          @media(max-width:767px){.instrument-comment__toggle{min-width:44px;min-height:44px;text-align:left}}
-        `;
-        document.head.appendChild(style);
-      })();
+      let aiCommentPopover = null;
+      let activeAiCommentButton = null;
+      let aiCommentMode = null;
+      let aiCommentSequence = 0;
+      let aiCommentCloseTimer = null;
+      let aiCommentPositionFrame = null;
 
-      function instrumentCommentPreview(fullText) {
-        const chars = Array.from(fullText.trim());
-        if (chars.length <= INSTRUMENT_COMMENT_PREVIEW_LIMIT) return chars.join('');
-        const candidate = chars.slice(0, INSTRUMENT_COMMENT_PREVIEW_LIMIT - 1).join('');
-        const boundary = candidate.lastIndexOf(' ');
-        const trimmed = boundary >= 90 ? candidate.slice(0, boundary) : candidate;
-        return trimmed.trimEnd() + '…';
+      function installAiCommentPopover() {
+        if (aiCommentPopover) return;
+        aiCommentPopover = document.createElement('div');
+        aiCommentPopover.className = 'ai-comment-popover';
+        aiCommentPopover.setAttribute('role', 'tooltip');
+        aiCommentPopover.hidden = true;
+        aiCommentPopover.addEventListener('pointerenter', () => clearTimeout(aiCommentCloseTimer));
+        aiCommentPopover.addEventListener('pointerleave', scheduleAiCommentClose);
+        document.body.appendChild(aiCommentPopover);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && activeAiCommentButton) {
+            event.preventDefault();
+            closeAiCommentPopover({ restoreFocus: true });
+          }
+        });
+        document.addEventListener('pointerdown', (event) => {
+          if (activeAiCommentButton && !activeAiCommentButton.contains(event.target)
+              && !aiCommentPopover.contains(event.target)) closeAiCommentPopover();
+        });
+        const queuePosition = () => {
+          if (!activeAiCommentButton || aiCommentPositionFrame) return;
+          aiCommentPositionFrame = requestAnimationFrame(() => {
+            aiCommentPositionFrame = null;
+            positionAiCommentPopover(activeAiCommentButton);
+          });
+        };
+        window.addEventListener('resize', queuePosition);
+        window.addEventListener('scroll', queuePosition, true);
       }
 
-      function createInstrumentComment(positionId, fullText) {
+      function positionAiCommentPopover(button) {
+        if (!button || !aiCommentPopover || aiCommentPopover.hidden) return;
+        const anchor = button.getBoundingClientRect();
+        if (anchor.bottom < 0 || anchor.top > window.innerHeight || anchor.right < 0 || anchor.left > window.innerWidth) {
+          closeAiCommentPopover();
+          return;
+        }
+        const surface = aiCommentPopover.getBoundingClientRect();
+        const inset = window.innerWidth <= 767 ? 16 : 8;
+        const gap = 8;
+        let left = anchor.right - surface.width;
+        let top = anchor.top - surface.height - gap;
+        if (top < inset) top = anchor.bottom + gap;
+        left = Math.max(inset, Math.min(left, window.innerWidth - surface.width - inset));
+        top = Math.max(inset, Math.min(top, window.innerHeight - surface.height - inset));
+        aiCommentPopover.style.left = `${Math.round(left)}px`;
+        aiCommentPopover.style.top = `${Math.round(top)}px`;
+      }
+
+      function openAiCommentPopover(button, text, mode) {
+        installAiCommentPopover();
+        clearTimeout(aiCommentCloseTimer);
+        if (activeAiCommentButton && activeAiCommentButton !== button) {
+          activeAiCommentButton.removeAttribute('aria-describedby');
+          activeAiCommentButton.dataset.open = 'false';
+          activeAiCommentButton.setAttribute('aria-expanded', 'false');
+        }
+        activeAiCommentButton = button;
+        aiCommentMode = mode;
+        aiCommentPopover.id = button.dataset.popoverId;
+        aiCommentPopover.textContent = text;
+        aiCommentPopover.hidden = false;
+        button.setAttribute('aria-describedby', aiCommentPopover.id);
+        button.setAttribute('aria-expanded', 'true');
+        button.dataset.open = 'true';
+        positionAiCommentPopover(button);
+      }
+
+      function closeAiCommentPopover(options = {}) {
+        clearTimeout(aiCommentCloseTimer);
+        const button = activeAiCommentButton;
+        if (button) {
+          button.removeAttribute('aria-describedby');
+          button.dataset.open = 'false';
+          button.setAttribute('aria-expanded', 'false');
+        }
+        activeAiCommentButton = null;
+        aiCommentMode = null;
+        if (aiCommentPopover) {
+          aiCommentPopover.hidden = true;
+          aiCommentPopover.removeAttribute('id');
+          aiCommentPopover.textContent = '';
+        }
+        if (options.restoreFocus && button?.isConnected) button.focus();
+      }
+
+      function scheduleAiCommentClose() {
+        clearTimeout(aiCommentCloseTimer);
+        aiCommentCloseTimer = setTimeout(() => {
+          if (aiCommentMode !== 'tap' && activeAiCommentButton !== document.activeElement) closeAiCommentPopover();
+        }, 100);
+      }
+
+      function createAiCommentAction(positionId, fullText, instrumentName = '') {
         const text = String(fullText || '').trim();
         if (!text) return null;
-        const key = String(positionId);
-        const preview = instrumentCommentPreview(text);
-        const expandable = preview !== text;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'instrument-comment';
-        const marker = document.createElement('span');
-        marker.className = 'instrument-comment__marker';
-        marker.textContent = 'AI';
-        marker.setAttribute('aria-hidden', 'true');
-        const body = document.createElement('span');
-        body.className = 'instrument-comment__body';
-        const value = document.createElement('span');
-        value.className = 'instrument-comment__text';
-        value.id = `instrument-comment-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-        const paint = () => { value.textContent = expandedInstrumentComments.has(key) ? text : preview; };
-        paint();
-        body.appendChild(value);
-        if (expandable) {
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = 'instrument-comment__toggle';
-          toggle.setAttribute('aria-controls', value.id);
-          const syncToggle = () => {
-            const expanded = expandedInstrumentComments.has(key);
-            toggle.textContent = expanded ? 'Скрыть' : 'Подробнее';
-            toggle.setAttribute('aria-expanded', String(expanded));
-          };
-          syncToggle();
-          toggle.addEventListener('click', () => {
-            if (expandedInstrumentComments.has(key)) expandedInstrumentComments.delete(key);
-            else expandedInstrumentComments.add(key);
-            paint();
-            syncToggle();
-          });
-          body.appendChild(toggle);
-        }
-        wrapper.append(marker, body);
-        return wrapper;
+        const key = String(positionId).replace(/[^a-zA-Z0-9_-]/g, '-');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ai-comment-action';
+        button.dataset.popoverId = `ai-comment-popover-${key}-${++aiCommentSequence}`;
+        button.dataset.open = 'false';
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-label', instrumentName ? `AI-комментарий к бумаге ${instrumentName}` : 'Показать AI-комментарий');
+        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>';
+        button.addEventListener('pointerenter', () => openAiCommentPopover(button, text, 'hover'));
+        button.addEventListener('pointerleave', scheduleAiCommentClose);
+        button.addEventListener('focus', () => openAiCommentPopover(button, text, 'focus'));
+        button.addEventListener('blur', () => { if (aiCommentMode !== 'tap') scheduleAiCommentClose(); });
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (activeAiCommentButton === button && aiCommentMode === 'tap') closeAiCommentPopover();
+          else openAiCommentPopover(button, text, 'tap');
+        });
+        return button;
       }
 
       // ── TOAST NOTIFICATIONS ──────────────────────────────────────
@@ -3584,16 +3637,13 @@
       }
 
       function renderTable() {
+        closeAiCommentPopover();
         // Re-validate profit mode against current data (full mode needs T-Bank rows).
         // Pass the DESIRED mode, not the (possibly degraded) effective one — otherwise a
         // 'full'→'total' degradation during loading would persist as the saved choice.
         if (typeof setProfitMode === 'function') setProfitMode(window._profitModeDesired);
         tableRows.forEach(r => computeSortFields(r));
         const rows = getSortedRows(tableRows);
-        const currentPositionIds = new Set(rows.map(row => String(row.id)));
-        for (const id of expandedInstrumentComments) {
-          if (!currentPositionIds.has(id)) expandedInstrumentComments.delete(id);
-        }
         tableBody.innerHTML = '';
 
         // Show portfolio wizard if empty
@@ -3702,8 +3752,6 @@
             qualBadge.style.cssText = 'display:inline-block;margin-top:3px;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:rgba(234,179,8,.15);color:#ca8a04;border:1px solid rgba(234,179,8,.3);letter-spacing:.3px;';
             nameTd.appendChild(qualBadge);
           }
-          const instrumentComment = createInstrumentComment(row.id, row.ai_comment);
-          if (instrumentComment) nameTd.appendChild(instrumentComment);
           // The same hint also rides in the name cell, which is the only column
           // visible on a phone without scrolling the table sideways — the buy-price
           // column sits well past the right edge at 360-390px. CSS shows exactly
@@ -3800,13 +3848,15 @@
           addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
           { const td = document.createElement('td'); td.className = 'col-offer'; td.textContent = row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : ''; tr.appendChild(td); }  // Оферта
 
-          // Actions (only in edit mode; never in /all — rows there are aggregated/virtual)
-          if (!isReadOnly && !isAllMode) {
+          // Actions are available in private/share views, but never in /all where rows are aggregated.
+          if (!isAllMode) {
             const actionTd = document.createElement('td');
-            actionTd.style.cssText = 'white-space:nowrap; text-align:right;';
+            actionTd.className = 'actions-column';
+            const actionGroup = document.createElement('div');
+            actionGroup.className = 'row-action-group';
 
             // Move button — shown only when user has more than one portfolio
-            if (portfolios.length > 1) {
+            if (!isReadOnly && portfolios.length > 1) {
               const moveBtn = document.createElement('button');
               moveBtn.className = 'btn-sm-move';
               moveBtn.title = t('action.moveTooltip');
@@ -3821,58 +3871,60 @@
                   showMovePopover(moveBtn, row.id);
                 }
               });
-              actionTd.appendChild(moveBtn);
+              actionGroup.appendChild(moveBtn);
             }
 
-            // Alert (bell) button
-            const alertBtn = document.createElement('button');
-            alertBtn.className = 'btn-sm';
-            alertBtn.style.marginLeft = '4px';
-            alertBtn.title = 'Ценовые алерты';
-            alertBtn.textContent = '\uD83D\uDD14';
-            alertBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              openPriceAlerts(row.id, portfolioId);
-            });
-            actionTd.appendChild(alertBtn);
+            if (!isReadOnly) {
+              // Alert (bell) button
+              const alertBtn = document.createElement('button');
+              alertBtn.className = 'btn-sm';
+              alertBtn.title = 'Ценовые алерты';
+              alertBtn.textContent = '\uD83D\uDD14';
+              alertBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPriceAlerts(row.id, portfolioId);
+              });
+              actionGroup.appendChild(alertBtn);
 
-            // Edit button (price / quantity)
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-sm';
-            editBtn.style.marginLeft = '4px';
-            editBtn.title = 'Редактировать';
-            editBtn.textContent = '✎';
-            editBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              openEditInstrumentModal(row);
-            });
-            actionTd.appendChild(editBtn);
+              // Edit button (price / quantity)
+              const editBtn = document.createElement('button');
+              editBtn.className = 'btn-sm';
+              editBtn.title = 'Редактировать';
+              editBtn.textContent = '✎';
+              editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditInstrumentModal(row);
+              });
+              actionGroup.appendChild(editBtn);
 
-            // Delete button
-            const delBtn = document.createElement('button');
-            delBtn.className = 'btn-sm';
-            delBtn.style.marginLeft = '4px';
-            delBtn.title = t('action.deleteTooltip');
-            delBtn.textContent = '✕';
-            delBtn.addEventListener('click', async () => {
-              if (!confirm(t('action.confirmDelete'))) return;
-              try {
-                const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
-                const body = await resp.json();
-                if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
-                tableRows = tableRows.filter(r => r.id !== row.id);
-                recalculateWeights(tableRows); persistTableCache(); renderTable();
-                setStatus(tableStatusEl, t('action.deleted'));
-              } catch (err) { setStatus(tableStatusEl, err.message || t('action.deleteError'), true); }
-            });
-            actionTd.appendChild(delBtn);
+              // Delete button
+              const delBtn = document.createElement('button');
+              delBtn.className = 'btn-sm';
+              delBtn.title = t('action.deleteTooltip');
+              delBtn.textContent = '✕';
+              delBtn.addEventListener('click', async () => {
+                if (!confirm(t('action.confirmDelete'))) return;
+                try {
+                  const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
+                  const body = await resp.json();
+                  if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
+                  tableRows = tableRows.filter(r => r.id !== row.id);
+                  recalculateWeights(tableRows); persistTableCache(); renderTable();
+                  setStatus(tableStatusEl, t('action.deleted'));
+                } catch (err) { setStatus(tableStatusEl, err.message || t('action.deleteError'), true); }
+              });
+              actionGroup.appendChild(delBtn);
+            }
 
             if (row.accounting_managed) {
-              actionTd.replaceChildren();
+              actionGroup.replaceChildren();
               const journalBtn = document.createElement('button'); journalBtn.className = 'btn-sm'; journalBtn.textContent = 'Операции';
               journalBtn.onclick = () => openManualAccounting('coupon', row.id);
-              actionTd.append(journalBtn);
+              actionGroup.append(journalBtn);
             }
+            const aiAction = createAiCommentAction(row.id, row.ai_comment, fmt(row.name));
+            if (aiAction) actionGroup.prepend(aiAction);
+            actionTd.appendChild(actionGroup);
             tr.appendChild(actionTd);
           }
           tableBody.appendChild(tr);

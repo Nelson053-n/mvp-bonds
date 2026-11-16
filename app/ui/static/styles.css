@@ -663,8 +663,48 @@ th.no-sort { cursor: default; }
 th.no-sort:hover { background: var(--table-header-bg); color: var(--text-muted); }
 th.wrap { white-space: normal; line-height: 1.3; }
 
-/* Hide actions column in read-only mode */
-body.read-only-mode .actions-column { display: none; }
+/* Share mode keeps this column for the read-only AI comment action. */
+.row-action-group {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 4px; white-space: nowrap;
+}
+.ai-comment-action {
+  width: 28px; height: 28px; box-sizing: border-box; padding: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg-elevated); color: var(--blue-400); cursor: pointer;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out,
+              color 150ms ease-out, transform 80ms ease-out;
+}
+[data-theme="light"] .ai-comment-action { color: var(--blue-600); }
+.ai-comment-action svg {
+  width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; pointer-events: none;
+}
+.ai-comment-action:hover,
+.ai-comment-action[data-open="true"] {
+  border-color: var(--blue-500); background: rgba(59,130,246,.12);
+}
+.ai-comment-action:active { transform: translateY(1px); background: rgba(59,130,246,.18); }
+.ai-comment-action:focus-visible { outline: 2px solid var(--blue-500); outline-offset: 2px; }
+.ai-comment-popover {
+  position: fixed; z-index: 9500; box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px)); max-height: min(50vh, 320px);
+  overflow: auto; padding: 12px 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--modal-bg, var(--bg-card)); color: var(--text-primary);
+  box-shadow: 0 8px 32px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.20);
+  font: 400 13px/20px Inter, system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums; white-space: pre-wrap; overflow-wrap: anywhere;
+  animation: aiCommentIn 120ms ease-out;
+}
+.ai-comment-popover[hidden] { display: none; }
+@keyframes aiCommentIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-comment-action { transition: none; }
+  .ai-comment-action:active { transform: none; }
+  .ai-comment-popover { animation: none; }
+}
 
 td {
   padding: 5px 7px;
