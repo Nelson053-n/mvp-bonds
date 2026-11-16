@@ -696,7 +696,7 @@ th.wrap { white-space: normal; line-height: 1.3; }
   box-shadow: 0 8px 32px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.20);
   font: 400 13px/20px Inter, system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums; white-space: pre-wrap; overflow-wrap: anywhere;
-  animation: aiCommentIn 120ms ease-out;
+  opacity: 1;
 }
 .ai-comment-popover[hidden] { display: none; }
 @keyframes aiCommentIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
