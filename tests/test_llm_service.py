@@ -13,6 +13,15 @@ from app.models import AddInstrumentInput, InstrumentMetrics
 from app.services.llm_service import LLMService
 
 
+def test_years_phrase_plural_forms() -> None:
+    """Дальнее погашение называют словами: 1 год, 2 года, 5 лет, 13 лет, 21 год."""
+    from app.services.llm_service import llm_service as service
+
+    cases = {1: "1 год", 2: "2 года", 4: "4 года", 5: "5 лет", 11: "11 лет", 13: "13 лет", 21: "21 год", 22: "22 года"}
+    for years, expected in cases.items():
+        assert service._years_phrase(years) == expected
+
+
 def test_times_a_year_plural_forms() -> None:
     """Купоны называют правильно: 1 раз, 2 раза, 5 раз, 11 раз, 21 раз, 22 раза."""
     from app.services.llm_service import llm_service as service

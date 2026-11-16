@@ -175,13 +175,21 @@ class LLMService:
         return f"{times} раз в год"
 
     @staticmethod
+    def _years_phrase(years: int) -> str:
+        """«через 1 год» / «2 года» / «13 лет» — без десятых, по-русски."""
+        if years % 10 == 1 and years % 100 != 11:
+            return f"{years} год"
+        if years % 10 in (2, 3, 4) and years % 100 not in (12, 13, 14):
+            return f"{years} года"
+        return f"{years} лет"
+
+    @staticmethod
     def _fmt_metric(value: float) -> str:
         """Match the table's ru-RU display: up to two decimal places."""
         text = f"{value:,.2f}".rstrip("0").rstrip(".")
         return text.replace(",", "\N{NO-BREAK SPACE}").replace(".", ",")
 
-    @staticmethod
-    def _nearest_event(payload: InstrumentMetrics) -> str | None:
+    def _nearest_event(self, payload: InstrumentMetrics) -> str | None:
         today = date.today()
         events = (
             ("погашение", payload.maturity_date),
@@ -194,9 +202,7 @@ class LLMService:
         event_date, label = min(upcoming)
         days = (event_date - today).days
         if days >= 365:
-            years = days / 365.25
-            years_text = f"{years:.1f}".rstrip("0").rstrip(".").replace(".", ",")
-            return f"{label} через {years_text} лет ({event_date:%d-%m-%Y})"
+            return f"{label} через {self._years_phrase(round(days / 365.25))} ({event_date:%d-%m-%Y})"
         return f"{label} через {days} дн. ({event_date:%d-%m-%Y})"
 
     async def _openai_validate(
