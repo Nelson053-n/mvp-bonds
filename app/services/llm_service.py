@@ -148,7 +148,7 @@ class LLMService:
             coupon = f"купон {self._fmt_metric(payload.coupon_rate)}%"
             if payload.coupon_period:
                 frequency = max(1, round(365 / payload.coupon_period))
-                coupon += f", {frequency} раз в год"
+                coupon += f", {self._times_a_year(frequency)}"
             facts.append(coupon)
         if payload.dividend_yield is not None:
             facts.append(f"дивидендная доходность {self._fmt_metric(payload.dividend_yield)}%")
@@ -164,6 +164,15 @@ class LLMService:
         if nearest:
             facts.append(nearest)
         return ". ".join(fact[0].upper() + fact[1:] for fact in facts) + "."
+
+    @staticmethod
+    def _times_a_year(times: int) -> str:
+        """«раз в год» / «раза в год» / «раз в год» — правильная форма по числу."""
+        if times % 10 == 1 and times % 100 != 11:
+            return f"{times} раз в год"
+        if times % 10 in (2, 3, 4) and times % 100 not in (12, 13, 14):
+            return f"{times} раза в год"
+        return f"{times} раз в год"
 
     @staticmethod
     def _fmt_metric(value: float) -> str:

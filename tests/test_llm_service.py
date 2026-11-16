@@ -13,6 +13,25 @@ from app.models import AddInstrumentInput, InstrumentMetrics
 from app.services.llm_service import LLMService
 
 
+def test_times_a_year_plural_forms() -> None:
+    """Купоны называют правильно: 1 раз, 2 раза, 5 раз, 11 раз, 21 раз, 22 раза."""
+    from app.services.llm_service import llm_service as service
+
+    cases = {
+        1: "1 раз в год",
+        2: "2 раза в год",
+        3: "3 раза в год",
+        4: "4 раза в год",
+        5: "5 раз в год",
+        11: "11 раз в год",
+        12: "12 раз в год",
+        21: "21 раз в год",
+        22: "22 раза в год",
+        }
+    for times, expected in cases.items():
+        assert service._times_a_year(times) == expected
+
+
 class TestLLMServiceStubValidate:
     """Tests for LLM service stub validation mode."""
 
@@ -252,7 +271,7 @@ class TestLLMServiceStubComment:
             first = await service.generate_comment(metrics)
             second = await service.generate_comment(metrics)
         assert first == second
-        assert "Купон 12,1%, 4 раз в год" in first
+        assert "Купон 12,1%, 4 раза в год" in first
         remote.assert_not_awaited()
 
 
