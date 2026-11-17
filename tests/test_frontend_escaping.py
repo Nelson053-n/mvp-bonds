@@ -47,3 +47,31 @@ def test_table_polling_stops_when_logged_out() -> None:
     i = APP_JS.index("syncTableFromServer().catch(() => {});\n            }, SYNC_INTERVAL_MS);")
     interval_body = APP_JS[APP_JS.rindex("setInterval(", 0, i):i]
     assert "localStorage.getItem('mvp_logged_in')" in interval_body
+
+
+def test_ai_comment_popover_uses_safe_text_and_accessible_relationship() -> None:
+    block = APP_JS[APP_JS.index("function installAiCommentPopover"):APP_JS.index("// ── TOAST", APP_JS.index("function installAiCommentPopover"))]
+    assert "aiCommentPopover.textContent = text" in block
+    assert "aria-describedby" in block
+    assert "role', 'tooltip" in block
+    assert "restoreFocus: true" in block
+    assert "aiCommentPopover.innerHTML" not in block
+
+
+def test_ai_comment_action_is_conditional_and_rendered_in_action_cell() -> None:
+    block = APP_JS[APP_JS.index("function createAiCommentAction"):APP_JS.index("// ── TOAST", APP_JS.index("function createAiCommentAction"))]
+    assert "String(fullText || '').trim()" in block
+    assert "if (!text) return null" in block
+    assert "createAiCommentAction(row.id, row.ai_comment" in APP_JS
+    assert "actionGroup.prepend(aiAction)" in APP_JS
+    assert "createInstrumentComment" not in APP_JS
+    assert ".instrument-comment" not in APP_JS
+
+
+def test_ai_comment_popover_has_hover_focus_tap_and_viewport_positioning() -> None:
+    assert "button.addEventListener('pointerenter'" in APP_JS
+    assert "button.addEventListener('focus'" in APP_JS
+    assert "aiCommentMode === 'tap'" in APP_JS
+    assert "window.addEventListener('resize', queuePosition)" in APP_JS
+    assert "window.addEventListener('scroll', queuePosition, true)" in APP_JS
+    assert "if (!isAllMode)" in APP_JS

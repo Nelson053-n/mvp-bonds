@@ -13,6 +13,34 @@ from app.models import AddInstrumentInput, InstrumentMetrics
 from app.services.llm_service import LLMService
 
 
+def test_years_phrase_plural_forms() -> None:
+    """Дальнее погашение называют словами: 1 год, 2 года, 5 лет, 13 лет, 21 год."""
+    from app.services.llm_service import llm_service as service
+
+    cases = {1: "1 год", 2: "2 года", 4: "4 года", 5: "5 лет", 11: "11 лет", 13: "13 лет", 21: "21 год", 22: "22 года"}
+    for years, expected in cases.items():
+        assert service._years_phrase(years) == expected
+
+
+def test_times_a_year_plural_forms() -> None:
+    """Купоны называют правильно: 1 раз, 2 раза, 5 раз, 11 раз, 21 раз, 22 раза."""
+    from app.services.llm_service import llm_service as service
+
+    cases = {
+        1: "1 раз в год",
+        2: "2 раза в год",
+        3: "3 раза в год",
+        4: "4 раза в год",
+        5: "5 раз в год",
+        11: "11 раз в год",
+        12: "12 раз в год",
+        21: "21 раз в год",
+        22: "22 раза в год",
+        }
+    for times, expected in cases.items():
+        assert service._times_a_year(times) == expected
+
+
 class TestLLMServiceStubValidate:
     """Tests for LLM service stub validation mode."""
 
@@ -138,8 +166,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Доходность выше средней" in comment
-        assert "ниже номинала" in comment
+        assert "Доходность к погашению 13,5%" in comment
+        assert "Доля в портфеле 100%" in comment
 
     async def test_comment_bond_profit_positive(
         self, service: LLMService
@@ -161,7 +189,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        assert "Доходность к погашению 10%" in comment
+        assert "Результат от покупки 130 ₽" in comment
 
     async def test_comment_bond_profit_negative(
         self, service: LLMService
@@ -183,7 +212,7 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в минусе" in comment or "Позиция в просадке" in comment
+        assert "Результат от покупки -70 ₽" in comment
 
     async def test_comment_stock_positive(self, service: LLMService) -> None:
         """Test stock comment for positive profit."""
@@ -203,7 +232,8 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        assert "Дивидендная доходность 6%" in comment
+        assert "Результат от покупки 5\N{NO-BREAK SPACE}000 ₽" in comment
 
     async def test_comment_stock_negative(self, service: LLMService) -> None:
         """Test stock comment for negative profit."""
@@ -223,7 +253,35 @@ class TestLLMServiceStubComment:
         )
         comment = await service.generate_comment(metrics)
 
-        assert "Позиция в просадке" in comment or "Позиция в минусе" in comment
+        assert "Результат от покупки -5\N{NO-BREAK SPACE}000 ₽" in comment
+
+    async def test_comments_vary_by_available_metrics_and_omit_missing(self, service: LLMService) -> None:
+        base = dict(type="bond", name="Bond", ticker="BOND", current_price=100,
+                    purchase_price=100, quantity=1, current_value=100, weight=12.34, ai_comment="")
+        rated = InstrumentMetrics(**base, id=1, profit=2.5, market_yield=14.25,
+                                  company_rating="AA-", rating_source="smartlab")
+        no_market = InstrumentMetrics(**base, id=2, profit=-1, no_market_data=True)
+
+        rated_comment = await service.generate_comment(rated)
+        no_market_comment = await service.generate_comment(no_market)
+
+        assert rated_comment != no_market_comment
+        assert "14,25%" in rated_comment and "AA- (smartlab)" in rated_comment
+        assert "Рыночные данные недоступны" in no_market_comment
+        assert "Доходность к погашению" not in no_market_comment
+
+    async def test_stub_comment_is_local_and_deterministic(self, service: LLMService) -> None:
+        metrics = InstrumentMetrics(
+            id=1, type="bond", name="Bond", ticker="BOND", current_price=100,
+            purchase_price=99, quantity=1, current_value=100, profit=1,
+            weight=7.5, coupon_rate=12.1, coupon_period=91, ai_comment="",
+        )
+        with patch.object(service, "_openai_comment", AsyncMock()) as remote:
+            first = await service.generate_comment(metrics)
+            second = await service.generate_comment(metrics)
+        assert first == second
+        assert "Купон 12,1%, 4 раза в год" in first
+        remote.assert_not_awaited()
 
 
 def _http_error() -> httpx.HTTPStatusError:
@@ -298,7 +356,10 @@ class TestLLMServiceOpenAIFallback:
         ):
             comment = await service.generate_comment(metrics)
 
-        assert "Позиция в плюсе" in comment
+        # The stub no longer uses canned "in profit / in loss" phrasing: it builds
+        # a factual comment from the metrics, so assert the fallback is that one.
+        assert "Доля в портфеле" in comment
+        assert "Дивидендная доходность 6%" in comment
 
     async def test_analyze_portfolio_unavailable_on_failure(
         self, service: LLMService

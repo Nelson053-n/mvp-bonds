@@ -123,6 +123,130 @@
           .replace(/'/g, '&#39;');
       }
 
+      let aiCommentPopover = null;
+      let activeAiCommentButton = null;
+      let aiCommentMode = null;
+      let aiCommentSequence = 0;
+      let aiCommentCloseTimer = null;
+      let aiCommentPositionFrame = null;
+
+      function installAiCommentPopover() {
+        if (aiCommentPopover) return;
+        aiCommentPopover = document.createElement('div');
+        aiCommentPopover.className = 'ai-comment-popover';
+        aiCommentPopover.setAttribute('role', 'tooltip');
+        aiCommentPopover.hidden = true;
+        aiCommentPopover.addEventListener('pointerenter', () => clearTimeout(aiCommentCloseTimer));
+        aiCommentPopover.addEventListener('pointerleave', scheduleAiCommentClose);
+        document.body.appendChild(aiCommentPopover);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && activeAiCommentButton) {
+            event.preventDefault();
+            closeAiCommentPopover({ restoreFocus: true });
+          }
+        });
+        document.addEventListener('pointerdown', (event) => {
+          if (activeAiCommentButton && !activeAiCommentButton.contains(event.target)
+              && !aiCommentPopover.contains(event.target)) closeAiCommentPopover();
+        });
+        const queuePosition = () => {
+          if (!activeAiCommentButton || aiCommentPositionFrame) return;
+          aiCommentPositionFrame = requestAnimationFrame(() => {
+            aiCommentPositionFrame = null;
+            positionAiCommentPopover(activeAiCommentButton);
+          });
+        };
+        window.addEventListener('resize', queuePosition);
+        window.addEventListener('scroll', queuePosition, true);
+      }
+
+      function positionAiCommentPopover(button) {
+        if (!button || !aiCommentPopover || aiCommentPopover.hidden) return;
+        const anchor = button.getBoundingClientRect();
+        if (anchor.bottom < 0 || anchor.top > window.innerHeight || anchor.right < 0 || anchor.left > window.innerWidth) {
+          closeAiCommentPopover();
+          return;
+        }
+        const surface = aiCommentPopover.getBoundingClientRect();
+        const inset = window.innerWidth <= 767 ? 16 : 8;
+        const gap = 8;
+        let left = anchor.right - surface.width;
+        let top = anchor.top - surface.height - gap;
+        if (top < inset) top = anchor.bottom + gap;
+        left = Math.max(inset, Math.min(left, window.innerWidth - surface.width - inset));
+        top = Math.max(inset, Math.min(top, window.innerHeight - surface.height - inset));
+        aiCommentPopover.style.left = `${Math.round(left)}px`;
+        aiCommentPopover.style.top = `${Math.round(top)}px`;
+      }
+
+      function openAiCommentPopover(button, text, mode) {
+        installAiCommentPopover();
+        clearTimeout(aiCommentCloseTimer);
+        if (activeAiCommentButton && activeAiCommentButton !== button) {
+          activeAiCommentButton.removeAttribute('aria-describedby');
+          activeAiCommentButton.dataset.open = 'false';
+          activeAiCommentButton.setAttribute('aria-expanded', 'false');
+        }
+        activeAiCommentButton = button;
+        aiCommentMode = mode;
+        aiCommentPopover.id = button.dataset.popoverId;
+        aiCommentPopover.textContent = text;
+        aiCommentPopover.hidden = false;
+        button.setAttribute('aria-describedby', aiCommentPopover.id);
+        button.setAttribute('aria-expanded', 'true');
+        button.dataset.open = 'true';
+        positionAiCommentPopover(button);
+      }
+
+      function closeAiCommentPopover(options = {}) {
+        clearTimeout(aiCommentCloseTimer);
+        const button = activeAiCommentButton;
+        if (button) {
+          button.removeAttribute('aria-describedby');
+          button.dataset.open = 'false';
+          button.setAttribute('aria-expanded', 'false');
+        }
+        activeAiCommentButton = null;
+        aiCommentMode = null;
+        if (aiCommentPopover) {
+          aiCommentPopover.hidden = true;
+          aiCommentPopover.removeAttribute('id');
+          aiCommentPopover.textContent = '';
+        }
+        if (options.restoreFocus && button?.isConnected) button.focus();
+      }
+
+      function scheduleAiCommentClose() {
+        clearTimeout(aiCommentCloseTimer);
+        aiCommentCloseTimer = setTimeout(() => {
+          if (aiCommentMode !== 'tap' && activeAiCommentButton !== document.activeElement) closeAiCommentPopover();
+        }, 100);
+      }
+
+      function createAiCommentAction(positionId, fullText, instrumentName = '') {
+        const text = String(fullText || '').trim();
+        if (!text) return null;
+        const key = String(positionId).replace(/[^a-zA-Z0-9_-]/g, '-');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ai-comment-action';
+        button.dataset.popoverId = `ai-comment-popover-${key}-${++aiCommentSequence}`;
+        button.dataset.open = 'false';
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-label', instrumentName ? `AI-комментарий к бумаге ${instrumentName}` : 'Показать AI-комментарий');
+        button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>';
+        button.addEventListener('pointerenter', () => openAiCommentPopover(button, text, 'hover'));
+        button.addEventListener('pointerleave', scheduleAiCommentClose);
+        button.addEventListener('focus', () => openAiCommentPopover(button, text, 'focus'));
+        button.addEventListener('blur', () => { if (aiCommentMode !== 'tap') scheduleAiCommentClose(); });
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (activeAiCommentButton === button && aiCommentMode === 'tap') closeAiCommentPopover();
+          else openAiCommentPopover(button, text, 'tap');
+        });
+        return button;
+      }
+
       // ── TOAST NOTIFICATIONS ──────────────────────────────────────
       (function() {
         const TOAST_STYLES = `
@@ -3513,6 +3637,7 @@
       }
 
       function renderTable() {
+        closeAiCommentPopover();
         // Re-validate profit mode against current data (full mode needs T-Bank rows).
         // Pass the DESIRED mode, not the (possibly degraded) effective one — otherwise a
         // 'full'→'total' degradation during loading would persist as the saved choice.
@@ -3723,13 +3848,15 @@
           addCell(tr, row.type === 'bond' ? fmt(row.maturity_date) : '—');  // Погашение
           { const td = document.createElement('td'); td.className = 'col-offer'; td.textContent = row.type === 'bond' && row.offer_date ? fmt(row.offer_date) : ''; tr.appendChild(td); }  // Оферта
 
-          // Actions (only in edit mode; never in /all — rows there are aggregated/virtual)
-          if (!isReadOnly && !isAllMode) {
+          // Actions are available in private/share views, but never in /all where rows are aggregated.
+          if (!isAllMode) {
             const actionTd = document.createElement('td');
-            actionTd.style.cssText = 'white-space:nowrap; text-align:right;';
+            actionTd.className = 'actions-column';
+            const actionGroup = document.createElement('div');
+            actionGroup.className = 'row-action-group';
 
             // Move button — shown only when user has more than one portfolio
-            if (portfolios.length > 1) {
+            if (!isReadOnly && portfolios.length > 1) {
               const moveBtn = document.createElement('button');
               moveBtn.className = 'btn-sm-move';
               moveBtn.title = t('action.moveTooltip');
@@ -3744,58 +3871,60 @@
                   showMovePopover(moveBtn, row.id);
                 }
               });
-              actionTd.appendChild(moveBtn);
+              actionGroup.appendChild(moveBtn);
             }
 
-            // Alert (bell) button
-            const alertBtn = document.createElement('button');
-            alertBtn.className = 'btn-sm';
-            alertBtn.style.marginLeft = '4px';
-            alertBtn.title = 'Ценовые алерты';
-            alertBtn.textContent = '\uD83D\uDD14';
-            alertBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              openPriceAlerts(row.id, portfolioId);
-            });
-            actionTd.appendChild(alertBtn);
+            if (!isReadOnly) {
+              // Alert (bell) button
+              const alertBtn = document.createElement('button');
+              alertBtn.className = 'btn-sm';
+              alertBtn.title = 'Ценовые алерты';
+              alertBtn.textContent = '\uD83D\uDD14';
+              alertBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPriceAlerts(row.id, portfolioId);
+              });
+              actionGroup.appendChild(alertBtn);
 
-            // Edit button (price / quantity)
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-sm';
-            editBtn.style.marginLeft = '4px';
-            editBtn.title = 'Редактировать';
-            editBtn.textContent = '✎';
-            editBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              openEditInstrumentModal(row);
-            });
-            actionTd.appendChild(editBtn);
+              // Edit button (price / quantity)
+              const editBtn = document.createElement('button');
+              editBtn.className = 'btn-sm';
+              editBtn.title = 'Редактировать';
+              editBtn.textContent = '✎';
+              editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditInstrumentModal(row);
+              });
+              actionGroup.appendChild(editBtn);
 
-            // Delete button
-            const delBtn = document.createElement('button');
-            delBtn.className = 'btn-sm';
-            delBtn.style.marginLeft = '4px';
-            delBtn.title = t('action.deleteTooltip');
-            delBtn.textContent = '✕';
-            delBtn.addEventListener('click', async () => {
-              if (!confirm(t('action.confirmDelete'))) return;
-              try {
-                const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
-                const body = await resp.json();
-                if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
-                tableRows = tableRows.filter(r => r.id !== row.id);
-                recalculateWeights(tableRows); persistTableCache(); renderTable();
-                setStatus(tableStatusEl, t('action.deleted'));
-              } catch (err) { setStatus(tableStatusEl, err.message || t('action.deleteError'), true); }
-            });
-            actionTd.appendChild(delBtn);
+              // Delete button
+              const delBtn = document.createElement('button');
+              delBtn.className = 'btn-sm';
+              delBtn.title = t('action.deleteTooltip');
+              delBtn.textContent = '✕';
+              delBtn.addEventListener('click', async () => {
+                if (!confirm(t('action.confirmDelete'))) return;
+                try {
+                  const resp = await apiFetch(`/portfolios/${portfolioId}/instruments/${row.id}`, { method: 'DELETE' });
+                  const body = await resp.json();
+                  if (!resp.ok) throw new Error(body.detail || 'Не удалось удалить.');
+                  tableRows = tableRows.filter(r => r.id !== row.id);
+                  recalculateWeights(tableRows); persistTableCache(); renderTable();
+                  setStatus(tableStatusEl, t('action.deleted'));
+                } catch (err) { setStatus(tableStatusEl, err.message || t('action.deleteError'), true); }
+              });
+              actionGroup.appendChild(delBtn);
+            }
 
             if (row.accounting_managed) {
-              actionTd.replaceChildren();
+              actionGroup.replaceChildren();
               const journalBtn = document.createElement('button'); journalBtn.className = 'btn-sm'; journalBtn.textContent = 'Операции';
               journalBtn.onclick = () => openManualAccounting('coupon', row.id);
-              actionTd.append(journalBtn);
+              actionGroup.append(journalBtn);
             }
+            const aiAction = createAiCommentAction(row.id, row.ai_comment, fmt(row.name));
+            if (aiAction) actionGroup.prepend(aiAction);
+            actionTd.appendChild(actionGroup);
             tr.appendChild(actionTd);
           }
           tableBody.appendChild(tr);
@@ -9612,4 +9741,3 @@
           }
         }, true);
       })();
-
