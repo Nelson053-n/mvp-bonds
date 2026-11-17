@@ -60,21 +60,36 @@ def test_git_rev_list_count_same_commit_is_zero():
     assert count == 0, "HEAD..HEAD должен дать 0"
 
 
-def test_git_rev_list_count_one_behind():
-    """Если tip на 1 коммит впереди base — count=1."""
-    # Берём HEAD и HEAD~1; HEAD~1..HEAD = 1 коммит
-    try:
-        parent = subprocess.check_output(
-            ["git", "rev-parse", "HEAD~1"], cwd=str(REPO_ROOT),
-            stderr=subprocess.DEVNULL, text=True
+def test_git_rev_list_count_one_behind(tmp_path):
+    """Если tip на 1 коммит впереди base — count=1 (на изолированном репозитории).
+
+    Раньше тест считал HEAD~1..HEAD в самом проекте: после merge-коммита туда
+    попадает вся история ветки, и проверка падала по причине, не связанной с
+    логикой авто-деплоя.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def run(*args: str) -> str:
+        return subprocess.check_output(
+            ["git", *args], cwd=str(repo), stderr=subprocess.DEVNULL, text=True
         ).strip()
-    except subprocess.CalledProcessError:
-        # Репозиторий с 1 коммитом — пропускаем
-        return
-    head = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=str(REPO_ROOT), text=True
-    ).strip()
-    count = _git_rev_list_count(parent, head)
+
+    run("init", "-q")
+    run("config", "user.email", "test@example.com")
+    run("config", "user.name", "test")
+    (repo / "a.txt").write_text("one", encoding="utf-8")
+    run("add", ".")
+    run("commit", "-q", "-m", "first")
+    base = run("rev-parse", "HEAD")
+    (repo / "a.txt").write_text("two", encoding="utf-8")
+    run("add", ".")
+    run("commit", "-q", "-m", "second")
+    tip = run("rev-parse", "HEAD")
+
+    count = int(subprocess.check_output(
+        ["git", "rev-list", "--count", f"{base}..{tip}"], cwd=str(repo), text=True
+    ).strip())
     assert count == 1
 
 
